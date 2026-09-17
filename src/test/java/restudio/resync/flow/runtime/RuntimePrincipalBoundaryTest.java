@@ -18,7 +18,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RuntimePrincipalBoundaryTest {
     private static final RuntimeAuthority AUTHORITY = new RuntimeAuthority("resync:principal-test");
@@ -51,6 +53,15 @@ class RuntimePrincipalBoundaryTest {
             () -> registry.acquire(input(binding, foreignPrincipals.issuePlayer("player"))));
 
         assertEquals("RUNTIME.AUTHORIZATION_DENIED", failure.diagnostic().code());
+    }
+
+    @Test
+    void issuePlayerReusesTheSamePrincipalForTheSameIdentity() {
+        RuntimePrincipalAuthority principals = new RuntimePrincipalAuthority(AUTHORITY);
+        RuntimePrincipal first = principals.issuePlayer("player-stable");
+        RuntimePrincipal second = principals.issuePlayer("player-stable");
+        assertSame(first, second);
+        assertTrue(principals.trusts(second, AUTHORITY));
     }
 
     private static RuntimeBindingRegistry registry(RuntimePrincipalAuthority principals) {

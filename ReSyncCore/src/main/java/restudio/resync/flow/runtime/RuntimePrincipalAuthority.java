@@ -1,5 +1,6 @@
 package restudio.resync.flow.runtime;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -63,9 +64,10 @@ public final class RuntimePrincipalAuthority {
     }
 
     private RuntimePrincipal issue(RuntimePrincipal.Kind kind, String identity) {
-        UUID token = UUID.randomUUID();
-        RuntimePrincipal principal = new RuntimePrincipal(kind, identity, token, authority.identity());
-        issued.put(token, principal);
-        return principal;
+        String normalized = identity == null ? "" : identity;
+        UUID token = UUID.nameUUIDFromBytes((authority.identity() + ":" + kind.name().toLowerCase(Locale.ROOT) + ":" + normalized)
+            .getBytes(StandardCharsets.UTF_8));
+        return issued.computeIfAbsent(token, ignored ->
+            new RuntimePrincipal(kind, normalized, token, authority.identity()));
     }
 }

@@ -1,6 +1,5 @@
 package restudio.resync.flow.graph;
 
-import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.diagnostic.Diagnostic;
 import restudio.resync.flow.diagnostic.DiagnosticPhase;
 import restudio.resync.flow.diagnostic.DiagnosticSeverity;
@@ -160,8 +159,15 @@ public final class CompiledExecutionRunner {
         Map<GraphEndpoint, List<RoutedConnection>> routes = conversionBindings(plan, scoped, activation, runtimeSnapshot);
         List<RuntimeLeaseInput.BindingRequirement> requirements = requirements(plan, scoped, runtimeSnapshot, routes);
         templatePreparations.incrementAndGet();
+        LinkedHashMap<NodeInstanceId, CompiledExecutionStep> indexed = new LinkedHashMap<>();
+        scoped.forEach(step -> indexed.put(step.nodeId(), step));
+        Map<NodeInstanceId, CompiledExecutionStep> stepsByNode = Map.copyOf(indexed);
+        LoopOwnership loopOwnership = LoopOwnership.of(scoped, stepsByNode.keySet());
+        List<CompiledExecutionStep> rootSteps = scoped.stream()
+            .filter(step -> !loopOwnership.bodyOwned(step.nodeId())).toList();
         return new ExecutionTemplate(plan, startNodeId, scoped, routes, executionInputs(scoped),
-            invocationStarts(plan, scoped, startNodeId), requirements, runtimeSnapshot);
+            invocationStarts(plan, scoped, startNodeId), requirements, runtimeSnapshot, stepsByNode, loopOwnership,
+            rootSteps);
     }
 
     public CompletionStage<ExecutionResult> execute(ExecutionTemplate template,
@@ -201,8 +207,8 @@ public final class CompiledExecutionRunner {
             Map<GraphEndpoint, TypedValue> outputs = new LinkedHashMap<>();
             RuntimePlanLease executionLease = lease;
             ExecutionFrame rootFrame = new ExecutionFrame(results, routedInputs, activatedExecutionInputs, outputs);
-            ExecutionMachine machine = new ExecutionMachine(plan, template.scoped, executionLease, cancellationToken, runtimeContext,
-                invocationId, computedDeadline, template.routes, template.executionInputs, template.invocationStarts);
+            ExecutionMachine machine = new ExecutionMachine(template, executionLease, cancellationToken, runtimeContext,
+                invocationId, computedDeadline);
             CompletableFuture<ExecutionResult> execution = machine.execute(rootFrame);
             execution.whenComplete((ignored, failure) -> {
                 try {
@@ -238,6 +244,9 @@ public final class CompiledExecutionRunner {
         private final Set<NodeInstanceId> invocationStarts;
         private final List<RuntimeLeaseInput.BindingRequirement> requirements;
         private final RuntimeRegistrySnapshot runtimeSnapshot;
+        private final Map<NodeInstanceId, CompiledExecutionStep> stepsByNode;
+        private final LoopOwnership loopOwnership;
+        private final List<CompiledExecutionStep> rootSteps;
 
         private ExecutionTemplate(CompiledExecutionPlan plan, NodeInstanceId startNodeId,
                                   List<CompiledExecutionStep> scoped,
@@ -245,7 +254,10 @@ public final class CompiledExecutionRunner {
                                   Map<NodeInstanceId, Set<PinId>> executionInputs,
                                   Set<NodeInstanceId> invocationStarts,
                                   List<RuntimeLeaseInput.BindingRequirement> requirements,
-                                  RuntimeRegistrySnapshot runtimeSnapshot) {
+                                  RuntimeRegistrySnapshot runtimeSnapshot,
+                                  Map<NodeInstanceId, CompiledExecutionStep> stepsByNode,
+                                  LoopOwnership loopOwnership,
+                                  List<CompiledExecutionStep> rootSteps) {
             this.plan = plan;
             this.startNodeId = startNodeId;
             this.scoped = scoped;
@@ -254,6 +266,9 @@ public final class CompiledExecutionRunner {
             this.invocationStarts = invocationStarts;
             this.requirements = requirements;
             this.runtimeSnapshot = runtimeSnapshot;
+            this.stepsByNode = stepsByNode;
+            this.loopOwnership = loopOwnership;
+            this.rootSteps = rootSteps;
         }
 
         public CompiledExecutionPlan plan() {
@@ -339,26 +354,21 @@ public final class CompiledExecutionRunner {
         private final Trampoline trampoline = new Trampoline();
         private final CompletableFuture<ExecutionResult> completion = new CompletableFuture<>();
 
-        private ExecutionMachine(CompiledExecutionPlan plan, List<CompiledExecutionStep> steps, RuntimePlanLease lease,
+        private ExecutionMachine(ExecutionTemplate template, RuntimePlanLease lease,
                                  RuntimeCancellationToken cancellationToken, CompiledRuntimeContext runtimeContext,
-                                 CorrelationId invocationId, long deadlineMillis,
-                                 Map<GraphEndpoint, List<RoutedConnection>> routes,
-                                 Map<NodeInstanceId, Set<PinId>> executionInputs,
-                                 Set<NodeInstanceId> invocationStarts) {
-            this.plan = plan;
+                                 CorrelationId invocationId, long deadlineMillis) {
+            this.plan = template.plan;
             this.lease = lease;
             this.cancellationToken = cancellationToken;
             this.runtimeContext = runtimeContext;
             this.invocationId = invocationId;
             this.deadlineMillis = deadlineMillis;
-            this.routes = routes;
-            this.executionInputs = executionInputs;
-            this.invocationStarts = invocationStarts;
-            LinkedHashMap<NodeInstanceId, CompiledExecutionStep> indexed = new LinkedHashMap<>();
-            steps.forEach(step -> indexed.put(step.nodeId(), step));
-            this.stepsByNode = Map.copyOf(indexed);
-            this.loopOwnership = LoopOwnership.of(steps, stepsByNode.keySet());
-            this.rootSteps = steps.stream().filter(step -> !loopOwnership.bodyOwned(step.nodeId())).toList();
+            this.routes = template.routes;
+            this.executionInputs = template.executionInputs;
+            this.invocationStarts = template.invocationStarts;
+            this.stepsByNode = template.stepsByNode;
+            this.loopOwnership = template.loopOwnership;
+            this.rootSteps = template.rootSteps;
         }
 
         private CompletableFuture<ExecutionResult> execute(ExecutionFrame frame) {
@@ -691,16 +701,23 @@ public final class CompiledExecutionRunner {
         }
 
         private String conversionId(RoutedConnection route, int index, ConversionBinding conversion, FramePath path) {
-            LinkedHashMap<String, Object> identity = new LinkedHashMap<>();
-            identity.put("invocation", invocationId.canonicalText());
-            identity.put("plan", plan.planHash().canonicalText());
-            identity.put("connection", route.connection().canonicalValue());
-            identity.put("hop", index);
-            identity.put("conversion", conversion.edge().id().canonicalValue());
+            StringBuilder identity = new StringBuilder(80);
+            identity.append("conversion:")
+                .append(invocationId.canonicalText())
+                .append(':')
+                .append(plan.planHash().canonicalText())
+                .append(':')
+                .append(route.connection().connectionId().canonicalText())
+                .append(':')
+                .append(index)
+                .append(':')
+                .append(conversion.edge().id().ownerId())
+                .append('.')
+                .append(conversion.edge().id().localId());
             if (!path.isRoot()) {
-                identity.put("frame", path.canonicalValue());
+                identity.append(":frame:").append(path.identity());
             }
-            return "conversion:" + CanonicalJson.sha256("compiled-conversion-invocation", identity);
+            return identity.toString();
         }
 
         private void schedule(Runnable action) {
@@ -740,7 +757,7 @@ public final class CompiledExecutionRunner {
         if (path.isRoot()) {
             return base;
         }
-        return base + ":frame:" + CanonicalJson.sha256("compiled-loop-frame", Map.of("segments", path.canonicalValue()));
+        return base + ":frame:" + path.identity();
     }
 
     private static final class ExecutionFrame {
@@ -832,10 +849,6 @@ public final class CompiledExecutionRunner {
                 throw new IllegalArgumentException("Loop Frame Ordinal Cannot Be Negative");
             }
         }
-
-        private Map<String, Object> canonicalValue() {
-            return Map.of("controller", controller, "ordinal", ordinal);
-        }
     }
 
     private record FramePath(List<FrameSegment> segments) {
@@ -857,8 +870,18 @@ public final class CompiledExecutionRunner {
             return segments.isEmpty();
         }
 
-        private List<Map<String, Object>> canonicalValue() {
-            return segments.stream().map(FrameSegment::canonicalValue).toList();
+        private String identity() {
+            if (segments.isEmpty()) {
+                return "";
+            }
+            StringBuilder text = new StringBuilder();
+            for (FrameSegment segment : segments) {
+                if (!text.isEmpty()) {
+                    text.append('/');
+                }
+                text.append(segment.controller()).append('#').append(segment.ordinal());
+            }
+            return text.toString();
         }
     }
 

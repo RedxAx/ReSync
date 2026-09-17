@@ -213,9 +213,10 @@ public final class CompiledTriggerExecution {
                                             CompiledRuntimeContextAdapter.Result preparedContext) {
         Objects.requireNonNull(invocationId, "Invocation ID Is Required");
         long started = TemporaryLifecycleDiagnostics.start();
-        Map<String, Object> identity = lifecycleIdentity(graph, startNodeId, invocationId, null);
-        TemporaryLifecycleDiagnostics.event("trigger_execution_received", started,
-            TemporaryLifecycleDiagnostics.with(identity, "outcome", "received"));
+        Map<String, Object> identity = TemporaryLifecycleDiagnostics.recordsNormal()
+            ? lifecycleIdentity(graph, startNodeId, invocationId, null)
+            : new LinkedHashMap<>();
+        progress("trigger_execution_received", started, identity, "outcome", "received");
         if (requestedDeadlineMillis < 0) {
             return rejected("The compiled trigger deadline is invalid", graph, startNodeId, invocationId, started, identity,
                 null, null, null, List.of());
@@ -224,7 +225,9 @@ public final class CompiledTriggerExecution {
         GraphDocument sourceDocument = null;
         try {
             SourceAuthority sourceOwner = Objects.requireNonNull(sourceAuthority, "Authoritative Core trigger source is not configured");
-            identity = TemporaryLifecycleDiagnostics.with(identity, "serverId", sourceOwner.serverId());
+            if (TemporaryLifecycleDiagnostics.recordsNormal()) {
+                identity = TemporaryLifecycleDiagnostics.with(identity, "serverId", sourceOwner.serverId());
+            }
             GraphDocument document;
             FunctionSourceDocument functionSource;
             String envelopeHash;
@@ -251,7 +254,9 @@ public final class CompiledTriggerExecution {
                 metadata = null;
             }
             sourceDocument = document;
-            identity = sourceIdentity(identity, document);
+            if (TemporaryLifecycleDiagnostics.recordsNormal()) {
+                identity = sourceIdentity(identity, document);
+            }
             if (!document.resource().serverId().equals(sourceOwner.serverId())
                 || !document.resource().id().equals(graph.getId())
                 || !document.resource().resourceType().value().equals(graph.getResourceType())
@@ -261,8 +266,7 @@ public final class CompiledTriggerExecution {
                 || activationState != ResourceActivationState.ACTIVE) {
                 throw new IllegalStateException("The loaded trigger projection does not match its active authoritative Core source");
             }
-            TemporaryLifecycleDiagnostics.event("trigger_source_admitted", started,
-                TemporaryLifecycleDiagnostics.with(identity, "outcome", "admitted"));
+            progress("trigger_source_admitted", started, identity, "outcome", "admitted");
             if (metadata == null) {
                 metadata = Objects.requireNonNull(metadataProvider.provide(document, functionSource),
                     "Compiled trigger metadata result is required");
@@ -292,9 +296,10 @@ public final class CompiledTriggerExecution {
         CompiledGraphMetadata compiledMetadata;
         try {
             compiledMetadata = Objects.requireNonNull(metadata.metadata(), "Accepted compiled trigger metadata is required");
-            identity = lifecycleIdentity(graph, startNodeId, invocationId, compiledMetadata);
-            TemporaryLifecycleDiagnostics.event("trigger_activation_resolved", started,
-                TemporaryLifecycleDiagnostics.with(identity, "outcome", "resolved"));
+            if (TemporaryLifecycleDiagnostics.recordsNormal()) {
+                identity = lifecycleIdentity(graph, startNodeId, invocationId, compiledMetadata);
+            }
+            progress("trigger_activation_resolved", started, identity, "outcome", "resolved");
         } catch (RuntimeException failure) {
             TemporaryLifecycleDiagnostics.event("trigger_activation_resolution", started,
                 TemporaryLifecycleDiagnostics.with(identity, "outcome", "failed", "diagnosticCode", "TRIGGER.ACTIVATION_REJECTED",
@@ -383,9 +388,8 @@ public final class CompiledTriggerExecution {
                 started, identity, sourceDocument, compiledMetadata, null, List.of(diagnostic));
         }
         CompiledRuntimeContext runtimeContext = contextResult.context();
-        TemporaryLifecycleDiagnostics.event("trigger_context_adapted", started,
-            TemporaryLifecycleDiagnostics.with(identity, "outcome", "adapted", "playerPresent", player != null,
-                "eventPresent", event != null, "variableCount", eventVariables == null ? 0 : eventVariables.size()));
+        progress("trigger_context_adapted", started, identity, "outcome", "adapted", "playerPresent", player != null,
+            "eventPresent", event != null, "variableCount", eventVariables == null ? 0 : eventVariables.size());
         FlowExecutionBridge.MappingContext mappingContext = metadata.mappingContext();
         try {
             FlowExecutor.CompiledExecutionAuthority authority = new FlowExecutor.CompiledExecutionAuthority(
@@ -402,8 +406,7 @@ public final class CompiledTriggerExecution {
                 bridge,
                 invocationId,
                 requestedDeadlineMillis));
-            TemporaryLifecycleDiagnostics.event("trigger_executor_admitted", started,
-                TemporaryLifecycleDiagnostics.with(identity, "outcome", "admitted"));
+            progress("trigger_executor_admitted", started, identity, "outcome", "admitted");
             return terminal(future, graph, sourceDocument, compiledMetadata, startNodeId, invocationId, started, identity, true);
         } catch (RuntimeException failure) {
             TemporaryLifecycleDiagnostics.event("trigger_executor_admission", started,
@@ -510,6 +513,9 @@ public final class CompiledTriggerExecution {
                     "Compiled trigger diagnostic persistence failed correlationId=" + invocationId.canonicalText()
                         + " diagnosticCode=TRIGGER.DIAGNOSTIC_PERSISTENCE_FAILED");
             } finally {
+                if (failure == null) {
+                    return;
+                }
                 TerminalOutcome outcome = terminalOutcome(failure);
                 Map<String, Object> terminalIdentity = reportId == null ? identity
                     : TemporaryLifecycleDiagnostics.with(identity, "diagnosticReportId", reportId);
@@ -517,6 +523,13 @@ public final class CompiledTriggerExecution {
                     outcome.diagnosticCode(), outcome.reason());
             }
         });
+    }
+
+    private static void progress(String stage, long started, Map<String, Object> identity, Object... fields) {
+        if (!TemporaryLifecycleDiagnostics.recordsNormal()) {
+            return;
+        }
+        TemporaryLifecycleDiagnostics.event(stage, started, TemporaryLifecycleDiagnostics.with(identity, fields));
     }
 
     private Map<String, Object> lifecycleIdentity(FlowGraph graph, String startNodeId, CorrelationId invocationId,

@@ -236,17 +236,22 @@ class CompiledTriggerExecutionTest {
             }
             assertEquals(4, chains.size());
             Map<String, Integer> terminalOutcomes = new HashMap<>();
+            int successfulWithoutTerminal = 0;
             for (List<DiagnosticEvent> chain : chains.values()) {
                 assertEquals(1L, chain.stream().filter(event -> event.stage().equals("trigger_ingress")).count());
                 assertEquals(1L, chain.stream().filter(event -> event.stage().equals("trigger_binding_selected")).count());
-                assertEquals(1L, chain.stream().filter(event -> event.stage().equals("trigger_execution_terminal")).count());
-                DiagnosticEvent terminal = chain.stream()
+                List<DiagnosticEvent> terminals = chain.stream()
                     .filter(event -> event.stage().equals("trigger_execution_terminal"))
-                    .findFirst().orElseThrow();
-                String terminalOutcome = terminal.value("outcome").toJava().toString();
-                terminalOutcomes.merge(terminalOutcome, 1, Integer::sum);
+                    .toList();
+                if (terminals.isEmpty()) {
+                    successfulWithoutTerminal++;
+                    continue;
+                }
+                assertEquals(1, terminals.size());
+                terminalOutcomes.merge(terminals.getFirst().value("outcome").toJava().toString(), 1, Integer::sum);
             }
-            assertEquals(1, terminalOutcomes.get("success"));
+            assertEquals(1, successfulWithoutTerminal);
+            assertNull(terminalOutcomes.get("success"));
             assertEquals(1, terminalOutcomes.get("failed"));
             assertEquals(1, terminalOutcomes.get("timeout"));
             assertEquals(1, terminalOutcomes.get("cancelled"));
@@ -292,12 +297,9 @@ class CompiledTriggerExecutionTest {
             assertEquals(0, fixture.bridge().activeInvocationCount());
             assertEquals(0, fixture.plans().activeLeaseCount());
             assertTrue(fixture.diagnostics().stream().noneMatch(value -> value.code().equals("GRAPH.OPAQUE_UNAVAILABLE")));
-            DiagnosticEvent terminal = lifecycle.events.stream()
+            assertTrue(lifecycle.events.stream()
                 .filter(event -> invocationId.equals(event.identity().correlationId()))
-                .filter(event -> event.stage().equals("trigger_execution_terminal"))
-                .findFirst().orElseThrow();
-            assertEquals("success", terminal.value("outcome").toJava());
-            assertEquals("TRIGGER.EXECUTION_SUCCEEDED", terminal.value("diagnosticCode").toJava());
+                .noneMatch(event -> event.stage().equals("trigger_execution_terminal")));
         } finally {
             fixture.executor().shutdown();
         }
@@ -366,7 +368,7 @@ class CompiledTriggerExecutionTest {
                 .toList();
             assertEquals(1L, chain.stream().filter(value -> value.stage().equals("trigger_ingress")).count());
             assertEquals(1L, chain.stream().filter(value -> value.stage().equals("trigger_binding_selected")).count());
-            assertEquals(1L, chain.stream().filter(value -> value.stage().equals("trigger_execution_terminal")).count());
+            assertEquals(0L, chain.stream().filter(value -> value.stage().equals("trigger_execution_terminal")).count());
             assertEquals(1, chain.stream().map(value -> value.identity().correlationId()).distinct().count());
         } finally {
             fixture.executor().shutdown();

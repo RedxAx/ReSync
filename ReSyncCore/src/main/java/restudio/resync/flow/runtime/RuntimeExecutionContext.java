@@ -23,8 +23,8 @@ public final class RuntimeExecutionContext {
     private final AtomicReference<RuntimeSemantics.Effect> establishedEffect = new AtomicReference<>();
     private final AtomicBoolean policyEvidence = new AtomicBoolean();
     private final AtomicBoolean handlerInvoked = new AtomicBoolean();
-    private final Set<ServerResourceLocator> establishedReads = ConcurrentHashMap.newKeySet();
-    private final Set<ServerResourceLocator> establishedWrites = ConcurrentHashMap.newKeySet();
+    private final Set<ServerResourceLocator> establishedReads;
+    private final Set<ServerResourceLocator> establishedWrites;
 
     public RuntimeExecutionContext(RuntimeBindingDescriptor descriptor, RuntimeAuthority authority) {
         this(descriptor, authority, null, NO_DEADLINE);
@@ -47,6 +47,8 @@ public final class RuntimeExecutionContext {
         this.principal = principal;
         this.deadlineMillis = deadlineMillis;
         semantics = descriptor.semantics();
+        this.establishedReads = semantics.resourceReads().isEmpty() ? Set.of() : ConcurrentHashMap.newKeySet();
+        this.establishedWrites = semantics.resourceWrites().isEmpty() ? Set.of() : ConcurrentHashMap.newKeySet();
     }
 
     public RuntimeBindingDescriptor descriptor() {

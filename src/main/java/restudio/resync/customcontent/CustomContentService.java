@@ -16,6 +16,7 @@ import restudio.flow.data.CustomAbilityBinding;
 import restudio.flow.data.CustomContentGraphAdapter;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.CustomTriggerRule;
+import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.resync.Log;
@@ -23,6 +24,7 @@ import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.diagnostics.BoundedDiagnosticDeduplicator;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.modules.flow.FlowResourceMutationStamp;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -452,18 +454,34 @@ public class CustomContentService {
         compiledExecution = execution;
     }
 
+    public boolean hasBoundTrigger(String contentId, String trigger) {
+        if (contentId == null || contentId.isBlank() || trigger == null || trigger.isBlank()) {
+            return false;
+        }
+        CompiledContentDefinition compiled = resident(contentId);
+        return compiled != null && compiled.definition.isEnabled()
+            && compiled.bindingsByTrigger.containsKey(trigger.toLowerCase(Locale.ROOT));
+    }
+
+    public ActivationNeeds activationNeeds(String contentId) {
+        CompiledContentDefinition compiled = resident(contentId);
+        if (compiled == null) {
+            return ActivationNeeds.ALL;
+        }
+        return ActivationNeeds.fromPins(compiled.consumedStartPins);
+    }
+
     public void dispatch(String contentId, String trigger, Player player, Event event, Map<String, Object> eventVars) {
-        CustomContentDefinition definition = contentStorage.get(contentId);
-        if (definition == null || !definition.isEnabled() || trigger == null) {
+        if (trigger == null) {
             return;
         }
-        definition = compiledDefinition(contentId, definition);
-        List<CustomAbilityBinding> bindings = new ArrayList<>(definition.getAbilities());
-        bindings.sort(Comparator.comparingInt((CustomAbilityBinding binding) -> binding.getRule() != null ? binding.getRule().getPriority() : 0).reversed());
+        CompiledContentDefinition compiled = resident(contentId);
+        if (compiled == null || !compiled.definition.isEnabled()) {
+            return;
+        }
+        CustomContentDefinition definition = compiled.definition;
+        List<CustomAbilityBinding> bindings = compiled.bindingsByTrigger.getOrDefault(trigger.toLowerCase(Locale.ROOT), List.of());
         for (CustomAbilityBinding binding : bindings) {
-            if (binding == null || !binding.isEnabled() || binding.getTrigger() == null || !binding.getTrigger().equalsIgnoreCase(trigger)) {
-                continue;
-            }
             if (!passes(definition, binding, player, event, eventVars)) {
                 continue;
             }
@@ -523,33 +541,77 @@ public class CustomContentService {
         }
     }
 
-    private CustomContentDefinition compiledDefinition(String contentId, CustomContentDefinition storedDefinition) {
+    private CompiledContentDefinition resident(String contentId) {
+        if (contentId == null || contentId.isBlank()) {
+            return null;
+        }
+        CustomContentExecution runtime = compiledExecution;
+        FlowResourceMutationStamp stamp = runtime != null ? runtime.projectionStamp(contentId) : null;
+        CompiledContentDefinition cached = compiledDefinitions.get(contentId);
+        if (cached != null && stamp != null && stamp.equals(cached.stamp)) {
+            return cached;
+        }
+        CustomContentDefinition stored = contentStorage.get(contentId);
+        if (stored == null) {
+            compiledDefinitions.remove(contentId);
+            return null;
+        }
+        compiledDefinition(contentId, stored, stamp);
+        return compiledDefinitions.get(contentId);
+    }
+
+    private CustomContentDefinition compiledDefinition(String contentId, CustomContentDefinition storedDefinition, FlowResourceMutationStamp stamp) {
         String flowId = storedDefinition.getFlowId();
         FlowGraph sourceGraph = storedDefinition.getGraph();
         if (sourceGraph == null && (flowId == null || flowId.isBlank())) {
-            compiledDefinitions.remove(contentId);
+            compiledDefinitions.put(contentId, indexDefinition(storedDefinition, stamp, 0, 0));
             return storedDefinition;
         }
-        if (sourceGraph == null) {
+        if (sourceGraph == null && flowStorage != null) {
             sourceGraph = flowStorage.getGraph("flow", flowId);
         }
         if (sourceGraph == null) {
-            compiledDefinitions.remove(contentId);
+            compiledDefinitions.put(contentId, indexDefinition(storedDefinition, stamp, 0, 0));
             return storedDefinition;
         }
         int graphIdentity = System.identityHashCode(sourceGraph);
         int graphVersion = sourceGraph.getVersion();
         CompiledContentDefinition cached = compiledDefinitions.get(contentId);
-        if (cached != null && cached.graphIdentity == graphIdentity && cached.graphVersion == graphVersion) {
+        if (cached != null && stamp != null && stamp.equals(cached.stamp)) {
+            return cached.definition;
+        }
+        if (cached != null && stamp == null && cached.stamp == null && cached.graphIdentity == graphIdentity && cached.graphVersion == graphVersion) {
             return cached.definition;
         }
         CustomContentDefinition graphDefinition = CustomContentGraphAdapter.toDefinition(sourceGraph);
         if (graphDefinition == null || !contentId.equals(graphDefinition.getId())) {
-            compiledDefinitions.remove(contentId);
+            compiledDefinitions.put(contentId, indexDefinition(storedDefinition, stamp, graphIdentity, graphVersion));
             return storedDefinition;
         }
-        compiledDefinitions.put(contentId, new CompiledContentDefinition(graphDefinition, graphIdentity, graphVersion));
+        compiledDefinitions.put(contentId, indexDefinition(graphDefinition, stamp, graphIdentity, graphVersion));
         return graphDefinition;
+    }
+
+    private static CompiledContentDefinition indexDefinition(CustomContentDefinition definition, FlowResourceMutationStamp stamp, int graphIdentity, int graphVersion) {
+        Map<String, List<CustomAbilityBinding>> grouped = new HashMap<>();
+        for (CustomAbilityBinding binding : definition.getAbilities()) {
+            if (binding == null || !binding.isEnabled() || binding.getTrigger() == null || binding.getTrigger().isBlank()) {
+                continue;
+            }
+            grouped.computeIfAbsent(binding.getTrigger().toLowerCase(Locale.ROOT), key -> new ArrayList<>()).add(binding);
+        }
+        Map<String, List<CustomAbilityBinding>> bindingsByTrigger = new HashMap<>();
+        for (Map.Entry<String, List<CustomAbilityBinding>> entry : grouped.entrySet()) {
+            List<CustomAbilityBinding> bindings = entry.getValue();
+            if (bindings.size() > 1) {
+                bindings.sort(Comparator.comparingInt((CustomAbilityBinding binding) -> binding.getRule() != null ? binding.getRule().getPriority() : 0).reversed());
+            }
+            bindingsByTrigger.put(entry.getKey(), List.copyOf(bindings));
+        }
+        FlowGraph graph = definition.getGraph();
+        String startNodeId = findCustomContentStartNode(graph);
+        return new CompiledContentDefinition(definition, stamp, graphIdentity, graphVersion, Map.copyOf(bindingsByTrigger),
+            startNodeId, consumedStartPins(graph, startNodeId));
     }
 
     private FlowGraph graphFor(CustomContentDefinition definition, String flowId) {
@@ -695,7 +757,7 @@ public class CustomContentService {
         };
     }
 
-    private String findCustomContentStartNode(FlowGraph graph) {
+    private static String findCustomContentStartNode(FlowGraph graph) {
         if (graph == null || graph.getNodes() == null || graph.getNodes().isEmpty()) {
             return null;
         }
@@ -714,8 +776,55 @@ public class CustomContentService {
         return null;
     }
 
+    private static Set<String> consumedStartPins(FlowGraph graph, String startNodeId) {
+        if (graph == null || startNodeId == null || startNodeId.isBlank() || graph.getConnections() == null) {
+            return Set.of();
+        }
+        LinkedHashSet<String> pins = new LinkedHashSet<>();
+        for (FlowConnection connection : graph.getConnections()) {
+            if (connection == null || !startNodeId.equals(connection.getSourceNodeId())) {
+                continue;
+            }
+            String pin = connection.getSourcePin();
+            if (pin != null && !pin.isBlank()) {
+                pins.add(pin);
+            }
+        }
+        return Set.copyOf(pins);
+    }
+
     public VanillaContentProvider getVanillaProvider() {
         return vanillaProvider;
+    }
+
+    public record ActivationNeeds(boolean item, boolean block, boolean location, boolean instanceId, boolean target) {
+        static final ActivationNeeds ALL = new ActivationNeeds(true, true, true, true, true);
+
+        static ActivationNeeds fromPins(Set<String> pins) {
+            return new ActivationNeeds(
+                pinNamed(pins, "item"),
+                pinNamed(pins, "block"),
+                pinNamed(pins, "location"),
+                pinNamed(pins, "instance_id", "instanceid"),
+                pinNamed(pins, "target"));
+        }
+
+        private static boolean pinNamed(Set<String> pins, String... names) {
+            for (String pin : pins) {
+                if (pin == null || pin.isBlank()) {
+                    continue;
+                }
+                String normalized = pin.toLowerCase(Locale.ROOT);
+                int separator = Math.max(normalized.lastIndexOf('.'), normalized.lastIndexOf('/'));
+                String local = separator >= 0 ? normalized.substring(separator + 1) : normalized;
+                for (String name : names) {
+                    if (local.equals(name) || normalized.equals(name) || normalized.equals("event." + name)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
     }
 
     public record CooldownState(
@@ -731,6 +840,14 @@ public class CustomContentService {
     ) {
     }
 
-    private record CompiledContentDefinition(CustomContentDefinition definition, int graphIdentity, int graphVersion) {
+    private record CompiledContentDefinition(
+        CustomContentDefinition definition,
+        FlowResourceMutationStamp stamp,
+        int graphIdentity,
+        int graphVersion,
+        Map<String, List<CustomAbilityBinding>> bindingsByTrigger,
+        String startNodeId,
+        Set<String> consumedStartPins
+    ) {
     }
 }

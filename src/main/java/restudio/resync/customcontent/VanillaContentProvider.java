@@ -46,6 +46,7 @@ public class VanillaContentProvider implements CustomContentProvider {
     private final ItemAttributeSchemaService attributeSchemaService;
     private final Object persistenceMonitor = new Object();
     private Map<String, String> blocks = new LinkedHashMap<>();
+    private volatile Map<String, String> publishedBlocks = Map.of();
     private volatile ActiveBinding activeBinding;
     private boolean quiesced;
     private boolean quiescing;
@@ -105,6 +106,7 @@ public class VanillaContentProvider implements CustomContentProvider {
                     LegacyFileMigrationCoordinator.migrate(file, canonicalBytes(blocks), MIGRATION_OWNER,
                         LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID, decoded.sourceVersion(), DOCUMENT_VERSION);
                 }
+                publishPlacedBlocks();
             }
         } catch (IOException | RuntimeException exception) {
             throw new IllegalStateException("Failed to initialize custom block persistence", exception);
@@ -212,15 +214,10 @@ public class VanillaContentProvider implements CustomContentProvider {
 
     @Override
     public String identifyBlock(Location location) {
-        if (location == null) {
+        if (location == null || location.getWorld() == null) {
             return null;
         }
-        synchronized (persistenceMonitor) {
-            if (location.getWorld() == null) {
-                return null;
-            }
-            return blocks.get(blockKey(location));
-        }
+        return publishedBlocks.get(blockKey(location));
     }
 
     @Override
@@ -238,6 +235,7 @@ public class VanillaContentProvider implements CustomContentProvider {
             String previous = blocks.put(key, id);
             try {
                 writeBlocks(activeBinding.file(), blocks);
+                publishPlacedBlocks();
             } catch (IOException exception) {
                 if (previous == null) {
                     blocks.remove(key);
@@ -261,6 +259,7 @@ public class VanillaContentProvider implements CustomContentProvider {
             String previous = blocks.remove(key);
             try {
                 writeBlocks(activeBinding.file(), blocks);
+                publishPlacedBlocks();
             } catch (IOException exception) {
                 if (previous != null) {
                     blocks.put(key, previous);
@@ -272,9 +271,7 @@ public class VanillaContentProvider implements CustomContentProvider {
     }
 
     public Map<String, String> getPlacedBlocks() {
-        synchronized (persistenceMonitor) {
-            return new LinkedHashMap<>(blocks);
-        }
+        return publishedBlocks;
     }
 
     public Path persistenceRoot() {
@@ -391,6 +388,7 @@ public class VanillaContentProvider implements CustomContentProvider {
             ActiveBinding nextBinding = new ActiveBinding(nextFile, generation);
             blocks = decoded.blocks();
             activeBinding = nextBinding;
+            publishPlacedBlocks();
         }
     }
 
@@ -458,6 +456,10 @@ public class VanillaContentProvider implements CustomContentProvider {
             Log.warn("Failed to apply custom content components for " + definition.getId() + ": " + failure.getMessage());
             return item;
         }
+    }
+
+    private void publishPlacedBlocks() {
+        publishedBlocks = Map.copyOf(blocks);
     }
 
     private String blockKey(Location location) {

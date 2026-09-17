@@ -49,11 +49,21 @@ class TemporaryLifecycleDiagnosticsTest {
     }
 
     @Test
-    void diagnosticsDefaultToRecoveryWithExplicitOffOverride() {
-        assertEquals(DiagnosticSink.Mode.RECOVERY, LifecycleDiagnosticPolicy.resolveMode(null, null, null, null));
-        assertEquals(DiagnosticSink.Mode.RECOVERY, LifecycleDiagnosticPolicy.resolveMode(null, null, "", ""));
+    void diagnosticsDefaultToImportantWithExplicitOffOverride() {
+        assertEquals(DiagnosticSink.Mode.NORMAL, LifecycleDiagnosticPolicy.resolveMode(null, null, null, null));
+        assertEquals(DiagnosticSink.Mode.NORMAL, LifecycleDiagnosticPolicy.resolveMode(null, null, "", ""));
+        assertFalse(DiagnosticSink.Mode.NORMAL.accepts(DiagnosticSink.Priority.NORMAL));
+        assertTrue(DiagnosticSink.Mode.NORMAL.accepts(DiagnosticSink.Priority.IMPORTANT));
+        assertTrue(DiagnosticSink.Mode.RECOVERY.accepts(DiagnosticSink.Priority.NORMAL));
         assertTrue(TemporaryLifecycleDiagnostics.enabled(null, null));
         assertTrue(TemporaryLifecycleDiagnostics.enabled("", ""));
+        assertEquals(DiagnosticSink.Mode.NORMAL, LifecycleDiagnosticPolicy.resolveMode(null, null, "true", null));
+        assertEquals(DiagnosticSink.Mode.NORMAL, LifecycleDiagnosticPolicy.parseMode("true"));
+        assertEquals(DiagnosticSink.Mode.RECOVERY, LifecycleDiagnosticPolicy.parseMode("recovery"));
+        assertEquals(DiagnosticSink.Priority.NORMAL, LifecycleDiagnosticPolicy.priority(
+            "trigger_execution_terminal", Map.of("outcome", "success"), true));
+        assertEquals(DiagnosticSink.Priority.TERMINAL, LifecycleDiagnosticPolicy.priority(
+            "trigger_execution_terminal", Map.of("outcome", "failed"), true));
         assertTrue(TemporaryLifecycleDiagnostics.enabled("true", "false"));
         assertTrue(TemporaryLifecycleDiagnostics.enabled(null, "1"));
         assertTrue(TemporaryLifecycleDiagnostics.enabled("recovery", null));

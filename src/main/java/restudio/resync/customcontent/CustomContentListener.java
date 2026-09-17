@@ -36,9 +36,12 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import restudio.resync.ReSync;
 import restudio.flow.data.CustomContentDefinition;
+import restudio.resync.flow.CompiledRuntimeValueCodec;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -47,10 +50,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CustomContentListener implements Listener {
     private static final ThreadLocal<Integer> SUPPRESSED_DAMAGE_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final NamespacedKey PROJECTILE_CONTENT_KEY = new NamespacedKey("resync", "projectile_content_id");
+    private static final double NEARBY_RANGE_SQUARED = 9.0;
     private final CustomContentStorage storage;
     private final CustomContentService service;
     private final Map<UUID, String[]> armorSnapshots = new ConcurrentHashMap<>();
     private final Map<UUID, String> fullSetSnapshots = new ConcurrentHashMap<>();
+    private Map<String, String> placedSnapshot = Map.of();
+    private List<PlacedAnchor> placedAnchors = List.of();
 
     public CustomContentListener(CustomContentStorage storage, CustomContentService service) {
         this.storage = storage;
@@ -303,17 +309,25 @@ public class CustomContentListener implements Listener {
     }
 
     public void tick() {
-        tickBlocks();
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        CompiledRuntimeValueCodec.beginHostCache();
+        try {
+            tickBlocks();
+            for (Player player : Bukkit.getOnlinePlayers()) {
             scanArmor(player);
             tickHeldItem(player, player.getInventory().getItemInMainHand(), EquipmentSlot.HAND);
             tickHeldItem(player, player.getInventory().getItemInOffHand(), EquipmentSlot.OFF_HAND);
             for (ItemStack armor : player.getInventory().getArmorContents()) {
                 String contentId = service.identifyItem(armor);
-                if (contentId != null) {
-                    Map<String, Object> vars = baseVars(player, armor, player.getLocation(), null, null);
+                if (contentId == null) {
+                    continue;
+                }
+                Map<String, Object> vars = null;
+                if (service.hasBoundTrigger(contentId, "armor.tick")) {
+                    vars = baseVars(player, armor, player.getLocation(), null, null);
                     service.dispatch(contentId, "armor.tick", player, null, vars);
-                    service.dispatch(contentId, "armor.while_holding", player, null, vars);
+                }
+                if (service.hasBoundTrigger(contentId, "armor.while_holding")) {
+                    service.dispatch(contentId, "armor.while_holding", player, null, vars != null ? vars : baseVars(player, armor, player.getLocation(), null, null));
                 }
             }
             String fullSet = fullSetKey(player);
@@ -321,20 +335,28 @@ public class CustomContentListener implements Listener {
             if (!fullSet.isBlank()) {
                 for (ItemStack armor : player.getInventory().getArmorContents()) {
                     String contentId = service.identifyItem(armor);
-                    if (contentId != null) {
-                        if (!fullSet.equals(previousFullSet)) {
-                            service.dispatch(contentId, "armor.full_set", player, null, baseVars(player, armor, player.getLocation(), null, null));
-                        }
-                        service.dispatch(contentId, "armor.full_set_tick", player, null, baseVars(player, armor, player.getLocation(), null, null));
+                    if (contentId == null) {
+                        continue;
+                    }
+                    Map<String, Object> vars = null;
+                    if (!fullSet.equals(previousFullSet) && service.hasBoundTrigger(contentId, "armor.full_set")) {
+                        vars = baseVars(player, armor, player.getLocation(), null, null);
+                        service.dispatch(contentId, "armor.full_set", player, null, vars);
+                    }
+                    if (service.hasBoundTrigger(contentId, "armor.full_set_tick")) {
+                        service.dispatch(contentId, "armor.full_set_tick", player, null, vars != null ? vars : baseVars(player, armor, player.getLocation(), null, null));
                     }
                 }
             }
+        }
+        } finally {
+            CompiledRuntimeValueCodec.endHostCache();
         }
     }
 
     private void tickHeldItem(Player player, ItemStack item, EquipmentSlot hand) {
         String contentId = service.identifyItem(item);
-        if (contentId != null) {
+        if (contentId != null && service.hasBoundTrigger(contentId, "item.while_holding")) {
             service.dispatch(contentId, "item.while_holding", player, null, baseVars(player, item, player.getLocation(), null, hand));
         }
     }
@@ -360,43 +382,130 @@ public class CustomContentListener implements Listener {
     }
 
     private void tickBlocks() {
-        for (Map.Entry<String, String> entry : service.getVanillaProvider().getPlacedBlocks().entrySet()) {
-            Location location = locationFromKey(entry.getKey());
-            if (location == null) {
+        refreshPlacedAnchors();
+        if (placedAnchors.isEmpty()) {
+            return;
+        }
+        Map<String, Boolean> nearbyTriggers = new HashMap<>();
+        Map<String, Boolean> tickTriggers = new HashMap<>();
+        tickNearbyPlayers(nearbyTriggers);
+        tickBoundBlocks(tickTriggers);
+    }
+
+    private void tickNearbyPlayers(Map<String, Boolean> nearbyTriggers) {
+        List<PlacedAnchor> anchors = placedAnchors;
+        if (anchors.isEmpty()) {
+            return;
+        }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            World world = player.getWorld();
+            if (world == null) {
                 continue;
             }
-            String contentId = entry.getValue();
+            String worldName = world.getName();
+            double px = player.getX();
+            double py = player.getY();
+            double pz = player.getZ();
+            ItemStack hand = null;
+            boolean resolvedHand = false;
+            for (PlacedAnchor anchor : anchors) {
+                if (!worldName.equals(anchor.worldName)) {
+                    continue;
+                }
+                double dx = px - anchor.x;
+                double dy = py - anchor.y;
+                double dz = pz - anchor.z;
+                if (dx * dx + dy * dy + dz * dz > NEARBY_RANGE_SQUARED) {
+                    continue;
+                }
+                if (!world.isChunkLoaded(anchor.x >> 4, anchor.z >> 4)) {
+                    continue;
+                }
+                if (!cachedTrigger(nearbyTriggers, anchor.contentId, "block.nearby_player")) {
+                    continue;
+                }
+                CustomContentService.ActivationNeeds needs = service.activationNeeds(anchor.contentId);
+                if ((needs.item() || needs.instanceId()) && !resolvedHand) {
+                    hand = player.getInventory().getItemInMainHand();
+                    resolvedHand = true;
+                }
+                Location location = needs.location() || needs.block() ? new Location(world, anchor.x, anchor.y, anchor.z) : null;
+                service.dispatch(anchor.contentId, "block.nearby_player", player, null,
+                    baseVars(player, needs.item() || needs.instanceId() ? hand : null, location, needs.target() ? player : null, null, needs));
+            }
+        }
+    }
+
+    private void tickBoundBlocks(Map<String, Boolean> tickTriggers) {
+        for (PlacedAnchor anchor : placedAnchors) {
+            if (!cachedTrigger(tickTriggers, anchor.contentId, "block.tick")) {
+                continue;
+            }
+            World world = Bukkit.getWorld(anchor.worldName);
+            if (world == null || !world.isChunkLoaded(anchor.x >> 4, anchor.z >> 4)) {
+                continue;
+            }
+            CustomContentService.ActivationNeeds needs = service.activationNeeds(anchor.contentId);
+            Location location = needs.location() || needs.block() ? new Location(world, anchor.x, anchor.y, anchor.z) : null;
             Player nearest = null;
             double nearestDistance = Double.MAX_VALUE;
-            for (Player player : location.getWorld().getPlayers()) {
-                double distance = player.getLocation().distanceSquared(location);
+            for (Player player : world.getPlayers()) {
+                double dx = player.getX() - anchor.x;
+                double dy = player.getY() - anchor.y;
+                double dz = player.getZ() - anchor.z;
+                double distance = dx * dx + dy * dy + dz * dz;
                 if (distance < nearestDistance) {
                     nearestDistance = distance;
                     nearest = player;
                 }
-                if (distance <= 9.0) {
-                    service.dispatch(contentId, "block.nearby_player", player, null, baseVars(player, player.getInventory().getItemInMainHand(), location, player, null));
-                }
             }
-            service.dispatch(contentId, "block.tick", nearest, null, baseVars(nearest, nearest != null ? nearest.getInventory().getItemInMainHand() : null, location, nearest, null));
+            ItemStack hand = nearest != null && (needs.item() || needs.instanceId()) ? nearest.getInventory().getItemInMainHand() : null;
+            service.dispatch(anchor.contentId, "block.tick", nearest, null,
+                baseVars(nearest, hand, location, needs.target() ? nearest : null, null, needs));
         }
     }
 
-    private Location locationFromKey(String key) {
-        if (key == null) {
+    private void refreshPlacedAnchors() {
+        Map<String, String> snapshot = service.getVanillaProvider().getPlacedBlocks();
+        if (snapshot == placedSnapshot) {
+            return;
+        }
+        placedSnapshot = snapshot;
+        if (snapshot.isEmpty()) {
+            placedAnchors = List.of();
+            return;
+        }
+        List<PlacedAnchor> anchors = new ArrayList<>(snapshot.size());
+        for (Map.Entry<String, String> entry : snapshot.entrySet()) {
+            PlacedAnchor anchor = anchorFromKey(entry.getKey(), entry.getValue());
+            if (anchor != null) {
+                anchors.add(anchor);
+            }
+        }
+        placedAnchors = List.copyOf(anchors);
+    }
+
+    private boolean cachedTrigger(Map<String, Boolean> cache, String contentId, String trigger) {
+        Boolean cached = cache.get(contentId);
+        if (cached != null) {
+            return cached;
+        }
+        boolean bound = service.hasBoundTrigger(contentId, trigger);
+        cache.put(contentId, bound);
+        return bound;
+    }
+
+    private PlacedAnchor anchorFromKey(String key, String contentId) {
+        if (key == null || contentId == null || contentId.isBlank()) {
             return null;
         }
         String[] parts = key.split(":");
         if (parts.length != 4) {
             return null;
         }
-        World world = Bukkit.getWorld(parts[0]);
-        if (world == null) {
-            return null;
-        }
         try {
-            return new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
-        } catch (NumberFormatException e) {
+            return new PlacedAnchor(parts[0], contentId, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+        } catch (NumberFormatException ignored) {
             return null;
         }
     }
@@ -439,16 +548,31 @@ public class CustomContentListener implements Listener {
     }
 
     private Map<String, Object> baseVars(Player player, ItemStack item, Location location, Entity target, EquipmentSlot hand) {
+        return baseVars(player, item, location, target, hand, CustomContentService.ActivationNeeds.ALL);
+    }
+
+    private Map<String, Object> baseVars(Player player, ItemStack item, Location location, Entity target, EquipmentSlot hand,
+                                         CustomContentService.ActivationNeeds needs) {
         Map<String, Object> vars = new HashMap<>();
         vars.put("event.player", player);
-        vars.put("event.item", item);
-        vars.put("event.location", location != null ? location : player != null ? player.getLocation() : null);
-        vars.put("event.block", location != null ? location.getBlock() : null);
-        vars.put("event.target", target);
+        if (needs.item()) {
+            vars.put("event.item", item);
+        }
+        if (needs.location()) {
+            vars.put("event.location", location != null ? location : player != null ? player.getLocation() : null);
+        }
+        if (needs.block()) {
+            vars.put("event.block", location != null ? location.getBlock() : null);
+        }
+        if (needs.target()) {
+            vars.put("event.target", target);
+            if (target instanceof LivingEntity) {
+                vars.put("event.target_living", true);
+            }
+        }
         vars.put("event.hand", hand != null ? hand.name().toLowerCase() : "any");
-        vars.put("event.instance_id", service.getVanillaProvider().getInstanceId(item));
-        if (target instanceof LivingEntity) {
-            vars.put("event.target_living", true);
+        if (needs.instanceId()) {
+            vars.put("event.instance_id", service.getVanillaProvider().getInstanceId(item));
         }
         return vars;
     }
@@ -622,5 +746,8 @@ public class CustomContentListener implements Listener {
             return null;
         }
         return definition.getGraph().getContentProperties().get("projectile." + key);
+    }
+
+    private record PlacedAnchor(String worldName, String contentId, int x, int y, int z) {
     }
 }

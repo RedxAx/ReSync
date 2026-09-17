@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -24,8 +25,13 @@ import java.util.regex.Pattern;
 public final class TabListService {
     private static final Pattern ANIMATION_PATTERN = Pattern.compile("%resync_animation[:_][^%]+%", Pattern.CASE_INSENSITIVE);
     private static final Map<UUID, ActiveTabState> ACTIVE_TABS = new ConcurrentHashMap<>();
+    private static final Map<String, ResidentTab> RESIDENT_TABS = new ConcurrentHashMap<>();
     private static BukkitTask updaterTask;
     private static long updaterTick;
+    private static long residentSequence = Long.MIN_VALUE;
+    private static String residentDefaultTabId;
+    private static boolean residentDefaultUsePapi;
+    private static boolean residentAnimatedTabs;
 
     private TabListService() {
     }
@@ -45,6 +51,7 @@ public final class TabListService {
             updaterTask.cancel();
             updaterTask = null;
         }
+        clearResident();
     }
 
     public static int getRefreshIntervalTicks() {
@@ -111,6 +118,7 @@ public final class TabListService {
     }
 
     public static void refreshActiveTabs(FlowStorage storage, String tabId) {
+        clearResident();
         if (storage == null || tabId == null || tabId.isBlank() || Bukkit.getServer() == null) {
             return;
         }
@@ -223,12 +231,13 @@ public final class TabListService {
         }
         long tick = ++updaterTick;
         boolean regularRefresh = Math.floorMod(tick, Math.max(1, storage.getTabRefreshIntervalTicks())) == 0;
-        if (regularRefresh || hasAnimatedTabs(storage)) {
-            String defaultTabId = storage.getDefaultTabId();
+        refreshResident(storage);
+        if (regularRefresh || residentAnimatedTabs) {
+            String defaultTabId = residentDefaultTabId;
             if (defaultTabId != null && !defaultTabId.isBlank()) {
-                TabDefinition defaultDefinition = storage.getRuntimeTab(defaultTabId);
+                TabDefinition defaultDefinition = residentTab(storage, defaultTabId);
                 if (defaultDefinition != null && defaultDefinition.isEnabled()) {
-                    applyTemplateToAll(defaultDefinition, storage.isDefaultTabUsePapi());
+                    applyTemplateToAll(defaultDefinition, residentDefaultUsePapi);
                 } else {
                     clearActiveTabReferences(defaultTabId, true);
                 }
@@ -238,7 +247,7 @@ public final class TabListService {
                     if (state == null) {
                         continue;
                     }
-                    TabDefinition definition = storage.getRuntimeTab(state.tabId());
+                    TabDefinition definition = residentTab(storage, state.tabId());
                     if (definition != null && definition.isEnabled()) {
                         applyViewerHeaderFooter(player, definition, state.usePapi());
                         applyEntryFormat(player, definition.getEntryFormat(), state.usePapi());
@@ -253,14 +262,60 @@ public final class TabListService {
         }
     }
 
-    private static boolean hasAnimatedTabs(FlowStorage storage) {
-        for (ActiveTabState state : ACTIVE_TABS.values()) {
-            if (state != null && hasAnimation(storage.getRuntimeTab(state.tabId()))) {
-                return true;
+    private static void refreshResident(FlowStorage storage) {
+        long sequence;
+        try {
+            sequence = storage.committedSequence();
+        } catch (RuntimeException ignored) {
+            clearResident();
+            return;
+        }
+        String defaultTabId = storage.getDefaultTabId();
+        boolean defaultUsePapi = storage.isDefaultTabUsePapi();
+        if (sequence == residentSequence
+            && Objects.equals(defaultTabId, residentDefaultTabId)
+            && defaultUsePapi == residentDefaultUsePapi) {
+            return;
+        }
+        RESIDENT_TABS.clear();
+        residentSequence = sequence;
+        residentDefaultTabId = defaultTabId;
+        residentDefaultUsePapi = defaultUsePapi;
+        residentAnimatedTabs = false;
+        if (residentDefaultTabId != null && !residentDefaultTabId.isBlank()) {
+            TabDefinition definition = residentTab(storage, residentDefaultTabId);
+            residentAnimatedTabs = hasAnimation(definition);
+        }
+        if (!residentAnimatedTabs) {
+            for (ActiveTabState state : ACTIVE_TABS.values()) {
+                if (state != null && hasAnimation(residentTab(storage, state.tabId()))) {
+                    residentAnimatedTabs = true;
+                    break;
+                }
             }
         }
-        String defaultId = storage.getDefaultTabId();
-        return defaultId != null && !defaultId.isBlank() && hasAnimation(storage.getRuntimeTab(defaultId));
+    }
+
+    private static TabDefinition residentTab(FlowStorage storage, String tabId) {
+        if (tabId == null || tabId.isBlank()) {
+            return null;
+        }
+        ResidentTab cached = RESIDENT_TABS.get(tabId);
+        if (cached != null) {
+            return cached.definition();
+        }
+        TabDefinition definition = storage.getRuntimeTab(tabId);
+        RESIDENT_TABS.put(tabId, new ResidentTab(definition));
+        return definition;
+    }
+
+    private static void clearResident() {
+        residentSequence = Long.MIN_VALUE;
+        residentDefaultTabId = null;
+        residentDefaultUsePapi = false;
+        residentAnimatedTabs = false;
+        RESIDENT_TABS.clear();
+        ScoreboardTemplateManager.clearResident();
     }
 
     private static boolean hasAnimation(TabDefinition definition) {
@@ -310,5 +365,8 @@ public final class TabListService {
     }
 
     private record ActiveTabState(String tabId, boolean usePapi) {
+    }
+
+    private record ResidentTab(TabDefinition definition) {
     }
 }

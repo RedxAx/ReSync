@@ -170,6 +170,12 @@ public class JsonAssetStore<T> implements AutoCloseable {
         }
     }
 
+    private record CoordinatorLineage(long revision, String mutationValue, boolean deleted) {
+        private CoordinatorLineage {
+            Objects.requireNonNull(mutationValue, "mutationValue");
+        }
+    }
+
     public static final class PreparedMutation {
         private final JsonAssetStore<?> owner;
         private final UUID mutationId;
@@ -502,31 +508,36 @@ public class JsonAssetStore<T> implements AutoCloseable {
             long generation;
             AssetStamp before;
             String json;
+            boolean lineageHit = false;
             try (MutationLease ignored = acquireMutationLease()) {
                 generation = cacheGeneration.get();
-                before = currentStamp(safeId);
-                if (before == null) {
-                    synchronized (cacheLock) {
-                        if (generation != cacheGeneration.get()) {
-                            continue;
-                        }
-                        cache.remove(safeId);
-                        return null;
-                    }
-                }
+                Snapshot snapshot = coordinator.read(current -> current);
+                CoordinatorLineage lineage = coordinatorLineage(safeId, snapshot);
                 CachedValue cached = cacheGet(safeId);
-                if (cached != null && !before.equals(cached.stamp())) {
-                    synchronized (cacheLock) {
-                        if (generation != cacheGeneration.get()) {
-                            continue;
+                if (cached != null && matches(cached.stamp(), lineage)) {
+                    before = cached.stamp();
+                    json = cached.json();
+                    lineageHit = true;
+                } else {
+                    if (cached != null) {
+                        synchronized (cacheLock) {
+                            if (generation != cacheGeneration.get()) {
+                                continue;
+                            }
+                            cache.remove(safeId, cached);
                         }
-                        cache.remove(safeId, cached);
                     }
-                    cached = null;
-                }
-                json = cached == null ? null : cached.json();
-                if (json == null) {
-                    json = readCurrentJson(safeId);
+                    before = currentStamp(safeId, snapshot);
+                    if (before == null) {
+                        synchronized (cacheLock) {
+                            if (generation != cacheGeneration.get()) {
+                                continue;
+                            }
+                            cache.remove(safeId);
+                            return null;
+                        }
+                    }
+                    json = before.deleted() ? null : readCurrentJson(safeId, snapshot);
                 }
             } catch (IOException exception) {
                 lastFailure = exception;
@@ -536,7 +547,8 @@ public class JsonAssetStore<T> implements AutoCloseable {
             String valueId = value == null ? null : safeId(idExtractor.id(value), "load");
             try (MutationLease ignored = acquireMutationLease()) {
                 synchronized (cacheLock) {
-                    if (generation != cacheGeneration.get() || !Objects.equals(before, currentStamp(safeId))) {
+                    if (generation != cacheGeneration.get()
+                        || (!lineageHit && !matches(before, coordinatorLineage(safeId, coordinator.read(current -> current))))) {
                         continue;
                     }
                     if (value == null) {
@@ -546,8 +558,6 @@ public class JsonAssetStore<T> implements AutoCloseable {
                     cache.put(valueId != null ? valueId : safeId, new CachedValue(json, before));
                     return value;
                 }
-            } catch (IOException exception) {
-                lastFailure = exception;
             }
         }
         cacheRemove(safeId);
@@ -1039,7 +1049,13 @@ public class JsonAssetStore<T> implements AutoCloseable {
             throw new IllegalArgumentException("Invalid " + typeId + " id");
         }
         try {
-            return currentStamp(safeId);
+            Snapshot snapshot = coordinator.read(current -> current);
+            CoordinatorLineage lineage = coordinatorLineage(safeId, snapshot);
+            CachedValue cached = cacheGet(safeId);
+            if (cached != null && matches(cached.stamp(), lineage)) {
+                return cached.stamp();
+            }
+            return currentStamp(safeId, snapshot);
         } catch (IOException | RuntimeException exception) {
             if (exception instanceof IllegalArgumentException) {
                 throw (IllegalArgumentException) exception;
@@ -1864,6 +1880,29 @@ public class JsonAssetStore<T> implements AutoCloseable {
         tombstone.addProperty("deleted", true);
         tombstone.addProperty("deletedAt", System.currentTimeMillis());
         return tombstone;
+    }
+
+    private CoordinatorLineage coordinatorLineage(String safeId, Snapshot snapshot) {
+        AssetKey key = assetKey(safeId);
+        ExpectedState state = snapshot.state(key).orElse(null);
+        if (state instanceof Live live) {
+            return snapshot.mutationValue(key)
+                .map(mutation -> new CoordinatorLineage(live.revision(), mutation, false))
+                .orElse(null);
+        }
+        if (state instanceof Deleted deleted) {
+            return snapshot.mutationValue(key)
+                .map(mutation -> new CoordinatorLineage(deleted.revision(), mutation, true))
+                .orElse(null);
+        }
+        return null;
+    }
+
+    private static boolean matches(AssetStamp stamp, CoordinatorLineage lineage) {
+        return stamp != null && lineage != null
+            && stamp.revision() == lineage.revision()
+            && stamp.mutationValue().equals(lineage.mutationValue())
+            && stamp.deleted() == lineage.deleted();
     }
 
     private AssetStamp currentStamp(String safeId) throws IOException {

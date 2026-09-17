@@ -369,6 +369,27 @@ class JsonAssetStoreTest {
     }
 
     @Test
+    void repeatedGetsTrustCoordinatorLineageWithoutRereadingBytes() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> store = store(assets, coordinator)) {
+            store.save(new TestResource("main", "Stable"), UUID.randomUUID(), 0L);
+            assertEquals("Stable", store.get("main").name());
+            Path file = store.findAssetFile("main");
+            assertTrue(file != null && Files.exists(file));
+            String original = Files.readString(file);
+            Files.writeString(file, "corrupt");
+            assertEquals("Stable", store.get("main").name());
+            assertEquals("Stable", store.get("main").name());
+            assertEquals(1L, store.readStamp("main").revision());
+            assertThrows(Exception.class, store::healthCheck);
+            Files.writeString(file, original);
+            store.save(new TestResource("main", "Updated"), UUID.randomUUID(), 1L);
+            assertEquals("Updated", store.get("main").name());
+        }
+    }
+
+    @Test
     void reloadAndValidatedPublicationPreserveOpaqueDurableFieldsWithARestrictedWriter() throws Exception {
         Path assets = tempDir.resolve("assets");
         try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);

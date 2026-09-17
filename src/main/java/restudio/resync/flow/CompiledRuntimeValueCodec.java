@@ -43,8 +43,25 @@ public final class CompiledRuntimeValueCodec {
     private static final int MAX_VALUES = 8_192;
     private static final int MAX_DEPTH = 32;
     private static final int MAX_ITEM_BYTES = 1_048_576;
+    private static final ThreadLocal<Integer> HOST_CACHE_DEPTH = ThreadLocal.withInitial(() -> 0);
+    private static final ThreadLocal<IdentityHashMap<Object, Object>> HOST_CACHE =
+        ThreadLocal.withInitial(IdentityHashMap::new);
 
     private CompiledRuntimeValueCodec() {
+    }
+
+    public static void beginHostCache() {
+        HOST_CACHE_DEPTH.set(HOST_CACHE_DEPTH.get() + 1);
+    }
+
+    public static void endHostCache() {
+        int depth = HOST_CACHE_DEPTH.get() - 1;
+        if (depth <= 0) {
+            HOST_CACHE_DEPTH.remove();
+            HOST_CACHE.remove();
+            return;
+        }
+        HOST_CACHE_DEPTH.set(depth);
     }
 
     public static TypedValue encode(ServerId serverId, TypeExpr type, Object value) {
@@ -234,20 +251,32 @@ public final class CompiledRuntimeValueCodec {
         }
 
         private Object encodeHost(String id, Object raw) {
+            if (HOST_CACHE_DEPTH.get() > 0) {
+                Object cached = HOST_CACHE.get().get(raw);
+                if (cached != null) {
+                    return cached;
+                }
+            }
+            Object encoded;
             if (raw instanceof Map<?, ?>) {
                 decodeHost(id, raw);
-                return raw;
+                encoded = raw;
+            } else {
+                encoded = switch (id) {
+                    case "player", "living_entity", "entity" -> entity(id, raw);
+                    case "world" -> world(raw);
+                    case "block" -> block(raw);
+                    case "location" -> location(raw);
+                    case "vector" -> vector(raw);
+                    case "item", "itemstack" -> item(raw);
+                    case "inventory" -> inventory(raw);
+                    default -> throw invalid("Unsupported Host Type");
+                };
             }
-            return switch (id) {
-                case "player", "living_entity", "entity" -> entity(id, raw);
-                case "world" -> world(raw);
-                case "block" -> block(raw);
-                case "location" -> location(raw);
-                case "vector" -> vector(raw);
-                case "item", "itemstack" -> item(raw);
-                case "inventory" -> inventory(raw);
-                default -> throw invalid("Unsupported Host Type");
-            };
+            if (HOST_CACHE_DEPTH.get() > 0) {
+                HOST_CACHE.get().put(raw, encoded);
+            }
+            return encoded;
         }
 
         private Object decodeHost(String id, Object raw) {

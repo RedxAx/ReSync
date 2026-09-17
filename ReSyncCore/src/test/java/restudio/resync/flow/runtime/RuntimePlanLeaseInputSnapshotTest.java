@@ -73,6 +73,38 @@ class RuntimePlanLeaseInputSnapshotTest {
     }
 
     @Test
+    void ephemeralExecuteCopiesInputsAndCompletesWithoutDurableReceipts() throws Exception {
+        RuntimeBindingRegistry registry = RuntimeTestSupport.registry();
+        ContractRef<ProviderId> provider = provider("ephemeral-snapshot");
+        RuntimeOperationDescriptor operation = ephemeralOperation();
+        CompletableFuture<RuntimeResult> pending = new CompletableFuture<>();
+        AtomicInteger calls = new AtomicInteger();
+        List<TypedValue> observedInputs = new ArrayList<>();
+        RuntimeBinding binding = RuntimeBinding.available(operation, provider, "1.0.0", invocation -> {
+            TypedValue value = invocation.inputs().get(INPUT);
+            observedInputs.add(value);
+            calls.incrementAndGet();
+            return pending;
+        });
+        registry.activate(providerDescriptor(provider), List.of(binding));
+        RuntimePlanLease lease = registry.acquire(RuntimeTestSupport.input(requirement(operation, binding)));
+        TypedValue original = value("original");
+        TypedValue changed = value("changed");
+        Map<PinId, TypedValue> callerInputs = new HashMap<>();
+        callerInputs.put(INPUT, original);
+
+        CompletionStage<RuntimeResult> started = lease.execute(operation.key(), callerInputs, "ephemeral-1");
+        callerInputs.put(INPUT, changed);
+        pending.complete(RuntimeResult.success(Map.of(OUTPUT, original), null));
+
+        RuntimeResult result = started.toCompletableFuture().get(2, TimeUnit.SECONDS);
+        assertEquals(RuntimeResult.Status.SUCCESS, result.status());
+        assertEquals(original, observedInputs.getFirst());
+        assertEquals(1, calls.get());
+        lease.close();
+    }
+
+    @Test
     void nullInputIsRejectedBeforeInvocationAdmission() {
         RuntimeBindingRegistry registry = RuntimeTestSupport.registry();
         ContractRef<ProviderId> provider = provider("null-input");
@@ -130,6 +162,40 @@ class RuntimePlanLeaseInputSnapshotTest {
                     Set.of("RUNTIME.HANDLER_FAILURE"),
                     Set.of("failure"),
                     RuntimeFailureContract.CommitBoundary.ATOMIC),
+                Set.of(),
+                Set.of()));
+    }
+
+    private static RuntimeOperationDescriptor ephemeralOperation() {
+        return new RuntimeOperationDescriptor(
+            capability("ephemeral-snapshot"),
+            operationId("ephemeral-snapshot"),
+            List.of(
+                new RuntimeOperationDescriptor.Pin(INPUT, RuntimeOperationDescriptor.Direction.INPUT, type("string")),
+                new RuntimeOperationDescriptor.Pin(OUTPUT, RuntimeOperationDescriptor.Direction.OUTPUT, type("string"))),
+            new RuntimeSemantics(
+                RuntimeSemantics.Effect.PURE,
+                RuntimeSemantics.ThreadMode.CURRENT,
+                capability("authorization"),
+                RuntimeSemantics.Cancellation.NONE,
+                0,
+                0,
+                0,
+                RuntimeSemantics.UnloadPolicy.DRAIN,
+                RuntimeSemantics.Retry.NEVER,
+                RuntimeSemantics.Idempotency.NONE,
+                RuntimeSemantics.Audit.NONE,
+                RuntimeSemantics.Confirmation.NONE,
+                RuntimeSemantics.SensitiveData.NONE,
+                RuntimeSemantics.Determinism.DETERMINISTIC,
+                Set.of(),
+                Set.of("failure"),
+                Set.of(),
+                new RuntimeFailureContract(
+                    type("failure"),
+                    Set.of("RUNTIME.HANDLER_FAILURE"),
+                    Set.of("failure"),
+                    RuntimeFailureContract.CommitBoundary.NO_MUTATION),
                 Set.of(),
                 Set.of()));
     }

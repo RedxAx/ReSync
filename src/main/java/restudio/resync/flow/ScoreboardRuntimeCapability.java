@@ -7,10 +7,13 @@ import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class ScoreboardRuntimeCapability {
     private final FlowResourceRegistry resourceRegistry;
+    private final Map<String, ResidentScoreboard> residents = new ConcurrentHashMap<>();
 
     private ScoreboardRuntimeCapability(FlowResourceRegistry resourceRegistry) {
         this.resourceRegistry = resourceRegistry;
@@ -34,8 +37,18 @@ public final class ScoreboardRuntimeCapability {
         }
         try {
             FlowResourceAdapter<ScoreboardDefinition> adapter = adapter();
-            if (adapter == null || !isAuthoritativeLive(adapter, id)) {
+            if (adapter == null) {
+                residents.remove(id);
                 return null;
+            }
+            FlowResourceMutationStamp stamp = adapter.readMutationStamp(id);
+            if (!live(stamp, id)) {
+                residents.remove(id);
+                return null;
+            }
+            ResidentScoreboard cached = residents.get(id);
+            if (cached != null && stamp.equals(cached.stamp())) {
+                return cached.definition();
             }
             ScoreboardDefinition definition = adapter.get(id);
             if (definition == null) {
@@ -44,6 +57,7 @@ public final class ScoreboardRuntimeCapability {
             if (!id.equals(definition.getId())) {
                 throw new IllegalStateException("Live scoreboard authority returned the wrong identity for " + id);
             }
+            residents.put(id, new ResidentScoreboard(stamp, definition));
             return definition;
         } catch (RuntimeException failure) {
             throw new IllegalStateException("Scoreboard authority could not read " + id, failure);
@@ -62,7 +76,7 @@ public final class ScoreboardRuntimeCapability {
             }
             return ids.stream()
                 .filter(id -> id != null && !id.isBlank())
-                .filter(id -> isAuthoritativeLive(adapter, id))
+                .filter(id -> live(adapter.readMutationStamp(id), id))
                 .distinct()
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
@@ -88,11 +102,13 @@ public final class ScoreboardRuntimeCapability {
         return scoreboardAdapter;
     }
 
-    private boolean isAuthoritativeLive(FlowResourceAdapter<ScoreboardDefinition> adapter, String id) {
-        FlowResourceMutationStamp stamp = adapter.readMutationStamp(id);
+    private boolean live(FlowResourceMutationStamp stamp, String id) {
         return stamp != null
             && ReSyncResourceCatalog.SCOREBOARD.equals(stamp.type())
             && id.equals(stamp.id())
             && !stamp.deleted();
+    }
+
+    private record ResidentScoreboard(FlowResourceMutationStamp stamp, ScoreboardDefinition definition) {
     }
 }

@@ -103,6 +103,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -267,6 +268,20 @@ class CustomContentDispatchRuntimeTest {
         assertEquals(List.of("resin:item.consume:original"), observedTriggers);
         assertEquals(player.getUniqueId(), observedContext.get().player().uniqueId());
         assertNotNull(observedContext.get().variables().get("event.item"));
+    }
+
+    @Test
+    void repeatedDispatchReusesThePreparedGraph() {
+        saveContentGraph("resin", "item");
+        FlowGraph prepared = contentExecution.graph("resin");
+        assertNotNull(prepared, () -> projectionFailure("resin"));
+        int compiled = compilations.get();
+        service.dispatch("resin", "item.use", null, null, Map.of());
+        service.dispatch("resin", "item.use", null, null, Map.of());
+        service.dispatch("resin", "item.use", null, null, Map.of());
+        assertSame(prepared, contentExecution.graph("resin"));
+        assertEquals(compiled, compilations.get());
+        assertEquals(List.of("resin:item.use:original", "resin:item.use:original", "resin:item.use:original"), observedTriggers);
     }
 
     @Test

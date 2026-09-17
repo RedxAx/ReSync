@@ -22,6 +22,7 @@ import restudio.resync.player.PlayerSessionLinkService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -34,6 +35,11 @@ public final class ScoreboardTemplateManager {
     private static volatile EditTargetStateSender editTargetStateSender;
     private static volatile PlayerSessionLinkService sessionLinkService;
     private static volatile ScoreboardRuntimeCapability runtimeCapability = ScoreboardRuntimeCapability.unavailable();
+    private static final Map<String, ResidentScoreboard> RESIDENT_SCOREBOARDS = new ConcurrentHashMap<>();
+    private static long residentSequence = Long.MIN_VALUE;
+    private static String residentDefaultId;
+    private static boolean residentDefaultUsePapi;
+    private static boolean residentAnimated;
 
     private ScoreboardTemplateManager() {
     }
@@ -50,10 +56,12 @@ public final class ScoreboardTemplateManager {
 
     public static void configureRuntimeCapability(ScoreboardRuntimeCapability capability) {
         runtimeCapability = capability != null ? capability : ScoreboardRuntimeCapability.unavailable();
+        clearResident();
     }
 
     public static void clearRuntimeCapability() {
         runtimeCapability = ScoreboardRuntimeCapability.unavailable();
+        clearResident();
     }
 
     public static String getDefaultScoreboardId() {
@@ -116,10 +124,11 @@ public final class ScoreboardTemplateManager {
         if (storage == null) {
             return;
         }
+        refreshResident(storage);
         for (Player player : Bukkit.getOnlinePlayers()) {
             ActiveScoreboardState state = ACTIVE_SCOREBOARDS.get(player.getUniqueId());
             if (state != null) {
-                ScoreboardDefinition definition = getRuntimeScoreboard(state.scoreboardId());
+                ScoreboardDefinition definition = residentScoreboard(state.scoreboardId());
                 if (definition != null && definition.isEnabled()) {
                     applyTemplate(player, definition, state.usePapi());
                 } else {
@@ -127,10 +136,10 @@ public final class ScoreboardTemplateManager {
                 }
             }
         }
-        String defaultId = storage.getDefaultScoreboardId();
+        String defaultId = residentDefaultId;
         if (defaultId != null && !defaultId.isBlank()) {
-            boolean usePapi = storage.isDefaultScoreboardUsePapi();
-            ScoreboardDefinition definition = getRuntimeScoreboard(defaultId);
+            boolean usePapi = residentDefaultUsePapi;
+            ScoreboardDefinition definition = residentScoreboard(defaultId);
             if (definition != null && definition.isEnabled()) {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (!ACTIVE_SCOREBOARDS.containsKey(player.getUniqueId())) {
@@ -142,6 +151,7 @@ public final class ScoreboardTemplateManager {
     }
 
     public static void refreshActiveTemplates(FlowStorage storage, String scoreboardId) {
+        clearResident();
         if (storage == null || scoreboardId == null || scoreboardId.isBlank()) {
             return;
         }
@@ -253,13 +263,60 @@ public final class ScoreboardTemplateManager {
         if (storage == null) {
             return false;
         }
-        for (ActiveScoreboardState state : ACTIVE_SCOREBOARDS.values()) {
-            if (state != null && hasAnimation(getRuntimeScoreboard(state.scoreboardId()))) {
-                return true;
-            }
+        refreshResident(storage);
+        return residentAnimated;
+    }
+
+    static void clearResident() {
+        residentSequence = Long.MIN_VALUE;
+        residentDefaultId = null;
+        residentDefaultUsePapi = false;
+        residentAnimated = false;
+        RESIDENT_SCOREBOARDS.clear();
+    }
+
+    private static void refreshResident(FlowStorage storage) {
+        long sequence;
+        try {
+            sequence = storage.committedSequence();
+        } catch (RuntimeException ignored) {
+            clearResident();
+            return;
         }
         String defaultId = storage.getDefaultScoreboardId();
-        return defaultId != null && !defaultId.isBlank() && hasAnimation(getRuntimeScoreboard(defaultId));
+        boolean defaultUsePapi = storage.isDefaultScoreboardUsePapi();
+        if (sequence == residentSequence
+            && Objects.equals(defaultId, residentDefaultId)
+            && defaultUsePapi == residentDefaultUsePapi) {
+            return;
+        }
+        RESIDENT_SCOREBOARDS.clear();
+        residentSequence = sequence;
+        residentDefaultId = defaultId;
+        residentDefaultUsePapi = defaultUsePapi;
+        residentAnimated = false;
+        for (ActiveScoreboardState state : ACTIVE_SCOREBOARDS.values()) {
+            if (state != null && hasAnimation(residentScoreboard(state.scoreboardId()))) {
+                residentAnimated = true;
+                break;
+            }
+        }
+        if (!residentAnimated && defaultId != null && !defaultId.isBlank()) {
+            residentAnimated = hasAnimation(residentScoreboard(defaultId));
+        }
+    }
+
+    private static ScoreboardDefinition residentScoreboard(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        ResidentScoreboard cached = RESIDENT_SCOREBOARDS.get(id);
+        if (cached != null) {
+            return cached.definition();
+        }
+        ScoreboardDefinition definition = getRuntimeScoreboard(id);
+        RESIDENT_SCOREBOARDS.put(id, new ResidentScoreboard(definition));
+        return definition;
     }
 
     private static boolean applyTemplate(Player player, ScoreboardDefinition definition, boolean usePapi) {
@@ -390,6 +447,9 @@ public final class ScoreboardTemplateManager {
     }
 
     private record ActiveScoreboardState(String scoreboardId, boolean usePapi) {
+    }
+
+    private record ResidentScoreboard(ScoreboardDefinition definition) {
     }
 
     private record PacketScoreboardState(String objectiveId, int lineCount) {

@@ -266,6 +266,13 @@ public record RuntimeSemantics(
         return cancellation != Cancellation.NONE;
     }
 
+    public boolean ephemeral() {
+        return audit == Audit.NONE
+            && (idempotency == Idempotency.NONE || idempotency == Idempotency.INTRINSIC)
+            && cancellation == Cancellation.NONE
+            && retry == Retry.NEVER;
+    }
+
     public long executionBudgetMillis() {
         return timeoutMillis;
     }

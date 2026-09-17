@@ -159,10 +159,14 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
     public Optional<CommittedAsset> committedAsset(AssetKey key) {
         Objects.requireNonNull(key, "key");
         requireOpen();
-        ResourceEntry entry = context.state.resources().get(key);
+        CoordinatorState state = context.state;
+        ResourceEntry entry = state.resources().get(key);
         requireOpen();
-        return entry == null ? Optional.empty() : Optional.of(new CommittedAsset(
-            entry.state(), context.root.resolve(entry.path()).normalize(), entry.mutationId()));
+        if (entry == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new CommittedAsset(entry.state(), context.resolvedPath(key, entry, state.rootSequence()),
+            entry.mutationId()));
     }
 
     public long committedSequence() {
@@ -177,7 +181,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             requireOpen();
             context.lock.readLock().lock();
             try {
-                return reader.apply(context.state.snapshot(context.metadata, context.root));
+                return reader.apply(context.snapshotForRead());
             } finally {
                 context.lock.readLock().unlock();
             }
@@ -472,6 +476,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         private final CopyOnWriteArrayList<ListenerFailure> listenerFailures = new CopyOnWriteArrayList<>();
         private final PhaseTimings phaseTimings = new PhaseTimings();
         private volatile CoordinatorState state;
+        private volatile Snapshot cachedSnapshot;
         private AssetProjectMetadata metadata;
         private HistoryValidation historyValidation;
         private long fullValidationPasses = 1L;
@@ -1014,8 +1019,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                 }
                 historyValidation = new HistoryValidation(compactValidatedJournals(appended, nextState,
                     appendedTransition.stateIdentity));
-                state = nextState;
-                metadata = nextMetadata;
+                publishState(nextState, nextMetadata);
                 persistHistoryCheckpoint(appendedTransition.stateIdentity);
                 phaseTimings.finishAcceptedTip();
                 incrementalValidationPasses++;
@@ -1053,8 +1057,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                 }
                 throw failure;
             }
-            state = nextState;
-            metadata = nextMetadata;
+            publishState(nextState, nextMetadata);
             return result;
         }
 
@@ -1420,8 +1423,34 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             AssetProjectMetadata durableMetadata = readMetadata(projectFile);
             validatePair(stateFile, projectFile, durable, durableMetadata);
             validateAssets(root, durable, phaseTimings);
-            state = durable;
-            metadata = durableMetadata;
+            publishState(durable, durableMetadata);
+        }
+
+        private Snapshot snapshotForRead() {
+            Snapshot snapshot = cachedSnapshot;
+            if (snapshot != null) {
+                return snapshot;
+            }
+            snapshot = state.snapshot(metadata, root);
+            cachedSnapshot = snapshot;
+            return snapshot;
+        }
+
+        private Path resolvedPath(AssetKey key, ResourceEntry entry, long sequence) {
+            Snapshot snapshot = cachedSnapshot;
+            if (snapshot != null && snapshot.rootSequence() == sequence) {
+                Path path = snapshot.paths().get(key);
+                if (path != null) {
+                    return path;
+                }
+            }
+            return root.resolve(entry.path()).normalize();
+        }
+
+        private void publishState(CoordinatorState nextState, AssetProjectMetadata nextMetadata) {
+            state = nextState;
+            metadata = nextMetadata;
+            cachedSnapshot = null;
         }
 
         private void healthCheck() throws IOException {

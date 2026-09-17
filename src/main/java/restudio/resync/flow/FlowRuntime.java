@@ -55,6 +55,7 @@ public class FlowRuntime {
     private final ExecutionAuthority executionAuthority;
     private final CorrelationId invocationId;
     private BranchBaseline branchBaseline;
+    private boolean serverGlobalsReady;
 
     private final Deque<Frame> callStack = new ArrayDeque<>();
     private final Deque<LoopControl> loopControls = new ArrayDeque<>();
@@ -134,8 +135,14 @@ public class FlowRuntime {
 
     public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
                        NodeDefinitionRegistry nodeDefinitions, LegacyRuntimeActivationGate legacyRuntimeGate) {
+        this(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, legacyRuntimeGate, CorrelationId.random());
+    }
+
+    public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
+                       NodeDefinitionRegistry nodeDefinitions, LegacyRuntimeActivationGate legacyRuntimeGate, CorrelationId invocationId) {
         this(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions,
-            legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyAliases(), new ExecutionAuthority(), CorrelationId.random());
+            legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyAliases(), new ExecutionAuthority(),
+            invocationId != null ? invocationId : CorrelationId.random());
     }
 
     private FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
@@ -155,23 +162,22 @@ public class FlowRuntime {
         if (graph.getLocalVariables() != null) {
             graph.getLocalVariables().forEach(var -> localVariables.put(var.getName(), var.getInitialValue()));
         }
-
-        initializeServerGlobals();
     }
 
     private Map<String, Object> concurrentVariables(Map<String, Object> variables) {
+        if (variables == null || variables.isEmpty()) {
+            return new HashMap<>();
+        }
         if (variables instanceof ConcurrentMap<?, ?>) {
             return variables;
         }
-        Map<String, Object> concurrent = new ConcurrentHashMap<>();
-        if (variables != null) {
-            variables.forEach((key, value) -> {
-                if (key != null && value != null) {
-                    concurrent.put(key, value);
-                }
-            });
-        }
-        return concurrent;
+        HashMap<String, Object> copy = HashMap.newHashMap(variables.size());
+        variables.forEach((key, value) -> {
+            if (key != null && value != null) {
+                copy.put(key, value);
+            }
+        });
+        return copy;
     }
 
     public FlowRuntime createSubRuntime(FlowGraph subGraph) {
@@ -328,6 +334,13 @@ public class FlowRuntime {
         globalVariables.put("server.version", Bukkit.getVersion());
         globalVariables.put("server.bukkit_version", Bukkit.getBukkitVersion());
         globalVariables.put("server.port", server.getPort());
+        serverGlobalsReady = true;
+    }
+
+    private void ensureServerGlobals() {
+        if (!serverGlobalsReady) {
+            initializeServerGlobals();
+        }
     }
 
     public void triggerOutput(String pinName) {
@@ -667,6 +680,7 @@ public class FlowRuntime {
             return eventVariables.get(name);
         }
         if (name.startsWith("server.")) {
+            ensureServerGlobals();
             return globalVariables.get(name);
         }
         return localVariables.get(name);

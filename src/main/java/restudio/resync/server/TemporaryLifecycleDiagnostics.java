@@ -110,6 +110,11 @@ public final class TemporaryLifecycleDiagnostics {
         return SINK.get().enabled();
     }
 
+    public static boolean recordsNormal() {
+        DiagnosticSink.Status status = SINK.get().status();
+        return status.enabled() && !status.failed() && status.mode().accepts(DiagnosticSink.Priority.NORMAL);
+    }
+
     public static DiagnosticSink.Status status() {
         return SINK.get().status();
     }
@@ -337,6 +342,9 @@ public final class TemporaryLifecycleDiagnostics {
             return;
         }
         if (!status.enabled()) {
+            return;
+        }
+        if (!status.mode().accepts(LifecycleDiagnosticPolicy.priority(stage, values, terminal))) {
             return;
         }
         try {

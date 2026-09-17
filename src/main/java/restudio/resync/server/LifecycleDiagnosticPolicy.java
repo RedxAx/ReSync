@@ -66,7 +66,10 @@ final class LifecycleDiagnosticPolicy {
             return parseMode(explicit);
         }
         String legacy = firstNonBlank(legacyProperty, legacyEnvironment);
-        return legacy.isBlank() || truthy(legacy) ? DiagnosticSink.Mode.RECOVERY : DiagnosticSink.Mode.OFF;
+        if (legacy.isBlank()) {
+            return DiagnosticSink.Mode.NORMAL;
+        }
+        return truthy(legacy) ? DiagnosticSink.Mode.NORMAL : DiagnosticSink.Mode.OFF;
     }
 
     static DiagnosticSink.Mode resolveFromProcess() {
@@ -80,8 +83,8 @@ final class LifecycleDiagnosticPolicy {
             return DiagnosticSink.Mode.OFF;
         }
         return switch (value.strip().toLowerCase(Locale.ROOT)) {
-            case "on", "true", "yes", "1", "recovery" -> DiagnosticSink.Mode.RECOVERY;
-            case "normal", "important" -> DiagnosticSink.Mode.NORMAL;
+            case "on", "true", "yes", "1", "normal", "important" -> DiagnosticSink.Mode.NORMAL;
+            case "recovery" -> DiagnosticSink.Mode.RECOVERY;
             case "verbose", "trace", "all" -> DiagnosticSink.Mode.VERBOSE;
             case "off", "false", "no", "0", "disabled" -> DiagnosticSink.Mode.OFF;
             default -> DiagnosticSink.Mode.OFF;
@@ -89,14 +92,14 @@ final class LifecycleDiagnosticPolicy {
     }
 
     static DiagnosticSink.Priority priority(String stage, Map<String, ?> values, boolean terminal) {
-        if (terminal) {
-            return DiagnosticSink.Priority.TERMINAL;
-        }
-        String normalizedStage = stage == null ? "" : stage.toLowerCase(Locale.ROOT);
-        if (normalizedStage.contains("terminal")) {
-            return DiagnosticSink.Priority.TERMINAL;
-        }
         String outcome = text(values == null ? null : values.get("outcome"));
+        String normalizedStage = stage == null ? "" : stage.toLowerCase(Locale.ROOT);
+        if (terminal || normalizedStage.contains("terminal")) {
+            if ("success".equalsIgnoreCase(outcome) || "completed".equalsIgnoreCase(outcome)) {
+                return DiagnosticSink.Priority.NORMAL;
+            }
+            return DiagnosticSink.Priority.TERMINAL;
+        }
         String failure = (normalizedStage + " " + outcome + " "
             + text(values == null ? null : values.get("reason")) + " "
             + text(values == null ? null : values.get("status"))).toLowerCase(Locale.ROOT);

@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class RuntimePlanLease implements AutoCloseable {
+    private static final ContentHash OMITTED_HASH = ContentHash.of("0".repeat(64));
     private static final ScheduledExecutorService TIMER = Executors.newScheduledThreadPool(1, daemonThreadFactory("resync-runtime-timer"));
     private static final Set<String> RUNTIME_CODES = Set.of(
         "RUNTIME.AUTHORIZATION_DENIED",
@@ -214,7 +215,7 @@ public final class RuntimePlanLease implements AutoCloseable {
         }
 
         long deadlineMillis = effectiveDeadline(binding, suppliedToken, providerToken, bindingToken);
-        ContentHash invocationInputHash = inputHash(invocationInputs, runtimeContext, deadlineMillis);
+        ContentHash invocationInputHash = inputHash(binding, invocationInputs, runtimeContext, deadlineMillis);
         RuntimeResult policyFailure;
         try {
             policyFailure = preflight(binding, invocationInputs);
@@ -233,6 +234,15 @@ public final class RuntimePlanLease implements AutoCloseable {
             preExecutionFailure = timeoutResult(binding);
         } else if (binding.descriptor().semantics().cancellable() && suppliedToken != null && suppliedToken.isCancelled()) {
             preExecutionFailure = cancellationResult(binding);
+        }
+        if (binding.descriptor().semantics().ephemeral()
+            && deadlineMillis == RuntimeExecutionContext.NO_DEADLINE) {
+            if (preExecutionFailure != null) {
+                invocationFinished();
+                return CompletableFuture.completedFuture(preExecutionFailure);
+            }
+            return executeEphemeral(binding, invocationInputs, normalizedKey, suppliedToken, runtimeContext,
+                rootInvocationId);
         }
 
         CompletableFuture<RuntimeResult> outcome = null;
@@ -439,7 +449,7 @@ public final class RuntimePlanLease implements AutoCloseable {
                 && binding.descriptor().semantics().idempotency() == RuntimeSemantics.Idempotency.MUTATION_ID
                 ? idempotencyKey : input.mutationId(),
             invocationInputHash,
-            contextHash(runtimeContext),
+            contextHash(binding, runtimeContext),
             deadlineMillis,
             leaseId);
     }
@@ -468,9 +478,12 @@ public final class RuntimePlanLease implements AutoCloseable {
             provenance).leaseEvent();
     }
 
-    private static ContentHash inputHash(Map<PinId, TypedValue> inputs,
+    private static ContentHash inputHash(RuntimeBinding binding, Map<PinId, TypedValue> inputs,
                                          CompiledRuntimeContext runtimeContext,
                                          long deadlineMillis) {
+        if (!needsCanonicalHashes(binding)) {
+            return OMITTED_HASH;
+        }
         Map<String, Object> values = new TreeMap<>();
         inputs.forEach((pin, value) -> values.put(pin.canonicalText(), value.canonicalValue()));
         Map<String, Object> canonical = new TreeMap<>();
@@ -482,16 +495,80 @@ public final class RuntimePlanLease implements AutoCloseable {
 
     private static Map<PinId, TypedValue> immutableInputs(Map<PinId, TypedValue> inputs) {
         Objects.requireNonNull(inputs, "Inputs Are Required");
-        Map<PinId, TypedValue> copy = new TreeMap<>();
+        Map<PinId, TypedValue> copy = HashMap.newHashMap(inputs.size());
         inputs.forEach((pin, value) -> copy.put(
             Objects.requireNonNull(pin, "Input Pin Cannot Be Null"),
             Objects.requireNonNull(value, "Input Value Cannot Be Null")));
         return Collections.unmodifiableMap(copy);
     }
 
-    private static ContentHash contextHash(CompiledRuntimeContext runtimeContext) {
+    private static ContentHash contextHash(RuntimeBinding binding, CompiledRuntimeContext runtimeContext) {
+        if (!needsCanonicalHashes(binding)) {
+            return OMITTED_HASH;
+        }
         return ContentHash.of(CanonicalJson.sha256("runtime-context",
             runtimeContext == null ? Map.of() : runtimeContext.canonicalValue()));
+    }
+
+    private static boolean needsCanonicalHashes(RuntimeBinding binding) {
+        RuntimeSemantics semantics = binding.descriptor().semantics();
+        return semantics.audit() != RuntimeSemantics.Audit.NONE
+            || semantics.idempotency() == RuntimeSemantics.Idempotency.MUTATION_ID
+            || semantics.idempotency() == RuntimeSemantics.Idempotency.OPERATION_KEY;
+    }
+
+    private CompletionStage<RuntimeResult> executeEphemeral(
+        RuntimeBinding binding,
+        Map<PinId, TypedValue> inputs,
+        String idempotencyKey,
+        RuntimeCancellationToken suppliedToken,
+        CompiledRuntimeContext runtimeContext,
+        CorrelationId invocationId
+    ) {
+        RuntimeCancellationToken token = suppliedToken != null ? suppliedToken : bindingTokens.get(binding.key());
+        RuntimeInvocation invocation = new RuntimeInvocation(binding.key(), inputs, idempotencyKey, token)
+            .withRuntimeContext(runtimeContext)
+            .withInvocationId(invocationId);
+        AtomicReference<RuntimeExecutionContext> executionContext = new AtomicReference<>();
+        CompletionStage<RuntimeResult> stage;
+        try {
+            stage = invoke(binding, invocation, executionContext, RuntimeExecutionContext.NO_DEADLINE);
+        } catch (Throwable throwable) {
+            invocationFinished();
+            return CompletableFuture.completedFuture(normalizeFailure(binding, throwable,
+                RuntimeExecutionContext.NO_DEADLINE));
+        }
+        if (stage == null) {
+            invocationFinished();
+            return CompletableFuture.completedFuture(runtimeFailureResult(binding, "RUNTIME.INVALID_INVOCATION",
+                "Runtime Handler Returned No Result"));
+        }
+        if (stage instanceof CompletableFuture<?> future && future.isDone()) {
+            RuntimeResult result;
+            try {
+                result = (RuntimeResult) future.join();
+            } catch (Throwable throwable) {
+                result = normalizeFailure(binding, throwable, RuntimeExecutionContext.NO_DEADLINE);
+            }
+            if (result == null) {
+                result = runtimeFailureResult(binding, "RUNTIME.INVALID_INVOCATION",
+                    "Runtime Handler Returned No Result");
+            }
+            RuntimeResult validated = validateAttemptResult(binding, result, executionContext.get(), false);
+            invocationFinished();
+            return CompletableFuture.completedFuture(validated);
+        }
+        CompletableFuture<RuntimeResult> outcome = new CompletableFuture<>();
+        stage.whenComplete((result, failure) -> {
+            RuntimeResult terminal = failure != null
+                ? normalizeFailure(binding, failure, RuntimeExecutionContext.NO_DEADLINE)
+                : result == null
+                    ? runtimeFailureResult(binding, "RUNTIME.INVALID_INVOCATION", "Runtime Handler Returned No Result")
+                    : validateAttemptResult(binding, result, executionContext.get(), false);
+            outcome.complete(terminal);
+            invocationFinished();
+        });
+        return outcome;
     }
 
     private void runAttempts(
@@ -545,12 +622,10 @@ public final class RuntimePlanLease implements AutoCloseable {
                 RuntimeResult cancelled = deadlineTriggered(deadlineMillis, suppliedToken, providerToken, bindingToken)
                     ? timeoutResult(binding)
                     : cancellationResult(binding);
-                    completeOutcome(binding, idempotencyKey, outcome,
-                    validateAttemptResult(binding, cancelled, executionContext.get(), true), invocationInputHash,
+                RuntimeResult validated = validateAttemptResult(binding, cancelled, executionContext.get(), true);
+                releaseAttempt.run();
+                completeOutcome(binding, idempotencyKey, outcome, validated, invocationInputHash,
                     runtimeContext, deadlineMillis, invocationId);
-                if (!stageAttached.get()) {
-                    releaseAttempt.run();
-                }
             }
         };
         if (cancellable && suppliedToken != null) {
@@ -722,8 +797,11 @@ public final class RuntimePlanLease implements AutoCloseable {
     ) {
         RuntimeOperationHandler handler = binding.handler().orElseThrow(() ->
             new RuntimeCapabilityUnavailableException(binding.key(), "binding has no handler"));
+        RuntimePrincipal principal = invocation.runtimeContext() != null && invocation.runtimeContext().principal() != null
+            ? invocation.runtimeContext().principal()
+            : input.principal();
         RuntimeExecutionContext context = new RuntimeExecutionContext(
-            binding.descriptor(), input.authority(), input.principal(), deadlineMillis);
+            binding.descriptor(), input.authority(), principal, deadlineMillis);
         executionContext.set(context);
         invocation.throwIfCancelled();
         RuntimeSemantics semantics = binding.descriptor().semantics();

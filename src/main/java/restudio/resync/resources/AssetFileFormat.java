@@ -81,7 +81,10 @@ public final class AssetFileFormat {
     }
 
     public static boolean verify(Path file) {
-        JsonObject object = readObject(file);
+        return verify(readObject(file));
+    }
+
+    public static boolean verify(JsonObject object) {
         if (object == null) {
             return false;
         }
@@ -89,8 +92,17 @@ public final class AssetFileFormat {
         if (expected.isBlank()) {
             return true;
         }
-        object.remove(CONTENT_HASH);
-        return expected.equals(StorageSafety.sha256(GSON.toJson(object)));
+        JsonObject copy = object.deepCopy();
+        copy.remove(CONTENT_HASH);
+        return expected.equals(StorageSafety.sha256(GSON.toJson(copy)));
+    }
+
+    public static long revisionOf(JsonObject object) {
+        return number(object, REVISION, 0L);
+    }
+
+    public static String contentHashOf(JsonObject object) {
+        return text(object, CONTENT_HASH);
     }
 
     public static String idOnlyFileName(String id) {

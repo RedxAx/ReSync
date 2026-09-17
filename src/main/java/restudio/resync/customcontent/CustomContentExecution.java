@@ -156,14 +156,13 @@ public final class CustomContentExecution implements CoreGraphResourceAuthority,
     }
 
     public FlowGraph graph(String id) {
-        if (closed) {
-            return null;
-        }
-        Projection projection = projections.get(resource(id));
-        if (projection == null || !projection.stamp().equals(storage.readMutationStamp(id))) {
-            return null;
-        }
-        return projection.graph();
+        Projection projection = projection(id);
+        return projection == null ? null : projection.graph();
+    }
+
+    FlowResourceMutationStamp projectionStamp(String id) {
+        Projection projection = projection(id);
+        return projection == null ? null : projection.stamp();
     }
 
     private static FlowGraph executionProjection(GraphDocument document, FlowResourceMutationStamp stamp) {
@@ -189,8 +188,11 @@ public final class CustomContentExecution implements CoreGraphResourceAuthority,
         if (closed || current == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Custom content compiled execution is unavailable"));
         }
-        if (TYPE.equals(graph.getResourceType()) && graph(graph.getId()) != graph) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Custom content compiled execution changed before dispatch"));
+        if (TYPE.equals(graph.getResourceType())) {
+            Projection projection = projection(graph.getId());
+            if (projection == null || projection.graph() != graph) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Custom content compiled execution changed before dispatch"));
+            }
         }
         return current.execute(graph, start, player, event, variables);
     }
@@ -263,6 +265,13 @@ public final class CustomContentExecution implements CoreGraphResourceAuthority,
     private boolean content(ServerResourceLocator resource) {
         return TYPE.equals(resource.resourceType().value()) && resource.serverId().equals(serverId)
             && resource.owner().equals(OwnerId.of("restudio.resync"));
+    }
+
+    private Projection projection(String id) {
+        if (closed || id == null || id.isBlank()) {
+            return null;
+        }
+        return projections.get(resource(id));
     }
 
     private ServerResourceLocator resource(String id) {

@@ -80,7 +80,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             Player target = requirePlayer(ctx, node, "target");
             String text = ctx.getInputValue(node, "text", String.class, "");
             if (text.isBlank()) throw new IllegalArgumentException("Message text is required");
-            runSync(() -> target.sendMessage(TextFormatter.formatLegacy(text)));
+            runSync(() -> target.sendMessage(TextFormatter.parse(text)));
         });
 
         operations.put("player_kick", (ctx, node) -> {
@@ -641,7 +641,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             Player target = requirePlayer(ctx, node, "target");
             String text = ctx.getInputValue(node, "text", String.class, "");
             if (text.isBlank()) throw new IllegalArgumentException("Message text is required");
-            String message = TextFormatter.formatLegacy(text);
+            Component message = TextFormatter.parse(text);
             runSync(() -> target.sendMessage(message));
         });
 

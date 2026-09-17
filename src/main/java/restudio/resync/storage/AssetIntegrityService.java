@@ -94,7 +94,8 @@ public final class AssetIntegrityService {
 
     private void inspect(Path file, List<ResourceIdentity> resources, List<Issue> issues) {
         try {
-            JsonElement parsed = JsonParser.parseString(StorageSafety.readUtf8(file));
+            String json = StorageSafety.readUtf8(file);
+            JsonElement parsed = JsonParser.parseString(json);
             if (!parsed.isJsonObject()) {
                 issues.add(issue(Severity.CRITICAL, "INVALID_RESOURCE", "", file, "Resource root is not an object"));
                 return;
@@ -111,10 +112,10 @@ public final class AssetIntegrityService {
             if (id.isBlank()) {
                 issues.add(issue(Severity.CRITICAL, "MISSING_RESOURCE_ID", "", file, "Resource id is missing"));
             }
-            if (!verifyIntegrity(file, object, type)) {
+            if (!verifyIntegrity(json, object, type)) {
                 issues.add(issue(Severity.CRITICAL, "HASH_MISMATCH", id, file, "Resource integrity check failed"));
             }
-            resources.add(new ResourceIdentity(type, id, file, AssetFileFormat.readRevision(file), AssetFileFormat.readContentHash(file)));
+            resources.add(new ResourceIdentity(type, id, file, AssetFileFormat.revisionOf(object), AssetFileFormat.contentHashOf(object)));
         } catch (RuntimeException | IOException failure) {
             issues.add(issue(Severity.CRITICAL, "INVALID_JSON", "", file, failure.getMessage()));
         }
@@ -248,16 +249,16 @@ public final class AssetIntegrityService {
         return path.startsWith(assetsRoot) ? path : null;
     }
 
-    private boolean verifyIntegrity(Path file, JsonObject object, String type) throws IOException {
+    private boolean verifyIntegrity(String json, JsonObject object, String type) {
         if (GRAPH_TYPES.contains(type) && object.has(CoreGraphStorageBoundary.CORE_PAYLOAD_KIND)) {
             try {
-                coreGraphs.decode(Files.readAllBytes(file));
+                coreGraphs.decodeText(json);
                 return true;
             } catch (RuntimeException exception) {
                 return false;
             }
         }
-        return AssetFileFormat.verify(file);
+        return AssetFileFormat.verify(object);
     }
 
     private boolean isCanonical(ResourceIdentity resource, Path expected) {

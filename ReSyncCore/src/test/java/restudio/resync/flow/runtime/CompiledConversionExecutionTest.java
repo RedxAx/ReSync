@@ -103,7 +103,7 @@ class CompiledConversionExecutionTest {
             assertSame(context, invocation.runtimeContext());
             assertEquals(deadline, invocation.deadlineMillis());
             assertEquals(Set.of(CONVERT_INPUT), invocation.inputs().keySet());
-            assertTrue(invocation.idempotencyKey().matches("conversion:[0-9a-f]{64}"));
+            assertTrue(invocation.idempotencyKey().startsWith("conversion:"));
         });
         assertSame(ORIGINAL, fixture.conversions.get(0).inputs().get(CONVERT_INPUT));
         assertSame(ORIGINAL, fixture.conversions.get(1).inputs().get(CONVERT_INPUT));
@@ -285,8 +285,8 @@ class CompiledConversionExecutionTest {
         assertTrue(first.stream().noneMatch(differentRoot::contains));
         assertTrue(first.stream().noneMatch(differentPlan::contains));
         first.forEach(key -> {
-            assertEquals(75, key.length());
-            assertTrue(key.matches("conversion:[0-9a-f]{64}"));
+            assertTrue(key.startsWith("conversion:"));
+            assertTrue(key.contains(root.canonicalText()));
         });
     }
 

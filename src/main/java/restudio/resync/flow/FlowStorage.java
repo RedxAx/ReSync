@@ -2868,7 +2868,17 @@ public class FlowStorage {
     }
 
     private ScoreboardDefinition copyScoreboard(ScoreboardDefinition scoreboard) {
-        return scoreboard == null ? null : FlowSerializer.deserializeScoreboard(FlowSerializer.serializeScoreboard(scoreboard));
+        if (scoreboard == null) {
+            return null;
+        }
+        ScoreboardDefinition copy = new ScoreboardDefinition();
+        copy.setId(scoreboard.getId());
+        copy.setEnabled(scoreboard.isEnabled());
+        copy.setTitle(scoreboard.getTitle());
+        copy.setObjectiveId(scoreboard.getObjectiveId());
+        copy.setDisplaySlot(scoreboard.getDisplaySlot());
+        copy.setLines(scoreboard.getLines() == null ? new ArrayList<>() : new ArrayList<>(scoreboard.getLines()));
+        return copy;
     }
 
     private TabDefinition copyTab(TabDefinition tab) {
@@ -4289,6 +4299,15 @@ public class FlowStorage {
 
     public int getTabRefreshIntervalTicks() {
         return tabRefreshIntervalTicks;
+    }
+
+    public long committedSequence() {
+        AssetTransactionCoordinator coordinator = assetTransactions;
+        if (coordinator == null) {
+            return 0L;
+        }
+        coordinator.requireOpen();
+        return coordinator.committedSequence();
     }
 
     public synchronized void setTabRefreshIntervalTicks(int ticks) {
@@ -7800,20 +7819,27 @@ public class FlowStorage {
             AssetTransactionCoordinator.AssetKey key = assetKey(type, id);
             AssetTransactionCoordinator.ExpectedState state = snapshot.state(key)
                 .orElse(AssetTransactionCoordinator.Missing.INSTANCE);
+            if (!(state instanceof AssetTransactionCoordinator.Live live)) {
+                return Optional.empty();
+            }
+            CachedResourceIdentity cached = resourceCacheIdentities(type).get(id);
+            String mutation = snapshot.mutationValue(key).orElse("");
+            if (cached != null && cached.revision() == live.revision() && cached.mutationId().equals(mutation)) {
+                return Optional.of(cached);
+            }
             Path file = snapshot.path(key).orElse(null);
-            if (!(state instanceof AssetTransactionCoordinator.Live live) || file == null
+            if (file == null
                 || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
                 || !type.equals(AssetFileFormat.readResourceType(file))
                 || live.revision() != AssetFileFormat.readRevision(file)
-                || !Objects.equals(snapshot.mutationValue(key).orElse(""), AssetFileFormat.readMutationId(file))
+                || !mutation.equals(AssetFileFormat.readMutationId(file))
                 || !AssetFileFormat.verify(file)) {
                 return Optional.empty();
             }
             if (!live.hash().equals(StorageSafety.sha256(Files.readAllBytes(file)))) {
                 return Optional.empty();
             }
-            return Optional.of(new CachedResourceIdentity(live.revision(),
-                snapshot.mutationValue(key).orElse(""), AssetFileFormat.readContentHash(file)));
+            return Optional.of(new CachedResourceIdentity(live.revision(), mutation, AssetFileFormat.readContentHash(file)));
         } catch (IOException | RuntimeException exception) {
             return Optional.empty();
         }

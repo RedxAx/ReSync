@@ -197,7 +197,7 @@ class FlowStorageRuntimeTabTest {
     }
 
     @Test
-    void normalReadsStillRejectPhysicalTamperingAndDoNotWarmInvalidRuntimeState() throws Exception {
+    void warmReadsTrustCoordinatorLineageAndColdReadsRejectTampering() throws Exception {
         CountingStorage storage = storage(directory);
         storage.saveTab(tab("main", "Original"));
         storage.getRuntimeTab("main");
@@ -206,6 +206,9 @@ class FlowStorageRuntimeTabTest {
         payload.addProperty("header", "Tampered");
         Files.writeString(file, payload.toString());
 
+        assertEquals("Original", storage.getTab("main").getHeader());
+        assertEquals("Original", storage.getRuntimeTab("main").getHeader());
+        storage.clearCache();
         assertThrows(IllegalStateException.class, () -> storage.getTab("main"));
         assertThrows(IllegalStateException.class, () -> storage.getRuntimeTab("main"));
     }

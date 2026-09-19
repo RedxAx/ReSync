@@ -180,6 +180,17 @@ class CompiledRuntimeValueCodecTest {
     }
 
     @Test
+    void playerHostMapsDecodeAsEntityAndLivingEntityTargets() {
+        TypedValue encoded = encode("player", player);
+        assertSame(player, decode(TypedValue.value(type("entity"), encoded.value())));
+        assertSame(player, decode(TypedValue.value(type("living_entity"), encoded.value())));
+        Entity entity = world.spawnEntity(new Location(world, 5, 65, 5), EntityType.ZOMBIE);
+        TypedValue living = encode("living_entity", entity);
+        assertSame(entity, decode(TypedValue.value(type("entity"), living.value())));
+        assertThrows(IllegalArgumentException.class, () -> decode(TypedValue.value(type("player"), living.value())));
+    }
+
+    @Test
     void rejectsMovedWorldIdentityAndMissingLoadedWorld() {
         TypedValue encoded = encode("entity", player);
         assertThrows(IllegalArgumentException.class, () -> decode(changed(encoded, "worldId", UUID.randomUUID().toString())));
@@ -259,6 +270,12 @@ class CompiledRuntimeValueCodecTest {
         assertEquals("STONE", decode(encode("material", Material.STONE)));
         assertNull(decode(TypedValue.nullValue(type("player"))));
         assertEquals(new Vector(1, 2, 3), decode(encode("vector", new Vector(1, 2, 3))));
+        TypedValue anyPlayer = encode("any", player);
+        assertEquals(type("any"), anyPlayer.type());
+        Object portablePlayer = decode(anyPlayer);
+        assertInstanceOf(Map.class, portablePlayer);
+        assertSame(player, decode(encode("player", portablePlayer)));
+        assertSame(player, decode(encode("player", decode(encode("any", encode("player", player))))));
     }
 
     @Test

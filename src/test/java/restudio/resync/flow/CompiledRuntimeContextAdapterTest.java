@@ -86,10 +86,21 @@ class CompiledRuntimeContextAdapterTest {
         assertTrue(result.accepted());
         assertEquals(player.getUniqueId(), result.context().player().uniqueId());
         assertEquals(PlayerJoinEvent.class.getName(), result.context().event().type());
-        assertEquals(List.of("event.count", "event.message", "event.values"), result.context().variables().keySet().stream().toList());
+        assertEquals(List.of("event.count", "event.message", "event.player", "event.values"), result.context().variables().keySet().stream().toList());
         assertEquals(2, result.context().variables().get("event.count").value());
         assertEquals(Arrays.asList("a", null), result.context().variables().get("event.values").value());
         assertEquals(PlayerJoinEvent.class.getName(), result.context().event().type());
+    }
+
+    @Test
+    void injectsCanonicalEventPlayerWhenTheHostOmitsIt() {
+        Player player = MockBukkit.getMock().addPlayer();
+        CompiledRuntimeContextAdapter.Result result = CompiledRuntimeContextAdapter.adapt(
+            SERVER, player, null, Map.of("event.message", "go"));
+
+        assertTrue(result.accepted(), result.failure());
+        assertTrue(result.context().variables().containsKey("event.player"));
+        assertEquals(player, CompiledRuntimeValueCodec.decode(SERVER, result.context().variables().get("event.player")));
     }
 
     @Test

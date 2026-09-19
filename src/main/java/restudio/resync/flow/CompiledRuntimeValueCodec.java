@@ -104,15 +104,25 @@ public final class CompiledRuntimeValueCodec {
 
         private TypedValue typed(TypeExpr type, Object raw, int depth) {
             if (raw instanceof TypedValue value) {
-                if (!type.equals(value.type())) throw invalid("Type Mismatch");
-                decoded(value, depth);
-                return value;
+                if (type.equals(value.type())) {
+                    decoded(value, depth);
+                    return value;
+                }
+                if (isAny(type) && hostNamed(value.type())) {
+                    decoded(value, depth);
+                    return TypedValue.value(type, value.value());
+                }
+                throw invalid("Type Mismatch");
             }
             if (raw instanceof Optional<?> optional && type instanceof TypeExpr.OptionalType) raw = optional.orElse(null);
             if (raw instanceof ItemStack item && item.isEmpty()) raw = null;
             if (raw == null) {
                 material(type, null, depth);
                 return TypedValue.nullValue(type);
+            }
+            if (isAny(type) && runtimeType(raw) instanceof TypeExpr.Named host) {
+                claim(depth);
+                return TypedValue.value(type, encodeHost(host.reference().localId(), raw));
             }
             if (type instanceof TypeExpr.UnionType) throw invalid("Union Values Require An Explicit Typed Variant");
             Object value = material(type, raw, depth);
@@ -294,7 +304,7 @@ public final class CompiledRuntimeValueCodec {
             if (!value.keySet().equals(fields)) throw invalid("Reference Fields Do Not Match The Declared Type");
             if ("vector".equals(id)) return new Vector(number(value, "x"), number(value, "y"), number(value, "z"));
             if ("item".equals(id) || "itemstack".equals(id)) return item(value);
-            if (!id.equals(value.get("kind"))) throw invalid("Reference Kind Mismatch");
+            if (!compatibleHostKind(id, value.get("kind"))) throw invalid("Reference Kind Mismatch");
             requireIdentity(value);
             World world = resolveWorld(value);
             return switch (id) {
@@ -459,6 +469,16 @@ public final class CompiledRuntimeValueCodec {
             return entity;
         }
 
+        private static boolean compatibleHostKind(String requested, Object actual) {
+            if (requested.equals(actual)) {
+                return true;
+            }
+            if ("entity".equals(requested)) {
+                return "player".equals(actual) || "living_entity".equals(actual);
+            }
+            return "living_entity".equals(requested) && "player".equals(actual);
+        }
+
         private void requireEntity(String id, Entity entity, boolean capture) {
             if ("player".equals(id) && !(entity instanceof Player) || "living_entity".equals(id) && !(entity instanceof LivingEntity)) {
                 throw invalid("Entity Type Mismatch");
@@ -505,6 +525,16 @@ public final class CompiledRuntimeValueCodec {
 
     private static boolean builtin(TypeExpr.Named type) {
         return "builtin".equals(type.reference().ownerId()) && type.arguments().isEmpty();
+    }
+
+    private static boolean isAny(TypeExpr type) {
+        return type instanceof TypeExpr.Named named && builtin(named) && "any".equals(named.reference().localId());
+    }
+
+    private static boolean hostNamed(TypeExpr type) {
+        return type instanceof TypeExpr.Named named && builtin(named)
+            && List.of("player", "living_entity", "entity", "world", "block", "location", "vector", "item", "itemstack", "inventory")
+                .contains(named.reference().localId());
     }
 
     private static Map<?, ?> object(Object value) {

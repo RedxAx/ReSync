@@ -77,10 +77,11 @@ public final class CompiledRuntimeContextAdapter {
                         || !playerIdentity.uniqueId().equals(eventPlayer.getUniqueId())) {
                         throw new IllegalArgumentException("event.player must match the canonical player identity");
                     }
-                    transport.claimValue();
-                    continue;
                 }
                 variables.put(key, encode(value, serverId, transport));
+            }
+            if (player != null && !variables.containsKey("event.player")) {
+                variables.put("event.player", encode(player, serverId, transport));
             }
             Map<String, TypedValue> eventAttributes = new LinkedHashMap<>(variables);
             if (event != null) {

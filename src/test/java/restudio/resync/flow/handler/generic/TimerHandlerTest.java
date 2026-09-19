@@ -2,6 +2,7 @@ package restudio.resync.flow.handler.generic;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,8 @@ import restudio.flow.data.FlowResourceReference;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.automation.AutomationDefinitionRegistry;
+import restudio.resync.flow.automation.AutomationInstanceKey;
+import restudio.resync.flow.automation.AutomationScope;
 import restudio.resync.flow.automation.AutomationTaskService;
 import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.OwnerId;
@@ -139,13 +142,50 @@ class TimerHandlerTest {
             ? reference.id() : null);
     }
 
+    @Test
+    void serverScopedTimerKeepsTheStartingPlayerAsTheEventOwner() {
+        storage.save(ReSyncResourceCatalog.TIMER_DEFINITION, JsonParser.parseString("""
+            {
+              "id": "owned_timer",
+              "name": "Owned Timer",
+              "scope": "server",
+              "defaultDuration": 1,
+              "defaultUnit": "seconds"
+            }
+            """).getAsJsonObject());
+        AutomationDefinitionRegistry definitions = new AutomationDefinitionRegistry(storage);
+        tasks = new AutomationTaskService(plugin, definitions);
+        TimerHandler handler = new TimerHandler(definitions, tasks);
+        FlowNode node = new FlowNode("automation.timer", 0, 0, Map.of());
+        node.setHandlerConfig(Map.of("operation", "timer"));
+        Player player = MockBukkit.getMock().addPlayer();
+        TestFlowContext context = new TestFlowContext(player, Map.of(
+            "timer", "owned_timer",
+            "action", "Start",
+            "duration", 2D,
+            "unit", "Seconds"
+        ));
+
+        handler.execute(context, node);
+
+        AutomationTaskService.TaskSnapshot snapshot = tasks.check(
+            new AutomationInstanceKey("owned_timer", AutomationScope.SERVER, "server"));
+        assertEquals(player, snapshot.owner());
+        assertEquals("server", snapshot.ownerId());
+        assertEquals("active", context.outputs.get("state"));
+    }
+
     private static final class TestFlowContext extends FlowContext {
         private final Map<String, Object> inputs;
         private final Map<String, Object> outputs = new HashMap<>();
         private String triggeredOutput;
 
         private TestFlowContext(Map<String, Object> inputs) {
-            super(null, null, null);
+            this(null, inputs);
+        }
+
+        private TestFlowContext(Player player, Map<String, Object> inputs) {
+            super(null, player, null);
             this.inputs = inputs;
         }
 

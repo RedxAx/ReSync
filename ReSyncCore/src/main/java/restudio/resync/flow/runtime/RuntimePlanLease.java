@@ -1191,6 +1191,7 @@ public final class RuntimePlanLease implements AutoCloseable {
         return Diagnostic.builder(code, DiagnosticSeverity.ERROR, DiagnosticPhase.ENVIRONMENT, "execution")
             .messageKey(new ContractRef<>(new OwnerId("restudio.resync"), new NodeId(localId)))
             .message(normalizedMessage)
+            .evidence(Map.of("reason", normalizedMessage))
             .remediation("Inspect the runtime execution diagnostic.")
             .correlationId(UUID.randomUUID())
             .build();

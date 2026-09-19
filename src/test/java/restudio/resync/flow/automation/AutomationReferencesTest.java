@@ -23,6 +23,14 @@ class AutomationReferencesTest {
     private static final ServerId SERVER = ServerId.deterministic("automation-reference-test");
 
     @Test
+    void canonicalLocatorTextResolvesToDefinitionId() {
+        ServerResourceLocator locator = new ServerResourceLocator(SERVER,
+            ContractRef.of(OwnerId.of("builtin"), ResourceTypeId.of(ReSyncResourceCatalog.TIMER_DEFINITION)), "agentTimer");
+
+        assertEquals("agentTimer", AutomationReferences.id(locator.canonicalText()));
+    }
+
+    @Test
     void typedAutomationLocatorsPreserveExactDefinitionIdsAcrossAllFamilies() {
         for (String kind : List.of(ReSyncResourceCatalog.VARIABLE_DEFINITION, ReSyncResourceCatalog.TIMER_DEFINITION,
             ReSyncResourceCatalog.SCHEDULE_DEFINITION)) {

@@ -15,12 +15,22 @@ public record AutomationOwner(String id, Object value) {
 
     public static AutomationOwner resolve(AutomationScope scope, FlowContext context, Object owner) {
         return switch (scope) {
-            case FLOW -> new AutomationOwner(flowId(context), null);
-            case SERVER -> new AutomationOwner("server", null);
+            case FLOW -> new AutomationOwner(flowId(context), actor(owner, context));
+            case SERVER -> new AutomationOwner("server", actor(owner, context));
             case PLAYER -> entityOwner(owner != null ? owner : context.getPlayer(), "Player");
             case ENTITY -> entityOwner(owner, "Entity");
             case NETWORK -> textOwner(owner, "Network owner");
         };
+    }
+
+    private static Object actor(Object owner, FlowContext context) {
+        if (owner instanceof Entity || owner instanceof UUID) {
+            return owner;
+        }
+        if (owner instanceof String text && !text.isBlank()) {
+            return text;
+        }
+        return context != null ? context.getPlayer() : null;
     }
 
     private static AutomationOwner entityOwner(Object value, String label) {

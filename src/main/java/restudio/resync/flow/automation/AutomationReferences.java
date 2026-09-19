@@ -15,8 +15,20 @@ public final class AutomationReferences {
             case FlowResourceReference reference -> reference.id();
             case Map<?, ?> map when map.get("id") != null -> map.get("id").toString();
             case Map<?, ?> map when map.get("resourceId") != null -> map.get("resourceId").toString();
+            case String text -> locatorId(text);
             case null -> "";
-            default -> value.toString();
+            default -> locatorId(value.toString());
         };
+    }
+
+    private static String locatorId(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        try {
+            return ServerResourceLocator.parseCanonicalText(text).id();
+        } catch (RuntimeException ignored) {
+            return text;
+        }
     }
 }

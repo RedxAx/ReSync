@@ -95,6 +95,8 @@ class TabListServiceRuntimeTest {
         assertEquals(Component.text("Alice One %resync_animation:test%"), packets.lastHeader(alice));
         assertEquals(Component.text("Bob One %resync_animation:test%"), packets.lastHeader(bob));
         storage.reads = 0;
+        storage.runtimeReads = 0;
+        storage.defaultTabReads = 0;
         packets.sent.clear();
         globals.put("player_vars_" + alice.getUniqueId(), Map.of("label", "Alice Two"));
         globals.put("player_vars_" + bob.getUniqueId(), Map.of("label", "Bob Two"));
@@ -102,6 +104,8 @@ class TabListServiceRuntimeTest {
         server.getScheduler().performTicks(4);
 
         assertEquals(0, storage.reads);
+        assertEquals(0, storage.runtimeReads);
+        assertEquals(0, storage.defaultTabReads);
         assertTrue(packets.headers(alice).size() >= 2);
         assertTrue(packets.headers(bob).size() >= 2);
         assertEquals(Component.text("Alice Two %resync_animation:test%"), packets.lastHeader(alice));
@@ -151,9 +155,16 @@ class TabListServiceRuntimeTest {
     private static final class CountingStorage extends FlowStorage {
         private int reads;
         private int runtimeReads;
+        private int defaultTabReads;
 
         private CountingStorage(File directory, AssetTransactionCoordinator coordinator) {
             super(directory, coordinator);
+        }
+
+        @Override
+        public synchronized String getDefaultTabId() {
+            defaultTabReads++;
+            return super.getDefaultTabId();
         }
 
         @Override

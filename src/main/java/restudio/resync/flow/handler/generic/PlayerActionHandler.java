@@ -1002,7 +1002,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
     }
 
     private Player requirePlayer(FlowContext context, FlowNode node, String input) {
-        Player player = context.getInputValue(node, input, Player.class, null);
+        Player player = context.getInputValue(node, input, Player.class, context.getPlayer());
         if (player == null) throw new IllegalArgumentException("Player input is required: " + input);
         return player;
     }

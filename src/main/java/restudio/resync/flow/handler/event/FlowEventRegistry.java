@@ -350,6 +350,9 @@ public class FlowEventRegistry {
                         Object adapted = adaptOutput(def, mapping.target(), value);
                         if (adapted != null) {
                             vars.put(mapping.target(), adapted);
+                            if (!mapping.source().equals(mapping.target())) {
+                                vars.put(mapping.source(), adapted);
+                            }
                         }
                     }
                 }

@@ -22,7 +22,6 @@ import restudio.resync.player.PlayerSessionLinkService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -283,13 +282,11 @@ public final class ScoreboardTemplateManager {
             clearResident();
             return;
         }
-        String defaultId = storage.getDefaultScoreboardId();
-        boolean defaultUsePapi = storage.isDefaultScoreboardUsePapi();
-        if (sequence == residentSequence
-            && Objects.equals(defaultId, residentDefaultId)
-            && defaultUsePapi == residentDefaultUsePapi) {
+        if (sequence == residentSequence) {
             return;
         }
+        String defaultId = storage.getDefaultScoreboardId();
+        boolean defaultUsePapi = storage.isDefaultScoreboardUsePapi();
         RESIDENT_SCOREBOARDS.clear();
         residentSequence = sequence;
         residentDefaultId = defaultId;

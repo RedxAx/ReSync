@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -270,13 +269,11 @@ public final class TabListService {
             clearResident();
             return;
         }
-        String defaultTabId = storage.getDefaultTabId();
-        boolean defaultUsePapi = storage.isDefaultTabUsePapi();
-        if (sequence == residentSequence
-            && Objects.equals(defaultTabId, residentDefaultTabId)
-            && defaultUsePapi == residentDefaultUsePapi) {
+        if (sequence == residentSequence) {
             return;
         }
+        String defaultTabId = storage.getDefaultTabId();
+        boolean defaultUsePapi = storage.isDefaultTabUsePapi();
         RESIDENT_TABS.clear();
         residentSequence = sequence;
         residentDefaultTabId = defaultTabId;

@@ -228,6 +228,9 @@ public class TriggerDispatcher implements Listener {
                 return CompletableFuture.completedFuture(null);
             }
             player = entry.playerExtractor != null ? entry.playerExtractor.apply(event) : null;
+            if (player == null) {
+                player = playerFromEventVariables(customVars);
+            }
         } catch (RuntimeException failure) {
             for (Map.Entry<String, String> trigger : entry.triggerMap.entrySet()) {
                 CorrelationId invocationId = CorrelationId.random();
@@ -713,6 +716,15 @@ public class TriggerDispatcher implements Listener {
             if (player != null) return player;
             return null;
         };
+    }
+
+    private static Player playerFromEventVariables(Map<String, Object> variables) {
+        Object owner = variables.get("owner");
+        if (owner instanceof Player player) {
+            return player;
+        }
+        owner = variables.get("event.owner");
+        return owner instanceof Player player ? player : null;
     }
 
     private static Method findMethod(Class<?> type, String name) {

@@ -4239,11 +4239,11 @@ public class FlowStorage {
         }
     }
 
-    public synchronized String getDefaultScoreboardId() {
+    public String getDefaultScoreboardId() {
         return defaultScoreboardId;
     }
 
-    public synchronized boolean isDefaultScoreboardUsePapi() {
+    public boolean isDefaultScoreboardUsePapi() {
         return defaultScoreboardUsePapi;
     }
 
@@ -4268,11 +4268,11 @@ public class FlowStorage {
         }
     }
 
-    public synchronized String getDefaultTabId() {
+    public String getDefaultTabId() {
         return defaultTabId;
     }
 
-    public synchronized boolean isDefaultTabUsePapi() {
+    public boolean isDefaultTabUsePapi() {
         return defaultTabUsePapi;
     }
 

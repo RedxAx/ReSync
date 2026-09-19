@@ -85,6 +85,9 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     private FlowExecutor flowExecutor;
     private BukkitTask pollingTask;
     private JavaPlugin plugin;
+    private ReSyncJsonResourceStorage.ResourceSnapshot residentSnapshot;
+    private Map<String, JsonObject> residentTrees = Map.of();
+    private long residentRootSequence = Long.MIN_VALUE;
 
     public AdvancementModule() {
         this(PaperPlayerDataMutationAdmission.shared());
@@ -121,17 +124,24 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         Bukkit.getPluginManager().registerEvents(this, context.getPlugin());
         reloadAdvancements();
         Bukkit.getScheduler().runTaskLater(context.getPlugin(), this::reloadAdvancements, 40L);
-        pollingTask = Bukkit.getScheduler().runTaskTimer(context.getPlugin(), () -> Bukkit.getOnlinePlayers().forEach(player -> {
-            dispatch(player, "held_item", null, Map.of("event.item", player.getInventory().getItemInMainHand()));
-            dispatch(player, "permission", null, Map.of());
-            dispatch(player, "in_biome", null, Map.of("event.biome", player.getLocation().getBlock().getBiome().getKey().toString()));
-            pollQuestCompletion(player);
-        }), 20, 20);
+        pollingTask = Bukkit.getScheduler().runTaskTimer(context.getPlugin(), () -> {
+            Map<String, JsonObject> trees = admitTrees();
+            if (trees.isEmpty()) {
+                return;
+            }
+            for (Player player : List.copyOf(Bukkit.getOnlinePlayers())) {
+                dispatch(player, "held_item", null, Map.of("event.item", player.getInventory().getItemInMainHand()), trees);
+                dispatch(player, "permission", null, Map.of(), trees);
+                dispatch(player, "in_biome", null, Map.of("event.biome", player.getLocation().getBlock().getBiome().getKey().toString()), trees);
+                pollQuestCompletion(player, trees);
+            }
+        }, 20, 20);
     }
 
     @Override
     public void stop(ModuleContext context) {
         HandlerList.unregisterAll(this);
+        invalidateTrees();
         if (bridge.supported()) {
             bridge.replace(Map.of());
         }
@@ -175,7 +185,7 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        sync(event.getPlayer(), trees(null, null));
+        sync(event.getPlayer(), admitTrees());
     }
 
     @EventHandler
@@ -402,10 +412,15 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     }
 
     public void dispatch(Player player, String trigger, Event event, Map<String, Object> inputs) {
-        if (player == null || !AdvancementTriggerDescriptors.IDS.contains(trigger)) {
+        dispatch(player, trigger, event, inputs, admitTrees());
+    }
+
+    private void dispatch(Player player, String trigger, Event event, Map<String, Object> inputs,
+                          Map<String, JsonObject> trees) {
+        if (player == null || trees.isEmpty() || !AdvancementTriggerDescriptors.IDS.contains(trigger)) {
             return;
         }
-        for (Map.Entry<String, JsonObject> treeEntry : trees(null, null).entrySet()) {
+        for (Map.Entry<String, JsonObject> treeEntry : trees.entrySet()) {
             JsonObject nodes = treeEntry.getValue().getAsJsonObject("nodes");
             for (Map.Entry<String, JsonElement> nodeEntry : nodes.entrySet()) {
                 JsonObject node = nodeEntry.getValue().getAsJsonObject();
@@ -431,11 +446,11 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         }
     }
 
-    private void pollQuestCompletion(Player player) {
-        if (player == null || flowStorage == null || flowExecutor == null) {
+    private void pollQuestCompletion(Player player, Map<String, JsonObject> trees) {
+        if (player == null || trees.isEmpty() || flowStorage == null || flowExecutor == null) {
             return;
         }
-        for (Map.Entry<String, JsonObject> treeEntry : trees(null, null).entrySet()) {
+        for (Map.Entry<String, JsonObject> treeEntry : trees.entrySet()) {
             JsonObject nodes = treeEntry.getValue().getAsJsonObject("nodes");
             for (Map.Entry<String, JsonElement> nodeEntry : nodes.entrySet()) {
                 JsonObject node = nodeEntry.getValue().getAsJsonObject();
@@ -463,7 +478,7 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         if (player == null || command.isBlank()) {
             return;
         }
-        for (Map.Entry<String, JsonObject> treeEntry : trees(null, null).entrySet()) {
+        for (Map.Entry<String, JsonObject> treeEntry : admitTrees().entrySet()) {
             JsonObject nodes = treeEntry.getValue().getAsJsonObject("nodes");
             for (Map.Entry<String, JsonElement> nodeEntry : nodes.entrySet()) {
                 JsonObject node = nodeEntry.getValue().getAsJsonObject();
@@ -542,16 +557,46 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     }
 
     private Map<String, JsonObject> trees(String replacementId, JsonObject replacement) {
-        Map<String, JsonObject> trees = new LinkedHashMap<>();
-        for (String id : storage.listIds(ReSyncResourceCatalog.ADVANCEMENT_TREE)) {
-            if (!id.equals(replacementId)) {
-                trees.put(id, storage.get(ReSyncResourceCatalog.ADVANCEMENT_TREE, id));
-            }
+        Map<String, JsonObject> trees = new LinkedHashMap<>(admitTrees());
+        if (replacementId != null) {
+            trees.remove(replacementId);
         }
         if (replacement != null) {
             trees.put(id(replacement), replacement);
         }
         return trees;
+    }
+
+    private Map<String, JsonObject> admitTrees() {
+        if (storage == null) {
+            return Map.of();
+        }
+        long sequence;
+        try {
+            sequence = storage.committedSequence();
+        } catch (RuntimeException failed) {
+            invalidateTrees();
+            return Map.of();
+        }
+        if (residentSnapshot != null) {
+            residentRootSequence = sequence;
+            return residentTrees;
+        }
+        ReSyncJsonResourceStorage.ResourceSnapshot snapshot = storage.readSnapshot(ReSyncResourceCatalog.ADVANCEMENT_TREE);
+        Map<String, JsonObject> trees = new LinkedHashMap<>();
+        for (ReSyncJsonResourceStorage.ResourceSnapshotValue value : snapshot.values()) {
+            trees.put(value.id(), value.value());
+        }
+        residentSnapshot = snapshot;
+        residentTrees = Map.copyOf(trees);
+        residentRootSequence = snapshot.rootSequence();
+        return residentTrees;
+    }
+
+    private void invalidateTrees() {
+        residentSnapshot = null;
+        residentTrees = Map.of();
+        residentRootSequence = Long.MIN_VALUE;
     }
 
     private void requireSupported() {
@@ -569,7 +614,8 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         if (!bridge.supported()) {
             return;
         }
-        Map<String, JsonObject> trees = trees(null, null);
+        invalidateTrees();
+        Map<String, JsonObject> trees = admitTrees();
         if (trees.isEmpty()) {
             return;
         }

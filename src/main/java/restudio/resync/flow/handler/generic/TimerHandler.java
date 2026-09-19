@@ -78,14 +78,12 @@ public final class TimerHandler implements NodeHandler {
     }
 
     private Object ownerValue(FlowContext context, FlowNode node, TimerDefinition definition) {
+        Object wired = context.getInputValue(node, "owner", Object.class, null);
         return switch (definition.scope()) {
-            case PLAYER -> context.getInputValue(node, "owner", Object.class,
-                context.getInputValue(node, "player", Object.class, context.getPlayer()));
-            case ENTITY -> context.getInputValue(node, "owner", Object.class,
-                context.getInputValue(node, "entity", Object.class, null));
-            case NETWORK -> context.getInputValue(node, "owner", Object.class,
-                context.getInputValue(node, "network", Object.class, null));
-            default -> null;
+            case PLAYER -> wired != null ? wired : context.getInputValue(node, "player", Object.class, context.getPlayer());
+            case ENTITY -> wired != null ? wired : context.getInputValue(node, "entity", Object.class, null);
+            case NETWORK -> wired != null ? wired : context.getInputValue(node, "network", Object.class, null);
+            default -> wired != null ? wired : context.getPlayer();
         };
     }
 }

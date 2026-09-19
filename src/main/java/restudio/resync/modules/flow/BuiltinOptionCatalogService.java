@@ -50,6 +50,7 @@ public final class BuiltinOptionCatalogService {
         catalog("attribute", true),
         catalog("banner_pattern", true),
         catalog("damage_type", true),
+        catalog("data_component_type", true),
         catalog("dye_color", false),
         catalog("enchantment", true),
         catalog("entity_type", false),
@@ -108,9 +109,11 @@ public final class BuiltinOptionCatalogService {
         catalog("potion", true),
         catalog("potion_effect", false),
         catalog("sound", true),
+        catalog("statistic", true),
         catalog("text_decoration", false),
         catalog("trim_material", true),
         catalog("trim_pattern", true),
+        catalog("command", true),
         catalog("world", true)
     );
     private static final List<CatalogDefinition> CUSTOM_CONTENT_CATALOGS = List.of(
@@ -483,6 +486,7 @@ public final class BuiltinOptionCatalogService {
             case "attribute" -> registryKeysByField("ATTRIBUTE");
             case "banner_pattern" -> registryKeysByField("BANNER_PATTERN");
             case "damage_type" -> registryKeysByField("DAMAGE_TYPE");
+            case "data_component_type" -> registryKeys(Registry.DATA_COMPONENT_TYPE);
             case "dye_color" -> enumNames(DyeColor.values());
             case "enchantment" -> registryKeys(Registry.ENCHANTMENT);
             case "entity_type" -> enumNames(EntityType.values());
@@ -545,7 +549,9 @@ public final class BuiltinOptionCatalogService {
             case "potion" -> potionTypes();
             case "potion_effect" -> potionEffects();
             case "sound" -> registryKeys(Registry.SOUNDS);
+            case "statistic" -> registryKeys(Registry.STATISTIC);
             case "text_decoration" -> enumNames(TextDecoration.values());
+            case "command" -> commands();
             case "world" -> Bukkit.getWorlds().stream().map(World::getName).sorted(String.CASE_INSENSITIVE_ORDER).toList();
             case "custom_content_provider" -> service != null ? service.getAvailableProviderIds() : List.of("vanilla");
             case "custom_content_asset" -> List.of();
@@ -711,6 +717,15 @@ public final class BuiltinOptionCatalogService {
         Bukkit.recipeIterator().forEachRemaining(recipe -> addRecipeKey(values, recipe));
         values.sort(String.CASE_INSENSITIVE_ORDER);
         return values;
+    }
+
+    private List<String> commands() {
+        return Bukkit.getServer().getCommandMap().getKnownCommands().keySet().stream()
+            .filter(value -> value != null && !value.isBlank())
+            .map(String::trim)
+            .distinct()
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .toList();
     }
 
     private void addRecipeKey(List<String> values, Recipe recipe) {

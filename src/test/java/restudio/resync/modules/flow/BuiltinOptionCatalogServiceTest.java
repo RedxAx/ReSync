@@ -12,6 +12,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BuiltinOptionCatalogServiceTest {
@@ -45,5 +47,18 @@ class BuiltinOptionCatalogServiceTest {
         assertFalse(provider.diagnostic(query).isBlank());
         assertTrue(provider.values(query).isEmpty());
         assertTrue(provider.items(query).isEmpty());
+    }
+
+    @Test
+    void serverSettingsCatalogsRegisterOnlyPublicAuthorities() {
+        OptionCatalogRegistry registry = new OptionCatalogRegistry();
+        new BuiltinOptionCatalogService(() -> null, new ItemAttributeSchemaService()).registerProviders(registry);
+
+        assertNotNull(registry.provider("server:minecraft:data_component_type"));
+        assertNotNull(registry.provider("server:minecraft:statistic"));
+        assertNotNull(registry.provider("server:minecraft:command"));
+        assertNull(registry.provider("server:minecraft:item_model"));
+        assertNull(registry.provider("server:minecraft:serverbound_packet"));
+        assertNull(registry.provider("server:minecraft:configured_feature"));
     }
 }

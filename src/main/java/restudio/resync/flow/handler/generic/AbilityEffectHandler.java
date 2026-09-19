@@ -1421,11 +1421,14 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         int duration = Math.min(200, Math.max(1, integer(ctx, node, "duration_ticks", 20)));
         double arrivalRadius = Math.max(0.05, number(ctx, node, "arrival_radius", 0.35));
         LeapResult result = leapPath(target, start, requestedLocation, duration);
-        mutateEntity(target, "flow-ability-leap-start", () -> target.setVelocity(new Vector(0.0, 0.0, 0.0)));
+        target.setVelocity(new Vector(0.0, 0.0, 0.0));
+        Location previous = start.clone();
         for (int tick = 1; tick <= result.points().size(); tick++) {
             int scheduledTick = tick;
             Location point = result.points().get(tick - 1);
-            ctx.runLater(() -> moveAlongLeapPath(target, point), scheduledTick);
+            Location from = previous;
+            ctx.runLater(() -> moveAlongLeapPath(target, from, point), scheduledTick);
+            previous = point;
         }
         ctx.runLater(() -> {
             if (!target.isValid() || !(target instanceof Player)) {
@@ -1433,13 +1436,12 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             }
             Location current = target.getLocation();
             Location destination = result.destination();
-            if (current.getWorld() != null && current.getWorld().equals(destination.getWorld()) && current.distanceSquared(destination) <= arrivalRadius * arrivalRadius) {
-                mutateEntity(target, "flow-ability-leap-arrival", () -> {
-                    target.setVelocity(new Vector(0.0, 0.0, 0.0));
-                    target.setFallDistance(0.0f);
-                });
+            if (current.getWorld() != null && current.getWorld().equals(destination.getWorld())
+                && current.distanceSquared(destination) <= arrivalRadius * arrivalRadius) {
+                target.setVelocity(new Vector(0.0, 0.0, 0.0));
+                target.setFallDistance(0.0f);
             }
-        }, duration + 1);
+        }, duration + 1L);
         return result;
     }
 
@@ -1494,23 +1496,25 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         return null;
     }
 
-    private void moveAlongLeapPath(Entity target, Location point) {
-        mutateEntity(target, "flow-ability-leap-step", () -> {
-            if (!target.isValid() || !hasEntitySpace(target, point)) {
-                return;
-            }
-            Location current = target.getLocation();
-            if (target instanceof Player) {
-                target.setVelocity(point.toVector().subtract(current.toVector()));
-            } else {
-                Location targetLocation = point.clone();
-                targetLocation.setYaw(current.getYaw());
-                targetLocation.setPitch(current.getPitch());
-                target.teleport(targetLocation);
-                target.setVelocity(new Vector(0.0, 0.0, 0.0));
-            }
-            target.setFallDistance(0.0f);
-        });
+    private void moveAlongLeapPath(Entity target, Location previous, Location point) {
+        if (!target.isValid() || !hasEntitySpace(target, point)) {
+            return;
+        }
+        Location current = target.getLocation();
+        if (target instanceof Player) {
+            target.setVelocity(leapPlayerVelocity(previous, point));
+        } else {
+            Location targetLocation = point.clone();
+            targetLocation.setYaw(current.getYaw());
+            targetLocation.setPitch(current.getPitch());
+            target.teleport(targetLocation);
+            target.setVelocity(new Vector(0.0, 0.0, 0.0));
+        }
+        target.setFallDistance(0.0f);
+    }
+
+    static Vector leapPlayerVelocity(Location previous, Location point) {
+        return point.toVector().subtract(previous.toVector());
     }
 
     private Location nearestLeapDestination(Entity target, Location destination) {
@@ -1668,7 +1672,9 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
 
     private Player requirePlayer(FlowContext context, FlowNode node, String input) {
         Player player = context.getInputValue(node, input, Player.class, context.getPlayer());
-        if (player == null) throw new IllegalArgumentException("Ability player is required");
+        if (player == null) {
+            throw new IllegalArgumentException("This ability needs a player. Connect the Player pin, or run it from a player event.");
+        }
         return player;
     }
 

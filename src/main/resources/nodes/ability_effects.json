@@ -810,7 +810,7 @@
       "ability.raycast"
     ],
     "category": "ABILITY",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "QUERY",
     "tags": [
       "ability",
@@ -832,6 +832,16 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "description": "Starts execution for the Flow branch.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "optional": true,
+        "description": "Player to raycast from. Uses the event player when this pin is empty.",
         "direction": "input"
       },
       {
@@ -962,14 +972,19 @@
       }
     ],
     "migrationMapping": {
-      "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "sourceSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {
           "direction": "input",
           "source": "flow",
           "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
         },
         {
           "direction": "input",

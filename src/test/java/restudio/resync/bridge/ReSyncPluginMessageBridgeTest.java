@@ -9,6 +9,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import restudio.resync.ReSync;
 import restudio.resync.core.ConnectionInfo;
+import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.FrameSender;
 import restudio.resync.protocol.MessageType;
 
@@ -217,6 +218,27 @@ class ReSyncPluginMessageBridgeTest {
         assertTrue(backpressureEvents > 0);
         assertEquals("OPEN", state(session));
         assertTrue(queue(session).isEmpty());
+        assertEquals(0, bridge.closedConnections.get());
+    }
+
+    @Test
+    void protocolFrameBudgetUsesTheCodecLimitNotThePluginChunkSize() throws Exception {
+        TestReSync plugin = MockBukkit.loadSimple(TestReSync.class);
+        RecordingPlayer player = new RecordingPlayer(MockBukkit.getMock());
+        MockBukkit.getMock().addPlayer(player);
+        AdmissionBridge bridge = new AdmissionBridge(plugin);
+        Object session = newSession(player);
+        invoke(method("ensureConnection", session.getClass()), bridge, session);
+        assertNotNull(bridge.sender);
+        assertEquals(Codec.DEFAULT_MAX_ENCODED_FRAME_BYTES, bridge.sender.getMaxEncodedFrameBytes());
+
+        byte[] frame = new byte[256 * 1024];
+        frame[1] = MessageType.DATA.getValue();
+        assertEquals(FrameSender.SendResult.ACCEPTED, bridge.sender.trySend(frame));
+        drainTicks(session, 32);
+        assertEquals("OPEN", state(session));
+        assertTrue(queue(session).isEmpty());
+        assertTrue(player.messages.size() > 1);
         assertEquals(0, bridge.closedConnections.get());
     }
 

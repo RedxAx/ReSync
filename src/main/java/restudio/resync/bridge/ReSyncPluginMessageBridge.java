@@ -12,6 +12,7 @@ import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.core.ConnectionInfo;
 import restudio.resync.flow.identity.ServerId;
+import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.FrameSender;
 import restudio.resync.protocol.MessageType;
 import restudio.resync.server.ReSyncServer;
@@ -208,7 +209,7 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
 
                 @Override
                 public int getMaxEncodedFrameBytes() {
-                    return ReSyncBridgeChunker.CHUNK_SIZE;
+                    return Codec.DEFAULT_MAX_ENCODED_FRAME_BYTES;
                 }
 
                 @Override

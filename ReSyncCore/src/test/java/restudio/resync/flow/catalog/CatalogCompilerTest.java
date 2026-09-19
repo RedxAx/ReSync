@@ -1,6 +1,7 @@
 package restudio.resync.flow.catalog;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import restudio.resync.flow.identity.BranchId;
 import restudio.resync.flow.identity.CapabilityId;
 import restudio.resync.flow.identity.ContractRef;
@@ -28,6 +29,7 @@ import restudio.resync.flow.runtime.RuntimeSemantics;
 import restudio.resync.flow.type.TypeExpr;
 import restudio.resync.flow.type.TypeReference;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -64,6 +66,43 @@ class CatalogCompilerTest {
         assertTrue(right.canonicalContent().contains("\"generation\":9"));
         assertEquals(List.of(ref(OwnerId.of("resync.alpha"), NodeId.of("alpha-node")), ref(OwnerId.of("resync.beta"), NodeId.of("beta-node"))), left.definitions().stream().map(CatalogOwned::key).toList());
         assertThrows(UnsupportedOperationException.class, () -> left.definitions().add(null));
+    }
+
+    @Test
+    void generationRebaseMatchesIndependentCompile() {
+        CatalogContribution first = contribution(OwnerId.of("resync.alpha"), NodeId.of("alpha-node"));
+        CatalogContribution second = contribution(OwnerId.of("resync.beta"), NodeId.of("beta-node"));
+        CatalogCompiler compiler = compilerFor(first, second);
+        CatalogSnapshot snapshot = compiler.compile(List.of(first, second), 9).snapshot().orElseThrow();
+
+        CatalogSnapshot rebased = snapshot.withGeneration(10);
+        CatalogSnapshot compiled = compiler.compile(List.of(first, second), 10).snapshot().orElseThrow();
+
+        assertEquals(compiled.canonicalContent(), rebased.canonicalContent());
+        assertEquals(snapshot.contentChecksum(), rebased.contentChecksum());
+        assertEquals(compiled.contentChecksum(), rebased.contentChecksum());
+        assertEquals(10, rebased.generation());
+    }
+
+    @TempDir
+    Path startupIndex;
+
+    @Test
+    void startupIndexRestoresCompiledSnapshotWithoutChangingChecksum() {
+        CatalogContribution first = contribution(OwnerId.of("resync.alpha"), NodeId.of("alpha-node"));
+        CatalogContribution second = contribution(OwnerId.of("resync.beta"), NodeId.of("beta-node"));
+        CatalogCompiler compiler = compilerFor(first, second);
+        CatalogSnapshot compiled = compiler.compile(List.of(first, second), 4, startupIndex).snapshot().orElseThrow();
+
+        CatalogSnapshot restored = compiler.compile(List.of(second, first), 4, startupIndex).snapshot().orElseThrow();
+        CatalogSnapshot rebased = compiler.compile(List.of(first, second), 11, startupIndex).snapshot().orElseThrow();
+
+        assertEquals(compiled.contentChecksum(), restored.contentChecksum());
+        assertEquals(compiled.bindingManifestHash(), restored.bindingManifestHash());
+        assertEquals(compiled.canonicalContent(), restored.canonicalContent());
+        assertEquals(compiled.contentChecksum(), rebased.contentChecksum());
+        assertEquals(11, rebased.generation());
+        assertEquals(compiled.withGeneration(11).canonicalContent(), rebased.canonicalContent());
     }
 
     @Test

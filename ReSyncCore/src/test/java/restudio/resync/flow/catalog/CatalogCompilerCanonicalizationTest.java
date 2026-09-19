@@ -1,15 +1,19 @@
 package restudio.resync.flow.catalog;
 
 import org.junit.jupiter.api.Test;
+import restudio.resync.flow.canonical.CanonicalJson;
+import restudio.resync.flow.canonical.CanonicalLimits;
 import restudio.resync.flow.identity.ContentHash;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CatalogCompilerCanonicalizationTest {
     private static final CatalogVersion CONTRACT = new CatalogVersion(1, 0);
@@ -64,5 +68,37 @@ class CatalogCompilerCanonicalizationTest {
             snapshot.bindingManifestHash()), rebased.canonicalContent());
         assertEquals(snapshot, snapshot.withGeneration(7));
         assertThrows(IllegalArgumentException.class, () -> snapshot.withGeneration(0));
+    }
+
+    @Test
+    void generationRebaseCanChangeDigitLengthWithoutRewritingContractGeneration() {
+        CatalogSnapshot snapshot = new CatalogCompiler(CONTRACT).compile(List.of(), 9).snapshot().orElseThrow();
+
+        CatalogSnapshot rebased = snapshot.withGeneration(10);
+
+        assertEquals(CatalogCanonicalizer.canonicalSnapshotContent(10, CONTRACT, List.of(), Set.of(), List.of(),
+            snapshot.bindingManifestHash()), rebased.canonicalContent());
+        assertEquals(snapshot.contentChecksum(), rebased.contentChecksum());
+        assertTrue(rebased.canonicalContent().contains("\"generation\":10"));
+        assertTrue(rebased.canonicalContent().contains("\"generation\":1"));
+        assertEquals(snapshot.canonicalContent().indexOf("\"generation\":1"),
+            rebased.canonicalContent().indexOf("\"generation\":1"));
+    }
+
+    @Test
+    void ownerIdIsInsertedInCanonicalKeyOrder() {
+        CanonicalJson.CanonicalFragment descriptor = CanonicalJson.prepare(
+            Map.of("id", "alpha", "kind", "node"), CanonicalLimits.catalog());
+        CanonicalJson.CanonicalFragment owned = CatalogCanonicalizer.insertTopLevelField(
+            descriptor, "ownerId", "resync.alpha");
+
+        assertEquals(
+            CanonicalJson.canonicalize(Map.of("id", "alpha", "kind", "node", "ownerId", "resync.alpha"),
+                CanonicalLimits.catalog()),
+            owned.content());
+        assertEquals(
+            CanonicalJson.canonicalize(Map.of("ownerId", "resync.alpha"), CanonicalLimits.catalog()),
+            CatalogCanonicalizer.insertTopLevelField(
+                CanonicalJson.prepare(Map.of(), CanonicalLimits.catalog()), "ownerId", "resync.alpha").content());
     }
 }

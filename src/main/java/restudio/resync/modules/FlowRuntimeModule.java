@@ -51,6 +51,8 @@ import restudio.resync.flow.catalog.CatalogProvenance;
 import restudio.resync.flow.catalog.CatalogRuntimeActivation;
 import restudio.resync.flow.catalog.CatalogSnapshot;
 import restudio.resync.flow.catalog.CatalogSourceIngestor;
+import restudio.resync.flow.catalog.CatalogStartupIndex;
+import restudio.resync.flow.catalog.CatalogStartupIndexPersistenceParticipant;
 import restudio.resync.flow.runtime.CompiledRuntimeContext;
 import restudio.resync.flow.FlowNodeAuditRecord;
 import restudio.resync.flow.diagnostics.FlowDebugService;
@@ -513,6 +515,7 @@ public class FlowRuntimeModule implements Module {
         Map<String, NodeDefinition> startupDefinitions = nodeDefinitionRegistry.getAllDefinitions();
         int startupDefinitionCount = startupDefinitions.size();
         propertyRegistry.loadNodeDefinitions(startupDefinitions.values());
+        Map<String, Long> catalogPrepareTiming = initializationTiming(catalogPreparationStarted, catalogPreparationCpuStarted);
         TemporaryLifecycleDiagnostics.event("flow_initialize_stage", catalogPreparationStarted,
             TemporaryLifecycleDiagnostics.with(Map.of(
                 "moduleId", "flow",
@@ -520,7 +523,9 @@ public class FlowRuntimeModule implements Module {
                 "outcome", "complete",
                 "sourceCount", authoredCatalogSources.size(),
                 "definitionCount", startupDefinitionCount,
-                "participantTimings", initializationTiming(catalogPreparationStarted, catalogPreparationCpuStarted))));
+                "participantTimings", catalogPrepareTiming)));
+        Log.info("Flow catalog prepare completed in " + catalogPrepareTiming.get("wallMs") + " ms ["
+            + startupDefinitionCount + " definitions]");
         initializationStageStarted = TemporaryLifecycleDiagnostics.start();
         initializationStageCpuStarted = currentThreadCpuNanos();
         graphValidationRegistry = new FlowGraphValidationRegistry();
@@ -573,11 +578,20 @@ public class FlowRuntimeModule implements Module {
         reportInitializationStage("execution_services", initializationStageStarted, initializationStageCpuStarted);
         long catalogRuntimeStarted = TemporaryLifecycleDiagnostics.start();
         long catalogRuntimeCpuStarted = currentThreadCpuNanos();
+        Path catalogStartupIndexRoot = dataRoot.resolve(CatalogStartupIndex.DIRECTORY).toAbsolutePath().normalize();
+        try {
+            CatalogStartupIndexPersistenceParticipant catalogStartupIndex =
+                new CatalogStartupIndexPersistenceParticipant(dataRoot, catalogStartupIndexRoot);
+            context.registerService(CatalogStartupIndexPersistenceParticipant.class, catalogStartupIndex);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Catalog startup index could not be admitted", exception);
+        }
         delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService,
             context.getService(ReSyncExtensionData.class), optionCatalogRegistry, jsonResourceStorage, context.getService(MessageLogService.class),
             context.getRequiredService(PlayerSessionLinkService.class), builtinOptionCatalogs, resourceRegistry, valueCodecs, flowJobs, runtimeBindingRegistry, handlerRegistry,
             replacementActivationAuthority, serverId, publicationReceiptStore, authoredCatalogSources, authorityEpoch,
             FlowMutationPayloadReader::legacyCompatible);
+        Map<String, Long> catalogRuntimeTiming = initializationTiming(catalogRuntimeStarted, catalogRuntimeCpuStarted);
         TemporaryLifecycleDiagnostics.event("flow_initialize_stage", catalogRuntimeStarted,
             TemporaryLifecycleDiagnostics.with(Map.of(
                 "moduleId", "flow",
@@ -586,7 +600,9 @@ public class FlowRuntimeModule implements Module {
                 "sourceCount", authoredCatalogSources.size(),
                 "definitionCount", startupDefinitionCount,
                 "bindingCount", runtimeBindingRegistry.snapshot().bindings().size(),
-                "participantTimings", initializationTiming(catalogRuntimeStarted, catalogRuntimeCpuStarted))));
+                "participantTimings", catalogRuntimeTiming)));
+        Log.info("Flow catalog runtime completed in " + catalogRuntimeTiming.get("wallMs") + " ms ["
+            + startupDefinitionCount + " definitions]");
         initializationStageStarted = TemporaryLifecycleDiagnostics.start();
         initializationStageCpuStarted = currentThreadCpuNanos();
         delegate.setConversionAdapterRegistry(typeAdapterRegistry);
@@ -641,6 +657,7 @@ public class FlowRuntimeModule implements Module {
         globalTriggers.setCompiledExecution(compiledTriggerExecution);
         runtimeFlowDispatcher.setCompiledExecution(compiledTriggerExecution);
         customContentExecution.bind(compiledPlanRepository, compiledTriggerExecution);
+        customContentStorage.setGraphAdmission(customContentExecution::admit);
         customContentService.setCompiledExecution(customContentExecution);
         guiManager = new GuiManager(context.getServer(), storage, executor, delegate);
         context.registerService(FlowStorage.class, storage);

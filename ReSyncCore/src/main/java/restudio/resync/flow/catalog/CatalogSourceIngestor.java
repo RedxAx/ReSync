@@ -325,11 +325,12 @@ public final class CatalogSourceIngestor {
 
     private static PreparedCatalogSource prepareSource(OwnerId owner, byte[] bytes, ContentHash expectedSourceHash) {
         byte[] sourceBytes = Arrays.copyOf(Objects.requireNonNull(bytes, "Catalog source bytes are required"), bytes.length);
-        Object parsed = CanonicalJson.parse(sourceBytes);
-        ContentHash sourceHash = ContentHash.of(CanonicalJson.genericCanonicalContentHash(parsed));
+        CatalogSourceIndex.Entry indexed = CatalogSourceIndex.intern(sourceBytes);
+        ContentHash sourceHash = indexed.sourceHash();
         if (expectedSourceHash != null && !expectedSourceHash.equals(sourceHash)) {
             throw new IllegalArgumentException("Catalog source hash does not match its prepared source proof");
         }
+        Object parsed = indexed.parsed();
         List<Map<String, Object>> rows = new ArrayList<>();
         if (parsed instanceof Map<?, ?> object) {
             rows.add(immutableObject(object));
@@ -1718,7 +1719,7 @@ public final class CatalogSourceIngestor {
 
         public ContentHash sourceHash() {
             return prepared != null ? prepared.parsed().sourceHash()
-                : prepareSource(owner, bytes, null).parsed().sourceHash();
+                : CatalogSourceIndex.sourceHash(bytes);
         }
 
         public OwnerId ownerProof() {

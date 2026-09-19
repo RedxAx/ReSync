@@ -55,6 +55,12 @@ public final class WorldGenVanillaCatalog {
     private final Set<String> placedFeatures;
     private final Set<String> structures;
     private final Map<String, JsonObject> biomeData;
+    private final List<String> blockValues;
+    private final List<String> entityValues;
+    private final List<String> biomeValues;
+    private final List<String> placedFeatureValues;
+    private final List<String> structureValues;
+    private final List<String> treeValues;
 
     private WorldGenVanillaCatalog(CatalogData data) {
         minecraftVersion = data.minecraftVersion;
@@ -66,6 +72,16 @@ public final class WorldGenVanillaCatalog {
         placedFeatures = Set.copyOf(data.placedFeatures);
         structures = Set.copyOf(data.structures);
         biomeData = Map.copyOf(data.biomeData);
+        blockValues = blocks.stream().sorted().toList();
+        entityValues = entities.stream().sorted().toList();
+        biomeValues = biomes.stream().sorted().toList();
+        placedFeatureValues = placedFeatures.stream().sorted().toList();
+        structureValues = structures.stream().sorted().toList();
+        treeValues = TREE_FEATURES.entrySet().stream()
+            .filter(entry -> configuredFeatures.contains(entry.getValue()))
+            .map(Map.Entry::getKey)
+            .sorted()
+            .toList();
     }
 
     public static WorldGenVanillaCatalog load(WorldGenTargetVersion target) {
@@ -93,27 +109,27 @@ public final class WorldGenVanillaCatalog {
     }
 
     public List<String> blocks() {
-        return blocks.stream().sorted().toList();
+        return blockValues;
     }
 
     public List<String> entities() {
-        return entities.stream().sorted().toList();
+        return entityValues;
     }
 
     public List<String> biomes() {
-        return biomes.stream().sorted().toList();
+        return biomeValues;
     }
 
     public List<String> placedFeatures() {
-        return placedFeatures.stream().sorted().toList();
+        return placedFeatureValues;
     }
 
     public List<String> structures() {
-        return structures.stream().sorted().toList();
+        return structureValues;
     }
 
     public List<String> treeTypes() {
-        return TREE_FEATURES.entrySet().stream().filter(entry -> configuredFeatures.contains(entry.getValue())).map(Map.Entry::getKey).sorted().toList();
+        return treeValues;
     }
 
     JsonObject biome(String biomeId) {

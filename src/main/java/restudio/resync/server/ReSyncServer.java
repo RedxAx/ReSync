@@ -45,6 +45,8 @@ import restudio.resync.flow.protocol.ProtocolRejectionCode;
 import restudio.resync.flow.protocol.ProtocolEnvelope;
 import restudio.resync.flow.protocol.ProtocolBody;
 import restudio.resync.flow.catalog.CatalogActivationAuthority;
+import restudio.resync.flow.catalog.CatalogStartupIndex;
+import restudio.resync.flow.catalog.CatalogStartupIndexPersistenceParticipant;
 import restudio.resync.flow.diagnostics.DiagnosticReportPersistenceParticipant;
 import restudio.resync.flow.diagnostics.StructuredFlowDiagnosticReporter;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
@@ -164,6 +166,7 @@ import restudio.resync.worldgen.WorldGenGeneratedOutputPolicy;
 import restudio.resync.worldgen.WorldGenGeneratedPersistenceParticipant;
 import restudio.resync.worldgen.datapack.WorldGenInstalledDatapackCapability;
 import restudio.resync.worldgen.datapack.WorldGenInstalledDatapackPersistenceParticipant;
+import restudio.resync.flow.catalog.CatalogStartupIndexPersistenceParticipant;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -1340,6 +1343,25 @@ public class ReSyncServer {
             bindings.add(ReSyncPersistenceTopology.derivedUnavailable(
                 WorldGenGeneratedOutputPolicy.OWNER, generatedRoot,
                 "WorldGen generated output participant is unavailable and will be rebuilt"));
+        }
+        CatalogStartupIndexPersistenceParticipant catalogStartupIndexParticipant =
+            moduleContext.getService(CatalogStartupIndexPersistenceParticipant.class);
+        Path catalogStartupIndexRoot = dataRoot.resolve(CatalogStartupIndex.DIRECTORY).toAbsolutePath().normalize();
+        if (catalogStartupIndexParticipant != null) {
+            try {
+                catalogStartupIndexParticipant.healthCheck();
+                bindings.add(ReSyncPersistenceTopology.derivedCache(
+                    CatalogStartupIndexPersistenceParticipant.OWNER, catalogStartupIndexParticipant.root(),
+                    catalogStartupIndexParticipant));
+            } catch (IOException | RuntimeException exception) {
+                bindings.add(ReSyncPersistenceTopology.derivedUnavailable(
+                    CatalogStartupIndexPersistenceParticipant.OWNER, catalogStartupIndexRoot, catalogStartupIndexParticipant,
+                    persistenceReason("Catalog startup index is unavailable and will be rebuilt", exception)));
+            }
+        } else {
+            bindings.add(ReSyncPersistenceTopology.derivedUnavailable(
+                CatalogStartupIndexPersistenceParticipant.OWNER, catalogStartupIndexRoot,
+                "Catalog startup index participant is unavailable and will be rebuilt"));
         }
         WorldGenInstalledDatapackPersistenceParticipant installedDatapackParticipant =
             moduleContext.getService(WorldGenInstalledDatapackPersistenceParticipant.class);

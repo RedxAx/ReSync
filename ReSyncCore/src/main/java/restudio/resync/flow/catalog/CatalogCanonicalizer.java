@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -88,6 +89,11 @@ public final class CatalogCanonicalizer {
                                                   ContentHash bindingManifestHash) {
         return canonical(canonicalSnapshotObject(generation, contractVersion, contributions, minimumClientCapabilities, diagnostics,
             bindingManifestHash));
+    }
+
+    static DerivedSnapshot derivedSnapshot(ContentHash contentChecksum, ContentHash bindingManifestHash,
+                                          String canonicalContent) {
+        return new DerivedSnapshot(contentChecksum, bindingManifestHash, canonicalContent);
     }
 
     static DerivedSnapshot deriveSnapshot(long generation, CatalogVersion contractVersion,
@@ -160,6 +166,91 @@ public final class CatalogCanonicalizer {
         return hash(CATALOG_DOMAIN, parsed);
     }
 
+    public static String rebaseSnapshotGeneration(String canonicalContent, long generation) {
+        if (generation < 1) {
+            throw new IllegalArgumentException("Catalog generation must be positive");
+        }
+        String content = CatalogIds.required(canonicalContent, "canonicalContent");
+        int field = topLevelField(content, "generation");
+        int valueStart = field + "generation".length() + 3;
+        int valueEnd = valueStart;
+        while (valueEnd < content.length()) {
+            char character = content.charAt(valueEnd);
+            if (character < '0' || character > '9') {
+                break;
+            }
+            valueEnd++;
+        }
+        if (valueEnd == valueStart) {
+            throw new IllegalArgumentException("Catalog snapshot generation is not a canonical integer");
+        }
+        String replacement = Long.toString(generation);
+        if (content.regionMatches(valueStart, replacement, 0, replacement.length()) && valueEnd - valueStart == replacement.length()) {
+            return content;
+        }
+        return content.substring(0, valueStart) + replacement + content.substring(valueEnd);
+    }
+
+    private static int topLevelField(String json, String field) {
+        int depth = 0;
+        boolean inString = false;
+        boolean escape = false;
+        boolean pendingKey = false;
+        for (int index = 0; index < json.length(); index++) {
+            char character = json.charAt(index);
+            if (inString) {
+                if (escape) {
+                    escape = false;
+                    continue;
+                }
+                if (character == '\\') {
+                    escape = true;
+                    continue;
+                }
+                if (character == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (character == '"') {
+                if (depth == 1 && pendingKey && json.startsWith(field, index + 1)
+                    && json.startsWith("\":", index + 1 + field.length())) {
+                    return index;
+                }
+                inString = true;
+                continue;
+            }
+            if (character == '{') {
+                depth++;
+                pendingKey = depth == 1;
+                continue;
+            }
+            if (character == '}') {
+                depth--;
+                pendingKey = false;
+                continue;
+            }
+            if (character == '[') {
+                depth++;
+                pendingKey = false;
+                continue;
+            }
+            if (character == ']') {
+                depth--;
+                pendingKey = false;
+                continue;
+            }
+            if (character == ':' && depth == 1) {
+                pendingKey = false;
+                continue;
+            }
+            if (character == ',' && depth == 1) {
+                pendingKey = true;
+            }
+        }
+        throw new IllegalArgumentException("Catalog snapshot is missing a top-level " + field + " field");
+    }
+
     public static ContentHash bindingManifestHash(Collection<CatalogContribution> contributions) {
         return hash(BINDING_DOMAIN, bindingManifestObject(contributions));
     }
@@ -198,13 +289,22 @@ public final class CatalogCanonicalizer {
     }
 
     private static InspectorDescriptor findInspector(CatalogNodeDescriptor node, CatalogContribution contribution) {
+        return findInspector(node, inspectorIndex(contribution));
+    }
+
+    private static Map<Object, InspectorDescriptor> inspectorIndex(CatalogContribution contribution) {
+        Map<Object, InspectorDescriptor> inspectors = new HashMap<>();
+        for (InspectorDescriptor inspector : contribution.inspectors()) {
+            inspectors.putIfAbsent(inspector.id(), inspector);
+        }
+        return inspectors;
+    }
+
+    private static InspectorDescriptor findInspector(CatalogNodeDescriptor node, Map<Object, InspectorDescriptor> inspectors) {
         if (node.inspector() == null) {
             return null;
         }
-        return contribution.inspectors().stream()
-            .filter(value -> value.id().equals(node.inspector()))
-            .findFirst()
-            .orElse(null);
+        return inspectors.get(node.inspector());
     }
 
     private static Map<String, Object> canonicalInspectorLayout(InspectorDescriptor inspector) {
@@ -296,8 +396,8 @@ public final class CatalogCanonicalizer {
             throw new IllegalArgumentException("Catalog generation must be positive");
         }
         List<CatalogContribution> values = contributions == null ? List.of() : contributions.stream().filter(Objects::nonNull).sorted(Comparator.comparing(CatalogContribution::ownerId)).toList();
-        List<Object> contributionObjects = values.stream().map(value -> canonicalContributionObject(value, false)).map(value -> (Object) value).toList();
         List<Object> capabilityObjects = minimumClientCapabilities == null ? List.of() : minimumClientCapabilities.stream().map(CatalogCanonicalizer::canonicalReference).toList();
+        List<Object> contributionObjects = new ArrayList<>();
         List<Object> definitions = new ArrayList<>();
         List<Object> types = new ArrayList<>();
         List<Object> conversions = new ArrayList<>();
@@ -311,17 +411,68 @@ public final class CatalogCanonicalizer {
         List<Object> provenance = new ArrayList<>();
         for (CatalogContribution contribution : values) {
             OwnerId owner = contribution.ownerId();
-            contribution.definitions().forEach(value -> definitions.add(owned(owner, canonicalNodeObject(value, contribution))));
-            contribution.types().forEach(value -> types.add(owned(owner, canonicalTypeObject(value))));
-            contribution.conversions().forEach(value -> conversions.add(owned(owner, canonicalConversionObject(value))));
-            contribution.categories().forEach(value -> categories.add(owned(owner, canonicalCategoryObject(value))));
-            contribution.optionSources().forEach(value -> optionSources.add(owned(owner, canonicalOptionSourceObject(value))));
-            contribution.validators().forEach(value -> validators.add(owned(owner, canonicalValidationRuleObject(value))));
-            contribution.editors().forEach(value -> editors.add(owned(owner, canonicalEditorObject(value))));
-            contribution.previews().forEach(value -> previews.add(owned(owner, canonicalPreviewObject(value))));
-            contribution.capabilities().forEach(value -> capabilities.add(owned(owner, canonicalCapabilityObject(value))));
-            contribution.runtimeRequirements().forEach(value -> runtimeRequirements.add(owned(owner, canonicalRuntimeObject(value))));
+            Map<Object, InspectorDescriptor> inspectors = inspectorIndex(contribution);
+            List<Object> contributionDefinitions = new ArrayList<>(contribution.definitions().size());
+            for (CatalogNodeDescriptor value : contribution.definitions()) {
+                CanonicalJson.CanonicalFragment node = prepared(canonicalNodeObject(value, findInspector(value, inspectors)));
+                contributionDefinitions.add(node);
+                definitions.add(ownedPrepared(owner, node));
+            }
+            List<Object> contributionTypes = new ArrayList<>(contribution.types().size());
+            for (TypeDescriptor value : contribution.types()) {
+                CanonicalJson.CanonicalFragment type = prepared(canonicalTypeObject(value));
+                contributionTypes.add(type);
+                types.add(ownedPrepared(owner, type));
+            }
+            List<Object> contributionConversions = new ArrayList<>(contribution.conversions().size());
+            for (ConversionGraph.ConversionEdge value : contribution.conversions()) {
+                CanonicalJson.CanonicalFragment conversion = prepared(canonicalConversionObject(value));
+                contributionConversions.add(conversion);
+                conversions.add(ownedPrepared(owner, conversion));
+            }
+            List<Object> contributionCategories = new ArrayList<>(contribution.categories().size());
+            for (CatalogCategoryDescriptor value : contribution.categories()) {
+                CanonicalJson.CanonicalFragment category = prepared(canonicalCategoryObject(value));
+                contributionCategories.add(category);
+                categories.add(ownedPrepared(owner, category));
+            }
+            List<Object> contributionOptionSources = new ArrayList<>(contribution.optionSources().size());
+            for (InspectorOptionSource value : contribution.optionSources()) {
+                CanonicalJson.CanonicalFragment optionSource = prepared(canonicalOptionSourceObject(value));
+                contributionOptionSources.add(optionSource);
+                optionSources.add(ownedPrepared(owner, optionSource));
+            }
+            List<Object> contributionValidators = new ArrayList<>(contribution.validators().size());
+            for (InspectorValidationRule value : contribution.validators()) {
+                CanonicalJson.CanonicalFragment validator = prepared(canonicalValidationRuleObject(value));
+                contributionValidators.add(validator);
+                validators.add(ownedPrepared(owner, validator));
+            }
+            List<Object> contributionEditors = new ArrayList<>(contribution.editors().size());
+            for (InspectorCapability value : contribution.editors()) {
+                CanonicalJson.CanonicalFragment editor = prepared(canonicalEditorObject(value));
+                contributionEditors.add(editor);
+                editors.add(ownedPrepared(owner, editor));
+            }
+            List<Object> contributionPreviews = new ArrayList<>(contribution.previews().size());
+            for (InspectorCapability value : contribution.previews()) {
+                CanonicalJson.CanonicalFragment preview = prepared(canonicalPreviewObject(value));
+                contributionPreviews.add(preview);
+                previews.add(ownedPrepared(owner, preview));
+            }
+            List<Object> contributionCapabilities = new ArrayList<>(contribution.capabilities().size());
+            for (CatalogCapabilityDescriptor value : contribution.capabilities()) {
+                CanonicalJson.CanonicalFragment capability = prepared(canonicalCapabilityObject(value));
+                contributionCapabilities.add(capability);
+                capabilities.add(ownedPrepared(owner, capability));
+            }
+            for (RuntimeOperationDescriptor value : contribution.runtimeRequirements()) {
+                runtimeRequirements.add(prepared(owned(owner, canonicalRuntimeObject(value))));
+            }
             provenance.add(canonicalProvenanceObject(contribution.provenance()));
+            contributionObjects.add(prepared(canonicalContributionObject(contribution, false, contributionDefinitions, contributionTypes,
+                contributionConversions, contributionCategories, contributionOptionSources, contributionValidators,
+                contributionEditors, contributionPreviews, contributionCapabilities)));
         }
         List<Object> diagnosticObjects = diagnostics == null ? List.of() : diagnostics.stream().filter(Objects::nonNull).map(value -> (Object) canonicalValue(value.toMap())).toList();
         return object(
@@ -349,21 +500,46 @@ public final class CatalogCanonicalizer {
     }
 
     private static Map<String, Object> canonicalContributionObject(CatalogContribution contribution, boolean includeRuntimeRequirements) {
+        return canonicalContributionObject(
+            contribution,
+            includeRuntimeRequirements,
+            contribution.definitions().stream().map(value -> canonicalNodeObject(value, contribution)).map(value -> (Object) value).toList(),
+            contribution.types().stream().map(CatalogCanonicalizer::canonicalTypeObject).map(value -> (Object) value).toList(),
+            contribution.conversions().stream().map(CatalogCanonicalizer::canonicalConversionObject).map(value -> (Object) value).toList(),
+            contribution.categories().stream().map(CatalogCanonicalizer::canonicalCategoryObject).map(value -> (Object) value).toList(),
+            optionSources(contribution),
+            validators(contribution),
+            editors(contribution),
+            contribution.previews().stream().map(CatalogCanonicalizer::canonicalPreviewObject).map(value -> (Object) value).toList(),
+            contribution.capabilities().stream().map(CatalogCanonicalizer::canonicalCapabilityObject).map(value -> (Object) value).toList());
+    }
+
+    private static Map<String, Object> canonicalContributionObject(CatalogContribution contribution,
+                                                                   boolean includeRuntimeRequirements,
+                                                                   List<Object> definitions,
+                                                                   List<Object> types,
+                                                                   List<Object> conversions,
+                                                                   List<Object> categories,
+                                                                   List<Object> optionSources,
+                                                                   List<Object> validators,
+                                                                   List<Object> editors,
+                                                                   List<Object> previews,
+                                                                   List<Object> capabilities) {
         return object(
             "kind", "contribution",
             "ownerId", contribution.ownerId().canonicalText(),
             "version", contribution.version(),
             "contractRange", object("minimum", versionObject(contribution.contractRange().minimum()), "maximum", versionObject(contribution.contractRange().maximum())),
             "dependencies", ordered(contribution.dependencies().stream().map(CatalogCanonicalizer::canonicalDependencyObject).map(value -> (Object) value).toList()),
-            "definitions", ordered(contribution.definitions().stream().map(value -> canonicalNodeObject(value, contribution)).map(value -> (Object) value).toList()),
-            "types", ordered(contribution.types().stream().map(CatalogCanonicalizer::canonicalTypeObject).map(value -> (Object) value).toList()),
-            "conversions", ordered(contribution.conversions().stream().map(CatalogCanonicalizer::canonicalConversionObject).map(value -> (Object) value).toList()),
-            "categories", ordered(contribution.categories().stream().map(CatalogCanonicalizer::canonicalCategoryObject).map(value -> (Object) value).toList()),
-            "optionSources", ordered(optionSources(contribution)),
-            "validators", ordered(validators(contribution)),
-            "editors", ordered(editors(contribution)),
-            "previews", ordered(contribution.previews().stream().map(CatalogCanonicalizer::canonicalPreviewObject).map(value -> (Object) value).toList()),
-            "capabilities", ordered(contribution.capabilities().stream().map(CatalogCanonicalizer::canonicalCapabilityObject).map(value -> (Object) value).toList()),
+            "definitions", ordered(definitions),
+            "types", ordered(types),
+            "conversions", ordered(conversions),
+            "categories", ordered(categories),
+            "optionSources", ordered(optionSources),
+            "validators", ordered(validators),
+            "editors", ordered(editors),
+            "previews", ordered(previews),
+            "capabilities", ordered(capabilities),
             "runtimeRequirements", includeRuntimeRequirements ? ordered(contribution.runtimeRequirements().stream().map(CatalogCanonicalizer::canonicalRuntimeObject).map(value -> (Object) value).toList()) : List.of(),
             "migrations", ordered(contribution.migrations().stream().map(CatalogCanonicalizer::canonicalMigrationObject).map(value -> (Object) value).toList()),
             "provenance", canonicalProvenanceObject(contribution.provenance())
@@ -389,7 +565,7 @@ public final class CatalogCanonicalizer {
             "modes", ordered(node.modes().stream().map(CatalogCanonicalizer::canonicalModeObject).map(value -> (Object) value).toList()),
             "branches", ordered(node.branches().stream().map(CatalogCanonicalizer::canonicalBranchObject).map(value -> (Object) value).toList()),
             "repeatables", ordered(node.repeatables().stream().map(CatalogCanonicalizer::canonicalRepeatableObject).map(value -> (Object) value).toList()),
-            "inspector", canonicalInspectorLayout(inspector),
+            "inspector", prepared(canonicalInspectorLayout(inspector)),
             "preview", canonicalPreviewIntent(node.preview()),
             "handler", object("capability", canonicalReference(node.handler().capability()), "operation", canonicalReference(node.handler().operation())),
             "semantics", canonicalRuntimeSemantics(node.semantics()),
@@ -400,13 +576,13 @@ public final class CatalogCanonicalizer {
     }
 
     private static Map<String, Object> canonicalPinObject(CatalogNodeDescriptor.Pin pin) {
-        return object("kind", "pin", "id", pin.id().canonicalText(), "direction", pin.direction().name().toLowerCase(Locale.ROOT), "type", json(pin.type().canonicalJson()), "displayName", pin.displayName(), "description", pin.description(), "requirement", pin.requirement().name().toLowerCase(Locale.ROOT), "default", pin.defaultValue() == null ? null : json(pin.defaultValue().canonicalJson()), "editor", canonicalReference(pin.editor()), "optionSource", canonicalReference(pin.optionSource()), "visibility", canonicalConditionObject(pin.visibility()), "repeatable", object("enabled", pin.repeatable().enabled(), "minimum", pin.repeatable().minimum(), "maximum", pin.repeatable().maximum(), "ordered", pin.repeatable().ordered(), "groupId", pin.repeatable().groupId() == null ? null : pin.repeatable().groupId().canonicalText()), "resourceRole", pin.resourceRole(), "presentation", canonicalPinPresentationObject(pin.presentation()));
+        return object("kind", "pin", "id", pin.id().canonicalText(), "direction", pin.direction().name().toLowerCase(Locale.ROOT), "type", json(pin.type()), "displayName", pin.displayName(), "description", pin.description(), "requirement", pin.requirement().name().toLowerCase(Locale.ROOT), "default", pin.defaultValue() == null ? null : json(pin.defaultValue()), "editor", canonicalReference(pin.editor()), "optionSource", canonicalReference(pin.optionSource()), "visibility", canonicalConditionObject(pin.visibility()), "repeatable", object("enabled", pin.repeatable().enabled(), "minimum", pin.repeatable().minimum(), "maximum", pin.repeatable().maximum(), "ordered", pin.repeatable().ordered(), "groupId", pin.repeatable().groupId() == null ? null : pin.repeatable().groupId().canonicalText()), "resourceRole", pin.resourceRole(), "presentation", canonicalPinPresentationObject(pin.presentation()));
     }
 
     private static Map<String, Object> canonicalPinPresentationObject(CatalogNodeDescriptor.PinPresentation presentation) {
         return object("widget", presentation.widget(),
             "options", presentation.options().stream()
-                .map(value -> json(value.canonicalJson()))
+                .map(value -> json(value))
                 .map(value -> (Object) value)
                 .toList(),
             "constraints", canonicalValue(presentation.constraints()),
@@ -424,7 +600,7 @@ public final class CatalogCanonicalizer {
 
     private static Map<String, Object> canonicalRepeatableObject(CatalogNodeDescriptor.RepeatableGroup group) {
         Map<String, Object> values = new LinkedHashMap<>(object("kind", "repeatable", "id", group.id().canonicalText(),
-            "title", group.title(), "description", group.description(), "elementType", json(group.elementType().canonicalJson()),
+            "title", group.title(), "description", group.description(), "elementType", json(group.elementType()),
             "minimum", group.minimum(), "maximum", group.maximum(), "ordered", group.ordered()));
         if (!group.members().isEmpty()) {
             values.put("members", ordered(group.members().stream()
@@ -435,7 +611,7 @@ public final class CatalogCanonicalizer {
 
     private static Map<String, Object> canonicalRepeatableMemberObject(CatalogNodeDescriptor.RepeatableMember member) {
         return object("pinId", member.pinId().canonicalText(),
-            "direction", member.direction().name().toLowerCase(Locale.ROOT), "type", json(member.type().canonicalJson()));
+            "direction", member.direction().name().toLowerCase(Locale.ROOT), "type", json(member.type()));
     }
 
     private static Map<String, Object> canonicalDependencyObject(CatalogDependency dependency) {
@@ -443,11 +619,11 @@ public final class CatalogCanonicalizer {
     }
 
     private static Map<String, Object> canonicalTypeObject(TypeDescriptor type) {
-        return object("kind", "type", "id", type.id().canonicalValue(), "displayName", type.displayName(), "expression", json(type.expression().canonicalJson()), "literalSchema", type.literalSchema(), "storageCodec", type.storageCodec().id().canonicalValue(), "networkCodec", type.networkCodec().id().canonicalValue(), "editor", canonicalReference(type.editor()), "validators", ordered(type.validators().stream().map(CatalogCanonicalizer::canonicalTypeReference).map(value -> (Object) value).toList()), "transportable", type.transportable(), "persistable", type.persistable());
+        return object("kind", "type", "id", type.id().canonicalValue(), "displayName", type.displayName(), "expression", json(type.expression()), "literalSchema", type.literalSchema(), "storageCodec", type.storageCodec().id().canonicalValue(), "networkCodec", type.networkCodec().id().canonicalValue(), "editor", canonicalReference(type.editor()), "validators", ordered(type.validators().stream().map(CatalogCanonicalizer::canonicalTypeReference).map(value -> (Object) value).toList()), "transportable", type.transportable(), "persistable", type.persistable());
     }
 
     private static Map<String, Object> canonicalConversionObject(ConversionGraph.ConversionEdge conversion) {
-        return object("kind", "conversion", "id", conversion.id().canonicalValue(), "source", json(conversion.source().canonicalJson()), "target", json(conversion.target().canonicalJson()), "cost", conversion.cost(), "losslessness", conversion.losslessness().wireName(), "failure", conversion.failure().wireName(), "capability", canonicalReference(conversion.capability()), "operation", canonicalReference(conversion.operation()));
+        return object("kind", "conversion", "id", conversion.id().canonicalValue(), "source", json(conversion.source()), "target", json(conversion.target()), "cost", conversion.cost(), "losslessness", conversion.losslessness().wireName(), "failure", conversion.failure().wireName(), "capability", canonicalReference(conversion.capability()), "operation", canonicalReference(conversion.operation()));
     }
 
     private static Map<String, Object> canonicalCategoryObject(CatalogCategoryDescriptor category) {
@@ -459,7 +635,7 @@ public final class CatalogCanonicalizer {
     }
 
     private static Map<String, Object> canonicalRuntimeObject(RuntimeOperationDescriptor requirement) {
-        return object("kind", "runtimeRequirement", "capability", canonicalReference(requirement.capability()), "operation", canonicalReference(requirement.operation()), "inputs", requirement.inputs().stream().map(value -> json(value.canonicalJson())).toList(), "outputs", requirement.outputs().stream().map(value -> json(value.canonicalJson())).toList(), "pins", canonicalRuntimePins(requirement), "semantics", canonicalRuntimeSemantics(requirement.semantics()));
+        return object("kind", "runtimeRequirement", "capability", canonicalReference(requirement.capability()), "operation", canonicalReference(requirement.operation()), "inputs", requirement.inputs().stream().map(value -> json(value)).toList(), "outputs", requirement.outputs().stream().map(value -> json(value)).toList(), "pins", canonicalRuntimePins(requirement), "semantics", canonicalRuntimeSemantics(requirement.semantics()));
     }
 
     private static List<Object> canonicalRuntimePins(RuntimeOperationDescriptor requirement) {
@@ -470,7 +646,7 @@ public final class CatalogCanonicalizer {
     }
 
     private static Map<String, Object> canonicalRuntimePinObject(RuntimeOperationDescriptor.Pin pin) {
-        return object("id", pin.id().canonicalText(), "direction", pin.direction().name().toLowerCase(Locale.ROOT), "type", json(pin.type().canonicalJson()));
+        return object("id", pin.id().canonicalText(), "direction", pin.direction().name().toLowerCase(Locale.ROOT), "type", json(pin.type()));
     }
 
     private static Map<String, Object> canonicalRuntimeSemantics(RuntimeSemantics semantics) {
@@ -565,27 +741,27 @@ public final class CatalogCanonicalizer {
         values.put("kind", field.kind().wireName());
         values.put("title", field.title());
         values.put("description", field.description());
-        values.put("valueType", json(field.valueType().canonicalJson()));
+        values.put("valueType", json(field.valueType()));
         values.put("editor", canonicalReference(field.editor().id()));
         values.put("visibility", canonicalConditionObject(field.visibility()));
         values.put("fallback", field.fallback().wireName());
         if (field instanceof InspectorScalarField scalar) {
             values.put("required", scalar.required());
-            values.put("defaultValue", scalar.defaultValue() == null ? null : json(scalar.defaultValue().canonicalJson()));
+            values.put("defaultValue", scalar.defaultValue() == null ? null : json(scalar.defaultValue()));
             values.put("constraints", scalar.constraints().stream().map(CatalogCanonicalizer::canonicalConstraintObject).toList());
         } else if (field instanceof InspectorSelectorField selector) {
             values.put("optionSource", canonicalOptionSourceObject(selector.optionSource()));
             values.put("searchable", selector.searchable());
             values.put("allowAbsent", selector.allowAbsent());
         } else if (field instanceof InspectorListField list) {
-            values.put("elementType", json(list.elementType().canonicalJson()));
+            values.put("elementType", json(list.elementType()));
             values.put("minimum", list.minimum());
             values.put("maximum", list.maximum());
             values.put("ordered", list.ordered());
             values.put("element", list.element() == null ? null : canonicalInspectorFieldObject(list.element()));
         } else if (field instanceof InspectorMapField map) {
-            values.put("keyType", json(map.keyType().canonicalJson()));
-            values.put("mapValueType", json(map.mapValueType().canonicalJson()));
+            values.put("keyType", json(map.keyType()));
+            values.put("mapValueType", json(map.mapValueType()));
             values.put("minimum", map.minimum());
             values.put("maximum", map.maximum());
             values.put("value", map.value() == null ? null : canonicalInspectorFieldObject(map.value()));
@@ -619,7 +795,7 @@ public final class CatalogCanonicalizer {
     }
 
     private static Map<String, Object> canonicalUnionCaseObject(InspectorUnionCase value) {
-        return object("id", value.id().canonicalText(), "title", value.title(), "description", value.description(), "type", json(value.type().canonicalJson()), "field", canonicalInspectorFieldObject(value.field()), "visibility", canonicalConditionObject(value.visibility()));
+        return object("id", value.id().canonicalText(), "title", value.title(), "description", value.description(), "type", json(value.type()), "field", canonicalInspectorFieldObject(value.field()), "visibility", canonicalConditionObject(value.visibility()));
     }
 
     private static Map<String, Object> canonicalBranchCaseObject(InspectorBranchCase value) {
@@ -658,7 +834,7 @@ public final class CatalogCanonicalizer {
     }
 
     private static Map<String, Object> canonicalSchemaObject(InspectorValueSchema schema) {
-        return object("type", json(schema.type().canonicalJson()), "constraints", schema.constraints().stream().map(CatalogCanonicalizer::canonicalConstraintObject).toList());
+        return object("type", json(schema.type()), "constraints", schema.constraints().stream().map(CatalogCanonicalizer::canonicalConstraintObject).toList());
     }
 
     private static Map<String, Object> canonicalConstraintObject(InspectorConstraint constraint) {
@@ -670,7 +846,7 @@ public final class CatalogCanonicalizer {
     }
 
     private static Map<String, Object> canonicalOptionSourceObject(InspectorOptionSource source) {
-        return object("id", source.id().canonicalText(), "title", source.title(), "description", source.description(), "valueType", json(source.optionType().canonicalJson()), "querySchema", canonicalValue(source.querySchema().canonicalValue()), "capability", canonicalReference(source.capability()), "pageLimit", source.pageLimit(), "invalidationKey", source.invalidationKey());
+        return object("id", source.id().canonicalText(), "title", source.title(), "description", source.description(), "valueType", json(source.optionType()), "querySchema", canonicalValue(source.querySchema().canonicalValue()), "capability", canonicalReference(source.capability()), "pageLimit", source.pageLimit(), "invalidationKey", source.invalidationKey());
     }
 
     private static Map<String, Object> canonicalValidationRuleObject(InspectorValidationRule rule) {
@@ -678,11 +854,11 @@ public final class CatalogCanonicalizer {
     }
 
     private static Map<String, Object> canonicalFunctionSignatureObject(InspectorFunctionSignature signature) {
-        return object("id", signature.id().canonicalText(), "title", signature.title(), "description", signature.description(), "parameters", signature.parameters().stream().map(CatalogCanonicalizer::canonicalFunctionParameterObject).toList(), "returnType", json(signature.returnType().canonicalJson()), "visibility", canonicalConditionObject(signature.visibility()));
+        return object("id", signature.id().canonicalText(), "title", signature.title(), "description", signature.description(), "parameters", signature.parameters().stream().map(CatalogCanonicalizer::canonicalFunctionParameterObject).toList(), "returnType", json(signature.returnType()), "visibility", canonicalConditionObject(signature.visibility()));
     }
 
     private static Map<String, Object> canonicalFunctionParameterObject(InspectorFunctionParameter parameter) {
-        return object("id", parameter.id().canonicalText(), "title", parameter.title(), "description", parameter.description(), "type", json(parameter.type().canonicalJson()), "required", parameter.required(), "defaultValue", parameter.defaultValue() == null ? null : json(parameter.defaultValue().canonicalJson()));
+        return object("id", parameter.id().canonicalText(), "title", parameter.title(), "description", parameter.description(), "type", json(parameter.type()), "required", parameter.required(), "defaultValue", parameter.defaultValue() == null ? null : json(parameter.defaultValue()));
     }
 
     private static Map<String, Object> canonicalConditionObject(InspectorCondition condition) {
@@ -693,10 +869,10 @@ public final class CatalogCanonicalizer {
             return object("kind", "present", "fieldId", present.field().canonicalText());
         }
         if (condition instanceof InspectorCondition.Equals equals) {
-            return object("kind", "equals", "fieldId", equals.field().canonicalText(), "value", json(equals.value().canonicalJson()));
+            return object("kind", "equals", "fieldId", equals.field().canonicalText(), "value", json(equals.value()));
         }
         if (condition instanceof InspectorCondition.NotEquals notEquals) {
-            return object("kind", "not-equals", "fieldId", notEquals.field().canonicalText(), "value", json(notEquals.value().canonicalJson()));
+            return object("kind", "not-equals", "fieldId", notEquals.field().canonicalText(), "value", json(notEquals.value()));
         }
         if (condition instanceof InspectorCondition.All all) {
             return object("kind", "all", "children", all.conditions().stream().map(CatalogCanonicalizer::canonicalConditionObject).toList());
@@ -712,17 +888,19 @@ public final class CatalogCanonicalizer {
     }
 
     private static Object canonicalValue(Object value) {
-        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof CanonicalObject || value instanceof CanonicalList) {
+        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean
+            || value instanceof CanonicalObject || value instanceof CanonicalList
+            || value instanceof CanonicalJson.CanonicalFragment) {
             return value;
         }
         if (value instanceof UUID uuid) {
             return uuid.toString();
         }
         if (value instanceof TypedValue typedValue) {
-            return json(typedValue.canonicalJson());
+            return json(typedValue);
         }
         if (value instanceof TypeExpr type) {
-            return json(type.canonicalJson());
+            return json(type);
         }
         if (value instanceof ContractRef<?> reference) {
             return canonicalReference(reference);
@@ -746,8 +924,20 @@ public final class CatalogCanonicalizer {
         throw new IllegalArgumentException("Unsupported catalog canonical value");
     }
 
+    private static Object json(TypeExpr type) {
+        return jsonTree(Objects.requireNonNull(type, "type").canonicalValue());
+    }
+
+    private static Object json(TypedValue value) {
+        return jsonTree(Objects.requireNonNull(value, "value").canonicalValue());
+    }
+
     private static Object json(String canonicalJson) {
-        return CanonicalJson.parse(Objects.requireNonNull(canonicalJson, "canonicalJson"));
+        return jsonTree(CanonicalJson.parse(Objects.requireNonNull(canonicalJson, "canonicalJson"), CATALOG_LIMITS));
+    }
+
+    private static Object jsonTree(Object canonicalTree) {
+        return CanonicalJson.prepare(Objects.requireNonNull(canonicalTree, "canonicalTree"), CATALOG_LIMITS);
     }
 
     private static String canonical(Object value) {
@@ -762,10 +952,123 @@ public final class CatalogCanonicalizer {
         return ContentHash.of(CanonicalJson.sha256(domain, value, CATALOG_LIMITS));
     }
 
+    private static CanonicalJson.CanonicalFragment prepared(Object value) {
+        if (value instanceof CanonicalJson.CanonicalFragment fragment) {
+            if (!CATALOG_LIMITS.equals(fragment.limits())) {
+                throw new IllegalArgumentException("Canonical fragment limits do not match catalog limits");
+            }
+            return fragment;
+        }
+        return CanonicalJson.prepare(canonicalValue(value), CATALOG_LIMITS);
+    }
+
+    private static CanonicalJson.CanonicalFragment ownedPrepared(OwnerId owner, CanonicalJson.CanonicalFragment descriptor) {
+        return insertTopLevelField(descriptor, "ownerId", owner.canonicalText());
+    }
+
+    static CanonicalJson.CanonicalFragment insertTopLevelField(CanonicalJson.CanonicalFragment object,
+                                                              String field,
+                                                              String value) {
+        String content = object.content();
+        if (content.length() < 2 || content.charAt(0) != '{' || content.charAt(content.length() - 1) != '}') {
+            throw new IllegalArgumentException("Canonical catalog descriptor is not an object");
+        }
+        CanonicalJson.CanonicalFragment fieldValue = CanonicalJson.prepare(value, CATALOG_LIMITS);
+        String encodedField = CanonicalJson.canonicalize(field, CATALOG_LIMITS) + ":" + fieldValue.content();
+        String next;
+        if (content.equals("{}")) {
+            next = "{" + encodedField + "}";
+        } else {
+            int insertion = topLevelFieldInsertionIndex(content, field);
+            if (insertion == 1) {
+                next = "{" + encodedField + "," + content.substring(1);
+            } else if (insertion >= content.length() - 1) {
+                next = content.substring(0, content.length() - 1) + "," + encodedField + "}";
+            } else {
+                next = content.substring(0, insertion) + encodedField + "," + content.substring(insertion);
+            }
+        }
+        return CanonicalJson.adopt(next, CATALOG_LIMITS,
+            Math.addExact(object.tokens(), Math.addExact(fieldValue.tokens(), 1L)),
+            Math.max(object.maximumDepth(), fieldValue.maximumDepth()));
+    }
+
+    private static int topLevelFieldInsertionIndex(String json, String field) {
+        int depth = 0;
+        boolean inString = false;
+        boolean escape = false;
+        boolean pendingKey = false;
+        int keyStart = -1;
+        for (int index = 0; index < json.length(); index++) {
+            char character = json.charAt(index);
+            if (inString) {
+                if (escape) {
+                    escape = false;
+                    continue;
+                }
+                if (character == '\\') {
+                    escape = true;
+                    continue;
+                }
+                if (character == '"') {
+                    inString = false;
+                    if (depth == 1 && pendingKey && keyStart >= 0) {
+                        String key = json.substring(keyStart, index);
+                        int comparison = CanonicalJson.compareCodePoints(key, field);
+                        if (comparison == 0) {
+                            throw new IllegalArgumentException("Canonical catalog object already contains " + field);
+                        }
+                        if (comparison > 0) {
+                            return keyStart - 1;
+                        }
+                        pendingKey = false;
+                        keyStart = -1;
+                    }
+                }
+                continue;
+            }
+            if (character == '"') {
+                if (depth == 1 && pendingKey) {
+                    keyStart = index + 1;
+                }
+                inString = true;
+                continue;
+            }
+            if (character == '{') {
+                depth++;
+                pendingKey = depth == 1;
+                continue;
+            }
+            if (character == '}') {
+                depth--;
+                pendingKey = false;
+                continue;
+            }
+            if (character == '[') {
+                depth++;
+                pendingKey = false;
+                continue;
+            }
+            if (character == ']') {
+                depth--;
+                pendingKey = false;
+                continue;
+            }
+            if (character == ':' && depth == 1) {
+                pendingKey = false;
+                continue;
+            }
+            if (character == ',' && depth == 1) {
+                pendingKey = true;
+            }
+        }
+        return json.length() - 1;
+    }
+
     private static List<Object> sorted(Collection<?> values) {
         List<CanonicalJson.CanonicalFragment> canonicalValues = new ArrayList<>(values.size());
         for (Object value : values) {
-            canonicalValues.add(CanonicalJson.prepare(canonicalValue(value), CATALOG_LIMITS));
+            canonicalValues.add(prepared(value));
         }
         return new CanonicalList(stableSortedBy(canonicalValues, CanonicalJson.CanonicalFragment::content).stream().map(value -> (Object) value).toList());
     }

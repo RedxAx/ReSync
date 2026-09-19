@@ -62,6 +62,8 @@ val browserJar by tasks.registering(Jar::class) {
     exclude("**/flow/catalog/CatalogBindingProof*")
     exclude("**/flow/catalog/CatalogCompiler*")
     exclude("**/flow/catalog/CatalogSourceIngestor*")
+    exclude("**/flow/catalog/CatalogSourceIndex*")
+    exclude("**/flow/catalog/CatalogStartupIndex*")
     exclude("**/flow/validation/**")
     exclude("**/flow/runtime/RuntimeBindingRegistry*")
     exclude("**/flow/runtime/RuntimeBinding.class")

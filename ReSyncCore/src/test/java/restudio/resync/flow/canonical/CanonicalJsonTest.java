@@ -73,6 +73,21 @@ final class CanonicalJsonTest {
     }
 
     @Test
+    void adoptedFragmentPreservesPreparedContentAndAccounting() {
+        CanonicalLimits limits = CanonicalLimits.catalog();
+        CanonicalJson.CanonicalFragment prepared = CanonicalJson.prepare(Map.of("id", "alpha", "kind", "node"), limits);
+        CanonicalJson.CanonicalFragment adopted = CanonicalJson.adopt(
+            prepared.content(), limits, prepared.tokens(), prepared.maximumDepth());
+
+        assertEquals(prepared.content(), adopted.content());
+        assertEquals(prepared.bytes(), adopted.bytes());
+        assertEquals(prepared.tokens(), adopted.tokens());
+        assertEquals(prepared.maximumDepth(), adopted.maximumDepth());
+        assertEquals(CanonicalJson.canonicalize(List.of(prepared), limits), CanonicalJson.canonicalize(List.of(adopted), limits));
+        assertThrows(IllegalArgumentException.class, () -> CanonicalJson.adopt(prepared.content(), limits, -1, 0));
+    }
+
+    @Test
     void rejectsMalformedInputAndUnicode() {
         assertThrows(IllegalArgumentException.class, () -> CanonicalJson.parse("{\"a\":1,\"a\":2}"));
         assertThrows(IllegalArgumentException.class, () -> CanonicalJson.parse("{\"a\":01}"));

@@ -49,6 +49,30 @@ class WorldGenOptionCatalogsTest {
     }
 
     @Test
+    void capturePreparesOnlyTheRequestedVersion() {
+        OptionCatalogRegistry registry = new OptionCatalogRegistry();
+        WorldGenOptionCatalogs.register(registry);
+        AtomicInteger captures = new AtomicInteger();
+        OptionCatalogCaptureExecutor executor = (provider, query) -> {
+            captures.incrementAndGet();
+            return provider.capture(query);
+        };
+        OptionCatalogQuery requested = query("worldgen:blocks", "1.21");
+
+        assertThrows(OptionCatalogRegistry.CaptureUnavailable.class,
+            () -> registry.values("worldgen:blocks", requested));
+        assertEquals("available", executor.capture(registry.provider("worldgen:blocks"), requested).status());
+        assertEquals(1, captures.get());
+        registry.bindCapture((provider, query) -> {
+            throw new AssertionError("Prepared WorldGen catalogs must serve later synchronous consumers");
+        });
+        assertTrue(registry.values("worldgen:blocks", requested).contains("minecraft:stone"));
+        assertThrows(OptionCatalogRegistry.CaptureUnavailable.class,
+            () -> registry.values("worldgen:blocks", query("worldgen:blocks", "1.21.4")));
+        assertEquals(1, captures.get());
+    }
+
+    @Test
     void prewarmRejectsProviderReplacementDuringCapture() {
         OptionCatalogRegistry registry = new OptionCatalogRegistry();
         WorldGenOptionCatalogs.register(registry);

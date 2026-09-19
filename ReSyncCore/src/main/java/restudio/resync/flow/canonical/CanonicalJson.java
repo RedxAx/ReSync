@@ -54,6 +54,15 @@ public final class CanonicalJson {
         return new CanonicalFragment(checkedLimits, content, writer.outputBytes, writer.tokenCounter.value, writer.maximumDepth);
     }
 
+    public static CanonicalFragment adopt(String content, CanonicalLimits limits, long tokens, int maximumDepth) {
+        CanonicalLimits checkedLimits = Objects.requireNonNull(limits, "Limits are required");
+        if (tokens < 0 || maximumDepth < 0) {
+            throw new IllegalArgumentException("Canonical fragment accounting must not be negative");
+        }
+        byte[] encoded = utf8(Objects.requireNonNull(content, "Canonical content is required"), checkedLimits.canonicalBytes());
+        return new CanonicalFragment(checkedLimits, content, encoded.length, tokens, maximumDepth);
+    }
+
     public static byte[] canonicalBytes(Object value) {
         return canonicalBytes(value, CanonicalLimits.standard());
     }
@@ -370,6 +379,22 @@ public final class CanonicalJson {
 
         public String content() {
             return content;
+        }
+
+        public CanonicalLimits limits() {
+            return limits;
+        }
+
+        public int bytes() {
+            return bytes;
+        }
+
+        public long tokens() {
+            return tokens;
+        }
+
+        public int maximumDepth() {
+            return maximumDepth;
         }
     }
 

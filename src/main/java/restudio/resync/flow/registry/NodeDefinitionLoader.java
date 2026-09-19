@@ -14,14 +14,13 @@ import com.google.gson.stream.JsonWriter;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowTypeRef;
 import restudio.resync.Log;
-import restudio.resync.flow.canonical.CanonicalJson;
+import restudio.resync.flow.catalog.CatalogSourceIndex;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.NodeId;
 import restudio.resync.flow.identity.PinId;
 
 import java.io.IOException;
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -65,6 +64,10 @@ public class NodeDefinitionLoader {
             relativePath = relativePath == null ? "" : relativePath;
             origin = origin == null ? SourceOrigin.CLASSPATH : origin;
             bytes = bytes == null ? new byte[0] : bytes.clone();
+        }
+
+        public byte[] rawBytes() {
+            return bytes;
         }
 
         @Override
@@ -302,12 +305,16 @@ public class NodeDefinitionLoader {
             return results;
         }
         CatalogSource selectedSource = source != null ? source : CatalogSource.COMPATIBILITY;
+        List<SourceFile> present = new ArrayList<>();
         for (SourceFile sourceFile : sources) {
-            if (sourceFile == null) {
-                continue;
+            if (sourceFile != null) {
+                present.add(sourceFile);
             }
+        }
+        present.parallelStream().forEach(sourceFile -> CatalogSourceIndex.sourceHash(sourceFile.rawBytes()));
+        for (SourceFile sourceFile : present) {
             try {
-                results.addAll(parse(new ByteArrayInputStream(sourceFile.bytes()), sourceFile.sourceUri(), selectedSource));
+                results.addAll(parse(sourceFile.rawBytes(), sourceFile.sourceUri(), selectedSource));
             } catch (RuntimeException exception) {
                 Log.warn("[NodeDefinitionLoader] Failed to load " + sourceFile.sourceName() + ": " + exception.getMessage());
             }
@@ -381,6 +388,15 @@ public class NodeDefinitionLoader {
             addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "FILE_PARSE_FAILED", source, -1, "", exception.getMessage());
             return results;
         }
+        return parse(sourceBytes, source, sourceKind);
+    }
+
+    public List<NodeDefinition> parse(byte[] sourceBytes, String source, CatalogSource sourceKind) {
+        List<NodeDefinition> results = new ArrayList<>();
+        if (sourceBytes == null) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "FILE_PARSE_FAILED", source, -1, "", "Definition file bytes are required");
+            return results;
+        }
         JsonElement root;
         try {
             root = JsonParser.parseString(new String(sourceBytes, StandardCharsets.UTF_8));
@@ -388,7 +404,7 @@ public class NodeDefinitionLoader {
             addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "FILE_PARSE_FAILED", source, -1, "", exception.getMessage());
             return results;
         }
-        ContentHash sourceHash = sourceHash(root);
+        ContentHash sourceHash = CatalogSourceIndex.sourceHash(sourceBytes);
 
         if (root.isJsonArray()) {
             for (int index = 0; index < root.getAsJsonArray().size(); index++) {
@@ -418,14 +434,6 @@ public class NodeDefinitionLoader {
             origins.put(definition, new DefinitionOrigin(source, index));
         } catch (RuntimeException exception) {
             addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "DEFINITION_PARSE_FAILED", source, index, nodeId, exception.getMessage());
-        }
-    }
-
-    private ContentHash sourceHash(JsonElement root) {
-        try {
-            return ContentHash.of(CanonicalJson.genericCanonicalContentHash(CanonicalJson.parse(root.toString())));
-        } catch (RuntimeException exception) {
-            return ContentHash.of(CanonicalJson.genericCanonicalContentHash(root.toString()));
         }
     }
 

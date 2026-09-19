@@ -214,8 +214,7 @@ public final class CatalogSnapshot {
         this.migrations = source.migrations;
         this.provenance = source.provenance;
         this.diagnostics = source.diagnostics;
-        this.canonicalContent = CatalogCanonicalizer.canonicalSnapshotContent(generation, contractVersion,
-            contributions, minimumClientCapabilities, diagnostics, bindingManifestHash);
+        this.canonicalContent = CatalogCanonicalizer.rebaseSnapshotGeneration(source.canonicalContent, generation);
         this.definitionsByKey = source.definitionsByKey;
         this.inspectorsByKey = source.inspectorsByKey;
         this.capabilitiesByKey = source.capabilitiesByKey;

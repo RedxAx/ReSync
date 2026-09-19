@@ -1,6 +1,7 @@
 package restudio.resync.modules;
 
 import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.resync.core.Session;
 import restudio.resync.server.TemporaryLifecycleDiagnostics;
 
@@ -489,9 +490,14 @@ public class ModuleRegistry {
     }
 
     private static void moduleLifecycleEvent(String stage, Module module, long started, long cpuStarted, String outcome) {
+        Map<String, Long> timings = timing(started, cpuStarted);
         TemporaryLifecycleDiagnostics.event(stage, started,
             Map.of("moduleId", module.getModuleId(), "outcome", outcome,
-                "participantTimings", timing(started, cpuStarted)));
+                "participantTimings", timings));
+        long wallMs = timings.get("wallMs");
+        if (wallMs >= 25L) {
+            Log.info("Module " + module.getModuleId() + " " + stage.replace('_', ' ') + " completed in " + wallMs + " ms");
+        }
     }
 
     private static Map<String, Long> timing(long started, long cpuStarted) {

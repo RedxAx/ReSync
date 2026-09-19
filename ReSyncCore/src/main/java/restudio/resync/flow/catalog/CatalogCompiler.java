@@ -26,6 +26,7 @@ import restudio.resync.flow.type.TypeDescriptor;
 import restudio.resync.flow.type.TypeReference;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -64,6 +65,18 @@ public final class CatalogCompiler {
 
     public CatalogCompilationResult compile(Collection<CatalogContribution> input) {
         return compile(input, 1);
+    }
+
+    public CatalogCompilationResult compile(Collection<CatalogContribution> input, long generation, Path startupIndex) {
+        CatalogCompilationResult indexed = restoreIndexed(input, generation, startupIndex);
+        if (indexed != null) {
+            return indexed;
+        }
+        CatalogCompilationResult result = compile(input, generation);
+        if (result.accepted()) {
+            storeIndexed(input, generation, startupIndex, result);
+        }
+        return result;
     }
 
     public CatalogCompilationResult compile(Collection<CatalogContribution> input, long generation) {
@@ -183,6 +196,76 @@ public final class CatalogCompiler {
             derived
         );
         return CatalogCompilationResult.accepted(snapshot, diagnostics);
+    }
+
+    private CatalogCompilationResult restoreIndexed(Collection<CatalogContribution> input, long generation, Path startupIndex) {
+        if (startupIndex == null || input == null || generation < 1) {
+            return null;
+        }
+        try {
+            List<CatalogContribution> contributions = input.stream().filter(Objects::nonNull)
+                .sorted(Comparator.comparing(CatalogContribution::ownerId)).toList();
+            if (contributions.size() != input.size()) {
+                return null;
+            }
+            CatalogBindingProof activeBindingProof = Objects.requireNonNull(bindingProof.capture(),
+                "Captured Catalog Binding Proof Is Required");
+            Optional<ContentHash> activeManifestHash = activeBindingProof.activeBindingManifestHash();
+            ContentHash bindingManifestHash = activeManifestHash
+                .orElseGet(() -> CatalogCanonicalizer.bindingManifestHash(contributions));
+            String fingerprint = CatalogStartupIndex.fingerprint(CatalogStartupIndex.sourceIdentities(contributions),
+                bindingManifestHash.canonicalText(), contractVersion.toString(), definitionCount(contributions));
+            return CatalogStartupIndex.find(startupIndex, fingerprint, generation).map(derived -> {
+                Set<ContractRef<CapabilityId>> minimumClientCapabilities = minimumClientCapabilities(contributions);
+                CatalogSnapshot snapshot = new CatalogSnapshot(generation, contractVersion, minimumClientCapabilities,
+                    contributions, List.of(), derived);
+                return CatalogCompilationResult.accepted(snapshot, List.of());
+            }).orElse(null);
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private void storeIndexed(Collection<CatalogContribution> input, long generation, Path startupIndex,
+                              CatalogCompilationResult result) {
+        if (startupIndex == null || input == null || result == null || !result.accepted()) {
+            return;
+        }
+        CatalogSnapshot snapshot = result.snapshot().orElse(null);
+        if (snapshot == null) {
+            return;
+        }
+        try {
+            List<CatalogContribution> contributions = input.stream().filter(Objects::nonNull)
+                .sorted(Comparator.comparing(CatalogContribution::ownerId)).toList();
+            String fingerprint = CatalogStartupIndex.fingerprint(CatalogStartupIndex.sourceIdentities(contributions),
+                snapshot.bindingManifestHash().canonicalText(), contractVersion.toString(), definitionCount(contributions));
+            CatalogStartupIndex.store(startupIndex, fingerprint, generation,
+                CatalogCanonicalizer.derivedSnapshot(snapshot.contentChecksum(), snapshot.bindingManifestHash(),
+                    snapshot.canonicalContent()));
+        } catch (RuntimeException exception) {
+            return;
+        }
+    }
+
+    private static int definitionCount(Collection<CatalogContribution> contributions) {
+        int count = 0;
+        for (CatalogContribution contribution : contributions) {
+            count += contribution.definitions().size();
+        }
+        return count;
+    }
+
+    private static Set<ContractRef<CapabilityId>> minimumClientCapabilities(Collection<CatalogContribution> contributions) {
+        Set<ContractRef<CapabilityId>> minimumClientCapabilities = new HashSet<>();
+        for (CatalogContribution contribution : contributions) {
+            for (CatalogCapabilityDescriptor capability : contribution.capabilities()) {
+                if (!capability.optional()) {
+                    minimumClientCapabilities.add(capability.reference(contribution.ownerId()));
+                }
+            }
+        }
+        return minimumClientCapabilities;
     }
 
     private static void validateDependencies(List<CatalogContribution> contributions, Map<OwnerId, CatalogContribution> byOwner, Validation validation) {

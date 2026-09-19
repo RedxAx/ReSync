@@ -20,5 +20,10 @@ class FlowModuleStartupPrewarmTest {
 
         assertFalse(constructor.contains("prewarmAuthoring()"));
         assertTrue(noopCommit.contains("catalogPublicationTransport.prewarmAuthoring()"));
+        String captureBinding = source.substring(source.indexOf("public void setOptionCatalogCaptureExecutor"),
+            source.indexOf("public int getSubscribedSessionCount"));
+        assertFalse(captureBinding.contains("WorldGenOptionCatalogs.prewarm"));
+        assertFalse(captureBinding.contains("RuntimeDataOptionCatalogService.prewarm"));
+        assertFalse(captureBinding.contains(".join()"));
     }
 }

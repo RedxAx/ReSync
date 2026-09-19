@@ -6,7 +6,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -87,7 +86,15 @@ public record ServerSettingsBundle(int formatVersion, String createdAt, List<Sou
 
     private static String sha256(byte[] value) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value);
+            char[] result = new char[digest.length * 2];
+            char[] alphabet = "0123456789abcdef".toCharArray();
+            for (int index = 0; index < digest.length; index++) {
+                int part = digest[index] & 0xff;
+                result[index * 2] = alphabet[part >>> 4];
+                result[index * 2 + 1] = alphabet[part & 0x0f];
+            }
+            return new String(result);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }

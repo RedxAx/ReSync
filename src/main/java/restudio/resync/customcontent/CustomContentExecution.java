@@ -155,6 +155,47 @@ public final class CustomContentExecution implements CoreGraphResourceAuthority,
         }
     }
 
+    public void admit(CustomContentDefinition content) {
+        requireOpen();
+        if (content == null || content.getGraph() == null) {
+            return;
+        }
+        String id = content.getId();
+        FlowResourceMutationStamp before = storage.readMutationStamp(id);
+        FlowGraph graph = content.getGraph().copy();
+        graph.setId(id);
+        graph.setResourceType(TYPE);
+        if (before != null && !before.deleted()) {
+            graph.setResourceRevision(Math.max(graph.getResourceRevision(), before.revision()));
+            graph.setResourceHash(before.payloadHash());
+        }
+        try {
+            metadata.projectCustomContent(graph);
+        } catch (CompiledGraphMetadataProvider.UnsupportedGraphException failure) {
+            throw new IllegalArgumentException(admissionMessage(failure), failure);
+        } catch (RuntimeException failure) {
+            String message = failure.getMessage();
+            throw new IllegalArgumentException(message == null || message.isBlank() ? "This item graph cannot run" : message, failure);
+        }
+    }
+
+    private static String admissionMessage(CompiledGraphMetadataProvider.UnsupportedGraphException failure) {
+        String details = failure.diagnostics().stream()
+            .map(diagnostic -> {
+                Object reason = diagnostic.evidence().get("reason");
+                String message = diagnostic.message();
+                if (reason != null && !reason.toString().isBlank() && !reason.toString().equals(message)) {
+                    return message + ": " + reason;
+                }
+                return message;
+            })
+            .filter(message -> message != null && !message.isBlank())
+            .limit(8)
+            .reduce((left, right) -> left + "; " + right)
+            .orElse(failure.getMessage());
+        return details == null || details.isBlank() ? "This item graph cannot run" : details;
+    }
+
     public FlowGraph graph(String id) {
         Projection projection = projection(id);
         return projection == null ? null : projection.graph();

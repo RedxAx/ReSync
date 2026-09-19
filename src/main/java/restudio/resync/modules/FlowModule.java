@@ -80,7 +80,6 @@ import restudio.resync.server.AuthorityEpoch;
 import restudio.resync.server.CoreCatalogEvolution;
 import restudio.resync.server.CoreGraphMutationValidator;
 import restudio.resync.server.OptionCatalogCaptureExecutor;
-import restudio.resync.worldgen.registry.WorldGenOptionCatalogs;
 import restudio.resync.server.TemporaryLifecycleDiagnostics;
 import restudio.resync.modules.flow.FlowPlaceholderPreviewHandler;
 import restudio.resync.modules.flow.FlowResourcePacketRouter;
@@ -108,6 +107,7 @@ import restudio.resync.flow.catalog.CatalogProvenance;
 import restudio.resync.flow.catalog.CatalogRuntimeActivation;
 import restudio.resync.flow.catalog.CatalogSnapshot;
 import restudio.resync.flow.catalog.CatalogSourceIngestor;
+import restudio.resync.flow.catalog.CatalogStartupIndex;
 import restudio.resync.flow.catalog.CatalogVersion;
 import restudio.resync.flow.catalog.CatalogCanonicalizer;
 import restudio.resync.flow.diagnostic.Diagnostic;
@@ -236,6 +236,7 @@ public class FlowModule implements Module {
     private final List<CatalogSourceIngestor.CatalogSource> authoredCatalogSources;
     private final RuntimeBindingRegistry runtimeBindingRegistry;
     private final HandlerRegistry handlerRegistry;
+    private final TypeAdapterRegistry runtimeTypeAdapters = new TypeAdapterRegistry();
     private final Map<String, NodeHandler> startupHandlerRegistrations;
     private DefinitionRegistryInput startupDefinitionInput;
     private final Set<ContractRef<ProviderId>> runtimeProviders = new HashSet<>();
@@ -614,14 +615,21 @@ public class FlowModule implements Module {
         RuntimeReplacementPlan startupRuntimePlan = null;
         try {
             long contributionStarted = TemporaryLifecycleDiagnostics.start();
+            long contributionWall = System.nanoTime();
             CatalogBuild catalogBuild = buildStartupCatalog(this.authoredCatalogSources);
             List<CatalogContribution> contributions = catalogBuild.contributions();
             TemporaryLifecycleDiagnostics.event("catalog_contribution_build", contributionStarted,
                 Map.of("operation", "startup", "outcome", "complete", "count", contributions.size()));
+            Log.info("Flow catalog contribution build completed in "
+                + Math.max(0L, (System.nanoTime() - contributionWall) / 1_000_000L) + " ms [" + contributions.size()
+                + " contributions]");
             long runtimePreparationStarted = TemporaryLifecycleDiagnostics.start();
+            long runtimePreparationWall = System.nanoTime();
             startupRuntimePlan = prepareRuntimeReplacement(contributions, catalogBuild.runtimeDefinitions());
             TemporaryLifecycleDiagnostics.event("catalog_runtime_prepare", runtimePreparationStarted,
                 Map.of("operation", "startup", "outcome", "complete", "count", contributions.size()));
+            Log.info("Flow catalog runtime prepare completed in "
+                + Math.max(0L, (System.nanoTime() - runtimePreparationWall) / 1_000_000L) + " ms");
             RuntimeRegistrySnapshot stagedRuntime = startupRuntimePlan.replacement().preview();
             CatalogBinding persistedBinding = loadCatalogGeneration(storage);
             long publicationGeneration = latestPublishedGeneration(serverId, receiptStore);
@@ -1919,11 +1927,15 @@ public class FlowModule implements Module {
     private CatalogCompilationResult preflightCatalog(List<CatalogContribution> contributions, long generation,
                                                       RuntimeRegistrySnapshot runtimeSnapshot) {
         long started = TemporaryLifecycleDiagnostics.start();
+        long compileWall = System.nanoTime();
         try {
-            CatalogCompilationResult result = catalogCompilerFor(runtimeSnapshot).compile(contributions, generation);
+            CatalogCompilationResult result = catalogCompilerFor(runtimeSnapshot)
+                .compile(contributions, generation, catalogStartupIndexDirectory());
             TemporaryLifecycleDiagnostics.event("catalog_compile", started,
                 Map.of("generation", generation, "count", contributions.size(),
                     "outcome", result.accepted() ? "complete" : "rejected", "diagnosticCount", result.diagnostics().size()));
+            Log.info("Flow catalog compile completed in " + Math.max(0L, (System.nanoTime() - compileWall) / 1_000_000L)
+                + " ms [" + contributions.size() + " contributions]");
             return result;
         } catch (RuntimeException exception) {
             TemporaryLifecycleDiagnostics.event("catalog_compile", started,
@@ -2242,8 +2254,8 @@ public class FlowModule implements Module {
             FlowNode node = new FlowNode(definition.getId(), 0, 0, inputs);
             node.setHandlerConfig(definition.getHandlerConfig());
             FlowGraph graph = new FlowGraph("runtime", Map.of("runtime", node), List.of(), List.of());
-            FlowRuntime runtime = new FlowRuntime(graph, new TypeAdapterRegistry(), Map.of(), legacyContext.variables(), definitionsRegistry,
-                storage.legacyRuntimeGate());
+            FlowRuntime runtime = new FlowRuntime(graph, runtimeTypeAdapters, Map.of(), legacyContext.variables(), definitionsRegistry,
+                storage.legacyRuntimeGate(), invocation.invocationId());
             List<String> deferredOutputs = new CopyOnWriteArrayList<>();
             FlowContext context = new FlowContext(runtime, legacyContext.player(), legacyContext.event(), deferredOutputs::add, executor,
                 invocation.principal(), invocation.invocationId(), invocation.idempotencyKey(), invocation.runtimeContext(),
@@ -2255,6 +2267,15 @@ public class FlowModule implements Module {
             if (triggeredOutput != null && !triggeredOutput.isBlank() && !synchronousOutputs.contains(triggeredOutput)) {
                 synchronousOutputs = new ArrayList<>(synchronousOutputs);
                 synchronousOutputs.add(triggeredOutput);
+            }
+            if (context.getAsyncOperations().isEmpty()) {
+                if (!deferredOutputs.isEmpty()) {
+                    synchronousOutputs = new ArrayList<>(synchronousOutputs);
+                    synchronousOutputs.addAll(deferredOutputs);
+                }
+                invocation.throwIfCancelled();
+                return CompletableFuture.completedFuture(legacyRuntimeResult(requirement, definition, runtime,
+                    synchronousOutputs));
             }
             return completeLegacyOutputCapture(synchronousOutputs, deferredOutputs,
                 () -> new ArrayList<>(context.getAsyncOperations().values()), triggeredOutputs -> {
@@ -2415,14 +2436,21 @@ public class FlowModule implements Module {
             return RuntimeResult.success();
         }
         Map<PinId, TypedValue> outputs = new LinkedHashMap<>();
+        Map<PinId, TypeExpr> types = new LinkedHashMap<>();
+        for (RuntimeOperationDescriptor.Pin pin : requirement.outputPins()) {
+            types.put(pin.id(), pin.type());
+        }
         List<NodeDefinition.PinDefinition> pins = definition.getOutputs();
-        for (int index = 0; index < pins.size(); index++) {
-            NodeDefinition.PinDefinition pin = pins.get(index);
+        for (NodeDefinition.PinDefinition pin : pins) {
+            TypeExpr type = types.get(pin.getId());
+            if (type == null) {
+                throw new IllegalStateException("Runtime operation is missing output pin " + pin.getId().value());
+            }
             Object value = outputValue(values, pin);
             if (pin.getType() == NodeDefinition.PinType.FLOW) {
                 value = containsPinAlias(triggeredOutputs, pin) ? pin.getId().value() : null;
             }
-            outputs.put(pin.getId(), runtimeTypedValue(requirement.outputs().get(index), value));
+            outputs.put(pin.getId(), runtimeTypedValue(type, value));
         }
         return RuntimeResult.success(outputs, null);
     }
@@ -2469,14 +2497,21 @@ public class FlowModule implements Module {
             return RuntimeResult.success();
         }
         Map<PinId, TypedValue> outputs = new LinkedHashMap<>();
+        Map<PinId, TypeExpr> types = new LinkedHashMap<>();
+        for (RuntimeOperationDescriptor.Pin pin : requirement.outputPins()) {
+            types.put(pin.id(), pin.type());
+        }
         List<NodeDefinition.PinDefinition> pins = definition.getOutputs();
-        for (int index = 0; index < pins.size(); index++) {
-            NodeDefinition.PinDefinition pin = pins.get(index);
+        for (NodeDefinition.PinDefinition pin : pins) {
+            TypeExpr type = types.get(pin.getId());
+            if (type == null) {
+                throw new IllegalStateException("Runtime operation is missing output pin " + pin.getId().value());
+            }
             Object value = customFunctionOutputValue(function, values, pin);
             if (pin.getType() == NodeDefinition.PinType.FLOW) {
                 value = containsPinAlias(triggeredOutputs, pin) ? pin.getId().value() : null;
             }
-            outputs.put(pin.getId(), runtimeTypedValue(requirement.outputs().get(index), value));
+            outputs.put(pin.getId(), runtimeTypedValue(type, value));
         }
         return RuntimeResult.success(outputs, null);
     }
@@ -2812,8 +2847,6 @@ public class FlowModule implements Module {
         optionCatalogCaptureExecutor = Objects.requireNonNull(captureExecutor, "Option catalog capture executor is required");
         optionCatalogRegistry.bindCapture(captureExecutor::capture);
         optionCatalogHandler.setCaptureExecutor(captureExecutor);
-        RuntimeDataOptionCatalogService.prewarm(optionCatalogRegistry, captureExecutor).toCompletableFuture().join();
-        WorldGenOptionCatalogs.prewarm(optionCatalogRegistry, captureExecutor).toCompletableFuture().join();
     }
 
     public int getSubscribedSessionCount() {
@@ -3252,6 +3285,10 @@ public class FlowModule implements Module {
             throw new IllegalStateException("Flow asset root has no data root");
         }
         return root;
+    }
+
+    private Path catalogStartupIndexDirectory() {
+        return dataRoot(storage).resolve(CatalogStartupIndex.DIRECTORY);
     }
 
     public void sendFlowData(Session session, FlowGraph graph) {

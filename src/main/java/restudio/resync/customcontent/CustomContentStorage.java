@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public class CustomContentStorage implements AutoCloseable {
     private static final Set<String> DEFINITION_FIELDS = Set.of("id", "enabled", "flowId", "type", "displayName", "provider",
@@ -72,6 +73,7 @@ public class CustomContentStorage implements AutoCloseable {
     private final ItemAttributeSchemaService attributeSchemaService;
     private final LegacyRuntimeActivationGate legacyRuntimeGate;
     private final AssetPersistenceGate assetsGate;
+    private volatile Consumer<CustomContentDefinition> graphAdmission;
 
     public enum ProjectionUse {
         OPTION_CATALOG,
@@ -102,6 +104,10 @@ public class CustomContentStorage implements AutoCloseable {
         if (legacyRuntimeGate.allowsLegacyMigration()) {
             repairMalformedFlowAliases();
         }
+    }
+
+    public void setGraphAdmission(Consumer<CustomContentDefinition> graphAdmission) {
+        this.graphAdmission = graphAdmission;
     }
 
     private JsonAssetStore<CustomContentDefinition> createAssetStore(Path assetsRoot, Path legacyRoot,
@@ -356,6 +362,7 @@ public class CustomContentStorage implements AutoCloseable {
             if (!componentErrors.isEmpty()) {
                 throw new ItemAttributeValidationException(componentErrors);
             }
+            admitGraph(definition);
             Map<String, Object> canonicalPayload = gson.fromJson(serializeDefinition(definition), Map.class);
             if (!expectedPayloadHash.equals(ResourcePayloadCodecs.json().hashPayload(canonicalPayload).canonicalText())) {
                 throw new IllegalStateException("Custom content changed during aggregate create validation: " + safeId);
@@ -386,6 +393,7 @@ public class CustomContentStorage implements AutoCloseable {
             if (!componentErrors.isEmpty()) {
                 throw new ItemAttributeValidationException(componentErrors);
             }
+            admitGraph(definition);
             try {
                 Snapshot snapshot = assetStore.coordinatorSnapshot();
                 List<JsonAssetStore.PreparedMutation> mutations = new ArrayList<>();
@@ -404,6 +412,14 @@ public class CustomContentStorage implements AutoCloseable {
                 throw new IllegalStateException("Failed to save custom content: " + safeId, e);
             }
         }
+    }
+
+    private void admitGraph(CustomContentDefinition definition) {
+        Consumer<CustomContentDefinition> admission = graphAdmission;
+        if (admission == null || definition == null || definition.getGraph() == null) {
+            return;
+        }
+        admission.accept(definition);
     }
 
     public void delete(String id) {

@@ -521,24 +521,73 @@ public class CustomContentService {
     }
 
     private void reportDispatchFailure(String contentId, String trigger, String message, Throwable failure) {
-        Throwable cause = failure;
-        while (cause != null && cause.getCause() != null && cause.getCause() != cause) {
-            cause = cause.getCause();
-        }
-        String resolvedMessage = message;
-        if (resolvedMessage == null || resolvedMessage.isBlank()) {
-            resolvedMessage = cause != null && cause.getMessage() != null && !cause.getMessage().isBlank() ? cause.getMessage()
-                : cause != null ? cause.getClass().getSimpleName() : "Unknown custom content dispatch failure";
-        }
+        String resolvedMessage = dispatchFailureMessage(message, failure);
         String failureKey = contentId + '\u0000' + trigger + '\u0000' + resolvedMessage;
         if (!reportedDispatchFailures.add(failureKey)) {
             return;
         }
+        Throwable cause = rootCause(failure);
         if (cause != null) {
             Log.warn("Custom content flow failed for " + contentId + " (" + trigger + "): " + resolvedMessage, cause);
         } else {
             Log.warn("Custom content flow failed for " + contentId + " (" + trigger + "): " + resolvedMessage);
         }
+    }
+
+    static String dispatchFailureMessage(String message, Throwable failure) {
+        String resolvedMessage = message;
+        if (resolvedMessage == null || resolvedMessage.isBlank()) {
+            Throwable cause = rootCause(failure);
+            resolvedMessage = cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()
+                ? cause.getMessage()
+                : cause != null ? cause.getClass().getSimpleName() : "Unknown custom content dispatch failure";
+        }
+        String reason = diagnosticReason(failure);
+        if (reason != null && !reason.isBlank() && !reason.equals(resolvedMessage)) {
+            return resolvedMessage + ": " + reason;
+        }
+        return resolvedMessage;
+    }
+
+    private static Throwable rootCause(Throwable failure) {
+        Throwable cause = failure;
+        while (cause != null && cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause;
+    }
+
+    private static String diagnosticReason(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof FlowExecutor.FlowExecutionException execution) {
+                Object diagnostics = execution.getDetails().get("diagnostics");
+                if (diagnostics instanceof List<?> entries) {
+                    for (Object entry : entries) {
+                        String reason = diagnosticReason(entry);
+                        if (reason != null && !reason.isBlank()) {
+                            return reason;
+                        }
+                    }
+                }
+            }
+            current = current.getCause();
+        }
+        return "";
+    }
+
+    private static String diagnosticReason(Object diagnostic) {
+        if (!(diagnostic instanceof Map<?, ?> values)) {
+            return "";
+        }
+        Object evidence = values.get("evidence");
+        if (evidence instanceof Map<?, ?> details) {
+            Object reason = details.get("reason");
+            if (reason != null && !reason.toString().isBlank()) {
+                return reason.toString();
+            }
+        }
+        return "";
     }
 
     private CompiledContentDefinition resident(String contentId) {

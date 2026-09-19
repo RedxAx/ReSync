@@ -51,7 +51,11 @@ public class CustomContentHandler implements NodeHandler {
             ctx.triggerOutput("flow");
         });
         operations.put("content_start", (ctx, node) -> {
-            ctx.setOutput(node, "player", ctx.getRuntime().getEventVariables().get("event.player"));
+            Object player = ctx.getRuntime().getEventVariables().get("event.player");
+            if (!(player instanceof Player)) {
+                player = ctx.getPlayer();
+            }
+            ctx.setOutput(node, "player", player);
             ctx.setOutput(node, "content_id", ctx.getRuntime().getEventVariables().get("event.content_id"));
             ctx.setOutput(node, "content_type", ctx.getRuntime().getEventVariables().get("event.content_type"));
             ctx.setOutput(node, "trigger", ctx.getRuntime().getEventVariables().get("event.trigger"));

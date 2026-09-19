@@ -999,6 +999,59 @@ class SqliteProtocolResourceMutationAuthorityTest {
     }
 
     @Test
+    void rejectsAnUnappliedPendingMutationWhenItsPayloadCanNoLongerBeDecoded(@TempDir Path directory) {
+        Map<String, JsonObject> values = new ConcurrentHashMap<>();
+        CountingAdapter adapter = new CountingAdapter(values);
+        FlowResourceRegistry registry = registry(adapter);
+        ServerResourceLocator resource = resource("invalid-pending");
+        ProtocolEnvelope<Map<String, Object>> request = create(resource, "Invalid Pending");
+
+        adapter.failuresBeforeSave = 1;
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
+            ProtocolEnvelopeDispatchResult pending = mutate(authority, request);
+            assertFalse(pending.handled());
+            assertEquals("RESOURCE_MUTATION_PENDING", pending.code());
+        }
+
+        adapter.deserializationFailure = "The graph reported opaque unavailable";
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
+            assertTrue(authority.durable());
+            adapter.deserializationFailure = null;
+            ProtocolEnvelopeDispatchResult rejected = mutate(authority, request);
+            assertFalse(rejected.handled());
+            assertEquals(422, rejected.transportCode());
+            assertEquals("The graph reported opaque unavailable", rejected.message());
+        }
+        assertFalse(values.containsKey(resource.id()));
+    }
+
+    @Test
+    void rejectsAnUnappliedCreateWhenRecoveryFailsBeforeTheExternalWrite(@TempDir Path directory) {
+        Map<String, JsonObject> values = new ConcurrentHashMap<>();
+        CountingAdapter adapter = new CountingAdapter(values);
+        FlowResourceRegistry registry = registry(adapter);
+        ServerResourceLocator resource = resource("recovery-prewrite-failure");
+        ProtocolEnvelope<Map<String, Object>> request = create(resource, "Recovery Prewrite Failure");
+
+        adapter.failuresBeforeSave = 1;
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
+            ProtocolEnvelopeDispatchResult pending = mutate(authority, request);
+            assertFalse(pending.handled());
+            assertEquals("RESOURCE_MUTATION_PENDING", pending.code());
+        }
+
+        adapter.failuresBeforeGet = 1;
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
+            assertTrue(authority.durable());
+            ProtocolEnvelopeDispatchResult rejected = mutate(authority, request);
+            assertFalse(rejected.handled());
+            assertEquals(422, rejected.transportCode());
+            assertEquals("Injected get failure", rejected.message());
+        }
+        assertFalse(values.containsKey(resource.id()));
+    }
+
+    @Test
     void activationRevisionConflictReturnsAuthoritativeState(@TempDir Path directory) {
         Map<String, JsonObject> values = new ConcurrentHashMap<>();
         CountingAdapter adapter = new CountingAdapter(values);
@@ -1599,6 +1652,7 @@ class SqliteProtocolResourceMutationAuthorityTest {
         private final String type;
         private int saves;
         private int failuresBeforeSave;
+        private int failuresBeforeGet;
         private Runnable afterSaveMutation;
         private boolean exactIdentity = true;
         private StampMismatch stampMismatch;
@@ -1607,6 +1661,7 @@ class SqliteProtocolResourceMutationAuthorityTest {
         private boolean admittedDuringSave;
         private boolean admittedDuringStamp;
         private String validationFailure;
+        private String deserializationFailure;
         private boolean addServerDefault;
 
         private CountingAdapter(Map<String, JsonObject> values) {
@@ -1625,6 +1680,10 @@ class SqliteProtocolResourceMutationAuthorityTest {
 
         @Override
         public JsonObject get(String id) {
+            if (failuresBeforeGet > 0) {
+                failuresBeforeGet--;
+                throw new IllegalStateException("Injected get failure");
+            }
             JsonObject value = values.get(id);
             return value == null ? null : value.deepCopy();
         }
@@ -1636,6 +1695,9 @@ class SqliteProtocolResourceMutationAuthorityTest {
 
         @Override
         public JsonObject deserialize(String json) {
+            if (deserializationFailure != null) {
+                throw new IllegalArgumentException(deserializationFailure);
+            }
             return new Gson().fromJson(json, JsonObject.class);
         }
 

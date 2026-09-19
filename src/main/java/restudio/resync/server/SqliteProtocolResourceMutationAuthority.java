@@ -13,6 +13,7 @@ import restudio.resync.core.Session;
 import restudio.resync.contract.identity.IdentityCodec;
 import restudio.resync.flow.CoreGraphStorageBoundary;
 import restudio.resync.flow.canonical.CanonicalJson;
+import restudio.resync.flow.function.FunctionLocator;
 import restudio.resync.flow.function.FunctionRevision;
 import restudio.resync.flow.function.FunctionSignature;
 import restudio.resync.flow.function.FunctionSourceDocument;
@@ -531,7 +532,8 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         ServerResourceLocator resource = operationResource(operation);
         if (isCoreResource(resource)) {
             return operation.kind() == ResourceOperationKind.CREATE || operation.kind() == ResourceOperationKind.SAVE
-                || operation.kind() == ResourceOperationKind.DELETE || operation.kind() == ResourceOperationKind.ACTIVATE;
+                || operation.kind() == ResourceOperationKind.DELETE || operation.kind() == ResourceOperationKind.DUPLICATE
+                || operation.kind() == ResourceOperationKind.ACTIVATE;
         }
         return operation instanceof ResourceCreateRequest<?> || operation instanceof ResourceSaveRequest<?>
             || operation instanceof ResourceDeleteRequest || operation instanceof ResourceDuplicateRequest
@@ -1477,6 +1479,10 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 }
                 recovered++;
             } catch (RuntimeException exception) {
+                if (rejectProvenUnappliedCreate(row, exception)) {
+                    recovered++;
+                    continue;
+                }
                 blockRecovery("Pending resource mutation " + row.mutationId() + " cannot be reconciled: " + safeMessage(exception));
                 TemporaryLifecycleDiagnostics.event("pending_receipt_recovery", started,
                     TemporaryLifecycleDiagnostics.with(TemporaryLifecycleDiagnostics.identity(serverId, null, null, null,
@@ -1493,6 +1499,29 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             TemporaryLifecycleDiagnostics.with(TemporaryLifecycleDiagnostics.identity(serverId, null, null, null,
                 null, null, authorityEpoch.current(), null), "outcome", "complete", "pendingCount", pending.size(),
                 "recoveredCount", recovered, "skippedCount", skipped));
+    }
+
+    private boolean rejectProvenUnappliedCreate(MutationRow row, RuntimeException failure) {
+        try {
+            Command command = command(row);
+            if (!"CREATE".equals(command.operationName()) || command.presentation() != null || row.expectedRevision() != 0L
+                || row.preconditionHash() != null && !row.preconditionHash().isBlank()
+                || state(command.responseResource()) != null) {
+                return false;
+            }
+            FlowResourceAdapter<Object> adapter = adapter(command.responseResource());
+            if (adapter == null || readStamp(command.responseResource(), adapter) != null
+                || adapter.get(command.responseResource().id()) != null) {
+                return false;
+            }
+            finishRejected(row, "RESOURCE_PAYLOAD_INVALID", safeMessage(failure));
+            TemporaryLifecycleDiagnostics.event("pending_receipt_recovery", 0L,
+                TemporaryLifecycleDiagnostics.with(diagnosticIdentity(row), "outcome", "rejected",
+                    "failure", failure.getClass().getSimpleName()));
+            return true;
+        } catch (RuntimeException proofFailure) {
+            return false;
+        }
     }
 
     private void migrateCoreCatalogBindings() throws SQLException, IOException {
@@ -2743,9 +2772,6 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             return unavailable(ProtocolRejectionCode.RESOURCE_DURABILITY_UNAVAILABLE,
                 "Core graph resource authority is unavailable");
         }
-        if (command.kind() == ResourceOperationKind.DUPLICATE) {
-            return rejectUnsupported(command.kind());
-        }
         List<FlowResourceKey> keys = mutationKeys(command);
         if (keys.isEmpty() || hasDuplicateKeys(keys)) {
             return unavailable(ProtocolRejectionCode.RESOURCE_MUTATION_FAILED,
@@ -2830,6 +2856,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                     : current.activationState() == command.activationState()
                         ? coreTerminal(Status.APPLIED, current)
                         : coreActivatePending(command, current);
+            case "DUPLICATE" -> coreDuplicateOutcome(command, current);
             default -> throw new IllegalArgumentException("Core graph operation is not supported by the durable authority");
         };
     }
@@ -2849,6 +2876,52 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             null, null, null);
         return new CoreOutcome(Status.PENDING, current, desired, desired.protocolHash(), desired.assetHash(),
             desired.corePayloadHash(), desired.corePayloadKind(), true, desired.revision(), desired.mutationId(), null, null);
+    }
+
+    private CoreOutcome coreDuplicateOutcome(Command command, CoreState current) {
+        CoreState source = synchronizeCore(command.source());
+        if (source == null || source.deleted()) {
+            return coreTerminal(Status.NOT_FOUND, source);
+        }
+        if (source.revision() != command.expectedRevision()) {
+            return coreTerminal(Status.REVISION_CONFLICT, source);
+        }
+        if (current != null) {
+            return coreTerminal(Status.CONFLICT, current);
+        }
+        return corePending(command, source, duplicateCoreState(command, source));
+    }
+
+    private CoreState duplicateCoreState(Command command, CoreState source) {
+        CoreGraphStorageBoundary.Decoded decoded = source.decoded();
+        if (decoded == null) {
+            decoded = coreAuthority.load(command.source()).orElseThrow(() ->
+                new IllegalStateException("The duplicate source Core graph is unavailable"));
+        }
+        ResourceActivationState activation = decoded.envelope().assetActivationState();
+        if (activation == null) {
+            activation = ResourceActivationState.ACTIVE;
+        }
+        CoreGraphStorageBoundary.AssetMetadata metadata = new CoreGraphStorageBoundary.AssetMetadata(
+            command.responseResource().resourceType().value(), 1L, command.mutationId(), activation);
+        CoreGraphStorageBoundary.Decoded duplicated;
+        if (decoded.graphDocument() != null) {
+            GraphDocument graph = rebaseGraphResource(decoded.graphDocument(), command.responseResource(), 1L);
+            duplicated = coreBoundary.decode(coreBoundary.encode(graph, metadata, command.responseResource()),
+                command.responseResource());
+        } else {
+            FunctionSourceDocument function = rebaseFunctionResource(decoded.functionSourceDocument(),
+                command.responseResource(), 1L);
+            duplicated = coreBoundary.decode(coreBoundary.encode(function, metadata, command.responseResource()),
+                command.responseResource());
+        }
+        coreAuthority.validateSave(command.responseResource(), duplicated);
+        CoreState desired = coreState(duplicated);
+        if (desired.revision() != 1L || !command.mutationId().equals(desired.mutationId())
+            || !command.responseResource().equals(desired.resource())) {
+            throw new IllegalStateException("The duplicated Core graph did not preserve the requested target identity");
+        }
+        return desired;
     }
 
     private CoreOutcome coreActivatePending(Command command, CoreState current) {
@@ -2934,15 +3007,24 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     }
 
     private GraphDocument rebaseGraphRevision(GraphDocument graph, long revision) {
-        return new GraphDocument(graph.schemaVersion(), graph.resource(), revision, graph.catalogBinding(),
+        return rebaseGraphResource(graph, graph.resource(), revision);
+    }
+
+    private GraphDocument rebaseGraphResource(GraphDocument graph, ServerResourceLocator resource, long revision) {
+        return new GraphDocument(graph.schemaVersion(), resource, revision, graph.catalogBinding(),
             graph.requiredCapabilities(), graph.nodes(), graph.connections(), graph.passthroughs(), graph.variables(), graph.functions(),
             graph.unknown());
     }
 
     private FunctionSourceDocument rebaseFunctionRevision(FunctionSourceDocument source, long revision) {
-        GraphDocument graph = rebaseGraphRevision(source.graph(), revision);
+        return rebaseFunctionResource(source, source.graph().resource(), revision);
+    }
+
+    private FunctionSourceDocument rebaseFunctionResource(FunctionSourceDocument source, ServerResourceLocator resource,
+                                                          long revision) {
+        GraphDocument graph = rebaseGraphResource(source.graph(), resource, revision);
         FunctionSignature signature = source.signature();
-        FunctionSignature rebased = new FunctionSignature(signature.function(), new FunctionRevision(revision),
+        FunctionSignature rebased = new FunctionSignature(new FunctionLocator(resource), new FunctionRevision(revision),
             signature.inputs(), signature.outputs(), signature.unknown());
         return new FunctionSourceDocument(rebased, graph, source.unknown());
     }
@@ -2950,7 +3032,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     private void applyCore(Command command, CoreOutcome outcome) {
         ServerResourceLocator resource = command.responseResource();
         switch (command.operationName()) {
-            case "CREATE", "SAVE" -> coreAuthority.save(resource, CanonicalJson.canonicalBytes(outcome.payload()),
+            case "CREATE", "SAVE", "DUPLICATE" -> coreAuthority.save(resource, CanonicalJson.canonicalBytes(outcome.payload()),
                 command.mutationId(), outcome.revision() - 1L, new ContentHash(outcome.assetHash()));
             case "DELETE" -> {
                 CoreGraphStorageBoundary.CoreGraphTombstone tombstone = coreAuthority.delete(resource,
@@ -3038,9 +3120,12 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     }
 
     private void verifyCoreExternalPrecondition(Command command, CoreState precondition) {
-        if ("CREATE".equals(command.operationName())) {
+        if ("CREATE".equals(command.operationName()) || "DUPLICATE".equals(command.operationName())) {
             if (coreAuthority.load(command.responseResource()).isPresent()) {
                 throw new IllegalStateException("The Core graph mutation target changed while pending");
+            }
+            if ("DUPLICATE".equals(command.operationName()) && !sameCoreState(synchronizeCore(command.source()), precondition)) {
+                throw new IllegalStateException("The duplicate source Core graph changed while pending");
             }
             return;
         }
@@ -3058,6 +3143,22 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 || !Objects.equals(current == null ? "" : current.protocolHash(), row.preconditionHash())) {
                 throw new IllegalStateException("The durable Core graph create precondition is invalid");
             }
+        } else if ("DUPLICATE".equals(command.operationName())) {
+            if (current != null) {
+                throw new IllegalStateException("The durable Core graph duplicate target already has authoritative state");
+            }
+            CoreState source = synchronizeCore(command.source());
+            if (source == null || source.deleted() || source.assetHash() == null || source.assetHash().isBlank()
+                || source.corePayloadHash() == null || source.corePayloadHash().isBlank()
+                || source.corePayloadKind() == null || source.corePayloadKind().isBlank()
+                || source.revision() != row.expectedRevision()
+                || !Objects.equals(source.protocolHash(), row.preconditionHash())
+                || !Objects.equals(source.assetHash(), row.preconditionAssetHash())
+                || !Objects.equals(source.corePayloadHash(), row.preconditionCorePayloadHash())
+                || !Objects.equals(source.corePayloadKind(), row.preconditionCorePayloadKind())) {
+                throw new IllegalStateException("The durable Core graph duplicate source precondition no longer matches");
+            }
+            current = source;
         } else if (current == null || current.deleted() || current.payload() != null || current.assetHash() == null
             || current.assetHash().isBlank() || current.corePayloadHash() == null || current.corePayloadHash().isBlank()
             || current.corePayloadKind() == null || current.corePayloadKind().isBlank()
@@ -3068,7 +3169,8 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             || !Objects.equals(current.corePayloadKind(), row.preconditionCorePayloadKind())) {
             throw new IllegalStateException("The durable Core graph mutation precondition no longer matches");
         }
-        long expectedResultRevision = "CREATE".equals(command.operationName())
+        long expectedResultRevision = "DUPLICATE".equals(command.operationName()) ? 1L
+            : "CREATE".equals(command.operationName())
             ? resultRevision(current == null ? 0L : current.revision()) : resultRevision(row.expectedRevision());
         if (row.resultRevision() != expectedResultRevision || row.resultHash() == null || row.resultHash().isBlank()
             || row.resultMutationId() == null || !row.mutationId().toString().equals(row.resultMutationId())
@@ -3271,8 +3373,9 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                                 String errorMessage, long createdAt, long updatedAt) {
         CoreState precondition = outcome.precondition();
         return new MutationRow(command.mutationId(), actorId, fingerprint, command.operationName(),
-            command.resource().canonicalText(), command.responseResource().canonicalText(), null,
-            command.responseResource().canonicalText(), command.activationState(), command.expectedRevision(),
+            command.resource().canonicalText(), command.responseResource().canonicalText(),
+            command.source() == null ? null : command.source().canonicalText(),
+            command.target() == null ? null : command.target().canonicalText(), command.activationState(), command.expectedRevision(),
             precondition == null ? "" : precondition.protocolHash(), status, outcome.revision(),
             outcome.mutationId() == null ? command.mutationId().toString() : outcome.mutationId().toString(),
             outcome.protocolHash() == null ? "" : outcome.protocolHash(), outcome.deleted(), outcome.activationState(),
@@ -5444,12 +5547,18 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             outcome.resultHash() == null ? "" : outcome.resultHash().canonicalText());
         String type = command.responseResource().resourceType().value();
         if ("CREATE".equals(command.operationName())) {
-            Object value = adapter(command.responseResource()).deserialize(gson.toJson(outcome.resultPayload()));
-            return registry.create(type, value, context);
+            ExternalPayload payload = deserializeExternalPayload(command, outcome);
+            if (payload.failure() != null) {
+                return payload.failure();
+            }
+            return registry.create(type, payload.value(), context);
         }
         if ("SAVE".equals(command.operationName())) {
-            Object value = adapter(command.responseResource()).deserialize(gson.toJson(outcome.resultPayload()));
-            return registry.update(type, value, context);
+            ExternalPayload payload = deserializeExternalPayload(command, outcome);
+            if (payload.failure() != null) {
+                return payload.failure();
+            }
+            return registry.update(type, payload.value(), context);
         }
         if ("DELETE".equals(command.operationName())) {
             return registry.delete(type, command.responseResource().id(), context);
@@ -5460,6 +5569,18 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             return FlowOperationResult.success(serialized);
         }
         return registry.duplicate(type, command.source().id(), command.responseResource().id(), context);
+    }
+
+    private ExternalPayload deserializeExternalPayload(Command command, Outcome outcome) {
+        try {
+            return new ExternalPayload(adapter(command.responseResource()).deserialize(gson.toJson(outcome.resultPayload())), null);
+        } catch (RuntimeException failure) {
+            return new ExternalPayload(null, FlowOperationResult.failure("RESOURCE_PAYLOAD_INVALID", safeMessage(failure),
+                Map.of("failureType", failure.getClass().getSimpleName())));
+        }
+    }
+
+    private record ExternalPayload(Object value, FlowOperationResult<?> failure) {
     }
 
     private String registryOperation(Command command) {

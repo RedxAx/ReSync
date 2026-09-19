@@ -38,6 +38,7 @@ import restudio.resync.flow.protocol.ResourceActivationState;
 import restudio.resync.flow.protocol.ResourceCreateRequest;
 import restudio.resync.flow.protocol.ResourceDeleteRequest;
 import restudio.resync.flow.protocol.ResourceDocument;
+import restudio.resync.flow.protocol.ResourceDuplicateRequest;
 import restudio.resync.flow.protocol.ResourceOperation;
 import restudio.resync.flow.protocol.ResourceSaveRequest;
 import restudio.resync.flow.resource.ResourcePayloadCodecs;
@@ -349,6 +350,58 @@ class SqliteProtocolCoreGraphAuthorityTest {
     }
 
     @Test
+    void duplicatesCoreGraphsOntoANewResource(@TempDir Path directory) {
+        FlowStorage storage = storage(directory);
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        ServerResourceLocator source = resource("flow", "core-source");
+        ServerResourceLocator target = resource("flow", "core-copy");
+        UUID createMutation = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+        UUID duplicateMutation = UUID.fromString("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+        FlowStorageCoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER);
+        CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
+
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory, core)) {
+            ProtocolEnvelopeDispatchResult created = mutate(authority, create(source, graph(source, 1L), createMutation, boundary));
+            assertTrue(created.handled(), created.code() + ": " + created.message());
+
+            ProtocolEnvelopeDispatchResult duplicated = mutate(authority, duplicate(source, target, 1L, duplicateMutation));
+            assertTrue(duplicated.handled(), duplicated.code() + ": " + duplicated.message());
+            ResourceDocumentView copy = document(duplicated);
+            assertEquals(target, copy.resource());
+            assertEquals(1L, copy.revision());
+            assertEquals(duplicateMutation, copy.mutationId());
+            assertFalse(copy.deleted());
+            ResourceDocument<Map<String, Object>> loaded = authority.load(target);
+            assertEquals(1L, loaded.revision());
+            assertEquals(duplicateMutation, loaded.mutationId());
+            assertEquals(createMutation, authority.load(source).mutationId());
+        }
+    }
+
+    @Test
+    void duplicatesCoreFunctionSourcesOntoANewResource(@TempDir Path directory) {
+        FlowStorage storage = storage(directory);
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        ServerResourceLocator source = resource("function", "core-function-source");
+        ServerResourceLocator target = resource("function", "core-function-copy");
+        UUID createMutation = UUID.fromString("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+        UUID duplicateMutation = UUID.fromString("dddddddd-dddd-4ddd-8ddd-dddddddddddd");
+        CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
+
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory,
+            new FlowStorageCoreGraphResourceAuthority(storage, SERVER))) {
+            ProtocolEnvelopeDispatchResult created = mutate(authority, create(source, source(source, 1L), createMutation, boundary));
+            assertTrue(created.handled(), created.code() + ": " + created.message());
+            ProtocolEnvelopeDispatchResult duplicated = mutate(authority, duplicate(source, target, 1L, duplicateMutation));
+            assertTrue(duplicated.handled(), duplicated.code() + ": " + duplicated.message());
+            assertEquals(CoreGraphStorageBoundary.FUNCTION_SOURCE_KIND,
+                document(duplicated).payload().get(CoreGraphStorageBoundary.CORE_PAYLOAD_KIND));
+            assertEquals(1L, document(duplicated).revision());
+            assertEquals(duplicateMutation, document(duplicated).mutationId());
+        }
+    }
+
+    @Test
     void rejectsCoreMutationWhenTheCoreAuthorityIsUnavailable(@TempDir Path directory) {
         FlowResourceRegistry registry = new FlowResourceRegistry();
         ServerResourceLocator resource = resource("flow", "unavailable");
@@ -420,6 +473,12 @@ class SqliteProtocolCoreGraphAuthorityTest {
         return envelope(resource, new ResourceActivateRequest(resource, revision, state, mutationId));
     }
 
+    private static ProtocolEnvelope<Map<String, Object>> duplicate(ServerResourceLocator source,
+                                                                   ServerResourceLocator target, long revision,
+                                                                   UUID mutationId) {
+        return envelope(target, new ResourceDuplicateRequest(source, target, revision, mutationId));
+    }
+
     private static ProtocolEnvelope<Map<String, Object>> delete(ServerResourceLocator resource, long revision,
                                                                  UUID mutationId) {
         return envelope(resource, new ResourceDeleteRequest(resource, revision, mutationId));
@@ -444,7 +503,8 @@ class SqliteProtocolCoreGraphAuthorityTest {
             UUID.randomUUID(), UUID.randomUUID(), SERVER, resource, operation instanceof ResourceCreateRequest<?> ? 0
             : operation instanceof ResourceSaveRequest<?> save ? save.expectedRevision()
             : operation instanceof ResourceDeleteRequest delete ? delete.expectedRevision()
-            : operation instanceof ResourceActivateRequest activate ? activate.expectedRevision() : 0,
+            : operation instanceof ResourceActivateRequest activate ? activate.expectedRevision()
+            : operation instanceof ResourceDuplicateRequest duplicate ? duplicate.expectedRevision() : 0,
             1L, mutation(operation), ContractRef.of(OWNER, new OperationId(
                 "resource." + operation.kind().name().toLowerCase())),
             capabilities, ContractRef.of(OWNER, new ResourceTypeId("resource.document")), null,
@@ -460,6 +520,7 @@ class SqliteProtocolCoreGraphAuthorityTest {
             case ResourceSaveRequest<?> save -> save.mutationId();
             case ResourceDeleteRequest delete -> delete.mutationId();
             case ResourceActivateRequest activate -> activate.mutationId();
+            case ResourceDuplicateRequest duplicate -> duplicate.mutationId();
             default -> throw new IllegalArgumentException("Unsupported test operation");
         };
     }

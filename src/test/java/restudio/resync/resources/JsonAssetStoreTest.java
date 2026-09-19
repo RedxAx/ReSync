@@ -442,6 +442,22 @@ class JsonAssetStoreTest {
     }
 
     @Test
+    void writesCopiedResourcesBesideJsonFileFolderFields() throws Exception {
+        Path assets = tempDir.resolve("copy-folder-assets");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> store = new JsonAssetStore<>(assets, tempDir.resolve("legacy-copy"), "gui", "GUIs",
+                 TestResource::fromJson, TestResource::toJson, TestResource::id,
+                 value -> "GUIs/main.json", LegacyRuntimeActivationGate.runtime(tempDir), coordinator,
+                 () -> true)) {
+            store.save(new TestResource("main", "Main"), UUID.randomUUID(), 0L);
+            store.save(new TestResource("copy", "Copy"), UUID.randomUUID(), 0L);
+            assertTrue(Files.isRegularFile(assets.resolve("GUIs/main.json")));
+            assertTrue(Files.isRegularFile(assets.resolve("GUIs/copy.json")));
+            assertFalse(Files.exists(assets.resolve("GUIs/main.json/copy.json")));
+        }
+    }
+
+    @Test
     void retainsOpaqueAdoptedLineageWithoutPretendingItIsRuntimeUuid() {
         JsonAssetStore.AssetStamp stamp = new JsonAssetStore.AssetStamp("gui", "main", 1L, "legacy:opaque",
             "0".repeat(64), false);

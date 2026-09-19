@@ -17,6 +17,7 @@ import restudio.resync.migration.MigrationPaths;
 import restudio.resync.migration.MigrationReportsPersistenceParticipant;
 import restudio.resync.migration.RecipeMigrationReportContract;
 import restudio.resync.modules.flow.FlowResourceMutationStamp;
+import restudio.resync.resources.AssetFileFormat;
 import restudio.resync.resources.JsonAssetInventory;
 import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncManagedResource;
@@ -518,6 +519,14 @@ public class ReSyncJsonResourceStorage {
         }
     }
 
+    public long committedSequence() {
+        try {
+            return requireCoordinator().committedSequence();
+        } catch (IOException exception) {
+            throw new IllegalStateException("JSON resource snapshot authority is unavailable", exception);
+        }
+    }
+
     public ResourceSnapshot readSnapshot(String type) {
         JsonAssetStore.ReadSnapshot<JsonObject> snapshot = requireStore(type).readSnapshot();
         List<ResourceSnapshotValue> values = snapshot.values().stream().map(value -> {
@@ -962,10 +971,10 @@ public class ReSyncJsonResourceStorage {
 
     private String folder(JsonObject value, String defaultFolder) {
         if (value == null || !value.has("folder") || value.get("folder").isJsonNull()) {
-            return defaultFolder;
+            return AssetFileFormat.canonicalFolder(defaultFolder, defaultFolder);
         }
         String folder = value.get("folder").getAsString();
-        return folder == null || folder.isBlank() ? defaultFolder : folder;
+        return AssetFileFormat.canonicalFolder(folder, defaultFolder);
     }
 
     private String legacyFolder(String type) {

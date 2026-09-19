@@ -33,6 +33,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -1734,7 +1735,8 @@ public class JsonAssetStore<T> implements AutoCloseable {
 
     private Path defaultAssetPath(String safeId, T value) {
         String folder = value != null && folderResolver != null ? folderResolver.folder(value) : defaultFolder;
-        return safeAssetFolder(folder == null ? defaultFolder : folder).resolve(AssetFileFormat.idOnlyFileName(safeId)).normalize();
+        return safeAssetFolder(AssetFileFormat.canonicalFolder(folder, defaultFolder))
+            .resolve(AssetFileFormat.idOnlyFileName(safeId)).normalize();
     }
 
     private ProjectResourceEdit presentationEdit(String safeId, ResourcePresentationIntent presentation) {
@@ -1805,6 +1807,14 @@ public class JsonAssetStore<T> implements AutoCloseable {
         if (!target.startsWith(root) || target.equals(root) || isInternalAssetPath(target)
             || target.equals(root.resolve("project.json"))) {
             throw new IllegalArgumentException("Aggregate create path is outside coordinated asset storage: " + path);
+        }
+        Path ancestor = target.getParent();
+        while (ancestor != null && ancestor.startsWith(root) && !ancestor.equals(root)) {
+            if (Files.exists(ancestor, LinkOption.NOFOLLOW_LINKS)
+                && (Files.isSymbolicLink(ancestor) || !Files.isDirectory(ancestor, LinkOption.NOFOLLOW_LINKS))) {
+                throw new IllegalArgumentException("Aggregate create path is not a writable file: " + path);
+            }
+            ancestor = ancestor.getParent();
         }
         return target;
     }
@@ -2258,6 +2268,10 @@ public class JsonAssetStore<T> implements AutoCloseable {
         if (!normalized.isBlank()) {
             for (String part : normalized.split("/")) {
                 result = result.resolve(part);
+                if (Files.exists(result, LinkOption.NOFOLLOW_LINKS)
+                    && (Files.isSymbolicLink(result) || !Files.isDirectory(result, LinkOption.NOFOLLOW_LINKS))) {
+                    throw new IllegalArgumentException("Unsafe assets folder: " + folder);
+                }
             }
         }
         Path target = result.normalize();

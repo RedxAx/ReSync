@@ -9,6 +9,7 @@ import restudio.resync.storage.StorageSafety;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 public final class AssetFileFormat {
     public static final String RESOURCE_TYPE = "resourceType";
@@ -107,6 +108,33 @@ public final class AssetFileFormat {
 
     public static String idOnlyFileName(String id) {
         return id + ".json";
+    }
+
+    public static String canonicalFolder(String folder, String defaultFolder) {
+        String fallback = normalizeFolder(defaultFolder);
+        String normalized = folder == null || folder.isBlank() ? fallback : normalizeFolder(folder);
+        while (normalized.toLowerCase(Locale.ROOT).endsWith(".json")) {
+            int separator = normalized.lastIndexOf('/');
+            normalized = separator < 0 ? "" : normalized.substring(0, separator);
+        }
+        if (normalized.isBlank()) {
+            return fallback;
+        }
+        if (!fallback.isBlank() && !normalized.equals(fallback) && !normalized.startsWith(fallback + "/")) {
+            return fallback;
+        }
+        return normalized;
+    }
+
+    private static String normalizeFolder(String path) {
+        String normalized = path == null ? "" : path.replace('\\', '/').replaceAll("/+", "/").trim();
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
     }
 
     public static boolean isIdOnlyFileName(String fileName) {

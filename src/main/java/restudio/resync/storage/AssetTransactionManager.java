@@ -33,7 +33,7 @@ public final class AssetTransactionManager {
     private static final String WRITE_BINARY = "WRITE_BINARY";
     private static final String DELETE = "DELETE";
     private static final long RETAINED_EVIDENCE_FILE_LIMIT = 32L * 1024L * 1024L;
-    private static final long RETAINED_EVIDENCE_TOTAL_LIMIT = 128L * 1024L * 1024L;
+    private static final long RETAINED_EVIDENCE_TOTAL_LIMIT = 512L * 1024L * 1024L;
     private final Path assetsRoot;
     private final Path transactionRoot;
     private final Path snapshotRoot;
@@ -128,6 +128,7 @@ public final class AssetTransactionManager {
             return new CommitResult("", null, false);
         }
         NormalizedTransaction normalized = normalize(safeWrites, safeBinaryWrites, safeDeletes);
+        requireWritableOperations(normalized);
         recoverIfAutomatic();
         String safeMutationId = mutationId == null ? "" : mutationId;
         IndexedCommit indexed = indexedCommit(safeMutationId, normalized.descriptor().fingerprint());
@@ -276,6 +277,11 @@ public final class AssetTransactionManager {
             if (!PREPARED.equals(journal.state())) {
                 throw new IOException("Unknown asset transaction state: " + journal.state());
             }
+            if (hasUnwritablePreparedTarget(journal)) {
+                rollbackPreparedWrites(journal, null);
+                discardUnrecoverablePrepared(pending.transactionDir(), journal);
+                continue;
+            }
             apply(pending.transactionDir(), journal);
             StorageSafety.writeUtf8Atomic(pending.journalFile(), gson.toJson(journal(journal.id(), journal.mutationId(),
                 COMMITTED, journal.entries(), journal.fingerprint())));
@@ -326,6 +332,11 @@ public final class AssetTransactionManager {
             }
             if (!PREPARED.equals(frozen.state())) {
                 throw new IOException("Unknown asset transaction state: " + frozen.state());
+            }
+            if (hasUnwritablePreparedTarget(frozen)) {
+                rollbackPreparedWrites(frozen, recoveryEvidence);
+                discardUnrecoverablePrepared(inspection.journalEvidence().transactionDirectory(), frozen);
+                continue;
             }
             applyFrozen(inspection.journalEvidence().transactionDirectory(), frozen, inspection.stagedWritesView(),
                 recoveryEvidence);
@@ -459,6 +470,7 @@ public final class AssetTransactionManager {
 
     private void applyFrozen(Path transactionDir, Journal journal, Map<String, byte[]> stagedWrites,
                              RecoveryEvidence recoveryEvidence) throws IOException {
+        requireWritableJournal(journal);
         Map<Path, byte[]> recoveryFiles = recoveryEvidence.filesView();
         Set<Path> snapshotsToCreate = recoveryEvidence.snapshotsToCreate();
         MigrationPaths.requireNoSymlinkTraversal(transactionRoot, transactionDir);
@@ -778,6 +790,7 @@ public final class AssetTransactionManager {
     }
 
     private void apply(Path transactionDir, Journal journal) throws IOException {
+        requireWritableJournal(journal);
         MigrationPaths.requireNoSymlinkTraversal(transactionRoot, transactionDir);
         Path transactionSnapshotRoot = snapshotRoot.resolve(journal.id()).normalize();
         if (!transactionSnapshotRoot.startsWith(snapshotRoot)) {
@@ -1168,6 +1181,106 @@ public final class AssetTransactionManager {
             throw new IOException("Asset transaction target is empty: " + target);
         }
         return resource;
+    }
+
+    private void requireWritableOperations(NormalizedTransaction normalized) throws IOException {
+        for (PendingOperation operation : normalized.operations()) {
+            if (DELETE.equals(operation.operation())) {
+                continue;
+            }
+            requireWritableTarget(operation.target(), operation.resource());
+        }
+    }
+
+    private void requireWritableJournal(Journal journal) throws IOException {
+        if (hasUnwritablePreparedTarget(journal)) {
+            throw new IOException("Asset transaction write parent is not a directory");
+        }
+    }
+
+    private boolean hasUnwritablePreparedTarget(Journal journal) throws IOException {
+        for (Entry entry : journal.entries()) {
+            if (entry.delete()) {
+                continue;
+            }
+            Path target = requireAssetPath(assetsRoot.resolve(entry.target()));
+            if (regularFileAncestor(target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void requireWritableTarget(Path target, String resource) throws IOException {
+        if (regularFileAncestor(target)) {
+            throw new IOException("Asset transaction write parent is not a directory: " + resource);
+        }
+    }
+
+    private boolean regularFileAncestor(Path target) throws IOException {
+        Path root = assetsRoot.toAbsolutePath().normalize();
+        Path current = target == null ? null : target.getParent();
+        while (current != null && current.startsWith(root) && !current.equals(root)) {
+            if (Files.isSymbolicLink(current)) {
+                throw new IOException("Unsafe write target: " + target);
+            }
+            if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)
+                && !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
+                return true;
+            }
+            current = current.getParent();
+        }
+        return false;
+    }
+
+    private void rollbackPreparedWrites(Journal journal, RecoveryEvidence recoveryEvidence) throws IOException {
+        Map<Path, byte[]> recoveryFiles = recoveryEvidence == null ? Map.of() : recoveryEvidence.filesView();
+        Path transactionSnapshotRoot = snapshotRoot.resolve(journal.id()).normalize();
+        if (!transactionSnapshotRoot.startsWith(snapshotRoot)) {
+            throw new IOException("Unsafe asset transaction snapshot: " + journal.id());
+        }
+        for (Entry entry : journal.entries()) {
+            Path target = requireAssetPath(assetsRoot.resolve(entry.target()));
+            if (Boolean.TRUE.equals(entry.existed())) {
+                Path snapshot = transactionSnapshotRoot.resolve(entry.target()).normalize();
+                byte[] prior = null;
+                if (snapshot.startsWith(transactionSnapshotRoot)
+                    && Files.isRegularFile(snapshot, LinkOption.NOFOLLOW_LINKS)) {
+                    prior = Files.readAllBytes(snapshot);
+                }
+                if (prior == null) {
+                    prior = recoveryFiles.get(target.toAbsolutePath().normalize());
+                }
+                if (prior != null) {
+                    StorageSafety.writeBytesAtomic(target, prior);
+                }
+                continue;
+            }
+            Path parent = target.getParent();
+            if (parent != null && Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS)
+                && Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
+                StorageSafety.deleteIfExists(target);
+            }
+        }
+    }
+
+    private void discardUnrecoverablePrepared(Path transactionDir, Journal journal) throws IOException {
+        discardUnpreparedTransaction(transactionDir);
+        discardSnapshot(journal.id());
+    }
+
+    private void discardSnapshot(String transactionId) throws IOException {
+        Path root = snapshotRoot.resolve(transactionId).normalize();
+        if (!root.startsWith(snapshotRoot) || !Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+        MigrationPaths.requireNoSymlinkTraversal(snapshotRoot, root);
+        try (Stream<Path> paths = Files.walk(root)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        }
+        StorageSafety.forceDirectory(snapshotRoot);
     }
 
     private void discardUnpreparedTransaction(Path transactionDir) throws IOException {

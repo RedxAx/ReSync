@@ -6,6 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import restudio.resync.Log;
 import restudio.resync.migration.MigrationPaths;
 import restudio.resync.server.TemporaryLifecycleDiagnostics;
 
@@ -48,6 +49,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -55,6 +57,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -71,11 +74,14 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
     private static final String HISTORY_CHECKPOINT_FORMAT = "asset-history-checkpoint-v2";
     private static final String LEGACY_HISTORY_CHECKPOINT_FORMAT = "asset-history-checkpoint-v1";
     private static final String HISTORY_CHECKPOINT_FILE = "history-checkpoint.json";
+    private static final String HISTORY_EVIDENCE_INDEX_FILE = "history-evidence-index-v1.json";
+    private static final String HISTORY_EVIDENCE_INDEX_FORMAT = "asset-history-evidence-index-v1";
     private static final long HISTORY_CHECKPOINT_SIZE_LIMIT = 16L * 1024L * 1024L;
+    private static final long HISTORY_EVIDENCE_INDEX_SIZE_LIMIT = 16L * 1024L * 1024L;
     private static final String PREPARED = "PREPARED";
     private static final String COMMITTED = "COMMITTED";
     private static final long RETAINED_EVIDENCE_FILE_LIMIT = 32L * 1024L * 1024L;
-    private static final long RETAINED_EVIDENCE_TOTAL_LIMIT = 128L * 1024L * 1024L;
+    private static final long RETAINED_EVIDENCE_TOTAL_LIMIT = 512L * 1024L * 1024L;
     private static final int EVIDENCE_MAX_DEPTH = 64;
     private static final int EVIDENCE_MAX_PATHS = 100_000;
     private static final long HASHED_EVIDENCE_FILE_LIMIT = 512L * 1024L * 1024L;
@@ -545,7 +551,13 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                                 "asset_coordinator", null, null, null, checkpoint.state().rootSequence(), null,
                                 checkpoint.state().rootSequence()), "outcome", "accepted", "validationMode",
                                 "checkpoint", "historyEntryCount", checkpoint.checkpoint().evidenceCount(),
-                                "mutationCount", checkpoint.state().mutations().size()));
+                                "mutationCount", checkpoint.state().mutations().size(),
+                                "reusedFiles", checkpoint.reusedFiles(), "hashedFiles", checkpoint.hashedFiles(),
+                                "hashedBytes", checkpoint.hashedBytes()));
+                        Log.info("Asset history checkpoint accepted in "
+                            + Math.max(0L, (System.nanoTime() - checkpointStarted) / 1_000_000L)
+                            + " ms [Reused " + checkpoint.reusedFiles() + ", Hashed " + checkpoint.hashedFiles()
+                            + ", Hashed Bytes " + checkpoint.hashedBytes() + "]");
                         return new RootContext(root, coordinatorRoot, gson, clock, channel, processLock, manager,
                             checkpoint.state(), checkpoint.metadata(), checkpoint.historyValidation(), evidenceWatcher, 1L);
                     }
@@ -730,7 +742,8 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                     .collect(Collectors.toUnmodifiableSet());
                 long hashStarted = System.nanoTime();
                 long hashedBefore = evidence.hashBudget().hashed;
-                Map<String, CheckpointEvidence> currentEvidence = checkpointEvidence(root, evidence);
+                CheckpointHashStats hashStats = new CheckpointHashStats();
+                Map<String, CheckpointEvidence> currentEvidence = checkpointEvidence(root, evidence, hashStats);
                 checkpointPhase("content_hash", hashStarted, currentEvidence.size(), evidence.hashBudget().hashed - hashedBefore);
                 String currentEvidenceHash = checkpointEvidenceHash(currentEvidence);
                 long validationStarted = System.nanoTime();
@@ -758,14 +771,19 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                 startupWatcher = null;
                 requireUnchangedStartupNamespace(evidenceWatcher, "checkpoint watcher handoff");
                 manager.trustCommittedIndex(checkpoint.committedIndex());
+                writeHistoryEvidenceIndex(historyEvidenceIndexFile(root), currentEvidence);
                 EvidenceWatcher acceptedWatcher = evidenceWatcher;
                 evidenceWatcher = null;
-                return new CheckpointOpen(state, metadata, new HistoryValidation(validated), acceptedWatcher, checkpoint);
+                return new CheckpointOpen(state, metadata, new HistoryValidation(validated), acceptedWatcher, checkpoint,
+                    hashStats.reusedFiles.get(), hashStats.hashedFiles.get(), hashStats.hashedBytes.get());
             } catch (IOException | RuntimeException failure) {
                 TemporaryLifecycleDiagnostics.event("asset_history_checkpoint", checkpointStarted,
                     TemporaryLifecycleDiagnostics.with(TemporaryLifecycleDiagnostics.identity(null,
                         "asset_coordinator", null, null, null, null, null, null), "outcome", "fallback",
                         "failure", failure.getClass().getSimpleName(), "reason", Objects.toString(failure.getMessage(), "")));
+                Log.info("Asset history checkpoint fallback after "
+                    + Math.max(0L, (System.nanoTime() - checkpointStarted) / 1_000_000L)
+                    + " ms [" + failure.getClass().getSimpleName() + "]");
                 return null;
             } finally {
                 if (startupWatcher != null) {
@@ -809,6 +827,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                 committedIndex, evidence.size(), checkpointEvidenceHash(evidence), Map.of());
             String serialized = serializeHistoryCheckpoint(checkpoint);
             StorageSafety.writeUtf8Atomic(historyCheckpointFile, serialized);
+            writeHistoryEvidenceIndex(historyEvidenceIndexFile(root), evidence);
             if (evidenceWatcher.acceptCheckpoint(historyCheckpointFile)) {
                 throw new IOException("Asset history checkpoint changed during publication: "
                     + evidenceWatcher.changeReason());
@@ -1672,6 +1691,9 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                                 continue;
                             }
                             Path path = directory.resolve(relative).toAbsolutePath().normalize();
+                            if (isHistoryEvidenceIndexFile(root, path)) {
+                                continue;
+                            }
                             EvidenceIdentity expected = accepted.get(path);
                             if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
                                 if (!isAtomicTemporary(path)) {
@@ -1814,7 +1836,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             Map<Path, EvidenceIdentity> captured = new LinkedHashMap<>();
             for (Map.Entry<Path, EvidencePath> entry : evidence.paths.entrySet()) {
                 Path path = entry.getKey().toAbsolutePath().normalize();
-                if (evidenceRoots.stream().noneMatch(path::startsWith)) {
+                if (evidenceRoots.stream().noneMatch(path::startsWith) || isHistoryEvidenceIndexFile(root, path)) {
                     continue;
                 }
                 EvidencePath evidencePath = entry.getValue();
@@ -1837,7 +1859,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             Map<String, CheckpointEvidence> checkpoint = new LinkedHashMap<>();
             for (Map.Entry<Path, EvidenceIdentity> entry : accepted.entrySet()) {
                 Path path = entry.getKey();
-                if (path.equals(checkpointFile)) {
+                if (path.equals(checkpointFile) || isHistoryEvidenceIndexFile(root, path)) {
                     continue;
                 }
                 String relative = root.relativize(path).toString().replace('\\', '/');
@@ -1914,6 +1936,9 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                 throw new IOException("Symbolic link in asset transaction evidence: " + path);
             }
             Path normalized = path.toAbsolutePath().normalize();
+            if (isHistoryEvidenceIndexFile(root, normalized)) {
+                return;
+            }
             pathBudget.visit(root, normalized);
             EvidenceIdentity metadata = evidenceIdentity(EvidencePath.of(attributes), "");
             EvidenceIdentity previous = accepted.get(normalized);
@@ -2223,21 +2248,55 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             genesis, 1L, null, limits, hashBudget);
     }
 
-    private static Map<String, CheckpointEvidence> checkpointEvidence(Path root, EvidenceSnapshot snapshot) throws IOException {
+    private static Map<String, CheckpointEvidence> checkpointEvidence(Path root, EvidenceSnapshot snapshot)
+        throws IOException {
+        return checkpointEvidence(root, snapshot, new CheckpointHashStats());
+    }
+
+    private static Map<String, CheckpointEvidence> checkpointEvidence(Path root, EvidenceSnapshot snapshot,
+                                                                      CheckpointHashStats stats) throws IOException {
         Path checkpointFile = root.resolve(".asset-coordinator").resolve(HISTORY_CHECKPOINT_FILE).normalize();
+        Path indexFile = historyEvidenceIndexFile(root);
         List<Path> evidenceRoots = List.of(root.resolve(".transactions"), root.resolve(".snapshots"),
             root.resolve(".asset-coordinator"));
         List<Map.Entry<Path, EvidencePath>> entries = snapshot.paths().entrySet().stream()
-            .filter(entry -> !entry.getKey().equals(checkpointFile)
+            .filter(entry -> !entry.getKey().equals(checkpointFile) && !entry.getKey().equals(indexFile)
                 && evidenceRoots.stream().anyMatch(entry.getKey()::startsWith))
             .toList();
-        if (entries.size() < 2) {
-            Map<String, CheckpointEvidence> current = new LinkedHashMap<>();
-            for (Map.Entry<Path, EvidencePath> entry : entries) {
-                CheckpointEvidenceEntry captured = checkpointEvidenceEntry(root, snapshot, entry);
-                current.put(captured.path(), captured.evidence());
+        Map<String, CheckpointEvidence> previous = readHistoryEvidenceIndex(indexFile);
+        List<Map.Entry<Path, EvidencePath>> journals = new ArrayList<>();
+        List<Map.Entry<Path, EvidencePath>> remainder = new ArrayList<>();
+        for (Map.Entry<Path, EvidencePath> entry : entries) {
+            String relative = relativeEvidencePath(root, entry.getKey());
+            if (isTransactionJournal(relative)) {
+                journals.add(entry);
+            } else {
+                remainder.add(entry);
             }
-            return Map.copyOf(current);
+        }
+        Map<String, String> stagedHashes = new ConcurrentHashMap<>();
+        Map<String, CheckpointEvidence> current = new LinkedHashMap<>();
+        for (CheckpointEvidenceEntry captured : collectCheckpointEvidence(journals,
+            entry -> checkpointJournalEvidence(root, snapshot, entry, previous, stagedHashes, stats))) {
+            current.put(captured.path(), captured.evidence());
+        }
+        for (CheckpointEvidenceEntry captured : collectCheckpointEvidence(remainder,
+            entry -> checkpointEvidenceEntry(root, snapshot, entry, previous, stagedHashes, stats))) {
+            current.put(captured.path(), captured.evidence());
+        }
+        return Map.copyOf(current);
+    }
+
+    private static List<CheckpointEvidenceEntry> collectCheckpointEvidence(
+        List<Map.Entry<Path, EvidencePath>> entries,
+        CheckpointEvidenceTask task) throws IOException {
+        if (entries.isEmpty()) {
+            return List.of();
+        }
+        if (entries.size() < 2) {
+            List<CheckpointEvidenceEntry> captured = new ArrayList<>(1);
+            captured.add(task.capture(entries.getFirst()));
+            return captured;
         }
         int workers = Math.min(4, Math.max(1, Runtime.getRuntime().availableProcessors()));
         ExecutorService executor = Executors.newFixedThreadPool(workers,
@@ -2245,15 +2304,14 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         List<Future<CheckpointEvidenceEntry>> futures = new ArrayList<>(entries.size());
         try {
             for (Map.Entry<Path, EvidencePath> entry : entries) {
-                Callable<CheckpointEvidenceEntry> task = () -> checkpointEvidenceEntry(root, snapshot, entry);
-                futures.add(executor.submit(task));
+                Callable<CheckpointEvidenceEntry> callable = () -> task.capture(entry);
+                futures.add(executor.submit(callable));
             }
-            Map<String, CheckpointEvidence> current = new LinkedHashMap<>();
+            List<CheckpointEvidenceEntry> captured = new ArrayList<>(entries.size());
             for (Future<CheckpointEvidenceEntry> future : futures) {
-                CheckpointEvidenceEntry captured = future.get();
-                current.put(captured.path(), captured.evidence());
+                captured.add(future.get());
             }
-            return Map.copyOf(current);
+            return captured;
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             throw new IOException("Asset history checkpoint hashing was interrupted", failure);
@@ -2271,25 +2329,112 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         }
     }
 
-    private static CheckpointEvidenceEntry checkpointEvidenceEntry(Path root, EvidenceSnapshot snapshot,
-                                                                    Map.Entry<Path, EvidencePath> entry) throws IOException {
+    private static CheckpointEvidenceEntry checkpointJournalEvidence(Path root, EvidenceSnapshot snapshot,
+                                                                     Map.Entry<Path, EvidencePath> entry,
+                                                                     Map<String, CheckpointEvidence> previous,
+                                                                     Map<String, String> stagedHashes,
+                                                                     CheckpointHashStats stats)
+        throws IOException {
         Path path = entry.getKey();
-        String relative = root.relativize(path).toString().replace('\\', '/');
+        String relative = relativeEvidencePath(root, path);
+        EvidencePath evidence = entry.getValue();
+        CheckpointEvidence retained = previous.get(relative);
+        if (retained != null && retained.matches(evidence)) {
+            stats.reusedFiles.incrementAndGet();
+            return new CheckpointEvidenceEntry(relative, retained);
+        }
+        snapshot.requireNoSymlinkTraversal(path);
+        byte[] bytes = readRetainedBytes(path, evidence.size());
+        snapshot.hashBudget().reserve(evidence.size());
+        String hash = StorageSafety.sha256(bytes);
+        stats.hashedFiles.incrementAndGet();
+        stats.hashedBytes.addAndGet(Math.max(0L, evidence.size()));
+        requireUnchangedEvidence(path, relative, evidence);
+        recordStagedHashes(root, path, bytes, stagedHashes);
+        return checkpointEvidenceEntry(relative, evidence, hash);
+    }
+
+    private static CheckpointEvidenceEntry checkpointEvidenceEntry(Path root, EvidenceSnapshot snapshot,
+                                                                    Map.Entry<Path, EvidencePath> entry,
+                                                                    Map<String, CheckpointEvidence> previous,
+                                                                    Map<String, String> stagedHashes,
+                                                                    CheckpointHashStats stats)
+        throws IOException {
+        Path path = entry.getKey();
+        String relative = relativeEvidencePath(root, path);
         EvidencePath evidence = entry.getValue();
         String hash = "";
         if (evidence.regularFile() && !relative.equals(".asset-coordinator/root.lock")) {
             snapshot.requireNoSymlinkTraversal(path);
-            hash = streamHash(path, evidence.size(), snapshot.hashBudget());
-            BasicFileAttributes after = Files.readAttributes(path, BasicFileAttributes.class,
-                LinkOption.NOFOLLOW_LINKS);
-            if (!evidence.equals(EvidencePath.of(after))) {
-                throw new IOException("Asset history checkpoint evidence changed after hashing: " + relative);
+            CheckpointEvidence retained = previous.get(relative);
+            String staged = stagedHashes.get(relative);
+            if (retained != null && retained.matches(evidence) && !requiresFreshContentHash(relative)) {
+                stats.reusedFiles.incrementAndGet();
+                return new CheckpointEvidenceEntry(relative, retained);
+            } else if (staged != null && !staged.isEmpty() && !requiresFreshContentHash(relative)) {
+                hash = staged;
+                stats.reusedFiles.incrementAndGet();
+            } else {
+                hash = streamHash(path, evidence.size(), snapshot.hashBudget());
+                stats.hashedFiles.incrementAndGet();
+                stats.hashedBytes.addAndGet(Math.max(0L, evidence.size()));
             }
+            requireUnchangedEvidence(path, relative, evidence);
         }
+        return checkpointEvidenceEntry(relative, evidence, hash);
+    }
+
+    private static CheckpointEvidenceEntry checkpointEvidenceEntry(String relative, EvidencePath evidence, String hash) {
         return new CheckpointEvidenceEntry(relative, new CheckpointEvidence(evidence.directory(), evidence.regularFile(),
             evidence.regularFile() ? evidence.size() : 0L, hash,
             evidence.regularFile() ? evidence.modifiedAt().toString() : "",
             evidence.regularFile() ? evidence.createdAt().toString() : "", evidence.fileKey()));
+    }
+
+    private static void requireUnchangedEvidence(Path path, String relative, EvidencePath evidence) throws IOException {
+        BasicFileAttributes after = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        if (!evidence.equals(EvidencePath.of(after))) {
+            throw new IOException("Asset history checkpoint evidence changed after hashing: " + relative);
+        }
+    }
+
+    private static void recordStagedHashes(Path root, Path journal, byte[] bytes, Map<String, String> stagedHashes)
+        throws IOException {
+        JsonObject object;
+        try {
+            JsonElement parsed = JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8));
+            if (!parsed.isJsonObject()) {
+                throw new IOException("Asset transaction journal is not an object: " + journal);
+            }
+            object = parsed.getAsJsonObject();
+        } catch (RuntimeException failure) {
+            throw new IOException("Asset transaction journal is corrupt: " + journal, failure);
+        }
+        JsonArray journalEntries = object.getAsJsonArray("entries");
+        if (journalEntries == null) {
+            throw new IOException("Asset transaction journal has no entries: " + journal);
+        }
+        Path directory = journal.getParent();
+        if (directory == null) {
+            throw new IOException("Asset transaction journal has no parent: " + journal);
+        }
+        for (JsonElement element : journalEntries) {
+            JsonObject journalEntry = element.getAsJsonObject();
+            if (journalEntry.get("delete").getAsBoolean()) {
+                continue;
+            }
+            String staged = requiredString(journalEntry, "staged");
+            Path stagedPath = directory.resolve(staged).normalize();
+            if (!stagedPath.startsWith(directory) || !directory.equals(stagedPath.getParent())) {
+                throw new IOException("Asset transaction staged path is unsafe: " + staged);
+            }
+            stagedHashes.put(relativeEvidencePath(root, stagedPath), requiredHash(journalEntry, "hash"));
+        }
+    }
+
+    @FunctionalInterface
+    private interface CheckpointEvidenceTask {
+        CheckpointEvidenceEntry capture(Map.Entry<Path, EvidencePath> entry) throws IOException;
     }
 
     private static String checkpointEvidenceHash(Map<String, CheckpointEvidence> evidence) {
@@ -2319,6 +2464,89 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         digest.update((byte) (bytes.length >>> 8));
         digest.update((byte) bytes.length);
         digest.update(bytes);
+    }
+
+    private static Path historyEvidenceIndexFile(Path root) {
+        return root.resolve(".asset-coordinator").resolve(HISTORY_EVIDENCE_INDEX_FILE).toAbsolutePath().normalize();
+    }
+
+    private static boolean isHistoryEvidenceIndexFile(Path root, Path path) {
+        return path != null && historyEvidenceIndexFile(root).equals(path.toAbsolutePath().normalize());
+    }
+
+    private static boolean isHistoryControlFile(Path coordinator, Path path) {
+        return path.equals(coordinator.resolve(HISTORY_CHECKPOINT_FILE))
+            || path.equals(coordinator.resolve(HISTORY_EVIDENCE_INDEX_FILE));
+    }
+
+    private static String relativeEvidencePath(Path root, Path path) {
+        return root.relativize(path).toString().replace('\\', '/');
+    }
+
+    private static boolean isTransactionJournal(String relative) {
+        return relative.startsWith(".transactions/") && relative.endsWith("/journal.json")
+            && relative.indexOf('/', ".transactions/".length()) == relative.length() - "/journal.json".length();
+    }
+
+    private static boolean requiresFreshContentHash(String relative) {
+        return relative.equals(".asset-coordinator/state.json")
+            || relative.equals(".asset-coordinator/genesis.json");
+    }
+
+    private static Map<String, CheckpointEvidence> readHistoryEvidenceIndex(Path file) {
+        try {
+            if (Files.isSymbolicLink(file) || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
+                return Map.of();
+            }
+            byte[] bytes = Files.readAllBytes(file);
+            if (bytes.length == 0 || bytes.length > HISTORY_EVIDENCE_INDEX_SIZE_LIMIT) {
+                return Map.of();
+            }
+            JsonObject marker = parseObject(bytes, "Asset history evidence index");
+            if (!HISTORY_EVIDENCE_INDEX_FORMAT.equals(requiredString(marker, "format"))) {
+                return Map.of();
+            }
+            JsonArray entries = marker.getAsJsonArray("entries");
+            if (entries == null) {
+                return Map.of();
+            }
+            Map<String, CheckpointEvidence> evidence = new LinkedHashMap<>();
+            for (JsonElement element : entries) {
+                JsonObject item = element.getAsJsonObject();
+                String path = requiredString(item, "path");
+                CheckpointEvidence value = new CheckpointEvidence(item.get("directory").getAsBoolean(),
+                    item.get("regularFile").getAsBoolean(), item.get("size").getAsLong(),
+                    requiredString(item, "hash"), requiredString(item, "modifiedAt"),
+                    requiredString(item, "createdAt"), requiredString(item, "fileKey"));
+                if (evidence.putIfAbsent(path, value) != null) {
+                    return Map.of();
+                }
+            }
+            return Map.copyOf(evidence);
+        } catch (IOException | RuntimeException ignored) {
+            return Map.of();
+        }
+    }
+
+    private static void writeHistoryEvidenceIndex(Path file, Map<String, CheckpointEvidence> evidence) throws IOException {
+        JsonObject marker = new JsonObject();
+        marker.addProperty("format", HISTORY_EVIDENCE_INDEX_FORMAT);
+        JsonArray entries = new JsonArray();
+        evidence.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+            CheckpointEvidence value = entry.getValue();
+            JsonObject item = new JsonObject();
+            item.addProperty("path", entry.getKey());
+            item.addProperty("directory", value.directory());
+            item.addProperty("regularFile", value.regularFile());
+            item.addProperty("size", value.size());
+            item.addProperty("hash", value.hash());
+            item.addProperty("modifiedAt", value.modifiedAt());
+            item.addProperty("createdAt", value.createdAt());
+            item.addProperty("fileKey", value.fileKey());
+            entries.add(item);
+        });
+        marker.add("entries", entries);
+        StorageSafety.writeUtf8Atomic(file, AssetProjectMetadata.of(marker).canonicalJson());
     }
 
     private static String serializeHistoryCheckpoint(HistoryCheckpoint checkpoint) {
@@ -3834,7 +4062,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             }
             for (Path path : evidence.descendants(coordinator)) {
                 if (path.equals(bindings) || path.equals(rootLock) || path.equals(state) || path.equals(genesis)
-                    || path.equals(checkpoint)) {
+                    || isHistoryControlFile(coordinator, path)) {
                     continue;
                 }
                 if (!allowedBindings.contains(path) || evidence.isSymbolicLink(path)
@@ -3976,7 +4204,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             try (Stream<Path> coordinatorPaths = Files.walk(coordinator)) {
                 for (Path path : coordinatorPaths.toList()) {
                     if (path.equals(coordinator) || path.equals(bindings) || path.equals(rootLock) || path.equals(state)
-                        || path.equals(genesis) || path.equals(checkpoint)) {
+                        || path.equals(genesis) || isHistoryControlFile(coordinator, path)) {
                         continue;
                     }
                     if (!allowedBindings.contains(path) || Files.isSymbolicLink(path)
@@ -4298,6 +4526,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             return paths.anyMatch(path -> path.startsWith(snapshots) && !path.equals(snapshots)
                 || path.startsWith(coordinator) && !path.equals(coordinator) && !path.equals(bindings)
                     && !path.equals(coordinator.resolve("root.lock"))
+                    && !path.equals(coordinator.resolve(HISTORY_EVIDENCE_INDEX_FILE))
                 || (Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(path))
                     && !path.startsWith(transactions) && !path.startsWith(snapshots) && !path.startsWith(coordinator));
         }
@@ -4312,6 +4541,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         Path lock = coordinator.resolve("root.lock");
         return evidence.paths().keySet().stream().anyMatch(path -> path.startsWith(snapshots) && !path.equals(snapshots)
             || path.startsWith(coordinator) && !path.equals(coordinator) && !path.equals(bindings) && !path.equals(lock)
+                && !path.equals(coordinator.resolve(HISTORY_EVIDENCE_INDEX_FILE))
             || (evidence.isRegularFile(path) || evidence.isSymbolicLink(path))
                 && !path.startsWith(transactions) && !path.startsWith(snapshots) && !path.startsWith(coordinator));
     }
@@ -4997,7 +5227,13 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
 
     private record CheckpointOpen(CoordinatorState state, AssetProjectMetadata metadata,
                                   HistoryValidation historyValidation, EvidenceWatcher evidenceWatcher,
-                                  HistoryCheckpoint checkpoint) {
+                                  HistoryCheckpoint checkpoint, long reusedFiles, long hashedFiles, long hashedBytes) {
+    }
+
+    private static final class CheckpointHashStats {
+        private final AtomicLong reusedFiles = new AtomicLong();
+        private final AtomicLong hashedFiles = new AtomicLong();
+        private final AtomicLong hashedBytes = new AtomicLong();
     }
 
     private static final class PhaseTimings {
@@ -5419,12 +5655,55 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         }
 
         private boolean matches(EvidencePath evidence) {
-            if (evidence == null || directory != evidence.directory || regularFile != evidence.regularFile
-                || !fileKey.equals(evidence.fileKey)) {
+            if (evidence == null || directory != evidence.directory || regularFile != evidence.regularFile) {
                 return false;
             }
-            return directory || size == evidence.size && modifiedAt.equals(evidence.modifiedAt.toString())
-                && createdAt.equals(evidence.createdAt.toString());
+            if (directory) {
+                return true;
+            }
+            if (size != evidence.size || !fileTimeMatches(modifiedAt, evidence.modifiedAt)
+                || !fileTimeMatches(createdAt, evidence.createdAt)) {
+                return false;
+            }
+            return fileKey.isEmpty() || evidence.fileKey().isEmpty() || fileKey.equals(evidence.fileKey);
+        }
+
+        private static boolean fileTimeMatches(String stored, FileTime current) {
+            if (stored == null || stored.isEmpty() || current == null) {
+                return false;
+            }
+            if (stored.equals(current.toString())) {
+                return true;
+            }
+            Long storedMillis = epochMillis(stored);
+            return storedMillis != null && storedMillis == current.toMillis();
+        }
+
+        private static Long epochMillis(String value) {
+            try {
+                if (isDecimalInteger(value)) {
+                    return Long.parseLong(value);
+                }
+                return Instant.parse(value).toEpochMilli();
+            } catch (RuntimeException ignored) {
+                return null;
+            }
+        }
+
+        private static boolean isDecimalInteger(String value) {
+            if (value.isEmpty()) {
+                return false;
+            }
+            int start = value.charAt(0) == '-' ? 1 : 0;
+            if (start == value.length()) {
+                return false;
+            }
+            for (int index = start; index < value.length(); index++) {
+                if (!Character.isDigit(value.charAt(index))) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private EvidenceIdentity identity(EvidencePath evidence) throws IOException {

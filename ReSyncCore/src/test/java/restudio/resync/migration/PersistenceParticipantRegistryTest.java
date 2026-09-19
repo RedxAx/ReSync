@@ -151,6 +151,27 @@ class PersistenceParticipantRegistryTest {
     }
 
     @Test
+    void skipsRetainedAssetHistoryDuringOwnershipScan() throws Exception {
+        Path source = Files.createDirectory(temporary.resolve("retained-history-source"));
+        Path assets = Files.createDirectories(source.resolve("assets"));
+        Path live = Files.writeString(assets.resolve("project.json"), "{}");
+        Path journal = Files.createDirectories(assets.resolve(".transactions").resolve("tx-1"));
+        Files.writeString(journal.resolve("journal.json"), "{\"entries\":[]}");
+        Path snapshot = Files.createDirectories(assets.resolve(".snapshots").resolve("snap-1"));
+        Files.writeString(snapshot.resolve("state.json"), "{}");
+        PersistenceParticipantRegistry registry = new PersistenceParticipantRegistry(source);
+        registry.register(new RebindableRootParticipant("assets", source, assets, assets));
+
+        registry.validateForRestore(source);
+
+        PersistenceParticipantRegistry.OwnershipScanMetrics metrics = registry.ownershipValidationMetrics().get("restore");
+        assertEquals(1L, metrics.fileCount());
+        assertEquals("assets", registry.ownerFor(source, live));
+        assertEquals("assets", registry.ownerFor(source, journal.resolve("journal.json")));
+        assertEquals("assets", registry.ownerFor(source, snapshot.resolve("state.json")));
+    }
+
+    @Test
     void usesTheValidatedParticipantRootSnapshotForDefaultOwnership() throws Exception {
         Path source = Files.createDirectory(temporary.resolve("ownership-snapshot-source"));
         Path participantRoot = Files.createDirectory(source.resolve("participant"));

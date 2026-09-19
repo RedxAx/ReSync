@@ -24,6 +24,7 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.FileTime;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -225,6 +226,32 @@ class AssetTransactionCoordinatorTest {
             long rootSequence = coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence);
             assertEquals(1L, rootSequence);
             assertTrue(coordinator.transact(request).replay());
+        }
+    }
+
+    @Test
+    void rejectsWritesNestedUnderAnExistingAssetFile() throws Exception {
+        Path root = tempDir.resolve("nested-file-parent-assets");
+        AssetTransactionCoordinator.AssetKey source = new AssetTransactionCoordinator.AssetKey("advancement_tree", "asd");
+        try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(root, GSON)) {
+            coordinator.transact(request("72000000-0000-4000-8000-000000000001",
+                coordinator.read(AssetTransactionCoordinator.Snapshot::project),
+                AssetTransactionCoordinator.AssetDelta.write(source, Path.of("Content/Advancements/asd.json"),
+                    AssetTransactionCoordinator.Missing.INSTANCE, "source".getBytes(StandardCharsets.UTF_8))));
+            AssetTransactionCoordinator.AssetKey copy = new AssetTransactionCoordinator.AssetKey("advancement_tree", "asd_copy");
+            assertThrows(IOException.class, () -> coordinator.transact(request("72000000-0000-4000-8000-000000000002",
+                coordinator.read(AssetTransactionCoordinator.Snapshot::project),
+                AssetTransactionCoordinator.AssetDelta.write(copy, Path.of("Content/Advancements/asd.json/asd_copy.json"),
+                    AssetTransactionCoordinator.Missing.INSTANCE, "copy".getBytes(StandardCharsets.UTF_8)))));
+            assertEquals("source", Files.readString(root.resolve("Content/Advancements/asd.json")));
+            assertFalse(Files.exists(root.resolve("Content/Advancements/asd.json/asd_copy.json")));
+        }
+        try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(root, GSON)) {
+            assertEquals("source", Files.readString(root.resolve("Content/Advancements/asd.json")));
+            assertEquals(1L, coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence));
+        }
+        try (var transactions = Files.list(root.resolve(".transactions"))) {
+            assertEquals(1, transactions.filter(Files::isDirectory).count());
         }
     }
 
@@ -990,6 +1017,7 @@ class AssetTransactionCoordinatorTest {
         assertTrue(checkpoint.get("evidenceCount").getAsInt() > 0);
         assertEquals(64, checkpoint.get("evidenceHash").getAsString().length());
         assertFalse(checkpoint.has("evidence"));
+        assertTrue(Files.isRegularFile(root.resolve(".asset-coordinator/history-evidence-index-v1.json")));
 
         try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(root, GSON)) {
             AssetTransactionCoordinator.ValidationMetrics metrics = coordinator.validationMetrics();
@@ -1015,6 +1043,26 @@ class AssetTransactionCoordinatorTest {
             assertEquals(2L, coordinator.committedSequence());
             assertTrue(coordinator.validationMetrics().managerIndexedMutationLookups() > 0L);
         }
+    }
+
+    @Test
+    void checkpointEvidenceMatchesEquivalentTimestampsWithoutFileKey() throws Exception {
+        Class<?> checkpointType = Class.forName(AssetTransactionCoordinator.class.getName() + "$CheckpointEvidence");
+        Class<?> pathType = Class.forName(AssetTransactionCoordinator.class.getName() + "$EvidencePath");
+        var checkpointCtor = checkpointType.getDeclaredConstructor(boolean.class, boolean.class, long.class, String.class,
+            String.class, String.class, String.class);
+        checkpointCtor.setAccessible(true);
+        var pathCtor = pathType.getDeclaredConstructor(String.class, boolean.class, boolean.class, boolean.class, long.class,
+            FileTime.class, FileTime.class, String.class);
+        pathCtor.setAccessible(true);
+        Method matches = checkpointType.getDeclaredMethod("matches", pathType);
+        matches.setAccessible(true);
+        FileTime current = FileTime.fromMillis(1_000L);
+        Object stored = checkpointCtor.newInstance(false, true, 4L, "hash",
+            Instant.ofEpochMilli(1_000L).plusNanos(1L).toString(),
+            Instant.ofEpochMilli(1_000L).plusNanos(2L).toString(), "");
+        Object evidence = pathCtor.newInstance("FILE", false, true, false, 4L, current, current, "vol-1");
+        assertEquals(Boolean.TRUE, matches.invoke(stored, evidence));
     }
 
     @Test
@@ -1056,6 +1104,7 @@ class AssetTransactionCoordinatorTest {
         tampered[tampered.length / 2] ^= 1;
         Files.write(journal, tampered);
         Files.setLastModifiedTime(journal, modified);
+        Files.deleteIfExists(root.resolve(".asset-coordinator/history-evidence-index-v1.json"));
 
         assertThrows(IOException.class, () -> AssetTransactionCoordinator.open(root, GSON));
     }

@@ -855,6 +855,10 @@ public final class PersistenceParticipantRegistry {
                             counters[3]++;
                             return FileVisitResult.SKIP_SUBTREE;
                         }
+                        if (!directory.equals(root) && isRetainedAssetHistory(relativePath(root, directory))) {
+                            counters[3]++;
+                            return FileVisitResult.SKIP_SUBTREE;
+                        }
                         return FileVisitResult.CONTINUE;
                     }
 
@@ -1040,6 +1044,13 @@ public final class PersistenceParticipantRegistry {
     private static boolean isVerifiedTopologyExclusion(Path root, Path candidate, Set<String> exclusions) {
         return candidate.startsWith(root) && !candidate.equals(root)
             && exclusions.contains(relativePath(root, candidate));
+    }
+
+    private static boolean isRetainedAssetHistory(String relative) {
+        return relative.equals("assets/.transactions")
+            || relative.startsWith("assets/.transactions/")
+            || relative.equals("assets/.snapshots")
+            || relative.startsWith("assets/.snapshots/");
     }
 
     public void flushAll() throws IOException {

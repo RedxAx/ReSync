@@ -3,7 +3,6 @@ package restudio.resync.metadata;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -61,9 +60,8 @@ public record ServerSettingsBundle(int formatVersion, String createdAt, List<Sou
                 throw new IllegalArgumentException("Server settings source SHA-256 must be lowercase hexadecimal");
             }
             Objects.requireNonNull(content, "Server settings source content is required");
-            if (content.isEmpty() || content.indexOf('\0') >= 0 || content.indexOf('\r') >= 0
-                    || !Normalizer.isNormalized(content, Normalizer.Form.NFC)) {
-                throw new IllegalArgumentException("Server settings source content must be nonempty canonical UTF-8 text");
+            if (content.isEmpty() || content.indexOf('\0') >= 0 || content.indexOf('\r') >= 0) {
+                throw new IllegalArgumentException("Server settings source content must be nonempty canonical text");
             }
             byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
             if (bytes.length > MAXIMUM_SOURCE_BYTES) {
@@ -82,7 +80,7 @@ public record ServerSettingsBundle(int formatVersion, String createdAt, List<Sou
 
         private static String normalize(String value) {
             Objects.requireNonNull(value, "Server settings source content is required");
-            String normalized = Normalizer.normalize(value.replace("\r\n", "\n").replace('\r', '\n'), Normalizer.Form.NFC);
+            String normalized = value.replace("\r\n", "\n").replace('\r', '\n');
             return normalized.endsWith("\n") ? normalized : normalized + '\n';
         }
     }

@@ -41,6 +41,15 @@ class ServerSettingsBundleContractTest {
     }
 
     @Test
+    void preservesPortableUnicodeWhileCanonicalizingLineEndings() {
+        ServerSettingsBundle.Source source = ServerSettingsBundle.Source.yaml("unicode", 1, "name: Cafe\u0301\r\n");
+        ServerSettingsBundle bundle = new ServerSettingsBundle("created", List.of(source));
+
+        assertEquals("name: Cafe\u0301\n", source.content());
+        assertEquals(bundle, CODEC.decodeBytes(CODEC.encodeBytes(bundle)));
+    }
+
+    @Test
     void rejectsTamperingDuplicatesAndNoncanonicalInput() {
         ServerSettingsBundle.Source source = ServerSettingsBundle.Source.yaml("paper", 1, "providerId: paper\n");
         assertThrows(IllegalArgumentException.class, () -> new ServerSettingsBundle.Source(source.id(), 1,

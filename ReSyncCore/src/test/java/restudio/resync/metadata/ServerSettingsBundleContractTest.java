@@ -3,7 +3,9 @@ package restudio.resync.metadata;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -61,5 +63,15 @@ class ServerSettingsBundleContractTest {
         String canonical = CODEC.encodeText(new ServerSettingsBundle("created", List.of(source)));
         assertThrows(IllegalArgumentException.class, () -> CODEC.decodeText(canonical + "\n"));
         assertThrows(IllegalArgumentException.class, () -> CODEC.decodeText(canonical.replace("\"sources\":[", "\"unknown\":true,\"sources\":[")));
+    }
+
+    @Test
+    void portableDigestMatchesTheJvmAcrossPaddingBoundaries() throws Exception {
+        for (int length : List.of(0, 1, 54, 55, 56, 57, 63, 64, 65, 119, 120, 127, 128, 129, 1024)) {
+            byte[] value = new byte[length];
+            for (int index = 0; index < value.length; index++) value[index] = (byte) (index * 37 + length);
+            String expected = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
+            assertEquals(expected, PortableSha256.hex(value), "Digest mismatch at " + length + " bytes");
+        }
     }
 }

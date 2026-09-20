@@ -8,7 +8,9 @@ import restudio.resync.metadata.MinecraftSchemaBundle.EnumValue;
 import restudio.resync.metadata.MinecraftSchemaBundle.Evidence;
 import restudio.resync.metadata.MinecraftSchemaBundle.Field;
 import restudio.resync.metadata.MinecraftSchemaBundle.ListValue;
+import restudio.resync.metadata.MinecraftSchemaBundle.OpaqueValue;
 import restudio.resync.metadata.MinecraftSchemaBundle.Presentation;
+import restudio.resync.metadata.MinecraftSchemaBundle.PrimitiveKind;
 import restudio.resync.metadata.MinecraftSchemaBundle.PrimitiveValue;
 import restudio.resync.metadata.MinecraftSchemaBundle.RecordValue;
 import restudio.resync.metadata.MinecraftSchemaBundle.RegistryReferenceValue;
@@ -16,7 +18,9 @@ import restudio.resync.metadata.MinecraftSchemaBundle.ResourceLocationValue;
 import restudio.resync.metadata.MinecraftSchemaBundle.RuntimeIdentity;
 import restudio.resync.metadata.MinecraftSchemaBundle.Schema;
 import restudio.resync.metadata.MinecraftSchemaBundle.SchemaKey;
+import restudio.resync.metadata.MinecraftSchemaBundle.UnionValue;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,6 +85,17 @@ class MinecraftSchemaBundleContractTest {
             new Field("value", "Value.", PrimitiveValue.string(), true, null),
             new Field("value", "Value.", PrimitiveValue.string(), true, null)), false));
         assertThrows(IllegalArgumentException.class, () -> new EnumValue(List.of(JsonValue.of("same"), JsonValue.of("same"))));
+        assertThrows(IllegalArgumentException.class, () -> new UnionValue(List.of(PrimitiveValue.string(), PrimitiveValue.string())));
+        assertThrows(IllegalArgumentException.class, () -> new PrimitiveValue(PrimitiveKind.INTEGER,
+            new BigDecimal("1.5"), null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new Capability("missing", false, null));
+        assertThrows(IllegalArgumentException.class, () -> new Applicability(true, List.of("minecraft:stone"), List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new MinecraftSchemaBundle("26.3", "created",
+            new RuntimeIdentity("paper", "26.3", "build", "api"), List.of(), List.of(new Schema(
+                new SchemaKey("item_component", CatalogId.of("minecraft", "unknown")), "Unknown", "Unknown.",
+                new OpaqueValue("Unknown shape"), Applicability.any(),
+                new Presentation("Other", "schema", 100, List.of()),
+                List.of(new Evidence("runtime_registry", "paper:26.3", null)), null, List.of(), true))));
         assertThrows(IllegalArgumentException.class, () -> CODEC.decodeText(CODEC.encodeText(bundle()) + "\n"));
         assertThrows(IllegalArgumentException.class, () -> CODEC.decodeText(CODEC.encodeText(bundle())
             .replace("\"artifactFamily\":\"minecraft_schema\"", "\"artifactFamily\":\"minecraft_registry\"")));

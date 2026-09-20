@@ -27,6 +27,9 @@ permissions:
   resync.authority.grant:
     description: Allows issuing signed authority use grants
     default: false
+  resync.metadata.export:
+    description: Allows exporting versioned Minecraft schema metadata
+    default: false
 commands:
   resync:
     description: Manage ReSync systems

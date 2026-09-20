@@ -113,9 +113,12 @@ public class ReSyncCommand implements TabExecutor {
             && ("anchor".equalsIgnoreCase(args[1]) || "export-anchor".equalsIgnoreCase(args[1]));
         boolean authorityGrant = args.length >= 2 && "authority".equalsIgnoreCase(args[0])
             && "grant".equalsIgnoreCase(args[1]);
+        boolean metadataExport = args.length >= 2 && "metadata".equalsIgnoreCase(args[0])
+            && "export-schema".equalsIgnoreCase(args[1]);
         boolean allowed = authorityExport ? hasAuthorityExportPermission(sender)
             : authorityAnchor ? hasAuthorityAnchorPermission(sender)
             : authorityGrant ? hasAuthorityGrantPermission(sender)
+            : metadataExport ? sender.hasPermission("resync.metadata.export")
             : sender.hasPermission("resync.command");
         if (!allowed) {
             sendError(sender, "No permission");

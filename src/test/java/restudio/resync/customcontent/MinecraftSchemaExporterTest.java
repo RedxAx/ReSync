@@ -3,6 +3,7 @@ package restudio.resync.customcontent;
 import org.junit.jupiter.api.Test;
 import restudio.resync.metadata.MinecraftSchemaBundle;
 import restudio.resync.metadata.MinecraftSchemaBundle.ListValue;
+import restudio.resync.metadata.MinecraftSchemaBundle.OpaqueValue;
 import restudio.resync.metadata.MinecraftSchemaBundle.RecordValue;
 import restudio.resync.metadata.MinecraftSchemaBundle.RegistryReferenceValue;
 import restudio.resync.metadata.MinecraftSchemaBundle.RuntimeIdentity;
@@ -53,6 +54,19 @@ class MinecraftSchemaExporterTest {
         assertEquals(bundle, codec.decodeBytes(codec.encodeBytes(bundle)));
         assertArrayEquals(codec.encodeBytes(bundle), codec.encodeBytes(exporter.export("26.3",
             "2026-09-20T00:00:00Z", runtime, List.of("minecraft:attack_damage", "minecraft:max_health"), true)));
+    }
+
+    @Test
+    void preservesUnknownRuntimeShapesAsOpaqueEvidence() {
+        ItemAttributeSchemaService service = new ItemAttributeSchemaService(
+            List.of("minecraft:future_component"), Map.of(), true);
+        MinecraftSchemaBundle bundle = new MinecraftSchemaExporter(service).export("26.3", "2026-09-20T00:00:00Z",
+            new RuntimeIdentity("paper", "26.3", "git-Paper-130", "api"), List.of(), true);
+
+        MinecraftSchemaBundle.Schema schema = bundle.schemas().getFirst();
+        assertInstanceOf(OpaqueValue.class, schema.value());
+        assertTrue(schema.evidence().stream().anyMatch(value -> value.kind().equals("runtime_shape_unavailable")));
+        assertFalse(schema.evidence().stream().anyMatch(value -> value.kind().equals("sample_inference")));
     }
 
     @Test

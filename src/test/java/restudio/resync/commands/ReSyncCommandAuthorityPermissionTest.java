@@ -110,6 +110,33 @@ class ReSyncCommandAuthorityPermissionTest {
         assertTrue(message != null && message.toString().contains("No permission"));
     }
 
+    @Test
+    void generalCommandPermissionCannotExportMetadata() {
+        TestReSync plugin = MockBukkit.loadSimple(TestReSync.class);
+        PlayerMock player = MockBukkit.getMock().addPlayer();
+        player.addAttachment(plugin, "resync.command", true);
+        player.addAttachment(plugin, "resync.metadata.export", false);
+
+        new ReSyncCommand(plugin).onCommand(player, command(), "resync",
+            new String[]{"metadata", "export-schema", "26.3", "2026-09-20T00:00:00Z"});
+
+        Component message = player.nextComponentMessage();
+        assertTrue(message != null && message.toString().contains("No permission"));
+    }
+
+    @Test
+    void dedicatedMetadataPermissionReachesTheExporter() {
+        TestReSync plugin = MockBukkit.loadSimple(TestReSync.class);
+        PlayerMock player = MockBukkit.getMock().addPlayer();
+        player.addAttachment(plugin, "resync.metadata.export", true);
+
+        new ReSyncCommand(plugin).onCommand(player, command(), "resync",
+            new String[]{"metadata", "export-schema", "26.3", "2026-09-20T00:00:00Z"});
+
+        Component message = player.nextComponentMessage();
+        assertTrue(message != null && message.toString().contains("Server Not Initialized"));
+    }
+
     private static Command command() {
         return new Command("resync") {
             @Override

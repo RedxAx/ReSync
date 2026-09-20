@@ -84,10 +84,13 @@ public final class MinecraftSchemaExporter {
         Map<String, Object> metadata = item.metadata();
         Object sample = metadata.containsKey("defaultValue") ? metadata.get("defaultValue") : metadata.get("exampleValue");
         String editor = text(metadata.get("editor"), "schema");
-        Value inferred = infer(metadata.get("schema"), sample);
+        boolean observedShape = metadata.containsKey("defaultValue") || metadata.containsKey("exampleValue");
+        Value inferred = observedShape ? infer(metadata.get("schema"), sample)
+            : new OpaqueValue("Runtime component shape was not observed");
         Value value = semantic(item.value(), editor, inferred);
         List<String> targets = texts(metadata.get("appliesTo"));
         boolean universal = targets.remove("any");
+        if (universal) targets.clear();
         List<Evidence> evidence = new ArrayList<>();
         String source = runtime.softwareFamily() + ":" + runtime.softwareVersion();
         if (bool(metadata.get("runtime"))) evidence.add(new Evidence("runtime_registry", source, null));
@@ -95,7 +98,11 @@ public final class MinecraftSchemaExporter {
         if (bool(metadata.get("default")) || metadata.containsKey("exampleValue")) {
             evidence.add(new Evidence("observed_default", source, null));
         }
-        evidence.add(new Evidence("sample_inference", "resync:item_component_schema", null));
+        evidence.add(new Evidence(observedShape ? "sample_inference" : "runtime_shape_unavailable",
+            "resync:item_component_schema", null));
+        if (semanticKnown(item.value(), editor)) {
+            evidence.add(new Evidence("curated_semantic", "resync:minecraft_schema_exporter", null));
+        }
         evidence.add(new Evidence("curated_presentation", "resync:item_attribute_ui_schema", null));
         JsonValue defaultValue = metadata.containsKey("defaultValue") ? JsonValue.fromJava(metadata.get("defaultValue")) : null;
         List<JsonValue> examples = metadata.containsKey("exampleValue")
@@ -126,7 +133,8 @@ public final class MinecraftSchemaExporter {
             case "minecraft:damage_type" -> registry("damage_type");
             case "minecraft:item_model" -> registry("item_model");
             case "minecraft:provides_trim_material" -> registry("trim_material");
-            case "minecraft:provides_banner_patterns" -> registry("banner_pattern");
+            case "minecraft:provides_banner_patterns" -> new RegistryReferenceValue(
+                CatalogId.of("minecraft", "banner_pattern"), true);
             case "minecraft:dye", "minecraft:base_color" -> new EnumValue(DYE_COLORS);
             case "minecraft:enchantments", "minecraft:stored_enchantments" ->
                 new MapValue(PrimitiveValue.integer(), CatalogId.of("minecraft", "enchantment"), null, null);
@@ -142,8 +150,19 @@ public final class MinecraftSchemaExporter {
             field("type", "Attribute to modify.", new RegistryReferenceValue(ATTRIBUTE_CATALOG, false), true),
             field("amount", "Modifier amount.", PrimitiveValue.decimal(), true),
             field("operation", "Modifier operation.", new EnumValue(ATTRIBUTE_OPERATIONS), true),
-            field("slot", "Equipment slot or slot group.", new EnumValue(EQUIPMENT_SLOTS), true),
+            field("slot", "Equipment slot or slot group. Omit to target every slot.", new EnumValue(EQUIPMENT_SLOTS), false),
             field("id", "Stable modifier identity.", new ResourceLocationValue(), true)), false);
+    }
+
+    private static boolean semanticKnown(String id, String editor) {
+        if ("presence".equals(editor)) return true;
+        return switch (id) {
+            case "minecraft:attribute_modifiers", "minecraft:rarity", "minecraft:instrument", "minecraft:damage_type",
+                 "minecraft:item_model", "minecraft:provides_trim_material", "minecraft:provides_banner_patterns",
+                 "minecraft:dye", "minecraft:base_color", "minecraft:enchantments",
+                 "minecraft:stored_enchantments", "minecraft:trim" -> true;
+            default -> false;
+        };
     }
 
     private Value infer(Object raw, Object sample) {

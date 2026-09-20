@@ -58,6 +58,9 @@ public record MinecraftSchemaBundle(int formatVersion, String minecraftVersion, 
         public Capability {
             id = MetadataValidation.id(id, "Minecraft schema capability ID");
             diagnostic = MetadataValidation.optionalText(diagnostic, "Minecraft schema capability diagnostic", 2_048);
+            if (!available && diagnostic == null) {
+                throw new IllegalArgumentException("Unavailable Minecraft schema capability requires a diagnostic");
+            }
         }
 
         @Override
@@ -107,6 +110,9 @@ public record MinecraftSchemaBundle(int formatVersion, String minecraftVersion, 
         public Applicability {
             values = sortedText(values, "Minecraft schema applicable value", 1_024, 65_536);
             categories = sortedIds(categories, "Minecraft schema applicability category", 256);
+            if (universal && (!values.isEmpty() || !categories.isEmpty())) {
+                throw new IllegalArgumentException("Universal Minecraft schema applicability cannot declare filters");
+            }
             if (!universal && values.isEmpty() && categories.isEmpty()) {
                 throw new IllegalArgumentException("Minecraft schema applicability must declare a target");
             }
@@ -193,6 +199,9 @@ public record MinecraftSchemaBundle(int formatVersion, String minecraftVersion, 
             }
             if (kind == PrimitiveKind.BOOLEAN && (minimum != null || maximum != null)) {
                 throw new IllegalArgumentException("Boolean schemas cannot declare numeric constraints");
+            }
+            if (kind == PrimitiveKind.INTEGER && (!exactInteger(minimum) || !exactInteger(maximum))) {
+                throw new IllegalArgumentException("Integer schema bounds must be exactly representable integers");
             }
         }
 
@@ -299,8 +308,12 @@ public record MinecraftSchemaBundle(int formatVersion, String minecraftVersion, 
             if (alternatives.size() < 2 || alternatives.size() > 256) {
                 throw new IllegalArgumentException("Minecraft schema union must contain between 2 and 256 alternatives");
             }
-            alternatives = List.copyOf(alternatives.stream()
-                .map(value -> Objects.requireNonNull(value, "Minecraft schema union alternative is required")).toList());
+            List<Value> copy = alternatives.stream()
+                .map(value -> Objects.requireNonNull(value, "Minecraft schema union alternative is required")).toList();
+            if (new HashSet<>(copy).size() != copy.size()) {
+                throw new IllegalArgumentException("Minecraft schema union contains a duplicate alternative");
+            }
+            alternatives = List.copyOf(copy);
         }
     }
 
@@ -424,6 +437,16 @@ public record MinecraftSchemaBundle(int formatVersion, String minecraftVersion, 
         return value == null ? null : value.signum() == 0 ? BigDecimal.ZERO : value.stripTrailingZeros();
     }
 
+    private static boolean exactInteger(BigDecimal value) {
+        if (value == null) return true;
+        try {
+            value.toBigIntegerExact();
+            return true;
+        } catch (ArithmeticException exception) {
+            return false;
+        }
+    }
+
     private static Integer nonNegative(Integer value, String field) {
         if (value != null && value < 0) {
             throw new IllegalArgumentException(field + " must be non-negative");
@@ -435,7 +458,21 @@ public record MinecraftSchemaBundle(int formatVersion, String minecraftVersion, 
         int[] nodes = {0};
         for (Schema schema : schemas) {
             validateValue(schema.value(), 1, nodes);
+            if (schema.complete() && containsOpaque(schema.value())) {
+                throw new IllegalArgumentException("Complete Minecraft schema cannot contain an opaque value");
+            }
         }
+    }
+
+    private static boolean containsOpaque(Value value) {
+        if (value instanceof OpaqueValue) return true;
+        if (value instanceof RecordValue record) {
+            return record.fields().stream().anyMatch(field -> containsOpaque(field.value()));
+        }
+        if (value instanceof ListValue list) return containsOpaque(list.items());
+        if (value instanceof MapValue map) return containsOpaque(map.values());
+        if (value instanceof UnionValue union) return union.alternatives().stream().anyMatch(MinecraftSchemaBundle::containsOpaque);
+        return false;
     }
 
     private static void validateValue(Value value, int depth, int[] nodes) {

@@ -17,6 +17,9 @@ import restudio.flow.data.TabDefinition;
 import restudio.resync.ReSync;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.customcontent.ItemAttributeSchemaService;
+import restudio.resync.customcontent.MinecraftSchemaExportFiles;
+import restudio.resync.customcontent.MinecraftSchemaExporter;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.dialog.DialogService;
@@ -45,6 +48,7 @@ import restudio.resync.world.WorldProfileSettings;
 import restudio.resync.world.WorldRegistryEntry;
 import restudio.resync.world.WorldSignPortal;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.metadata.MinecraftSchemaBundle;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -97,6 +101,8 @@ public class ReSyncCommand implements TabExecutor {
         register("npc", "NPCs", this::handleNpc, this::tabCompleteNpc);
         register("trade", "Trades", this::handleTrade, this::tabCompleteTrade);
         register("resource", "Shared Resources", this::handleResource, this::tabCompleteResource);
+        register("metadata", "Metadata Extraction", this::handleMetadata, args ->
+            args.length == 2 ? filter(List.of("export-schema"), args[1]) : List.of());
     }
 
     @Override
@@ -161,6 +167,32 @@ public class ReSyncCommand implements TabExecutor {
             });
         } catch (Exception exception) {
             sendError(sender, "Network Sync Reload Failed", exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage());
+        }
+        return true;
+    }
+
+    private boolean handleMetadata(CommandSender sender, String[] args) {
+        if (args.length != 4 || !"export-schema".equalsIgnoreCase(args[1])) {
+            sendUsageLine(sender, "/resync metadata export-schema <minecraftVersion> <createdAt>");
+            return true;
+        }
+        ReSyncServer server = plugin.getReSyncServer();
+        if (server == null) {
+            sendError(sender, "Server Not Initialized");
+            return true;
+        }
+        ItemAttributeSchemaService schemaService = server.getModuleContext().getService(ItemAttributeSchemaService.class);
+        if (schemaService == null) {
+            sendError(sender, "Item Component Schema Service Not Initialized");
+            return true;
+        }
+        try {
+            MinecraftSchemaBundle bundle = new MinecraftSchemaExporter(schemaService).export(args[2], args[3]);
+            MinecraftSchemaExportFiles.Result result = MinecraftSchemaExportFiles.write(server.getDataRoot(), bundle);
+            sendSuccess(sender, "Minecraft Schema Exported", result.path() + " · " + result.sha256());
+        } catch (Exception exception) {
+            sendError(sender, "Minecraft Schema Export Failed",
+                exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName());
         }
         return true;
     }

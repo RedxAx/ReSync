@@ -209,6 +209,33 @@ class SqliteProtocolProjectMetadataMutationTest {
     }
 
     @Test
+    void exactProtocolAdoptsCoordinatorProvenProjectMetadataNormalization(@TempDir Path directory) throws Exception {
+        try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(directory.resolve("assets"), new Gson())) {
+            FlowStorage storage = storage(directory, coordinator);
+            FlowResourceRegistry registry = registry(storage);
+            UUID baselineMutation = UUID.fromString("abababab-abab-4bab-8bab-abababababab");
+            storage.saveProjectMetadata("{\"serverId\":\"project\"}", baselineMutation, 0L);
+
+            try (SqliteProtocolResourceMutationAuthority ignored = authority(registry, directory)) {
+            }
+
+            UUID normalizationMutation = UUID.fromString("cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd");
+            storage.saveProjectMetadata("{\"serverId\":\"project\",\"folders\":[],\"resources\":[]}",
+                normalizationMutation, 1L);
+
+            try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
+                List<ResourceDocument<Map<String, Object>>> documents = authority.list(SERVER, TYPE, "");
+
+                assertEquals(1, documents.size());
+                assertEquals(2L, documents.getFirst().revision());
+                assertEquals(normalizationMutation, documents.getFirst().mutationId());
+                assertEquals(List.of(), documents.getFirst().payload().get("folders"));
+                assertEquals(List.of(), documents.getFirst().payload().get("resources"));
+            }
+        }
+    }
+
+    @Test
     void exactProtocolListRepairsForwardMetadataDriftFromAppliedCoreReceipt(@TempDir Path directory) throws Exception {
         try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(directory.resolve("assets"), new Gson())) {
             FlowStorage storage = storage(directory, coordinator);
@@ -547,9 +574,9 @@ class SqliteProtocolProjectMetadataMutationTest {
                     }
                     metadataHash = metadata.payloadHash().canonicalText();
                 }
+                long settledSequence = coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence);
                 if (interruptSqliteSettlement) {
-                    assertEquals(recoveredSequence,
-                        coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence));
+                    assertEquals(Math.addExact(recoveredSequence, 1L), settledSequence);
                 }
                 List<UUID> chain = List.of(textCreate, scoreboardCreate, motdCreate, flowCreate,
                     scoreboardDelete, motdDelete, textDelete);
@@ -561,6 +588,10 @@ class SqliteProtocolProjectMetadataMutationTest {
                 try (SqliteProtocolResourceMutationAuthority authority = authority(registry, runtime,
                     new FlowStorageCoreGraphResourceAuthority(storage, SERVER))) {
                     assertEquals(legacyCore ? 10L : 9L, authority.list(SERVER, TYPE, "").getFirst().revision());
+                }
+                if (interruptSqliteSettlement) {
+                    assertEquals(settledSequence,
+                        coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence));
                 }
                 if (legacyCore) {
                     assertLegacyAdminCoreRecovery(runtime.resolve("resource.db"), chain, flowCreate, metadataHash);

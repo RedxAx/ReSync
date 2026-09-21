@@ -3600,6 +3600,11 @@ public class FlowStorage {
                 AssetTransactionCoordinator.MutationView source = coordinator.mutation(sourceMutationId)
                     .orElseThrow(() -> new IOException("Current project metadata transition is absent from coordinator history"));
                 JsonObject intent = source.intent();
+                ResourceIdentity normalization = recoverProjectMetadataNormalization(snapshot, source, intent,
+                    previousMetadataRevision, previousMetadataMutationId, previousMetadataHash);
+                if (normalization != null) {
+                    return normalization;
+                }
                 if (!intent.has("scope") || !intent.get("scope").isJsonObject()) {
                     return null;
                 }
@@ -3664,6 +3669,79 @@ public class FlowStorage {
                 throw new IllegalStateException("Failed to recover unreceipted project metadata lineage", exception);
             }
         }
+    }
+
+    private ResourceIdentity recoverProjectMetadataNormalization(AssetTransactionCoordinator.Snapshot snapshot,
+                                                                  AssetTransactionCoordinator.MutationView source,
+                                                                  JsonObject intent,
+                                                                  long previousMetadataRevision,
+                                                                  UUID previousMetadataMutationId,
+                                                                  String previousMetadataHash) throws IOException {
+        if (intent.has("scope") || !intent.keySet().equals(Set.of(
+            "assets", "expectedProject", "format", "mutationId", "projectDeltas"))) {
+            return null;
+        }
+        JsonArray deltas = array(intent, "projectDeltas", "Project metadata normalization deltas are invalid");
+        if (deltas.isEmpty() || deltas.size() > 2) {
+            return null;
+        }
+        JsonElement parsed = JsonParser.parseString(snapshot.metadata().serializedJson());
+        if (!parsed.isJsonObject()) {
+            throw new IOException("Project metadata normalization result is invalid");
+        }
+        JsonObject currentPayload = parsed.getAsJsonObject().deepCopy();
+        JsonObject previousPayload = currentPayload.deepCopy();
+        Set<String> normalizedFields = new HashSet<>();
+        for (JsonElement element : deltas) {
+            if (!element.isJsonObject()) {
+                return null;
+            }
+            JsonObject delta = element.getAsJsonObject();
+            JsonArray path = delta.has("path") && delta.get("path").isJsonArray()
+                ? delta.getAsJsonArray("path") : null;
+            JsonElement value = delta.get("value");
+            if (!delta.keySet().equals(Set.of("operation", "path", "value"))
+                || !"SET".equals(stringValue(delta, "operation", "Project metadata normalization operation is invalid"))
+                || path == null || path.size() != 1 || !path.get(0).isJsonPrimitive()
+                || value == null || !value.isJsonArray() || !value.getAsJsonArray().isEmpty()) {
+                return null;
+            }
+            String field = path.get(0).getAsString();
+            if (!Set.of("folders", "resources").contains(field) || !normalizedFields.add(field)
+                || !currentPayload.has(field) || !currentPayload.get(field).equals(value)) {
+                return null;
+            }
+            previousPayload.remove(field);
+        }
+        if (!canonicalProjectMetadataPayloadHash(canonicalProjectMetadataJson(gson.toJson(previousPayload)))
+            .equals(previousMetadataHash)) {
+            return null;
+        }
+        JsonObject expectedProject = object(intent, "expectedProject", "Project metadata normalization baseline is invalid");
+        if (!expectedProject.keySet().equals(Set.of("hash", "revision"))
+            || longValue(expectedProject, "revision", "Project metadata normalization revision is invalid")
+            != previousMetadataRevision
+            || !StorageSafety.sha256(gson.toJson(previousPayload).getBytes(StandardCharsets.UTF_8))
+            .equals(stringValue(expectedProject, "hash", "Project metadata normalization hash is invalid"))
+            || !source.mutationId().toString().equals(
+            stringValue(intent, "mutationId", "Project metadata normalization mutation is invalid"))) {
+            return null;
+        }
+        AssetTransactionCoordinator.AssetKey lineageKey = projectMetadataLineageKey();
+        if (!source.result().states().keySet().equals(Set.of(lineageKey))) {
+            return null;
+        }
+        requireProjectMetadataLineageBaseline(source, lineageKey, previousMetadataRevision,
+            previousMetadataMutationId, previousMetadataHash);
+        ResourceIdentity current = projectMetadataIdentity(snapshot, projectMetadataResourceId());
+        long revision = Math.addExact(previousMetadataRevision, 1L);
+        String payloadHash = canonicalProjectMetadataPayloadHash(canonicalProjectMetadataJson(gson.toJson(currentPayload)));
+        if (current == null || current.deleted() || current.revision() != revision
+            || !current.mutationId().equals(source.mutationId().toString())
+            || !current.payloadHash().equals(payloadHash)) {
+            throw new IOException("Project metadata normalization lineage is not authoritative");
+        }
+        return current;
     }
 
     private ResourceIdentity recoverUnreceiptedWorldGenDeleteLineage(

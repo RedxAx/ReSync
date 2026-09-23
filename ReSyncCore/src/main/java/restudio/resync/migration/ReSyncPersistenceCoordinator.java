@@ -359,6 +359,30 @@ public final class ReSyncPersistenceCoordinator {
         return freshRootProvenance != null;
     }
 
+    public synchronized ReSyncDataFixer.Result prepareDataFixes(ReSyncDataFixer fixer,
+                                                                 boolean allowCurrentBaseline) throws IOException {
+        requireOpen();
+        invalidateReadinessCertificate();
+        if (!participants.participants().isEmpty()) {
+            throw new IllegalStateException("ReSync Data Fixes Must Run Before Persistence Participants");
+        }
+        ReSyncDataFixer dataFixer = Objects.requireNonNull(fixer, "fixer");
+        Path activeRoot = activation.activeRoot()
+            .orElseThrow(() -> new MigrationException("ReSync Data Fixes Require An Active Root"));
+        activation.converged(activeRoot);
+        ReSyncDataFixer.Result result = dataFixer.prepare(activeRoot, coordinationRoot, allowCurrentBaseline,
+            activation::activate);
+        activation.converged(result.activeRoot());
+        Path preparedRoot = activation.activeRoot()
+            .orElseThrow(() -> new MigrationException("ReSync Data Fixes Removed The Active Root"));
+        if (!preparedRoot.equals(result.activeRoot())) {
+            throw new MigrationException("ReSync Data Fix Result Does Not Match The Active Root");
+        }
+        bindAuthorityEpoch(preparedRoot);
+        restoreFaulted = activation.recoveryPending();
+        return result;
+    }
+
     public synchronized boolean freshDerivedRepairAuthorized() {
         return freshRootProvenance != null && startupDerivedChecksRelaxed && sealed && !shutdownStarted();
     }

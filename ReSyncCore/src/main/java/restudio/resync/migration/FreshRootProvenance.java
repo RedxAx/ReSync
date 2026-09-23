@@ -111,8 +111,9 @@ public final class FreshRootProvenance {
             throw new MigrationException("Fresh Root Provenance Changed Before Consumption");
         }
         ensureEmpty(sourceRoot, "Fresh ReSync Data Root");
-        ensureEmpty(activeRoot, "Fresh ReSync Active Root");
-        if (!TreeDigest.of(sourceRoot).equals(sourceHash) || !TreeDigest.of(activeRoot).equals(activeHash)) {
+        ensureFreshActive(activeRoot);
+        if (!TreeDigest.of(sourceRoot).equals(sourceHash)
+            || (ReSyncDataFixer.installedVersion(activeRoot).isEmpty() && !TreeDigest.of(activeRoot).equals(activeHash))) {
             throw new MigrationException("Fresh Root Provenance No Longer Matches Empty Persistence Roots");
         }
     }
@@ -178,6 +179,29 @@ public final class FreshRootProvenance {
         MigrationPaths.requireNoSymlinkTree(directory);
         if (!empty(directory)) {
             throw new MigrationException(name + " Must Be Entirely Empty Before Persistence Writers Start");
+        }
+    }
+
+    private static void ensureFreshActive(Path root) throws IOException {
+        Path directory = MigrationPaths.requireDirectory(root, "activeRoot");
+        MigrationPaths.requireNoSymlinkTree(directory);
+        List<Path> entries;
+        try (var children = Files.list(directory)) {
+            entries = children.toList();
+        }
+        if (entries.isEmpty()) {
+            return;
+        }
+        Path versionDirectory = directory.resolve(ReSyncDataFixer.VERSION_DIRECTORY);
+        if (entries.size() != 1 || !entries.getFirst().equals(versionDirectory)
+            || ReSyncDataFixer.installedVersion(directory).orElse(-1) != 1) {
+            throw new MigrationException("Fresh ReSync Active Root Contains Unowned Data");
+        }
+        try (var versionEntries = Files.list(versionDirectory)) {
+            List<Path> files = versionEntries.toList();
+            if (files.size() != 1 || !files.getFirst().equals(ReSyncDataFixer.versionPath(directory))) {
+                throw new MigrationException("Fresh ReSync Active Root Contains Unowned Migration Data");
+            }
         }
     }
 

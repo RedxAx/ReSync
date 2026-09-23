@@ -8,7 +8,6 @@ import restudio.resync.migration.VerifiedSnapshotAdmission;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -20,8 +19,6 @@ class AssetCoordinatorMigrationTest {
     void claimsOnlyPreparationFailsClosed() {
         assertThrows(MigrationException.class, () -> AssetCoordinatorMigration.prepare(temporary,
             (VerifiedSnapshotAdmission) null));
-        assertThrows(MigrationException.class, () -> AssetCoordinatorMigration.prepare(temporary,
-            (VerifiedSnapshotAdmission) null, List.of()));
     }
 
     @Test

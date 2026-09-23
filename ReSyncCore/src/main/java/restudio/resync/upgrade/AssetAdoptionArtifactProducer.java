@@ -150,6 +150,12 @@ public final class AssetAdoptionArtifactProducer {
     }
 
     public static Result produceEmpty(Path coordinationRoot, FreshRootProvenance provenance) throws IOException {
+        Result result = produceEmptyUnconsumed(coordinationRoot, provenance);
+        provenance.consume(result.artifactHash());
+        return result;
+    }
+
+    public static Result produceEmptyUnconsumed(Path coordinationRoot, FreshRootProvenance provenance) throws IOException {
         Path coordination = MigrationPaths.requireDirectory(coordinationRoot, "coordinationRoot");
         FreshRootProvenance fresh = Objects.requireNonNull(provenance, "provenance");
         fresh.verify(coordination, fresh.activeRoot());
@@ -171,7 +177,6 @@ public final class AssetAdoptionArtifactProducer {
             Snapshot empty = emptySnapshot(fresh.activeRoot(), fresh.proofHash());
             Result retained = retained(artifactPath, empty.manifest().manifestHash());
             if (retained != null) {
-                fresh.consume(retained.artifactHash());
                 return retained;
             }
             QuarantineReport quarantine = QuarantineReport.empty();
@@ -180,9 +185,7 @@ public final class AssetAdoptionArtifactProducer {
             byte[] artifact = artifactBytes(empty, empty, manifestHash, List.of(), quarantine, acceptance,
                 inventory, List.of());
             persistArtifact(artifactPath, artifact);
-            Result result = decodeResult(artifactPath, artifact);
-            fresh.consume(result.artifactHash());
-            return result;
+            return decodeResult(artifactPath, artifact);
         } finally {
             jvmLock.unlock();
         }

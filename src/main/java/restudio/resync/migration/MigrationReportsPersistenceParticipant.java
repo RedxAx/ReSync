@@ -30,12 +30,9 @@ public final class MigrationReportsPersistenceParticipant implements CloseablePe
     private static final String ATOMIC_TEMP_SUFFIX = ".tmp";
     private static final int UUID_LENGTH = 36;
     private static final List<String> REPORT_FILES = List.of(
+        ReSyncDataFixer.VERSION_FILE,
         RECIPE_REPORT_FILE,
-        CATALOG_REBIND_REPORT_FILE,
-        LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID + ".json",
-        LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID + ".backup",
-        LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID + ".json",
-        LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID + ".backup");
+        CATALOG_REBIND_REPORT_FILE);
 
     private final Path scopeRoot;
     private final ReSyncJsonResourceStorage storage;
@@ -109,12 +106,10 @@ public final class MigrationReportsPersistenceParticipant implements CloseablePe
             .exactRoot()
             .exact(QUARANTINE_CONTAINER)
             .exact(QUARANTINE_DIRECTORY)
+            .directChildLiteral(ReSyncDataFixer.VERSION_FILE)
+            .directChildPrefix("data-fix-")
             .directChildLiteral(RECIPE_REPORT_FILE)
             .directChildLiteral(CATALOG_REBIND_REPORT_FILE)
-            .directChildLiteral(LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID + ".json")
-            .directChildLiteral(LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID + ".backup")
-            .directChildLiteral(LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID + ".json")
-            .directChildLiteral(LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID + ".backup")
             .directChildAtomicTemp()
             .directChildAtomicTemp(QUARANTINE_DIRECTORY)
             .build();
@@ -318,13 +313,17 @@ public final class MigrationReportsPersistenceParticipant implements CloseablePe
                         throw new IOException("Recipe migration report must be a regular non-symbolic-link file");
                     }
                     RecipeMigrationReportContract.read(child);
+                } else if (name.equals(ReSyncDataFixer.VERSION_FILE)) {
+                    if (ReSyncDataFixer.installedVersion(root.getParent()).isEmpty()) {
+                        throw new IOException("ReSync data version is missing");
+                    }
+                } else if (ReSyncDataFixer.isDataFixReportName(name)) {
+                    ReSyncDataFixer.validateReport(child);
                 } else if (name.equals(CATALOG_REBIND_REPORT_FILE)) {
                     if (Files.isSymbolicLink(child) || !Files.isRegularFile(child, LinkOption.NOFOLLOW_LINKS)) {
                         throw new IOException("Core catalog rebind report must be a regular non-symbolic-link file");
                     }
                     validateCatalogRebindReport(Files.readString(child));
-                } else if (LegacyFileMigrationCoordinator.isArtifactName(name)) {
-                    LegacyFileMigrationCoordinator.validateArtifact(child);
                 } else if (name.equals(QUARANTINE_CONTAINER)) {
                     validateQuarantine(root);
                 } else {
@@ -332,10 +331,6 @@ public final class MigrationReportsPersistenceParticipant implements CloseablePe
                 }
             }
         }
-        LegacyFileMigrationCoordinator.validateArtifactSet(root,
-            LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID);
-        LegacyFileMigrationCoordinator.validateArtifactSet(root,
-            LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID);
     }
 
     private static void recoverAtomicTemps(Path root) throws IOException {
@@ -438,7 +433,7 @@ public final class MigrationReportsPersistenceParticipant implements CloseablePe
     }
 
     private static boolean isReportFileName(String name) {
-        return REPORT_FILES.contains(name);
+        return REPORT_FILES.contains(name) || ReSyncDataFixer.isDataFixReportName(name);
     }
 
     private static void validateCatalogRebindReport(String report) throws IOException {

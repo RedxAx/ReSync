@@ -1,0 +1,1 @@
+{"id":"core-function-capability-rebind-v1","source":"admitted-generated-function-shape-capabilities","target":"registered-function-call-v1","projection":"replace-only-unambiguous-referenced-function-requirements","validation":"complete-active-catalog-and-runtime","preserve":"nodes-connections-values-unrelated-capabilities"}

@@ -27,8 +27,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
@@ -47,11 +45,6 @@ public final class AssetCoordinatorMigration {
         throw new MigrationException("Asset Adoption Requires A Typed Verified Stage Output");
     }
 
-    static Result prepare(Path coordinationRoot, VerifiedSnapshotAdmission verifiedSourceSnapshot,
-                          Collection<AuthoritativeOutput> lifecycleOutputs) throws IOException {
-        throw new MigrationException("Legacy Claims-Only Asset Adoption Preparation Is Retired");
-    }
-
     public static Result prepare(Path coordinationRoot, VerifiedSnapshotAdmission verifiedSourceSnapshot,
                                  AssetAdoptionArtifactProducer.StageOutput stageOutput) throws IOException {
         return portable(AssetAdoptionArtifactProducer.produce(coordinationRoot,
@@ -65,6 +58,12 @@ public final class AssetCoordinatorMigration {
 
     public static Result prepareEmpty(Path coordinationRoot, FreshRootProvenance freshRootProvenance) throws IOException {
         return portable(AssetAdoptionArtifactProducer.produceEmpty(coordinationRoot,
+            Objects.requireNonNull(freshRootProvenance, "freshRootProvenance")));
+    }
+
+    public static Result prepareEmptyUnconsumed(Path coordinationRoot, FreshRootProvenance freshRootProvenance)
+        throws IOException {
+        return portable(AssetAdoptionArtifactProducer.produceEmptyUnconsumed(coordinationRoot,
             Objects.requireNonNull(freshRootProvenance, "freshRootProvenance")));
     }
 
@@ -200,28 +199,6 @@ public final class AssetCoordinatorMigration {
         if (!Base64.getUrlEncoder().withoutPadding().encodeToString(manifest).equals(encodedManifest)
             || !sha256(manifest).equals(manifestHash)) {
             throw new MigrationException("Portable Asset Adoption " + label + " Manifest Hash Does Not Match");
-        }
-    }
-
-    public record AuthoritativeOutput(String adapterId, List<TypedLifecycleMigrationAdapter.Claim> claims) {
-        public AuthoritativeOutput(String adapterId, Collection<TypedLifecycleMigrationAdapter.Claim> claims) {
-            this(requireText(adapterId, "adapterId"), normalizeClaims(claims));
-        }
-
-        public AuthoritativeOutput {
-            adapterId = requireText(adapterId, "adapterId");
-            claims = normalizeClaims(claims);
-        }
-
-        private static List<TypedLifecycleMigrationAdapter.Claim> normalizeClaims(
-            Collection<TypedLifecycleMigrationAdapter.Claim> values) {
-            List<TypedLifecycleMigrationAdapter.Claim> claims = new ArrayList<>(values == null ? List.of() : values);
-            claims.sort(Comparator.comparing(TypedLifecycleMigrationAdapter.Claim::relativePath)
-                .thenComparing(TypedLifecycleMigrationAdapter.Claim::owner));
-            if (new HashSet<>(claims).size() != claims.size()) {
-                throw new IllegalArgumentException("Duplicate Authoritative Lifecycle Claim");
-            }
-            return List.copyOf(claims);
         }
     }
 

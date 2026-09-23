@@ -29,7 +29,6 @@ import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.identity.FunctionParameterId;
 import restudio.resync.flow.identity.PinId;
-import restudio.resync.flow.migration.IdCompatibilityLayer;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
@@ -102,7 +101,6 @@ public class FlowExecutor {
     private final boolean enableDebug;
     private final long maxExecutionDurationMillis;
     private final int maxFunctionCallDepth;
-    private final IdCompatibilityLayer idCompatibility;
     private final LegacyRuntimeActivationGate legacyRuntimeGate;
     private volatile FlowExecutionBridge executionBridge;
     private volatile CompiledFunctionExecutionBridge compiledFunctionExecutionBridge;
@@ -453,7 +451,6 @@ public class FlowExecutor {
         this.maxExecutionDurationMillis = Math.max(0L, maxExecutionDurationMillis);
         this.maxFunctionCallDepth = Math.max(1, maxFunctionCallDepth);
         this.legacyRuntimeGate = legacyRuntimeGate;
-        this.idCompatibility = legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyAliases() ? new IdCompatibilityLayer() : null;
         this.executionBridge = executionBridge;
         this.wallClockScheduler = new ScheduledThreadPoolExecutor(1, Thread.ofPlatform().daemon().name("ReSync-Flow-WallClock").factory());
         this.wallClockScheduler.setRemoveOnCancelPolicy(true);
@@ -3806,7 +3803,7 @@ public class FlowExecutor {
         if (nodeDefinitionRegistry == null || node == null || node.getType() == null) {
             return null;
         }
-        return nodeDefinitionRegistry.get(idCompatibility != null ? idCompatibility.mapToNew(node.getType()) : node.getType());
+        return nodeDefinitionRegistry.get(node.getType());
     }
 
     private boolean isFunctionStartType(String type) {
@@ -3866,9 +3863,6 @@ public class FlowExecutor {
         if (nodeType == null) {
             return null;
         }
-
-        String mappedType = idCompatibility != null ? idCompatibility.mapToNew(nodeType) : nodeType;
-        nodeType = mappedType;
 
         if (nodeDefinitionRegistry != null) {
             NodeDefinition definition = nodeDefinitionRegistry.get(nodeType);

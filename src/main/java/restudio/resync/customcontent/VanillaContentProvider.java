@@ -16,7 +16,6 @@ import restudio.resync.contract.canonical.JsonValue;
 import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.migration.AtomicFiles;
-import restudio.resync.migration.LegacyFileMigrationCoordinator;
 import restudio.resync.migration.MigrationPaths;
 
 import java.io.IOException;
@@ -56,7 +55,6 @@ public class VanillaContentProvider implements CustomContentProvider {
     private IOException persistenceFailure;
 
     private static final String DOCUMENT_KIND = "resync.custom-blocks";
-    private static final String MIGRATION_OWNER = "resync.custom-blocks";
     private static final int DOCUMENT_VERSION = 1;
     private static final String FILE_NAME = "custom-blocks.json";
     private static final int MAX_WORLD_NAME_BYTES = 256;
@@ -90,21 +88,13 @@ public class VanillaContentProvider implements CustomContentProvider {
         Path file = MigrationPaths.requirePath(dataRoot, "dataRoot").resolve(FILE_NAME);
         try {
             Files.createDirectories(requireParent(file));
-            DecodedBlocks decoded = readBlocks(file, false, true);
+            DecodedBlocks decoded = readBlocks(file, false);
             synchronized (persistenceMonitor) {
                 activeBinding = new ActiveBinding(file, 0L);
                 blocks = decoded.blocks();
                 boolean exists = Files.exists(file, LinkOption.NOFOLLOW_LINKS);
-                boolean migrationArtifacts = LegacyFileMigrationCoordinator.hasArtifacts(file,
-                    LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID);
-                if (!exists && migrationArtifacts) {
-                    throw new IOException("Custom blocks migration source is missing while recovery artifacts exist");
-                }
                 if (!exists) {
                     writeBlocks(file, blocks);
-                } else if (decoded.legacy() || migrationArtifacts) {
-                    LegacyFileMigrationCoordinator.migrate(file, canonicalBytes(blocks), MIGRATION_OWNER,
-                        LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID, decoded.sourceVersion(), DOCUMENT_VERSION);
                 }
                 publishPlacedBlocks();
             }
@@ -356,7 +346,7 @@ public class VanillaContentProvider implements CustomContentProvider {
             if (persistenceFailure != null) {
                 throw new IOException("Custom block persistence is unavailable", persistenceFailure);
             }
-            Map<String, String> persisted = readBlocks(activeBinding.file(), true, false).blocks();
+            Map<String, String> persisted = readBlocks(activeBinding.file(), true).blocks();
             if (!persisted.equals(blocks)) {
                 throw new IOException("Custom blocks mappings are out of sync with the active file");
             }
@@ -373,17 +363,12 @@ public class VanillaContentProvider implements CustomContentProvider {
                 throw new IOException("Custom block persistence must be quiesced before rebind");
             }
             Path nextFile = MigrationPaths.requirePath(candidateFile, "candidateFile");
-            DecodedBlocks decoded = readBlocks(nextFile, true, true);
+            DecodedBlocks decoded = readBlocks(nextFile, true);
             long generation;
             try {
                 generation = Math.addExact(activeBinding.generation(), 1L);
             } catch (ArithmeticException exception) {
                 throw new IOException("Custom block persistence generation overflowed", exception);
-            }
-            if (decoded.legacy() || LegacyFileMigrationCoordinator.hasArtifacts(nextFile,
-                LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID)) {
-                LegacyFileMigrationCoordinator.migrate(nextFile, canonicalBytes(decoded.blocks()), MIGRATION_OWNER,
-                    LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID, decoded.sourceVersion(), DOCUMENT_VERSION);
             }
             ActiveBinding nextBinding = new ActiveBinding(nextFile, generation);
             blocks = decoded.blocks();
@@ -396,7 +381,7 @@ public class VanillaContentProvider implements CustomContentProvider {
         synchronized (persistenceMonitor) {
             ensureNotClosed();
             ensureHealthy();
-            Map<String, String> persisted = readBlocks(activeBinding.file(), true, false).blocks();
+            Map<String, String> persisted = readBlocks(activeBinding.file(), true).blocks();
             if (!persisted.equals(blocks)) {
                 throw new IOException("Custom blocks mappings are out of sync with the active file");
             }
@@ -423,7 +408,7 @@ public class VanillaContentProvider implements CustomContentProvider {
                     quiescing = false;
                 } else {
                     ensureHealthy();
-                    Map<String, String> persisted = readBlocks(activeBinding.file(), true, false).blocks();
+                    Map<String, String> persisted = readBlocks(activeBinding.file(), true).blocks();
                     if (!persisted.equals(blocks)) {
                         throw new IOException("Custom blocks mappings are out of sync with the active file");
                     }
@@ -474,13 +459,13 @@ public class VanillaContentProvider implements CustomContentProvider {
         return world + ":" + location.getBlockX() + ":" + y + ":" + location.getBlockZ();
     }
 
-    private DecodedBlocks readBlocks(Path file, boolean required, boolean allowLegacy) throws IOException {
+    private DecodedBlocks readBlocks(Path file, boolean required) throws IOException {
         Path normalized = MigrationPaths.requirePath(file, "blockFile");
         if (Files.notExists(normalized, LinkOption.NOFOLLOW_LINKS)) {
             if (required) {
                 throw new IOException("Custom blocks file does not exist: " + normalized);
             }
-            return new DecodedBlocks(new LinkedHashMap<>(), false, DOCUMENT_VERSION);
+            return new DecodedBlocks(new LinkedHashMap<>());
         }
         if (Files.isSymbolicLink(normalized) || !Files.isRegularFile(normalized, LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("Custom blocks file is not a regular file: " + normalized);
@@ -491,21 +476,12 @@ public class VanillaContentProvider implements CustomContentProvider {
             try {
                 value = CanonicalCodec.decode(bytes);
             } catch (IllegalArgumentException canonicalFailure) {
-                if (!allowLegacy) {
-                    throw new IOException("Custom blocks file is not canonical: " + normalized, canonicalFailure);
-                }
-                value = CanonicalCodec.decodePermissive(bytes);
-                if (value instanceof JsonValue.JsonObject object && object.fields().keySet().equals(DOCUMENT_FIELDS)) {
-                    throw new IOException("Custom blocks versioned documents must use canonical bytes: " + normalized, canonicalFailure);
-                }
+                throw new IOException("Custom blocks file is not canonical: " + normalized, canonicalFailure);
             }
             if (value instanceof JsonValue.JsonObject object && object.fields().keySet().equals(DOCUMENT_FIELDS)) {
-                return new DecodedBlocks(decodeCanonical(object), false, DOCUMENT_VERSION);
+                return new DecodedBlocks(decodeCanonical(object));
             }
-            if (!allowLegacy) {
-                throw new IOException("Custom blocks file is not a versioned document: " + normalized);
-            }
-            return new DecodedBlocks(decodeLegacy(value), true, 0L);
+            throw new IOException("Custom blocks file is not a versioned document: " + normalized);
         } catch (IOException exception) {
             throw exception;
         } catch (RuntimeException exception) {
@@ -584,26 +560,6 @@ public class VanillaContentProvider implements CustomContentProvider {
         if (!new ArrayList<>(result.keySet()).equals(result.keySet().stream()
             .sorted(CanonicalJson::compareCodePoints).toList())) {
             throw new IOException("Custom block mappings are not in canonical order");
-        }
-        return result;
-    }
-
-    private Map<String, String> decodeLegacy(JsonValue value) throws IOException {
-        if (!(value instanceof JsonValue.JsonObject object)) {
-            throw new IOException("Custom blocks legacy data must be an object");
-        }
-        Map<String, String> result = new LinkedHashMap<>();
-        Set<String> foldedKeys = new HashSet<>();
-        for (Map.Entry<String, JsonValue> entry : object.fields().entrySet()) {
-            String key = parseCoordinateKey(entry.getKey());
-            if (!(entry.getValue() instanceof JsonValue.JsonString block)) {
-                throw new IOException("Custom blocks mapping values must be strings");
-            }
-            Coordinate coordinate = coordinate(key);
-            if (!foldedKeys.add(foldedKey(coordinate.world(), coordinate.x(), coordinate.y(), coordinate.z()))) {
-                throw new IOException("Custom blocks contain duplicate or case-colliding coordinates");
-            }
-            result.put(key, requireBlockId(block.value()));
         }
         return result;
     }
@@ -806,6 +762,6 @@ public class VanillaContentProvider implements CustomContentProvider {
     private record Coordinate(String world, int x, int y, int z) {
     }
 
-    private record DecodedBlocks(Map<String, String> blocks, boolean legacy, long sourceVersion) {
+    private record DecodedBlocks(Map<String, String> blocks) {
     }
 }

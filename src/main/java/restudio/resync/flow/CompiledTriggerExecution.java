@@ -434,7 +434,8 @@ public final class CompiledTriggerExecution {
                 : source != null && source.startsWith("event") ? "event" : "trigger";
             String message = "Compiled " + channel + " trigger invocation " + outcome.outcome()
                 + " correlationId=" + invocationId.canonicalText() + " diagnosticCode=" + outcome.diagnosticCode()
-                + (source == null || source.isBlank() ? "" : " source=" + source);
+                + (source == null || source.isBlank() ? "" : " source=" + source)
+                + invocationDetail(failure);
             warnInvocation((source == null ? channel : source) + "|" + outcome.diagnosticCode(), message);
             return null;
         });
@@ -653,6 +654,22 @@ public final class CompiledTriggerExecution {
             }
         }
         return List.copyOf(diagnostics);
+    }
+
+    private String invocationDetail(Throwable failure) {
+        for (Diagnostic diagnostic : executionDiagnostics(unwrap(failure))) {
+            Object reason = diagnostic.evidence().get("reason");
+            if (!(reason instanceof String text) || text.isBlank()) {
+                continue;
+            }
+            String normalized = text.replace('\n', ' ').replace('\r', ' ').strip();
+            if (normalized.length() > 240) {
+                normalized = normalized.substring(0, 240);
+            }
+            String node = diagnostic.nodeId() == null ? "" : " nodeId=" + diagnostic.nodeId().canonicalText();
+            return node + " detail=" + normalized;
+        }
+        return "";
     }
 
     private boolean boundedDiagnosticValue(Object value, int depth, int[] budget) {

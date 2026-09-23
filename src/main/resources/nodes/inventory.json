@@ -2405,6 +2405,7 @@
     "category": "ITEM",
     "schemaVersion": 2,
     "kind": "ACTION",
+    "hidden": true,
     "tags": [
       "item",
       "create"
@@ -3842,8 +3843,7 @@
         "displayName": "Enchantment",
         "name": "enchantment",
         "pinType": "DATA",
-        "dataType": "string",
-        "defaultValue": "",
+        "dataType": "enchantment",
         "description": "Enchantment key or name.",
         "direction": "input"
       },
@@ -3970,8 +3970,7 @@
         "displayName": "Enchantment",
         "name": "enchantment",
         "pinType": "DATA",
-        "dataType": "string",
-        "defaultValue": "",
+        "dataType": "enchantment",
         "description": "Enchantment key or name.",
         "direction": "input"
       }

@@ -102,6 +102,36 @@ class CompiledRuntimeValueCodecTest {
     }
 
     @Test
+    void eventBlockSnapshotSurvivesBreakAndRetainsLiveActionTarget() {
+        world.getChunkAt(0, 0);
+        Block block = world.getBlockAt(3, 64, 2);
+        block.setType(Material.STONE);
+        TypedValue captured = encode("block", block.getState());
+        block.setType(Material.AIR);
+        Object snapshot = decode(captured);
+        assertEquals("STONE", property("block", "type", snapshot));
+        assertEquals("Stone", property("block", "display_name", snapshot));
+        assertEquals("minecraft:stone", property("block", "key", snapshot));
+        assertEquals(false, property("block", "is_air", snapshot));
+        assertEquals(block.getLocation(), property("block", "location", snapshot));
+        assertEquals("STONE", property("block", "type", decode(encode("block", snapshot))));
+        assertEquals(Material.AIR, block.getType());
+        assertThrows(IllegalArgumentException.class, () -> decode(changed(captured, "material", "DIRT")));
+        PropertyRegistry properties = new PropertyRegistry();
+        properties.registerDescriptor(new PropertyRegistry.PropertyDescriptor("block", "type", FlowTypeRef.simple("any"),
+            List.of("set"), false, true, false, false, "builtin"));
+        HandlerRegistry handlers = new HandlerRegistry();
+        JsonFamilyHandler.registerFamilies(handlers, properties);
+        FlowNode action = new FlowNode("test", 0, 0, Map.of("target", snapshot, "value", Material.DIRT));
+        action.setHandlerConfig(Map.of("property", "type", "action", "set"));
+        FlowRuntime runtime = new FlowRuntime(new FlowGraph("test", Map.of("node", action), List.of(), List.of()),
+            new TypeAdapterRegistry(), Map.of());
+        handlers.getHandler("block").execute(new FlowContext(runtime, player, null), action);
+        assertEquals(Material.DIRT, block.getType());
+        assertEquals("STONE", property("block", "type", snapshot));
+    }
+
+    @Test
     void itemSnapshotPreservesMetadataAndProperties() {
         ItemStack item = new ItemStack(Material.DIAMOND_SWORD, 1);
         ItemMeta meta = item.getItemMeta();

@@ -74,6 +74,17 @@ public final class RuntimeDataRegistry {
             .toList();
     }
 
+    List<RuntimeDataAdapter<?>> registeredAdapters() {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.registeredAdapters();
+        }
+        return adapters.values().stream().flatMap(values -> values.values().stream())
+            .sorted(Comparator.comparing(RuntimeDataAdapter<?>::domain, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(RuntimeDataAdapter::id, String.CASE_INSENSITIVE_ORDER))
+            .toList();
+    }
+
     public RuntimeDataRegistry copy() {
         ExtensionRegistryActivation current = activation;
         if (current != null) {

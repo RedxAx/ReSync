@@ -2,7 +2,12 @@
   {
     "id": "itemstack.properties",
     "displayName": "Item Properties",
-    "description": "Read supported properties from an item stack without changing it.",
+    "aliases": [
+      "Get Item Property",
+      "Set Item Property",
+      "Read Item Properties"
+    ],
+    "description": "Get, check, or set supported properties on an item stack.",
     "domain": "minecraft",
     "family": "itemstack",
     "lifecycle": "active",
@@ -12,11 +17,12 @@
     "owner": "restudio.resync",
     "category": "ITEM",
     "schemaVersion": 2,
-    "kind": "QUERY",
+    "kind": "FAMILY",
     "tags": [
       "item",
       "property",
-      "query"
+      "query",
+      "set"
     ],
     "legacyIds": [
       "itemstack",
@@ -145,10 +151,11 @@
         "widget": "DROPDOWN",
         "options": [
           "get",
-          "has"
+          "has",
+          "set"
         ],
         "defaultValue": "get",
-        "description": "Reads a property or checks whether it is available.",
+        "description": "Gets, checks, or sets the selected property.",
         "direction": "input"
       },
       {
@@ -173,7 +180,176 @@
           "localized_name"
         ],
         "defaultValue": "type",
-        "description": "Property to read.",
+        "description": "Property to get, check, or set.",
+        "direction": "input"
+      },
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "description": "Starts setting the selected property.",
+        "direction": "input"
+      },
+      {
+        "id": "set_type",
+        "displayName": "Type",
+        "name": "set_type",
+        "pinType": "DATA",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "set",
+          "property": "type"
+        },
+        "description": "Material name to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_amount",
+        "displayName": "Amount",
+        "name": "set_amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "amount"
+        },
+        "description": "Stack amount to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_display_name",
+        "displayName": "Display Name",
+        "name": "set_display_name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "set",
+          "property": "display_name"
+        },
+        "description": "Display name to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_lore",
+        "displayName": "Lore",
+        "name": "set_lore",
+        "pinType": "DATA",
+        "dataType": "list<string>",
+        "visibleWhen": {
+          "action": "set",
+          "property": "lore"
+        },
+        "description": "Lore lines to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_durability",
+        "displayName": "Durability",
+        "name": "set_durability",
+        "pinType": "DATA",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "durability"
+        },
+        "description": "Damage value to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_max_durability",
+        "displayName": "Max Durability",
+        "name": "set_max_durability",
+        "pinType": "DATA",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "max_durability"
+        },
+        "description": "Maximum damage value to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_enchantments",
+        "displayName": "Enchantments",
+        "name": "set_enchantments",
+        "pinType": "DATA",
+        "dataType": "map<string,number>",
+        "visibleWhen": {
+          "action": "set",
+          "property": "enchantments"
+        },
+        "description": "Enchantments and levels to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_custom_model_data",
+        "displayName": "Custom Model Data",
+        "name": "set_custom_model_data",
+        "pinType": "DATA",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "custom_model_data"
+        },
+        "description": "Custom model data value to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_unbreakable",
+        "displayName": "Unbreakable",
+        "name": "set_unbreakable",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "widget": "TOGGLE",
+        "visibleWhen": {
+          "action": "set",
+          "property": "unbreakable"
+        },
+        "description": "Whether the item is unbreakable.",
+        "direction": "input"
+      },
+      {
+        "id": "set_repair_cost",
+        "displayName": "Repair Cost",
+        "name": "set_repair_cost",
+        "pinType": "DATA",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "repair_cost"
+        },
+        "description": "Repair cost to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_item_flags",
+        "displayName": "Item Flags",
+        "name": "set_item_flags",
+        "pinType": "DATA",
+        "dataType": "list<string>",
+        "visibleWhen": {
+          "action": "set",
+          "property": "item_flags"
+        },
+        "description": "Item flags to set.",
+        "direction": "input"
+      },
+      {
+        "id": "set_localized_name",
+        "displayName": "Localized Name",
+        "name": "set_localized_name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "set",
+          "property": "localized_name"
+        },
+        "description": "Localized name to set.",
         "direction": "input"
       }
     ],
@@ -345,12 +521,50 @@
         },
         "description": "Localized item name when available.",
         "direction": "output"
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "description": "Continues after the property is set.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "description": "Item with the selected property set.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "description": "Whether the property was set.",
+        "direction": "output"
       }
     ]
   },
   {
     "id": "itemstack.actions",
-    "displayName": "Item Actions",
+    "hidden": true,
+    "hiddenReason": "Use the typed Set Item nodes instead.",
+    "displayName": "Set Item Property",
     "description": "Run a supported item property action such as set, clear, or execute.",
     "domain": "minecraft",
     "family": "itemstack",
@@ -511,9 +725,435 @@
     ]
   },
   {
+    "id": "itemstack.create_item",
+    "displayName": "Create Item",
+    "description": "Create a vanilla, ReSync, or external provider item selected from the complete item catalog.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-create",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "create",
+      "catalog",
+      "custom-content",
+      "nexo"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_create_reference"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts creating the selected item.",
+        "direction": "input"
+      },
+      {
+        "id": "reference",
+        "displayName": "Item",
+        "name": "reference",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:custom_content:recipe_item",
+        "defaultValue": "stone",
+        "description": "Selects an item from every available item category and provider.",
+        "direction": "input"
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1
+        },
+        "description": "Sets the stack amount within the selected item's stack limit.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after creating the item.",
+        "direction": "output"
+      },
+      {
+        "id": "target",
+        "displayName": "Item",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the selected item stack.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "itemstack.component",
+    "displayName": "Item Component",
+    "description": "Get, set, or remove any supported item component through one component action.",
+    "domain": "minecraft",
+    "family": "item-components",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-component",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "component",
+      "attribute",
+      "get",
+      "set",
+      "remove"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_component"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the selected component action.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item whose component is read or changed.",
+        "direction": "input"
+      },
+      {
+        "id": "component",
+        "displayName": "Component",
+        "name": "component",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:item_attribute_schema",
+        "defaultValue": "minecraft:attribute_modifiers",
+        "description": "Selects any supported component, including attribute modifiers.",
+        "direction": "input"
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set",
+          "remove"
+        ],
+        "defaultValue": "get",
+        "description": "Chooses whether to read, replace, or remove the component.",
+        "direction": "input"
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "description": "Provides the complete value used when setting the component.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the component action completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the original or changed item stack.",
+        "direction": "output"
+      },
+      {
+        "id": "output_value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "description": "Returns the component value before removal or after setting.",
+        "direction": "output"
+      },
+      {
+        "id": "exists",
+        "displayName": "Exists",
+        "name": "exists",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Whether the component existed before this action or was set successfully.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "itemstack.apply_component_builder",
+    "displayName": "Apply Component Builder",
+    "description": "Apply a reusable Component Builder template to an item stack.",
+    "domain": "minecraft",
+    "family": "item-components",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "component-builder-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "component",
+      "builder",
+      "template",
+      "apply",
+      "edit"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_apply_component_builder"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts applying the component template.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Item",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item that receives the component template.",
+        "direction": "input"
+      },
+      {
+        "id": "builder",
+        "displayName": "Builder",
+        "name": "builder",
+        "pinType": "DATA",
+        "dataType": "component_builder_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:component_builder",
+        "description": "Reusable Component Builder to apply and edit.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the template is applied.",
+        "direction": "output"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns a new item stack with the template applied.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Whether the Component Builder was applied.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "itemstack.component_field",
+    "displayName": "Component Field",
+    "description": "Create or update one named field in an item component object using any value type.",
+    "domain": "minecraft",
+    "family": "item-components",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "component-builder",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": [
+      "item",
+      "component",
+      "field",
+      "object",
+      "build",
+      "edit"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_component_object_field",
+      "valuePin": "value"
+    },
+    "inputs": [
+      {
+        "id": "component_value",
+        "displayName": "Component",
+        "name": "component_value",
+        "pinType": "DATA",
+        "dataType": "item_component",
+        "optional": true,
+        "description": "Existing component object to copy before changing the field.",
+        "direction": "input"
+      },
+      {
+        "id": "field",
+        "displayName": "Field",
+        "name": "field",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Names the component field to create or replace.",
+        "direction": "input"
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "description": "Provides the number, Boolean, text, object, list, or item value for the field.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_component_value",
+        "displayName": "Component",
+        "name": "component_value",
+        "pinType": "DATA",
+        "dataType": "item_component",
+        "description": "Returns a new component object containing the field.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "itemstack.component_list_entry",
+    "displayName": "Component List Entry",
+    "description": "Append any supported value to an item component list without changing the original list.",
+    "domain": "minecraft",
+    "family": "item-components",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "component-builder",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": [
+      "item",
+      "component",
+      "list",
+      "entry",
+      "build",
+      "edit"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_component_list_entry",
+      "valuePin": "value"
+    },
+    "inputs": [
+      {
+        "id": "items",
+        "displayName": "List",
+        "name": "items",
+        "pinType": "DATA",
+        "dataType": "item_component_list",
+        "optional": true,
+        "description": "Existing component list to copy before appending the value.",
+        "direction": "input"
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "description": "Provides the number, Boolean, text, object, list, or item value to append.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_items",
+        "displayName": "List",
+        "name": "items",
+        "pinType": "DATA",
+        "dataType": "item_component_list",
+        "description": "Returns a new component list containing the appended value.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
     "id": "itemstack.item_components",
-    "displayName": "Item Components",
-    "description": "Read the complete component map from an item stack.",
+    "displayName": "Get Item Components",
+    "aliases": [
+      "Get Item Attributes"
+    ],
+    "description": "Read all editable data components from an item stack.",
     "domain": "minecraft",
     "family": "item-components",
     "lifecycle": "active",
@@ -556,13 +1196,14 @@
         "name": "components",
         "pinType": "DATA",
         "dataType": "item_components",
-        "description": "Component values keyed by their namespaced IDs.",
+        "description": "Editable component values keyed by their namespaced IDs.",
         "direction": "output"
       }
     ]
   },
   {
     "id": "itemstack.item_number_component",
+    "hidden": true,
     "displayName": "Number Item Component",
     "description": "Read or set a numeric item component.",
     "domain": "minecraft",
@@ -744,6 +1385,7 @@
   },
   {
     "id": "itemstack.item_boolean_component",
+    "hidden": true,
     "displayName": "Boolean Item Component",
     "description": "Read or set a Boolean item component.",
     "domain": "minecraft",
@@ -925,6 +1567,7 @@
   },
   {
     "id": "itemstack.item_text_component",
+    "hidden": true,
     "displayName": "Text Item Component",
     "description": "Read or set a text item component.",
     "domain": "minecraft",
@@ -1106,6 +1749,7 @@
   },
   {
     "id": "itemstack.item_object_component",
+    "hidden": true,
     "displayName": "Object Item Component",
     "description": "Read or set an object-valued item component.",
     "domain": "minecraft",
@@ -1287,6 +1931,7 @@
   },
   {
     "id": "itemstack.item_list_component",
+    "hidden": true,
     "displayName": "List Item Component",
     "description": "Read or set a list-valued item component.",
     "domain": "minecraft",
@@ -1468,6 +2113,7 @@
   },
   {
     "id": "itemstack.item_presence_component",
+    "hidden": true,
     "displayName": "Presence Item Component",
     "description": "Read or set the presence of an item component.",
     "domain": "minecraft",
@@ -1649,6 +2295,7 @@
   },
   {
     "id": "itemstack.item_component_number_field",
+    "hidden": true,
     "displayName": "Build Number Component Field",
     "description": "Add a numeric field to an item component object.",
     "domain": "minecraft",
@@ -1745,6 +2392,7 @@
   },
   {
     "id": "itemstack.item_component_boolean_field",
+    "hidden": true,
     "displayName": "Build Boolean Component Field",
     "description": "Add a Boolean field to an item component object.",
     "domain": "minecraft",
@@ -1841,6 +2489,7 @@
   },
   {
     "id": "itemstack.item_component_text_field",
+    "hidden": true,
     "displayName": "Build Text Component Field",
     "description": "Add a text field to an item component object.",
     "domain": "minecraft",
@@ -1937,6 +2586,7 @@
   },
   {
     "id": "itemstack.item_component_object_field",
+    "hidden": true,
     "displayName": "Build Object Component Field",
     "description": "Add an object field to an item component object.",
     "domain": "minecraft",
@@ -2033,6 +2683,7 @@
   },
   {
     "id": "itemstack.item_component_list_field",
+    "hidden": true,
     "displayName": "Build List Component Field",
     "description": "Add a list field to an item component object.",
     "domain": "minecraft",
@@ -2129,6 +2780,7 @@
   },
   {
     "id": "itemstack.item_component_number_list_entry",
+    "hidden": true,
     "displayName": "Add Number To Component List",
     "description": "Append a number to an item component list.",
     "domain": "minecraft",
@@ -2211,6 +2863,7 @@
   },
   {
     "id": "itemstack.item_component_boolean_list_entry",
+    "hidden": true,
     "displayName": "Add Boolean To Component List",
     "description": "Append a Boolean to an item component list.",
     "domain": "minecraft",
@@ -2293,6 +2946,7 @@
   },
   {
     "id": "itemstack.item_component_text_list_entry",
+    "hidden": true,
     "displayName": "Add Text To Component List",
     "description": "Append text to an item component list.",
     "domain": "minecraft",
@@ -2375,6 +3029,7 @@
   },
   {
     "id": "itemstack.item_component_object_list_entry",
+    "hidden": true,
     "displayName": "Add Object To Component List",
     "description": "Append an object to an item component list.",
     "domain": "minecraft",
@@ -2457,6 +3112,7 @@
   },
   {
     "id": "itemstack.item_component_item_list_entry",
+    "hidden": true,
     "displayName": "Add Item To Component List",
     "description": "Append an item stack to an item component list.",
     "domain": "minecraft",
@@ -2539,7 +3195,9 @@
   },
   {
     "id": "itemstack.item_attribute_modifier",
-    "displayName": "Build Item Attribute Modifier",
+    "hidden": true,
+    "hiddenReason": "Use Set Item Attributes for the structured attribute editor.",
+    "displayName": "Attribute Modifier",
     "description": "Build an attribute modifier value for use in item components.",
     "domain": "minecraft",
     "family": "item-components",
@@ -2649,6 +3307,8 @@
   },
   {
     "id": "itemstack.item_attribute_modifier_list",
+    "hidden": true,
+    "hiddenReason": "Use Set Item Attributes for the structured attribute editor.",
     "displayName": "Add Attribute Modifier",
     "description": "Append an attribute modifier to an item component list.",
     "domain": "minecraft",
@@ -2729,7 +3389,125 @@
     }
   },
   {
+    "id": "itemstack.attributes",
+    "hidden": true,
+    "hiddenReason": "Use Get Item Attributes or Set Item Attributes.",
+    "displayName": "Item Attribute Modifiers",
+    "description": "Get, set, or remove the attribute modifier list on an item stack.",
+    "domain": "minecraft",
+    "family": "item-attributes",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack-attributes",
+    "selectorIntent": "item-attributes",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "attribute",
+      "modifier",
+      "get",
+      "set",
+      "remove"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_component",
+      "component": "minecraft:attribute_modifiers",
+      "valuePin": "modifiers"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the selected attribute action.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item whose attribute modifiers are read or changed.",
+        "direction": "input"
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set",
+          "remove"
+        ],
+        "defaultValue": "get",
+        "description": "Chooses whether to read, replace, or remove all attribute modifiers.",
+        "direction": "input"
+      },
+      {
+        "id": "modifiers",
+        "displayName": "Modifiers",
+        "name": "modifiers",
+        "pinType": "DATA",
+        "dataType": "item_component_list",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "description": "Provides the complete modifier list used when setting attributes.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the attribute action completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the original or changed item stack.",
+        "direction": "output"
+      },
+      {
+        "id": "output_modifiers",
+        "displayName": "Modifiers",
+        "name": "modifiers",
+        "pinType": "DATA",
+        "dataType": "item_component_list",
+        "description": "Returns the modifier list before removal or after setting.",
+        "direction": "output"
+      },
+      {
+        "id": "exists",
+        "displayName": "Exists",
+        "name": "exists",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Whether attribute modifiers existed before this action or were set successfully.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
     "id": "itemstack.item_remove_component",
+    "hidden": true,
     "displayName": "Remove Item Component",
     "description": "Remove one component from an item and return the changed clone.",
     "domain": "minecraft",
@@ -2841,8 +3619,15 @@
   },
   {
     "id": "itemstack.item_apply_components",
+    "hidden": true,
+    "hiddenReason": "Use Item Properties to get or set individual item properties.",
     "displayName": "Apply Item Components",
-    "description": "Apply a complete component map to an item and return the changed clone.",
+    "aliases": [
+      "Edit Item Components",
+      "Set Item Components",
+      "Set Item Attributes"
+    ],
+    "description": "Open the searchable component editor and apply names, lore, enchantments, durability, attributes, and behavior to an item.",
     "domain": "minecraft",
     "family": "item-components",
     "lifecycle": "active",
@@ -2872,7 +3657,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts applying components.",
+        "description": "Starts applying item properties.",
         "direction": "input"
       },
       {
@@ -2890,7 +3675,7 @@
         "name": "components",
         "pinType": "DATA",
         "dataType": "item_components",
-        "description": "Component map to apply.",
+        "description": "Components selected in the searchable item property editor.",
         "direction": "input"
       }
     ],

@@ -33,6 +33,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RuntimeDataOptionCatalogServiceTest {
     @Test
+    void emptyItemContextListsEverySourceAndAggregatesEveryCategory() {
+        RuntimeDataRegistry runtimeData = new RuntimeDataRegistry();
+        runtimeData.register(callerAdapter("minecraft:items", Set.of("blocks", "tools"), () -> {}));
+        runtimeData.register(callerAdapter("resync:custom_items", Set.of("custom"), () -> {}));
+        OptionCatalogRegistry catalogs = catalogs(runtimeData);
+        OptionCatalogProvider source = catalogs.provider(RuntimeDataOptionCatalogService.SOURCE_SOURCE);
+        OptionCatalogProvider category = catalogs.provider(RuntimeDataOptionCatalogService.CATEGORY_SOURCE);
+
+        OptionCatalogCapture sources = source.capture(query(source.sourceId(), Map.of()));
+        OptionCatalogCapture categories = category.capture(query(category.sourceId(), Map.of()));
+
+        assertEquals(Set.of("minecraft:items", "resync:custom_items"), Set.copyOf(sources.values()));
+        assertEquals(Set.of("blocks", "tools", "custom"), Set.copyOf(categories.values()));
+    }
+
+    @Test
     void stalePreparedReaderCannotClearAConcurrentlyPublishedCapture() throws Exception {
         AtomicLong state = new AtomicLong(1L);
         CountDownLatch staleChecked = new CountDownLatch(1);
@@ -178,6 +194,7 @@ class RuntimeDataOptionCatalogServiceTest {
 
         assertEquals(OptionCatalogProvider.CaptureAffinity.CALLER, source.captureAffinity());
         assertEquals(OptionCatalogProvider.CaptureAffinity.SERVER_MAIN, category.captureAffinity());
+        assertEquals(OptionCatalogProvider.CaptureAffinity.CALLER, category.captureAffinity(query));
         assertEquals("unavailable", category.capture(query).status());
 
         try (OptionCatalogCaptureExecutor executor = OptionCatalogCaptureExecutor.bounded(1, Duration.ofSeconds(2),
@@ -207,6 +224,28 @@ class RuntimeDataOptionCatalogServiceTest {
             assertEquals(Set.of("building", "solid"), Set.copyOf(refreshed.values()));
             assertNotEquals(initial.revision(), refreshed.revision());
             assertEquals(0, recordCalls.get());
+        }
+    }
+
+    @Test
+    void selectedResidentCategoriesStayOnTheProtocolCaller() {
+        RuntimeDataRegistry runtimeData = new RuntimeDataRegistry();
+        runtimeData.register(callerAdapter("minecraft:items", Set.of("blocks", "tools"), () -> {
+        }));
+        OptionCatalogProvider category = catalogs(runtimeData).provider(RuntimeDataOptionCatalogService.CATEGORY_SOURCE);
+        OptionCatalogQuery query = query(category.sourceId(), Map.of("data_type", "item", "source", "minecraft:items"));
+        AtomicInteger mainSchedules = new AtomicInteger();
+
+        try (OptionCatalogCaptureExecutor executor = OptionCatalogCaptureExecutor.bounded(1, Duration.ofSeconds(2), () -> false,
+            task -> {
+                mainSchedules.incrementAndGet();
+                task.run();
+            }, task -> new Thread(task, "runtime-category-io"))) {
+            OptionCatalogCapture capture = executor.capture(category, query);
+
+            assertEquals("available", capture.status());
+            assertEquals(Set.of("blocks", "tools"), Set.copyOf(capture.values()));
+            assertEquals(0, mainSchedules.get());
         }
     }
 

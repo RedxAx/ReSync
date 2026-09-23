@@ -16,6 +16,7 @@ import org.bukkit.World;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
@@ -121,6 +122,7 @@ public class TypeAdapterRegistry {
 
         register(FlowEnchantment.class, Enchantment.class, FlowEnchantment::resolveEnchantment);
 
+        register(BlockState.class, Block.class, BlockState::getBlock);
         register(FlowBlock.class, Block.class, flowBlock -> {
             World world = worldFromName(flowBlock.getWorld());
             if (world == null) {

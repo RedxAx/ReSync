@@ -1,5 +1,6 @@
 package restudio.resync.flow.handler.generic;
 
+import com.google.gson.JsonObject;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -18,13 +19,21 @@ import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import restudio.flow.data.FlowResourceReference;
 import restudio.flow.data.FlowNode;
+import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.customcontent.ComponentBuilderDefinition;
 import restudio.resync.customcontent.ItemAttributeSchemaService;
+import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.ItemWriteback;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
+import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,8 +51,26 @@ public class InventoryActionHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
     private final ItemAttributeSchemaService itemComponents = new ItemAttributeSchemaService();
     private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
+    private final CustomContentService customContent;
+    private final ReSyncJsonResourceStorage jsonResources;
+    private final ServerId serverId;
 
     public InventoryActionHandler() {
+        this(null, null, null);
+    }
+
+    public InventoryActionHandler(CustomContentService customContent) {
+        this(customContent, null, null);
+    }
+
+    public InventoryActionHandler(CustomContentService customContent, ReSyncJsonResourceStorage jsonResources) {
+        this(customContent, jsonResources, null);
+    }
+
+    public InventoryActionHandler(CustomContentService customContent, ReSyncJsonResourceStorage jsonResources, ServerId serverId) {
+        this.customContent = customContent;
+        this.jsonResources = jsonResources;
+        this.serverId = serverId;
         operations.put("player_has_item", (ctx, node) -> {
             Player player = ctx.getPlayer();
             if (player == null) throw new IllegalArgumentException("Player is required");
@@ -312,6 +339,20 @@ public class InventoryActionHandler implements NodeHandler {
             Material material = requireMaterial(materialName);
             if (amount < 1 || amount > material.getMaxStackSize()) throw new IllegalArgumentException("Item amount must be between 1 and " + material.getMaxStackSize());
             ItemStack item = new ItemStack(material, amount);
+            ctx.setOutput(node, "item", item);
+        });
+
+        operations.put("item_create_reference", (ctx, node) -> {
+            String reference = ctx.getInputValue(node, "reference", String.class, "stone");
+            Integer amount = ctx.getInputValue(node, "amount", Integer.class, 1);
+            ItemStack item = customContent != null
+                ? customContent.createReferencedItem(reference, 1)
+                : vanillaReferencedItem(reference);
+            if (item == null) throw new IllegalArgumentException("Selected item is unavailable: " + reference);
+            if (amount < 1 || amount > item.getMaxStackSize()) {
+                throw new IllegalArgumentException("Item amount must be between 1 and " + item.getMaxStackSize());
+            }
+            item.setAmount(amount);
             ctx.setOutput(node, "item", item);
         });
 
@@ -610,6 +651,32 @@ public class InventoryActionHandler implements NodeHandler {
             }
         });
 
+        operations.put("item_component", (ctx, node) -> {
+            ItemStack item = requireItem(ctx, node, "target");
+            String configuredComponent = node.getHandlerConfig().getString("component", "");
+            String component = componentId(configuredComponent.isBlank()
+                ? ctx.getInputValue(node, "component", String.class, "") : configuredComponent);
+            String valuePin = node.getHandlerConfig().getString("valuePin", "value");
+            String action = ctx.getInputValue(node, "action", String.class, "get");
+            Map<String, Object> components = itemComponents.componentsFromStack(item);
+            boolean exists = components.containsKey(component);
+            Object value = components.get(component);
+            switch (action.toLowerCase(Locale.ROOT)) {
+                case "get" -> ctx.setOutput(node, "output_item", item);
+                case "set" -> {
+                    value = ctx.getInputValue(node, valuePin, Object.class, null);
+                    if (value == null) throw new IllegalArgumentException("Item component value is required");
+                    ctx.setOutput(node, "output_item", itemComponents.applyComponents(item.clone(), Map.of(component, value)));
+                    exists = true;
+                }
+                case "remove" -> ctx.setOutput(node, "output_item",
+                    itemComponents.applyComponents(item.clone(), Collections.singletonMap(component, null)));
+                default -> throw new IllegalArgumentException("Unknown item component action: " + action);
+            }
+            ctx.setOutput(node, valuePin, value);
+            ctx.setOutput(node, "exists", exists);
+        });
+
         operations.put("item_attribute_modifier", (ctx, node) -> {
             String attribute = ctx.getInputValue(node, "attribute", String.class, "minecraft:attack_damage");
             Double amount = ctx.getInputValue(node, "amount", Double.class, 0.0);
@@ -686,10 +753,61 @@ public class InventoryActionHandler implements NodeHandler {
             }
             ctx.setOutput(node, "item", itemComponents.applyComponents(item.clone(), components));
         });
+
+        operations.put("item_apply_component_builder", (ctx, node) -> {
+            ItemStack item = requireItem(ctx, node, "target");
+            String builderId = requireComponentBuilderId(ctx.getInputValue(node, "builder", Object.class, null), serverId);
+            if (jsonResources == null) throw new IllegalStateException("Component Builder storage is unavailable");
+            JsonObject resource = jsonResources.get(ReSyncResourceCatalog.COMPONENT_BUILDER, builderId);
+            if (resource == null) throw new IllegalArgumentException("Component Builder does not exist: " + builderId);
+            ComponentBuilderDefinition builder = ComponentBuilderDefinition.from(resource);
+            if (!builder.supports(item, customContent)) {
+                throw new IllegalArgumentException("Component Builder does not support this item");
+            }
+            ItemStack result = itemComponents.applyComponents(item.clone(), builder.components());
+            ItemWriteback.resolve(ctx, node, item).accept(result);
+            ctx.setOutput(node, "item", result);
+            ctx.setOutput(node, "success", true);
+        });
     }
 
     public void registerTo(HandlerRegistry registry) {
         registry.register("InventoryActionHandler", this);
+    }
+
+    private static ItemStack vanillaReferencedItem(String reference) {
+        Material material = Material.matchMaterial(reference != null ? reference : "");
+        return material != null && material.isItem() && !material.isAir() ? new ItemStack(material) : null;
+    }
+
+    static String requireComponentBuilderId(Object value, ServerId serverId) {
+        if (value instanceof ServerResourceLocator locator) {
+            if (serverId != null && !serverId.equals(locator.serverId())) {
+                throw new IllegalArgumentException("Component Builder belongs to another server");
+            }
+            if (!ReSyncResourceCatalog.COMPONENT_BUILDER.equals(locator.resourceType().value())) {
+                throw new IllegalArgumentException("Selected resource is not a Component Builder");
+            }
+            return locator.id();
+        }
+        if (value instanceof FlowResourceReference reference) {
+            if (!reference.available() || !ReSyncResourceCatalog.COMPONENT_BUILDER.equals(reference.kind())) {
+                throw new IllegalArgumentException("Selected resource is not an available Component Builder");
+            }
+            return reference.id();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            String id = text.strip();
+            if (id.indexOf('/') >= 0) {
+                try {
+                    return requireComponentBuilderId(ServerResourceLocator.parseCanonicalText(id), serverId);
+                } catch (IllegalArgumentException exception) {
+                    throw new IllegalArgumentException("Component Builder locator is invalid", exception);
+                }
+            }
+            return id;
+        }
+        throw new IllegalArgumentException("Component Builder is required");
     }
 
     @Override

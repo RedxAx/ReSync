@@ -24,7 +24,10 @@ public final class VanillaItemDataAdapter implements RuntimeDataAdapter<ItemStac
     public static final String ID = "minecraft:items";
     private final Map<Material, Set<String>> materialTags = discoverMaterialTags();
     private final List<RuntimeDataRecord> records = buildRecords();
+    private final String recordsRevision = ID + ":" + records.size() + ":" + records.hashCode();
     private final RuntimeDataCategoryCatalog<Void> categoryCatalog = new RuntimeDataCategoryCatalog<>(this) {
+        private final Snapshot<Void> recordsSnapshot = snapshot(VanillaItemDataAdapter.this.revision(), records, null);
+
         @Override
         public CaptureAffinity captureAffinity() {
             return CaptureAffinity.CALLER;
@@ -32,7 +35,7 @@ public final class VanillaItemDataAdapter implements RuntimeDataAdapter<ItemStac
 
         @Override
         protected Snapshot<Void> captureSnapshot() {
-            return snapshot(revision(), records, null);
+            return recordsSnapshot;
         }
     };
 
@@ -63,7 +66,7 @@ public final class VanillaItemDataAdapter implements RuntimeDataAdapter<ItemStac
 
     @Override
     public String revision() {
-        return ID + ":" + records.size() + ":" + records.hashCode();
+        return recordsRevision;
     }
 
     @Override

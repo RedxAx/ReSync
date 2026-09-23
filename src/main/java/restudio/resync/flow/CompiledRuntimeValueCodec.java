@@ -5,6 +5,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -78,7 +79,7 @@ public final class CompiledRuntimeValueCodec {
         if (value instanceof Player) return named("player");
         if (value instanceof LivingEntity) return named("living_entity");
         if (value instanceof Entity || value instanceof FlowEntityRef) return named("entity");
-        if (value instanceof Block || value instanceof FlowBlock) return named("block");
+        if (value instanceof Block || value instanceof BlockState || value instanceof FlowBlock) return named("block");
         if (value instanceof World || value instanceof FlowWorldRef) return named("world");
         if (value instanceof Location) return named("location");
         if (value instanceof Vector) return named("vector");
@@ -294,7 +295,9 @@ public final class CompiledRuntimeValueCodec {
             Set<String> fields = switch (id) {
                 case "player", "living_entity", "entity" -> Set.of("kind", "serverId", "worldId", "world", "uuid", "entityType");
                 case "world" -> Set.of("kind", "serverId", "worldId", "world", "name");
-                case "block" -> Set.of("kind", "serverId", "worldId", "world", "x", "y", "z", "material");
+                case "block" -> value.containsKey("blockData")
+                    ? Set.of("kind", "serverId", "worldId", "world", "x", "y", "z", "material", "blockData")
+                    : Set.of("kind", "serverId", "worldId", "world", "x", "y", "z", "material");
                 case "location" -> Set.of("kind", "serverId", "worldId", "world", "x", "y", "z", "yaw", "pitch");
                 case "vector" -> Set.of("x", "y", "z");
                 case "item", "itemstack" -> Set.of("format", "data", "material", "amount");
@@ -357,6 +360,17 @@ public final class CompiledRuntimeValueCodec {
         }
 
         private Object block(Object raw) {
+            if (raw instanceof BlockState state) {
+                if (!state.getWorld().isChunkLoaded(state.getX() >> 4, state.getZ() >> 4)) throw invalid("Block Chunk Is Unavailable");
+                Map<String, Object> value = identity(state.getWorld());
+                value.put("kind", "block");
+                value.put("x", state.getX());
+                value.put("y", state.getY());
+                value.put("z", state.getZ());
+                value.put("material", state.getType().name());
+                value.put("blockData", state.getBlockData().getAsString());
+                return value;
+            }
             Block block;
             if (raw instanceof Block value) block = value;
             else if (raw instanceof FlowBlock ref) {
@@ -488,14 +502,21 @@ public final class CompiledRuntimeValueCodec {
             }
         }
 
-        private Block resolveBlock(Map<?, ?> value, World world) {
+        private Object resolveBlock(Map<?, ?> value, World world) {
             if (Material.matchMaterial(text(value.get("material"))) == null) throw invalid("Block Material Is Invalid");
             int x = integer(value, "x");
             int y = integer(value, "y");
             int z = integer(value, "z");
             if (y < world.getMinHeight() || y >= world.getMaxHeight()) throw invalid("Block Height Is Invalid");
             if (!world.isChunkLoaded(x >> 4, z >> 4)) throw invalid("Block Chunk Is Unavailable");
-            return world.getBlockAt(x, y, z);
+            Block block = world.getBlockAt(x, y, z);
+            if (value.containsKey("blockData")) {
+                BlockState state = block.getState();
+                state.setBlockData(Bukkit.createBlockData(text(value.get("blockData"))));
+                if (!state.getType().name().equals(text(value.get("material")))) throw invalid("Block Snapshot Material Mismatch");
+                return state;
+            }
+            return block;
         }
 
         private void requireIdentity(Map<?, ?> value) {

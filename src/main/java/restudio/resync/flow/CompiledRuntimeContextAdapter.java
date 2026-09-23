@@ -3,6 +3,7 @@ package restudio.resync.flow;
 import org.bukkit.entity.Player;
 import org.bukkit.Chunk;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.event.Event;
 import org.bukkit.event.Cancellable;
 import restudio.flow.data.FlowJobReference;
@@ -20,6 +21,7 @@ import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.Normalizer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -120,7 +122,7 @@ public final class CompiledRuntimeContextAdapter {
         }
         TypeExpr runtimeType = CompiledRuntimeValueCodec.runtimeType(value);
         if (runtimeType != null) {
-            return CompiledRuntimeValueCodec.encode(serverId, runtimeType, value);
+            return CompiledRuntimeValueCodec.encode(serverId, runtimeType, value instanceof Block block ? block.getState() : value);
         }
         if (value instanceof String string) {
             return TypedValue.value(STRING, string);
@@ -244,7 +246,7 @@ public final class CompiledRuntimeContextAdapter {
             if (value instanceof FlowOperationResult<?> result) {
                 return expand(value, resultValue(result), depth);
             }
-            if (value instanceof java.time.Instant instant) {
+            if (value instanceof Instant instant) {
                 return instant.toString();
             }
             if (value instanceof Optional<?> optional) {

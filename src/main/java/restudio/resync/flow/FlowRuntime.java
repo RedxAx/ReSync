@@ -5,7 +5,6 @@ import org.bukkit.Server;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
-import restudio.resync.flow.migration.IdCompatibilityLayer;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
@@ -42,7 +41,6 @@ public class FlowRuntime {
     private final Map<String, Object> eventVariables;
     private final TypeAdapterRegistry typeAdapter;
     private final NodeDefinitionRegistry nodeDefinitions;
-    private final IdCompatibilityLayer compatibility;
     private final AtomicReference<String> triggeredOutputPin = new AtomicReference<>();
     private final ThreadLocal<Set<String>> resolvingPassthroughOutputs = ThreadLocal.withInitial(HashSet::new);
     private final Set<String> evaluatingNodes = ConcurrentHashMap.newKeySet();
@@ -130,7 +128,7 @@ public class FlowRuntime {
 
     public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
                        NodeDefinitionRegistry nodeDefinitions) {
-        this(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, true, new ExecutionAuthority(), CorrelationId.random());
+        this(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, new ExecutionAuthority(), CorrelationId.random());
     }
 
     public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
@@ -141,13 +139,11 @@ public class FlowRuntime {
     public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
                        NodeDefinitionRegistry nodeDefinitions, LegacyRuntimeActivationGate legacyRuntimeGate, CorrelationId invocationId) {
         this(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions,
-            legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyAliases(), new ExecutionAuthority(),
-            invocationId != null ? invocationId : CorrelationId.random());
+            new ExecutionAuthority(), invocationId != null ? invocationId : CorrelationId.random());
     }
 
     private FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
-                        NodeDefinitionRegistry nodeDefinitions, boolean legacyAliasesEnabled, ExecutionAuthority executionAuthority,
-                        CorrelationId invocationId) {
+                        NodeDefinitionRegistry nodeDefinitions, ExecutionAuthority executionAuthority, CorrelationId invocationId) {
         this.graph = graph;
         this.nodeOutputs = new LinkedHashMap<>();
         this.localVariables = new HashMap<>();
@@ -155,7 +151,6 @@ public class FlowRuntime {
         this.eventVariables = concurrentVariables(eventVariables);
         this.typeAdapter = typeAdapter;
         this.nodeDefinitions = nodeDefinitions;
-        this.compatibility = legacyAliasesEnabled ? new IdCompatibilityLayer() : null;
         this.executionAuthority = executionAuthority;
         this.invocationId = Objects.requireNonNull(invocationId, "Invocation ID Is Required");
 
@@ -181,13 +176,12 @@ public class FlowRuntime {
     }
 
     public FlowRuntime createSubRuntime(FlowGraph subGraph) {
-        return new FlowRuntime(subGraph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, compatibility != null,
-            executionAuthority, CorrelationId.random());
+        return new FlowRuntime(subGraph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, executionAuthority,
+            CorrelationId.random());
     }
 
     FlowRuntime forkBranch() {
-        FlowRuntime branch = new FlowRuntime(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, compatibility != null,
-            executionAuthority, invocationId);
+        FlowRuntime branch = new FlowRuntime(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, executionAuthority, invocationId);
         Map<String, Object> outputSnapshot = nodeOutputSnapshot();
         branch.replaceNodeOutputs(outputSnapshot);
         branch.localVariables.clear();
@@ -427,7 +421,7 @@ public class FlowRuntime {
         if (nodeDefinitions == null || node == null || node.getType() == null) {
             return null;
         }
-        return nodeDefinitions.get(compatibility != null ? compatibility.mapToNew(node.getType()) : node.getType());
+        return nodeDefinitions.get(node.getType());
     }
 
     public NodeDefinition.PinDefinition resolveInputPin(FlowNode node, String pinName) {

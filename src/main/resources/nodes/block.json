@@ -193,7 +193,23 @@
           "y",
           "z",
           "state",
-          "container_items"
+          "container_items",
+          "display_name",
+          "translation_key",
+          "key",
+          "hardness",
+          "blast_resistance",
+          "slipperiness",
+          "is_occluding",
+          "is_flammable",
+          "is_burnable",
+          "has_gravity",
+          "light_from_sky",
+          "light_from_blocks",
+          "power",
+          "is_powered",
+          "is_indirectly_powered",
+          "is_passable"
         ],
         "defaultValue": "type"
       }
@@ -430,6 +446,214 @@
         "visibleWhen": {
           "action": "get",
           "property": "container_items"
+        }
+      },
+      {
+        "id": "display_name",
+        "displayName": "Display Name",
+        "name": "display_name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Readable material name, such as Grass Block.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "display_name"
+        }
+      },
+      {
+        "id": "translation_key",
+        "displayName": "Translation Key",
+        "name": "translation_key",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Translation key for the block material.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "translation_key"
+        }
+      },
+      {
+        "id": "key",
+        "displayName": "Key",
+        "name": "key",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Namespaced material key.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "key"
+        }
+      },
+      {
+        "id": "hardness",
+        "displayName": "Hardness",
+        "name": "hardness",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Material hardness. Unbreakable materials return a negative value.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "hardness"
+        }
+      },
+      {
+        "id": "blast_resistance",
+        "displayName": "Blast Resistance",
+        "name": "blast_resistance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Material resistance to explosions.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "blast_resistance"
+        }
+      },
+      {
+        "id": "slipperiness",
+        "displayName": "Slipperiness",
+        "name": "slipperiness",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Material surface slipperiness.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "slipperiness"
+        }
+      },
+      {
+        "id": "is_occluding",
+        "displayName": "Is Occluding",
+        "name": "is_occluding",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Whether this material blocks light.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_occluding"
+        }
+      },
+      {
+        "id": "is_flammable",
+        "displayName": "Is Flammable",
+        "name": "is_flammable",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Whether this material can catch fire.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_flammable"
+        }
+      },
+      {
+        "id": "is_burnable",
+        "displayName": "Is Burnable",
+        "name": "is_burnable",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Whether fire can consume this material.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_burnable"
+        }
+      },
+      {
+        "id": "has_gravity",
+        "displayName": "Has Gravity",
+        "name": "has_gravity",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Whether this material falls without support.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "has_gravity"
+        }
+      },
+      {
+        "id": "light_from_sky",
+        "displayName": "Light From Sky",
+        "name": "light_from_sky",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Sky light at the block location.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "light_from_sky"
+        }
+      },
+      {
+        "id": "light_from_blocks",
+        "displayName": "Light From Blocks",
+        "name": "light_from_blocks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Light from nearby blocks.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "light_from_blocks"
+        }
+      },
+      {
+        "id": "power",
+        "displayName": "Power",
+        "name": "power",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Redstone power at the block location.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "power"
+        }
+      },
+      {
+        "id": "is_powered",
+        "displayName": "Is Powered",
+        "name": "is_powered",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Whether the block receives direct redstone power.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_powered"
+        }
+      },
+      {
+        "id": "is_indirectly_powered",
+        "displayName": "Is Indirectly Powered",
+        "name": "is_indirectly_powered",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Whether the block receives indirect redstone power.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_indirectly_powered"
+        }
+      },
+      {
+        "id": "is_passable",
+        "displayName": "Is Passable",
+        "name": "is_passable",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Whether entities can pass through the current block at this location.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_passable"
         }
       }
     ]

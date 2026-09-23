@@ -154,6 +154,16 @@ public final class RuntimeDataOptionCatalogService {
         }
 
         @Override
+        public CaptureAffinity captureAffinity(OptionCatalogQuery query) {
+            AdapterSelection selection = select(dataType(query), selectedSources(query));
+            if (!selection.available()) {
+                return CaptureAffinity.CALLER;
+            }
+            return selection.adapters().stream().anyMatch(target -> target.affinity() == CaptureAffinity.SERVER_MAIN)
+                ? CaptureAffinity.SERVER_MAIN : CaptureAffinity.CALLER;
+        }
+
+        @Override
         public OptionCatalogCapture capture(OptionCatalogQuery query) {
             String domain = dataType(query);
             Set<String> requested = selectedSources(query);

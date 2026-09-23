@@ -5,6 +5,12 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.papermc.paper.datacomponent.DataComponentType;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.ItemLore;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
@@ -18,6 +24,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -212,13 +219,24 @@ public class ItemAttributeSchemaService {
         if (base == null || components == null || components.isEmpty()) {
             return base;
         }
+        ItemStack result = base.clone();
+        Map<String, Object> residual = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : components.entrySet()) {
+            String id = normalizeComponentId(entry.getKey());
+            if (!applyTypedComponent(result, id, entry.getValue())) {
+                residual.put(id, entry.getValue());
+            }
+        }
+        if (residual.isEmpty()) {
+            return result;
+        }
         if (!itemJsonRoundTripSupported()) {
             throw new IllegalStateException("Item component JSON is not available on this server");
         }
-        JsonObject root = PaperUnsafe.serializeItemAsJson(base.clone());
+        JsonObject root = PaperUnsafe.serializeItemAsJson(result);
         JsonObject patch = root.has("components") && root.get("components").isJsonObject() ? root.getAsJsonObject("components") : new JsonObject();
-        for (Map.Entry<String, Object> entry : components.entrySet()) {
-            String id = normalizeComponentId(entry.getKey());
+        for (Map.Entry<String, Object> entry : residual.entrySet()) {
+            String id = entry.getKey();
             if (entry.getValue() == null) {
                 patch.remove(id);
             } else {
@@ -227,6 +245,40 @@ public class ItemAttributeSchemaService {
         }
         root.add("components", patch);
         return PaperUnsafe.deserializeItemFromJson(root);
+    }
+
+    private boolean applyTypedComponent(ItemStack item, String id, Object value) {
+        return switch (id) {
+            case "minecraft:lore" -> {
+                if (value == null) {
+                    item.unsetData(DataComponentTypes.LORE);
+                } else if (value instanceof Collection<?> lines) {
+                    item.setData(DataComponentTypes.LORE, ItemLore.lore(lines.stream().map(this::component).toList()));
+                } else {
+                    throw new IllegalArgumentException("Lore must be a list of text lines");
+                }
+                yield true;
+            }
+            case "minecraft:custom_name" -> applyTextComponent(item, DataComponentTypes.CUSTOM_NAME, value);
+            case "minecraft:item_name" -> applyTextComponent(item, DataComponentTypes.ITEM_NAME, value);
+            default -> false;
+        };
+    }
+
+    private boolean applyTextComponent(ItemStack item, DataComponentType.Valued<Component> type, Object value) {
+        if (value == null) {
+            item.unsetData(type);
+        } else {
+            item.setData(type, component(value));
+        }
+        return true;
+    }
+
+    private Component component(Object value) {
+        JsonElement json = gson.toJsonTree(value);
+        Component component = json.isJsonPrimitive() && json.getAsJsonPrimitive().isString()
+            ? Component.text(json.getAsString()) : GsonComponentSerializer.gson().deserializeFromTree(json);
+        return component.decorationIfAbsent(TextDecoration.ITALIC, TextDecoration.State.FALSE);
     }
 
     private JsonElement normalizeItemTextComponent(String id, JsonElement value) {

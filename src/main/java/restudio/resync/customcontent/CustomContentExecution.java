@@ -155,19 +155,23 @@ public final class CustomContentExecution implements CoreGraphResourceAuthority,
         }
     }
 
-    public void admit(CustomContentDefinition content) {
+    public void admit(CustomContentDefinition content, FlowResourceMutationStamp intended) {
         requireOpen();
         if (content == null || content.getGraph() == null) {
             return;
         }
         String id = content.getId();
         FlowResourceMutationStamp before = storage.readMutationStamp(id);
+        FlowResourceMutationStamp identity = before != null && !before.deleted() ? before : intended;
+        if (identity != null && (!TYPE.equals(identity.type()) || !id.equals(identity.id()) || identity.deleted())) {
+            throw new IllegalArgumentException("Custom content admission identity does not match the item");
+        }
         FlowGraph graph = content.getGraph().copy();
         graph.setId(id);
         graph.setResourceType(TYPE);
-        if (before != null && !before.deleted()) {
-            graph.setResourceRevision(Math.max(graph.getResourceRevision(), before.revision()));
-            graph.setResourceHash(before.payloadHash());
+        if (identity != null) {
+            graph.setResourceRevision(identity.revision());
+            graph.setResourceHash(identity.payloadHash());
         }
         try {
             metadata.projectCustomContent(graph);

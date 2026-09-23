@@ -22,6 +22,7 @@ import restudio.flow.data.FlowSerializer;
 import restudio.resync.Log;
 import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.flow.protocol.ProtocolRejectionCode;
 import restudio.resync.flow.protocol.ResourcePresentationIntent;
 import restudio.resync.flow.resource.ResourcePayloadCodecs;
 import restudio.resync.migration.MigrationPaths;
@@ -29,6 +30,7 @@ import restudio.resync.modules.flow.FlowResourceMutationStamp;
 import restudio.resync.resources.JsonAssetInventory;
 import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.server.AggregateResourceCreateStorage;
 import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.storage.AssetTransactionCoordinator.AssetKey;
@@ -51,7 +53,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 public class CustomContentStorage implements AutoCloseable {
     private static final Set<String> DEFINITION_FIELDS = Set.of("id", "enabled", "flowId", "type", "displayName", "provider",
@@ -73,7 +74,12 @@ public class CustomContentStorage implements AutoCloseable {
     private final ItemAttributeSchemaService attributeSchemaService;
     private final LegacyRuntimeActivationGate legacyRuntimeGate;
     private final AssetPersistenceGate assetsGate;
-    private volatile Consumer<CustomContentDefinition> graphAdmission;
+    private volatile GraphAdmission graphAdmission;
+
+    @FunctionalInterface
+    public interface GraphAdmission {
+        void admit(CustomContentDefinition definition, FlowResourceMutationStamp intended);
+    }
 
     public enum ProjectionUse {
         OPTION_CATALOG,
@@ -106,7 +112,7 @@ public class CustomContentStorage implements AutoCloseable {
         }
     }
 
-    public void setGraphAdmission(Consumer<CustomContentDefinition> graphAdmission) {
+    public void setGraphAdmission(GraphAdmission graphAdmission) {
         this.graphAdmission = graphAdmission;
     }
 
@@ -354,20 +360,37 @@ public class CustomContentStorage implements AutoCloseable {
             if (safeId == null) {
                 throw new IllegalArgumentException("Invalid custom content id");
             }
-            List<String> errors = validator.validate(definition);
-            if (!errors.isEmpty()) {
-                throw new IllegalArgumentException(String.join("; ", errors));
+            try {
+                List<String> errors = validator.validate(definition);
+                if (!errors.isEmpty()) {
+                    throw new IllegalArgumentException(String.join("; ", errors));
+                }
+                List<Map<String, Object>> componentErrors = attributeSchemaService.validate(definition.getMaterial(), definition.getComponents());
+                if (!componentErrors.isEmpty()) {
+                    throw new ItemAttributeValidationException(componentErrors);
+                }
+                long revision = Math.addExact(expectedRevision, 1L);
+                FlowResourceMutationStamp intended = new FlowResourceMutationStamp(ReSyncResourceCatalog.CUSTOM_CONTENT,
+                    safeId, revision, mutationId, expectedPayloadHash, false);
+                admitGraph(definition, intended);
+                Map<String, Object> canonicalPayload = gson.fromJson(serializeDefinition(definition), Map.class);
+                if (!expectedPayloadHash.equals(ResourcePayloadCodecs.json().hashPayload(canonicalPayload).canonicalText())) {
+                    throw AggregateResourceCreateStorage.rejectBeforeCommit("RESOURCE_PAYLOAD_INVALID",
+                        "The item changed during validation. Create it again with the current editor.",
+                        new IllegalStateException("Custom content changed during aggregate create validation: " + safeId));
+                }
+            } catch (AggregateResourceCreateStorage.PreCommitRejection rejection) {
+                throw rejection;
+            } catch (RuntimeException rejection) {
+                throw AggregateResourceCreateStorage.rejectBeforeCommit(
+                    ProtocolRejectionCode.RESOURCE_OPERATION_FAILED.legacyValue(), rejection.getMessage(), rejection);
             }
-            List<Map<String, Object>> componentErrors = attributeSchemaService.validate(definition.getMaterial(), definition.getComponents());
-            if (!componentErrors.isEmpty()) {
-                throw new ItemAttributeValidationException(componentErrors);
+            try {
+                return assetStore.create(definition, Map.of(), mutationId, expectedRevision, presentation);
+            } catch (JsonAssetStore.PreCommitConflictException rejection) {
+                throw AggregateResourceCreateStorage.rejectBeforeCommit("RESOURCE_PATH_CONFLICT",
+                    rejection.getMessage() + ". Choose another folder or name.", rejection);
             }
-            admitGraph(definition);
-            Map<String, Object> canonicalPayload = gson.fromJson(serializeDefinition(definition), Map.class);
-            if (!expectedPayloadHash.equals(ResourcePayloadCodecs.json().hashPayload(canonicalPayload).canonicalText())) {
-                throw new IllegalStateException("Custom content changed during aggregate create validation: " + safeId);
-            }
-            return assetStore.create(definition, Map.of(), mutationId, expectedRevision, presentation);
         }
     }
 
@@ -393,7 +416,7 @@ public class CustomContentStorage implements AutoCloseable {
             if (!componentErrors.isEmpty()) {
                 throw new ItemAttributeValidationException(componentErrors);
             }
-            admitGraph(definition);
+            admitGraph(definition, null);
             try {
                 Snapshot snapshot = assetStore.coordinatorSnapshot();
                 List<JsonAssetStore.PreparedMutation> mutations = new ArrayList<>();
@@ -414,12 +437,12 @@ public class CustomContentStorage implements AutoCloseable {
         }
     }
 
-    private void admitGraph(CustomContentDefinition definition) {
-        Consumer<CustomContentDefinition> admission = graphAdmission;
+    private void admitGraph(CustomContentDefinition definition, FlowResourceMutationStamp intended) {
+        GraphAdmission admission = graphAdmission;
         if (admission == null || definition == null || definition.getGraph() == null) {
             return;
         }
-        admission.accept(definition);
+        admission.admit(definition, intended);
     }
 
     public void delete(String id) {

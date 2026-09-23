@@ -99,7 +99,7 @@ public final class FlowValueCodecRegistry {
             "variable_reference", "timer_reference", "schedule_reference");
         registerAliases("string", "permission_group", "region", "network_scope", "flow_id", "function", "command_id", "custom_content_id", "gui_id",
             "scoreboard_id", "tab_id", "chat_id", "motd_profile_id", "message_rule_id", "recipe_id", "text_template_id", "advancement_tree_id",
-            "dialog_id", "trade_profile_id", "npc_id", "loot_table_id", "worldgen_id");
+            "dialog_id", "trade_profile_id", "npc_id", "loot_table_id", "component_builder_id", "worldgen_id");
         registerAlias("worldgen_job", "job_reference");
     }
 

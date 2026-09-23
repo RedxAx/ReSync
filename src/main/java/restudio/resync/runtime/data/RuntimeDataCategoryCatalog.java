@@ -17,6 +17,8 @@ import java.util.concurrent.atomic.AtomicReference;
 abstract class RuntimeDataCategoryCatalog<T> implements OptionCatalogRegistry.PreparedCaptureProvider {
     private final RuntimeDataAdapter<?> adapter;
     private final AtomicReference<Prepared<T>> prepared = new AtomicReference<>();
+    private Snapshot<T> residentSnapshot;
+    private OptionCatalogCapture residentCapture;
 
     RuntimeDataCategoryCatalog(RuntimeDataAdapter<?> adapter) {
         this.adapter = Objects.requireNonNull(adapter, "Runtime data adapter is required");
@@ -111,7 +113,10 @@ abstract class RuntimeDataCategoryCatalog<T> implements OptionCatalogRegistry.Pr
         return captureAffinity() == CaptureAffinity.IO ? preparedCapture(query) : capture(query);
     }
 
-    private OptionCatalogCapture capture(Snapshot<T> snapshot) {
+    private synchronized OptionCatalogCapture capture(Snapshot<T> snapshot) {
+        if (residentSnapshot == snapshot) {
+            return residentCapture;
+        }
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (RuntimeDataRecord record : snapshot.records()) {
             if (record != null) {
@@ -123,8 +128,11 @@ abstract class RuntimeDataCategoryCatalog<T> implements OptionCatalogRegistry.Pr
                 "Categories", Map.of("count", entry.getValue(), "sources", List.of(adapter.id()))))
             .sorted((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.label(), right.label()))
             .toList();
-        return new OptionCatalogCapture(sourceId() + ":" + snapshot.revision() + ":" + items.size() + ":" + items.hashCode(),
+        OptionCatalogCapture capture = new OptionCatalogCapture(sourceId() + ":" + snapshot.revision() + ":" + items.size() + ":" + items.hashCode(),
             items, "available", "");
+        residentSnapshot = snapshot;
+        residentCapture = capture;
+        return capture;
     }
 
     private OptionCatalogRegistry.CaptureUnavailable unavailable(String message) {

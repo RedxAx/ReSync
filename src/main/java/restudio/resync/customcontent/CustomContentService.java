@@ -421,6 +421,13 @@ public class CustomContentService {
         return null;
     }
 
+    public String itemContentType(ItemStack item) {
+        String id = identifyItem(item);
+        CustomContentDefinition definition = id != null ? contentStorage.get(id) : null;
+        return definition != null && definition.getType() != null
+            ? definition.getType().toLowerCase(Locale.ROOT) : "";
+    }
+
     public String identifyBlock(Location location) {
         for (CustomContentProvider provider : providers.values()) {
             if (provider.isAvailable()) {

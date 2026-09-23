@@ -1,6 +1,5 @@
 package restudio.resync.server.coverage;
 
-import restudio.resync.migration.LegacyFileMigrationCoordinator;
 import restudio.resync.migration.ManagedFlowFileStoreContract;
 import restudio.resync.migration.MigrationReportsPersistenceParticipant;
 import restudio.resync.migration.PersistenceCoverageContract;
@@ -71,14 +70,9 @@ public final class PersistenceWriterCoverageBoundary {
             MigrationReportsPersistenceParticipant.OWNER,
             MigrationReportsPersistenceParticipant.DIRECTORY,
             List.of(MigrationReportsPersistenceParticipant.DIRECTORY,
-                MigrationReportsPersistenceParticipant.DIRECTORY + "/" + MigrationReportsPersistenceParticipant.RECIPE_REPORT_FILE,
-                MigrationReportsPersistenceParticipant.DIRECTORY + "/" + LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID + ".json",
-                MigrationReportsPersistenceParticipant.DIRECTORY + "/" + LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID + ".backup",
-                MigrationReportsPersistenceParticipant.DIRECTORY + "/" + LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID + ".json",
-                MigrationReportsPersistenceParticipant.DIRECTORY + "/" + LegacyFileMigrationCoordinator.CUSTOM_BLOCKS_MIGRATION_ID + ".backup"),
+                MigrationReportsPersistenceParticipant.DIRECTORY + "/" + MigrationReportsPersistenceParticipant.RECIPE_REPORT_FILE),
             List.of(
                 "src/main/java/restudio/resync/migration/MigrationReportsPersistenceParticipant.java",
-                "src/main/java/restudio/resync/migration/LegacyFileMigrationCoordinator.java",
                 "src/main/java/restudio/resync/customization/ReSyncJsonResourceStorage.java",
                 "src/test/java/restudio/resync/migration/MigrationReportsPersistenceParticipantTest.java",
                 "src/test/java/restudio/resync/customcontent/CustomBlocksPersistenceParticipantTest.java",

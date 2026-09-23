@@ -9,7 +9,9 @@ import restudio.resync.migration.PersistenceOwnershipIndex;
 import restudio.resync.migration.PersistenceOwnershipProvider;
 import restudio.resync.migration.RebindablePersistenceParticipant;
 import restudio.resync.migration.ProductionAuthoritySigner;
+import restudio.resync.migration.ReSyncDataFixer;
 import restudio.resync.storage.StorageSafety;
+import restudio.resync.upgrade.AssetCoordinatorMigration.FreshRootAuthority;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -131,15 +133,37 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
     }
 
     public static synchronized ServerIdentityStore open(Path path) throws IOException {
-        return open(path, AuthorityFaultInjector.none(), ProjectionWriter.atomic());
+        return open(path, null, AuthorityFaultInjector.none(), ProjectionWriter.atomic());
+    }
+
+    static synchronized ServerIdentityStore open(Path path, FreshRootAuthority freshAuthority) throws IOException {
+        return open(path, freshAuthority, null, AuthorityFaultInjector.none(), ProjectionWriter.atomic());
+    }
+
+    static synchronized ServerIdentityStore open(Path path, FreshRootAuthority freshAuthority,
+                                                  ServerId configuredServerId) throws IOException {
+        return open(path, freshAuthority, configuredServerId, AuthorityFaultInjector.none(), ProjectionWriter.atomic());
     }
 
     static synchronized ServerIdentityStore open(Path path, AuthorityFaultInjector faultInjector) throws IOException {
-        return open(path, faultInjector, ProjectionWriter.atomic());
+        return open(path, null, faultInjector, ProjectionWriter.atomic());
     }
 
     static synchronized ServerIdentityStore open(Path path, AuthorityFaultInjector faultInjector,
                                                   ProjectionWriter projectionWriter) throws IOException {
+        return open(path, null, faultInjector, projectionWriter);
+    }
+
+    static synchronized ServerIdentityStore open(Path path, FreshRootAuthority freshAuthority,
+                                                  AuthorityFaultInjector faultInjector,
+                                                  ProjectionWriter projectionWriter) throws IOException {
+        return open(path, freshAuthority, null, faultInjector, projectionWriter);
+    }
+
+    private static synchronized ServerIdentityStore open(Path path, FreshRootAuthority freshAuthority,
+                                                          ServerId configuredServerId,
+                                                          AuthorityFaultInjector faultInjector,
+                                                          ProjectionWriter projectionWriter) throws IOException {
         Path normalized = MigrationPaths.requirePath(Objects.requireNonNull(path, "Server Identity Path Is Required"), FILE_NAME);
         Path dataRoot = normalized.getParent();
         if (dataRoot == null) {
@@ -155,6 +179,7 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
         Optional<AuthorityRecord> authority = readAuthority(authorityRoot, injector);
         if (authority.isPresent()) {
             AuthorityRecord record = authority.get();
+            requireConfiguredIdentity(configuredServerId, record.serverId());
             ProjectionPresence projection = inspectProjection(normalized, signal, record);
             if (!projection.complete()) {
                 projectPair(dataRoot, record, projection, injector, writer);
@@ -173,19 +198,29 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
                 throw new IOException("ReSync Install Identity Pair Is Incomplete: " + dataRoot);
             }
             Pair pair = readPair(normalized, signal);
+            requireConfiguredIdentity(configuredServerId, pair.serverId());
             writeAuthority(authorityRoot, AuthorityRecord.committed(pair.serverId(), pair.signal()), injector);
             return new ServerIdentityStore(dataRoot, new Binding(normalized, pair.serverId(), false));
         }
-        if (!isFreshInstallRoot(dataRoot)) {
+        if (freshAuthority == null && !isFreshInstallRoot(dataRoot)) {
             throw new IOException("ReSync Server Identity Is Missing From An Existing Installation: " + normalized);
         }
-        ServerId created = ServerId.random();
+        if (freshAuthority != null) {
+            requireFreshAuthorityRoot(dataRoot, freshAuthority);
+        }
+        ServerId created = configuredServerId == null ? ServerId.random() : configuredServerId;
         AuthorityRecord pending = AuthorityRecord.pending(created);
         writeAuthority(authorityRoot, pending, injector);
         ProjectionPresence projection = inspectProjection(normalized, signal, pending);
         projectPair(dataRoot, pending, projection, injector, writer);
         finalizeAuthority(authorityRoot, pending, injector);
         return new ServerIdentityStore(dataRoot, new Binding(normalized, created, true));
+    }
+
+    private static void requireConfiguredIdentity(ServerId configured, ServerId durable) throws IOException {
+        if (configured != null && !configured.equals(durable)) {
+            throw new IOException("Configured ReSync Server Identity Does Not Match Durable Authority");
+        }
     }
 
     @Override
@@ -1706,6 +1741,34 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
         try (var entries = Files.list(dataRoot)) {
             return entries.map(entry -> entry.getFileName().toString())
                 .allMatch(FRESH_INSTALL_ENTRIES::contains);
+        }
+    }
+
+    private static void requireFreshAuthorityRoot(Path dataRoot, FreshRootAuthority authority) throws IOException {
+        Path root = MigrationPaths.requireDirectory(dataRoot, "server identity data root").toRealPath();
+        if (!root.equals(Objects.requireNonNull(authority, "freshAuthority").activeRoot())) {
+            throw new IOException("Fresh ReSync Identity Authority Does Not Match The Active Root");
+        }
+        Path migrations = root.resolve(ReSyncDataFixer.VERSION_DIRECTORY);
+        try (var entries = Files.list(root)) {
+            if (!entries.map(entry -> entry.getFileName().toString())
+                .allMatch(name -> FRESH_INSTALL_ENTRIES.contains(name)
+                    || name.equals(ReSyncDataFixer.VERSION_DIRECTORY))) {
+                throw new IOException("Fresh ReSync Identity Root Contains Unowned Data");
+            }
+        }
+        if (!Files.exists(migrations, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+        if (Files.isSymbolicLink(migrations) || !Files.isDirectory(migrations, LinkOption.NOFOLLOW_LINKS)
+            || ReSyncDataFixer.installedVersion(root).isEmpty()) {
+            throw new IOException("Fresh ReSync Identity Root Has Invalid Migration State");
+        }
+        Path version = ReSyncDataFixer.versionPath(root);
+        try (var entries = Files.list(migrations)) {
+            if (entries.anyMatch(entry -> !entry.equals(version))) {
+                throw new IOException("Fresh ReSync Identity Root Contains Unowned Migration Data");
+            }
         }
     }
 

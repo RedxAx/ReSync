@@ -103,9 +103,9 @@
         "displayName": "Value",
         "name": "value",
         "pinType": "DATA",
-        "dataType": "any",
-        "defaultValue": 0,
-        "description": "Provides the Value value to convert.",
+        "dataType": "string",
+        "defaultValue": "0",
+        "description": "Provides numeric text to convert.",
         "direction": "input"
       }
     ],

@@ -143,6 +143,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     private boolean coreReadAuthorityReady;
     private boolean catalogSettlementPending;
     private PersistenceState persistenceState = PersistenceState.OPEN;
+    private volatile boolean durableCapability;
 
     public SqliteProtocolResourceMutationAuthority(FlowResourceRegistry registry, ServerId serverId, Path databasePath) {
         this(registry, serverId, databasePath, CoreGraphResourceAuthority.unavailable(),
@@ -268,6 +269,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 }
             }
             coreReadAuthorityReady = !catalogSettlementPending && !recoveryBlocked && establishCoreReadAuthority();
+            publishDurability();
         } catch (Exception exception) {
             closeQuietly(connection);
             throw new IllegalStateException("Failed To Initialize Durable Resource Mutation Authority", exception);
@@ -523,8 +525,12 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     }
 
     @Override
-    public synchronized boolean durable() {
-        return !catalogSettlementPending && !recoveryBlocked && persistenceState == PersistenceState.OPEN;
+    public boolean durable() {
+        return durableCapability;
+    }
+
+    private void publishDurability() {
+        durableCapability = !catalogSettlementPending && !recoveryBlocked && persistenceState == PersistenceState.OPEN;
     }
 
     @Override
@@ -688,6 +694,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         }
         if (connection == null) {
             persistenceState = PersistenceState.CLOSED;
+            publishDurability();
             return;
         }
         RuntimeException failure = null;
@@ -707,6 +714,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         } finally {
             coreReadAuthorityReady = false;
             persistenceState = PersistenceState.CLOSED;
+            publishDurability();
         }
         if (failure != null) {
             throw failure;
@@ -733,6 +741,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         mutationAdmissionClosed = true;
         if (persistenceState == PersistenceState.OPEN) {
             persistenceState = PersistenceState.ADMISSION_CLOSED;
+            publishDurability();
         }
     }
 
@@ -746,6 +755,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         flushPersistence();
         coreReadAuthorityReady = false;
         persistenceState = PersistenceState.QUIESCED;
+        publishDurability();
     }
 
     synchronized void resumePersistence() throws IOException {
@@ -786,6 +796,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             throw new IOException("Core resource authority is not ready");
         }
         persistenceState = mutationAdmissionClosed ? PersistenceState.ADMISSION_CLOSED : PersistenceState.OPEN;
+        publishDurability();
     }
 
     synchronized void rebindPersistence(Path activeRoot) throws IOException {
@@ -819,6 +830,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             databasePath = candidateDatabase;
             activeScopeRoot = candidateScope;
             recoveryBlocked = false;
+            publishDurability();
             recoveryReason = "";
             configure();
             migrate();
@@ -832,6 +844,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             databasePath = previousDatabase;
             activeScopeRoot = previousScope;
             recoveryBlocked = previousRecoveryBlocked;
+            publishDurability();
             recoveryReason = previousRecoveryReason;
             catalogRecoveryRequired = previousCatalogRecoveryRequired;
             coreReadAuthorityReady = previousCoreReadAuthorityReady;
@@ -988,6 +1001,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             }
             coreReadAuthorityReady = false;
             catalogSettlementPending = true;
+            publishDurability();
             recoverCommittedAggregateCreates();
             if (recoveryBlocked) {
                 throw new IllegalStateException("Final aggregate create publication recovery is blocked");
@@ -1045,6 +1059,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             }
             coreReadAuthorityReady = true;
             catalogSettlementPending = false;
+            publishDurability();
         } catch (SQLException | IOException failure) {
             throw new IllegalStateException("Failed To Settle Final Core Catalog Authority", failure);
         }
@@ -1504,14 +1519,21 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     private boolean rejectProvenUnappliedCreate(MutationRow row, RuntimeException failure) {
         try {
             Command command = command(row);
-            if (!"CREATE".equals(command.operationName()) || command.presentation() != null || row.expectedRevision() != 0L
+            if (!"CREATE".equals(command.operationName()) || row.expectedRevision() != 0L
                 || row.preconditionHash() != null && !row.preconditionHash().isBlank()
                 || state(command.responseResource()) != null) {
                 return false;
             }
             FlowResourceAdapter<Object> adapter = adapter(command.responseResource());
-            if (adapter == null || readStamp(command.responseResource(), adapter) != null
-                || adapter.get(command.responseResource().id()) != null) {
+            if (adapter == null || readStamp(command.responseResource(), adapter) != null) {
+                return false;
+            }
+            if (command.presentation() != null) {
+                AggregateReceipt aggregate = aggregateReceipt(row.mutationId());
+                if (aggregate == null || aggregate.metadata() != null) {
+                    return false;
+                }
+            } else if (adapter.get(command.responseResource().id()) != null) {
                 return false;
             }
             finishRejected(row, "RESOURCE_PAYLOAD_INVALID", safeMessage(failure));
@@ -1681,7 +1703,8 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 CoreState before = synchronizeCore(resource);
                 MutationRow sourceReceipt = before == null ? null : mutation(before.mutationId());
                 if (before == null || !sameCoreState(before, coreState(source))
-                    || !provenCoreCatalogSource(before, sourceReceipt)) {
+                    || !provenCoreCatalogSource(before, sourceReceipt)
+                    || proof.evolution().requiresSourceReceipt() && !validEvolutionSourceReceipt(before, sourceReceipt)) {
                     continue;
                 }
                 UUID mutationId = proof.mutationId(source);
@@ -1784,6 +1807,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             || row.targetActivationState() != sourceState.activationState()
             || row.resultActivationState() != sourceState.activationState()
             || !provenCoreCatalogSource(sourceState, sourceReceipt)
+            || evolution.requiresSourceReceipt() && !validEvolutionSourceReceipt(sourceState, sourceReceipt)
             || row.status() == Status.APPLIED && sourceReceipt != null && row.sequence() <= sourceReceipt.sequence()
             || !matchesCoreOutcome(expected, row) || !expected.assetHash().equals(evidence.resultAssetHash())
             || !evolutionEvidenceHash(row.mutationId(), evidence.registrationHash(), evidence.sourceEnvelope(),
@@ -2814,6 +2838,9 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             MutationRow pending = insertCorePending(command, clientId, requestFingerprint, outcome);
             try {
                 applyCore(command, outcome);
+            } catch (CoreGraphMutationValidationException rejection) {
+                MutationRow rejected = finishCoreValidationRejected(pending, rejection);
+                return storedResponse(envelope, command.kind(), rejected);
             } catch (RuntimeException exception) {
                 return unavailable(ProtocolRejectionCode.RESOURCE_MUTATION_PENDING,
                     "Resource mutation is awaiting durable recovery");
@@ -3093,10 +3120,26 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         }
         verifyCoreExternalPrecondition(command, precondition);
         CoreOutcome outcome = coreOutcome(row, precondition);
-        applyCore(command, outcome);
+        try {
+            applyCore(command, outcome);
+        } catch (CoreGraphMutationValidationException rejection) {
+            finishCoreValidationRejected(row, rejection);
+            return;
+        }
         CoreState after = coreAppliedState(command, outcome);
         verifyCorePostApply(command, outcome, after);
         commitCoreApplied(row, after);
+    }
+
+    private MutationRow finishCoreValidationRejected(MutationRow pending,
+                                                       CoreGraphMutationValidationException rejection) {
+        MutationRow rejected = finishRejected(pending, ProtocolRejectionCode.RESOURCE_OPERATION_FAILED.legacyValue(),
+            rejection.actionableMessage());
+        TemporaryLifecycleDiagnostics.event("sqlite_mutation_terminal", 0L,
+            TemporaryLifecycleDiagnostics.with(diagnosticIdentity(pending), "operation", pending.operation(),
+                "outcome", rejected.status(), "receiptPersisted", true, "responsePrepared", true,
+                "resultRevision", rejected.resultRevision(), "failure", rejection.getClass().getSimpleName()));
+        return rejected;
     }
 
     private CoreState externallyAppliedCore(Command command, MutationRow row, CoreState precondition) {
@@ -3983,7 +4026,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             return value;
         } catch (AggregateResourceCreateStorage.PreCommitRejection rejection) {
             throw rejection;
-        } catch (IllegalArgumentException | UnsupportedOperationException rejection) {
+        } catch (RuntimeException rejection) {
             String message = rejection instanceof CoreGraphMutationValidationException validationFailure
                 ? validationFailure.actionableMessage() : safeMessage(rejection);
             throw AggregateResourceCreateStorage.rejectBeforeCommit(
@@ -6122,6 +6165,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
 
     private void blockRecovery(String reason) {
         recoveryBlocked = true;
+        publishDurability();
         recoveryReason = reason == null || reason.isBlank() ? "Resource mutation recovery is blocked" : reason;
     }
 

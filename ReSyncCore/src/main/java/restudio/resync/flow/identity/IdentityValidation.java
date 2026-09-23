@@ -13,8 +13,6 @@ import java.util.regex.Pattern;
 
 final class IdentityValidation {
     static final int MAX_IDENTIFIER_LENGTH = 128;
-    private static final Pattern OWNER = Pattern.compile("[a-z][a-z0-9]{0,31}(?:[.-][a-z][a-z0-9]{0,31})*");
-    private static final Pattern LOCAL = Pattern.compile("[a-z][a-z0-9]{0,31}(?:[._-][a-z0-9][a-z0-9]{0,31})*");
     private static final Pattern RESOURCE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
     private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
     private static final Pattern DOMAIN = Pattern.compile("[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*");
@@ -23,11 +21,11 @@ final class IdentityValidation {
     }
 
     static String owner(String value) {
-        return identifier(value, "Owner ID", OWNER);
+        return segmentedIdentifier(value, "Owner ID", true);
     }
 
     static String local(String value, String field) {
-        return identifier(value, field, LOCAL);
+        return segmentedIdentifier(value, field, false);
     }
 
     static String resource(String value) {
@@ -112,6 +110,31 @@ final class IdentityValidation {
         digest[8] = (byte) ((digest[8] & 0x3f) | 0x80);
         ByteBuffer result = ByteBuffer.wrap(digest);
         return CanonicalUuids.fromBits(result.getLong(), result.getLong());
+    }
+
+    private static String segmentedIdentifier(String value, String field, boolean owner) {
+        Objects.requireNonNull(value, field + " is required");
+        if (value.isEmpty() || value.length() > MAX_IDENTIFIER_LENGTH) {
+            throw new IllegalArgumentException(field + " must contain 1 to " + MAX_IDENTIFIER_LENGTH + " characters");
+        }
+        int segmentLength = 0;
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            boolean letter = character >= 'a' && character <= 'z';
+            boolean digit = character >= '0' && character <= '9';
+            boolean separator = character == '.' || character == '-' || !owner && character == '_';
+            if (separator && segmentLength > 0) {
+                segmentLength = 0;
+            } else if ((letter || digit && index > 0 && (!owner || segmentLength > 0)) && ++segmentLength <= 32) {
+                continue;
+            } else {
+                throw new IllegalArgumentException("Invalid " + field + ": " + value);
+            }
+        }
+        if (segmentLength == 0) {
+            throw new IllegalArgumentException("Invalid " + field + ": " + value);
+        }
+        return value;
     }
 
     private static String identifier(String value, String field, Pattern pattern) {

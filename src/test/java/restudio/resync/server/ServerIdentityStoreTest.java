@@ -4,6 +4,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.resync.migration.PersistenceOwnershipContext;
 import restudio.resync.migration.PersistenceOwnershipIndex;
+import restudio.resync.migration.ReSyncDataFixer;
+import restudio.resync.migration.ReSyncPersistenceCoordinator;
+import restudio.resync.upgrade.AssetCoordinatorMigration;
 
 import java.io.IOException;
 import java.nio.file.FileSystemException;
@@ -68,6 +71,47 @@ class ServerIdentityStoreTest {
         Files.createDirectories(temporary.resolve("assets"));
 
         assertThrows(IOException.class, () -> ServerIdentityStore.open(temporary.resolve("server-id")));
+    }
+
+    @Test
+    void durableFreshAuthorityAdmitsVersionedBaselineWithoutWeakeningNormalOpen(@TempDir Path temporary)
+        throws Exception {
+        Path coordination = temporary.resolve("coordination");
+        ReSyncPersistenceCoordinator persistence = ReSyncPersistenceCoordinator.bootstrap(
+            temporary.resolve("source"), coordination);
+        try {
+            Path activeRoot = persistence.prepareActiveRoot();
+            var provenance = persistence.freshRootProvenance().orElseThrow();
+            AssetCoordinatorMigration.Result migration = AssetCoordinatorMigration.prepareEmptyUnconsumed(
+                coordination, provenance);
+            persistence.prepareDataFixes(new ReSyncDataFixer(1, List.of()), true);
+            provenance.consume(migration.artifactHash());
+            var authority = migration.freshRootAuthority(coordination, activeRoot).orElseThrow();
+            Path identity = activeRoot.resolve(ServerIdentityStore.FILE_NAME);
+
+            assertThrows(IOException.class, () -> ServerIdentityStore.open(identity));
+
+            ServerIdentityStore created = ServerIdentityStore.open(identity, authority);
+            ServerIdentityStore reopened = ServerIdentityStore.open(identity);
+
+            assertTrue(created.freshInstall());
+            assertEquals(created.serverId(), reopened.serverId());
+            assertFalse(reopened.freshInstall());
+        } finally {
+            persistence.shutdown();
+        }
+    }
+
+    @Test
+    void durableFreshAuthorityRejectsUnownedBaselineData(@TempDir Path temporary) throws Exception {
+        Path activeRoot = Files.createDirectory(temporary.resolve("active"));
+        Files.writeString(activeRoot.resolve("foreign.json"), "{}");
+        var authority = new AssetCoordinatorMigration.FreshRootAuthority(
+            activeRoot.toRealPath(), "1".repeat(64), "2".repeat(64));
+
+        assertThrows(IOException.class, () -> ServerIdentityStore.open(
+            activeRoot.resolve(ServerIdentityStore.FILE_NAME), authority));
+        assertEquals("{}", Files.readString(activeRoot.resolve("foreign.json")));
     }
 
     @Test

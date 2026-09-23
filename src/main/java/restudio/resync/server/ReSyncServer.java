@@ -161,6 +161,7 @@ import restudio.resync.storage.AssetIntegrityService;
 import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.storage.AssetsPersistenceParticipant;
 import restudio.resync.upgrade.AssetCoordinatorMigration;
+import restudio.resync.upgrade.AssetCoordinatorMigration.FreshRootAuthority;
 import restudio.resync.worldgen.WorldGenProjectStorage;
 import restudio.resync.worldgen.WorldGenGeneratedOutputPolicy;
 import restudio.resync.worldgen.WorldGenGeneratedPersistenceParticipant;
@@ -207,6 +208,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 public class ReSyncServer {
+    private static final String HOSTED_SERVER_ID_FILE = ".resync-host-server-id";
     private static final Gson GSON = new Gson();
     private static final long BRIDGE_HANDSHAKE_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(8);
     private static final long BRIDGE_HANDSHAKE_TIMEOUT_TICKS = 160L;
@@ -219,6 +221,7 @@ public class ReSyncServer {
     private final LifecycleDiagnosticFileSink lifecycleDiagnosticSink;
     private final Path dataRoot;
     private final AssetCoordinatorMigration.Result assetMigration;
+    private final FreshRootAuthority freshRootAuthority;
     private final PaperPlayerDataMutationAdmission playerDataAdmission;
     private final PaperPlayerDataMutationAdmission.Installation playerDataAdmissionInstallation;
     private final ConnectionManager connectionManager;
@@ -355,7 +358,10 @@ public class ReSyncServer {
                 : replacementRuntimeProviderAuthority;
             this.configuredLuckPermsBackendPersistence = luckPermsBackendPersistence;
             ServerIdentityStore initialIdentity;
-            initialIdentity = ServerIdentityStore.open(dataRoot.resolve("server-id"));
+            this.freshRootAuthority = this.assetMigration
+                .freshRootAuthority(this.persistence.coordinationRoot(), dataRoot).orElse(null);
+            initialIdentity = ServerIdentityStore.open(dataRoot.resolve("server-id"), this.freshRootAuthority,
+                hostedServerId());
             TemporaryLifecycleDiagnostics.bindServerId(initialIdentity.serverId());
             TemporaryLifecycleDiagnostics.event("startup_diagnostics", startupStarted,
                 TemporaryLifecycleDiagnostics.with(TemporaryLifecycleDiagnostics.identity(initialIdentity.serverId(), null,
@@ -785,8 +791,8 @@ public class ReSyncServer {
         AssetTransactionCoordinator assetTransactions = null;
         try {
             stageStarted = TemporaryLifecycleDiagnostics.start();
-            FreshProjectMetadataBootstrap.Admission projectMetadataAdmission = FreshProjectMetadataBootstrap.preflight(
-                persistence.coordinationRoot(), dataRoot, migration);
+            FreshProjectMetadataBootstrap.Admission projectMetadataAdmission =
+                FreshProjectMetadataBootstrap.preflight(dataRoot, this.freshRootAuthority);
             assetTransactions = migration.openOrAdopt(dataRoot.resolve("assets"), GSON);
             TemporaryLifecycleDiagnostics.event("core_service_stage", stageStarted,
                 Map.of("stageName", "assetCoordinator", "outcome", "complete"));
@@ -1288,6 +1294,16 @@ public class ReSyncServer {
                 ConfigurationPersistenceParticipant.OWNER,
                 configurationPersistence.root(),
                 configurationPersistence));
+        }
+        TlsPersistenceParticipant tlsPersistence = persistence.registeredParticipants().stream()
+            .filter(TlsPersistenceParticipant.class::isInstance).map(TlsPersistenceParticipant.class::cast)
+            .findFirst().orElse(null);
+        if (tlsPersistence != null) {
+            bindings.add(ReSyncPersistenceTopology.requiredForRestore(
+                TlsPersistenceParticipant.OWNER, tlsPersistence.root(), tlsPersistence));
+        } else if (config.getTls().isEnabled()) {
+            bindings.add(ReSyncPersistenceTopology.unavailable(TlsPersistenceParticipant.OWNER,
+                dataRoot.resolve("tls/resync-server.p12"), "TLS Identity Persistence Is Unavailable"));
         }
         Path diagnosticsRoot = dataRoot.resolve("diagnostics").toAbsolutePath().normalize();
         bindings.add(ReSyncPersistenceTopology.requiredForRestore(
@@ -2397,10 +2413,12 @@ public class ReSyncServer {
             (result, dispatchAuthorityEpoch) ->
                 prepareProtocolDelivery(info, session, result, dispatchAuthorityEpoch, () -> true));
         if (!admission.accepted()) {
+            ProtocolEnvelopeDispatchResult rejection = correlateMailboxRejection(encodedPayload, payloadDecoder,
+                admission.rejection());
             TemporaryLifecycleDiagnostics.event("response_dispatch_decision", started,
                 TemporaryLifecycleDiagnostics.with(ingressIdentity, "outcome", admission.status(),
                     "mailboxGeneration", admission.generation(), "requestBytes", encodedPayload.length));
-            sendProtocolResult(info, protocolIngress, admission.rejection());
+            sendRejectedAdmission(info, protocolIngress, rejection);
         } else {
             TemporaryLifecycleDiagnostics.event("response_dispatch_decision", started,
                 TemporaryLifecycleDiagnostics.with(ingressIdentity, "outcome", admission.status(),
@@ -3262,6 +3280,63 @@ public class ReSyncServer {
 
     private void handleHeartbeat(ConnectionInfo info, Heartbeat req) {
         connectionManager.updateHeartbeat(info);
+        Session session = sessionManager.getSession(info);
+        if (session != null) {
+            session.updateActivity();
+        }
+    }
+
+    private ServerId hostedServerId() throws IOException {
+        Path pluginRoot = operatorDataRoot.getParent();
+        if (pluginRoot == null) {
+            return null;
+        }
+        Path marker = pluginRoot.resolve(HOSTED_SERVER_ID_FILE).toAbsolutePath().normalize();
+        if (!Files.exists(marker, LinkOption.NOFOLLOW_LINKS)) {
+            return null;
+        }
+        if (Files.isSymbolicLink(marker) || !Files.isRegularFile(marker, LinkOption.NOFOLLOW_LINKS)
+            || Files.size(marker) > 128L) {
+            throw new IOException("Hosted ReSync Server Identity Is Invalid");
+        }
+        String value = Files.readString(marker, StandardCharsets.UTF_8).strip();
+        try {
+            UUID parsed = UUID.fromString(value);
+            if (!parsed.toString().equals(value)) {
+                throw new IllegalArgumentException("Non-canonical identity");
+            }
+            return new ServerId(parsed);
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("Hosted ReSync Server Identity Is Invalid", exception);
+        }
+    }
+
+    private ProtocolEnvelopeDispatchResult correlateMailboxRejection(byte[] encodedPayload,
+                                                                      ProtocolEnvelopeMailbox.PayloadDecoder payloadDecoder,
+                                                                      ProtocolEnvelopeDispatchResult rejection) {
+        try {
+            byte[] payload = payloadDecoder.decode(encodedPayload.clone());
+            return protocolEnvelopeDispatch.rejectPayload(payload, rejection.rejectionCode(), rejection.message());
+        } catch (RuntimeException exception) {
+            return rejection;
+        }
+    }
+
+    private void sendRejectedAdmission(ConnectionInfo info, ProtocolIngress protocolIngress,
+                                       ProtocolEnvelopeDispatchResult result) {
+        if (info == null || protocolIngress == null || result == null) {
+            return;
+        }
+        ProtocolEnvelopeMailbox.EventFence ingressFence = () -> currentProtocolIngress(info, protocolIngress);
+        try {
+            EncodedProtocolDelivery encoded = prepareProtocolDeliveryFrame(info, protocolIngress.session(), result,
+                protocolIngress.authorityEpoch(), ingressFence);
+            encoded.delivery().tryDeliver();
+        } catch (RuntimeException exception) {
+            TemporaryLifecycleDiagnostics.event("response_dispatch", 0L,
+                TemporaryLifecycleDiagnostics.with(protocolDiagnosticIdentity(info, result.response()),
+                    "outcome", "encode_failed", "failure", exception.getClass().getSimpleName()));
+        }
     }
 
     private void sendError(WebSocket conn, int code, String message) {

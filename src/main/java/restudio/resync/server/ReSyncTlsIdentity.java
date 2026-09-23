@@ -16,14 +16,19 @@ import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import restudio.resync.migration.MigrationPaths;
+import restudio.resync.storage.StorageSafety;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,9 +56,9 @@ import java.util.Set;
 
 public final class ReSyncTlsIdentity {
     private static final String ALIAS = "resync-server";
-    private static final String KEY_STORE_FILE = "resync-server.p12";
-    private static final String PASSWORD_FILE = "resync-server.password";
-    private static final String ROTATION_FILE = "resync-server.rotation.properties";
+    static final String KEY_STORE_FILE = "resync-server.p12";
+    static final String PASSWORD_FILE = "resync-server.password";
+    static final String ROTATION_FILE = "resync-server.rotation.properties";
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Set<PosixFilePermission> PRIVATE_PERMISSIONS = Set.of(
             PosixFilePermission.OWNER_READ,
@@ -78,6 +83,13 @@ public final class ReSyncTlsIdentity {
         Path realRoot = root.toRealPath();
         if (!identityDirectory.toRealPath().startsWith(realRoot)) {
             throw new IllegalArgumentException("ReSync TLS Runtime Metadata Must Stay Inside The Plugin Directory");
+        }
+        if (Set.of(KEY_STORE_FILE, PASSWORD_FILE, ROTATION_FILE).contains(metadataFile.getFileName().toString())) {
+            throw new IllegalArgumentException("ReSync TLS Metadata Must Not Replace Its Identity Files");
+        }
+        MigrationPaths.requireNoSymlinkTraversal(root, metadataFile);
+        for (String name : List.of(KEY_STORE_FILE, PASSWORD_FILE, ROTATION_FILE)) {
+            MigrationPaths.requireNoSymlinkTraversal(root, identityDirectory.resolve(name));
         }
         Files.deleteIfExists(metadataFile);
 
@@ -134,7 +146,8 @@ public final class ReSyncTlsIdentity {
             } else if (!pendingRotation) {
                 Files.deleteIfExists(rotationFile);
             }
-            return new Prepared(sslContext(identity.keyStore(), identity.password()), identity.certificate(), metadata, metadataFile);
+            return new Prepared(sslContext(identity.keyStore(), identity.password()), identity.certificate(), metadata,
+                new TlsPersistenceParticipant(root, metadataFile, metadataBytes(metadata)));
         } finally {
             clear(identity.password());
             clear(identity.passwordBytes());
@@ -146,13 +159,23 @@ public final class ReSyncTlsIdentity {
         if (prepared == null) {
             throw new IllegalArgumentException("ReSync TLS Identity Is Required");
         }
-        writeMetadata(prepared.metadataFile(), prepared.metadata());
+        prepared.persistence().publish();
     }
 
     public static void withdraw(Prepared prepared) throws Exception {
         if (prepared != null) {
-            Files.deleteIfExists(prepared.metadataFile());
+            prepared.persistence().withdraw();
         }
+    }
+
+    public static TlsPersistenceParticipant persistence(Path dataDirectory, ReSyncConfig.TlsConfig config) throws IOException {
+        Path root = MigrationPaths.requireDirectory(dataDirectory, "TLS dataDirectory");
+        String configuredPath = config == null ? null : config.getRuntimeMetadataFile();
+        Path metadataFile = resolveInside(root, configuredPath == null || configuredPath.isBlank()
+            ? "tls/resync-server.runtime.json" : configuredPath);
+        TlsPersistenceParticipant participant = new TlsPersistenceParticipant(root, metadataFile, null);
+        participant.withdraw();
+        return participant;
     }
 
     static String normalizeFingerprint(String value) {
@@ -431,30 +454,35 @@ public final class ReSyncTlsIdentity {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
     }
 
-    private static void writeMetadata(Path path, Metadata metadata) throws Exception {
+    private static byte[] metadataBytes(Metadata metadata) {
         String json = "{\"format\":\"resync.tls.runtime\",\"version\":1,\"certificateFingerprint\":\"%s\",\"spkiFingerprint\":\"%s\",\"spkiPin\":\"%s\",\"keyStoreRevision\":\"%s\"}%n"
                 .formatted(metadata.certificateFingerprint(), metadata.spkiFingerprint(), metadata.spkiPin(), metadata.keyStoreRevision());
-        writePrivate(path, json.getBytes(StandardCharsets.UTF_8));
+        return json.getBytes(StandardCharsets.UTF_8);
     }
 
-    private static void writePrivate(Path path, byte[] content) throws Exception {
+    static void writePrivate(Path path, byte[] content) throws IOException {
         Files.createDirectories(path.getParent());
-        Path temporary = Files.createTempFile(path.getParent(), path.getFileName().toString() + ".", ".tmp");
+        Path temporary = Files.createTempFile(path.getParent(), KEY_STORE_FILE, ".tmp");
         try {
-            Files.write(temporary, content, StandardOpenOption.TRUNCATE_EXISTING);
             restrict(temporary);
+            try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                ByteBuffer buffer = ByteBuffer.wrap(content);
+                while (buffer.hasRemaining()) channel.write(buffer);
+                channel.force(true);
+            }
             try {
                 Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException exception) {
                 Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
             }
             restrict(path);
+            StorageSafety.forceDirectory(path.getParent());
         } finally {
             Files.deleteIfExists(temporary);
         }
     }
 
-    private static void restrict(Path path) throws Exception {
+    private static void restrict(Path path) throws IOException {
         try {
             Files.setPosixFilePermissions(path, PRIVATE_PERMISSIONS);
         } catch (UnsupportedOperationException ignored) {
@@ -497,6 +525,9 @@ public final class ReSyncTlsIdentity {
     public record Metadata(String certificateFingerprint, String spkiFingerprint, String spkiPin, String keyStoreRevision) {
     }
 
-    public record Prepared(SSLContext sslContext, X509Certificate certificate, Metadata metadata, Path metadataFile) {
+    public record Prepared(SSLContext sslContext, X509Certificate certificate, Metadata metadata, TlsPersistenceParticipant persistence) {
+        public Path metadataFile() {
+            return persistence.metadataFile();
+        }
     }
 }

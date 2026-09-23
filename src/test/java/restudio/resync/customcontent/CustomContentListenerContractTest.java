@@ -19,7 +19,7 @@ import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.junit.jupiter.api.Test;
 import restudio.flow.data.CustomContentGraphAdapter;
-import restudio.resync.upgrade.UpgradeNodeDefinitionSource;
+import restudio.resync.flow.registry.ActiveNodeDefinitionSource;
 
 import java.lang.reflect.Method;
 import java.nio.file.Files;
@@ -63,10 +63,10 @@ class CustomContentListenerContractTest {
         }
 
         JsonArray definitions;
-        definitions = JsonParser.parseString(UpgradeNodeDefinitionSource.read("ability_effects.json")).getAsJsonArray();
+        definitions = JsonParser.parseString(ActiveNodeDefinitionSource.read("ability_effects.json")).getAsJsonArray();
         JsonObject triggerNode = definitions.asList().stream()
             .map(element -> element.getAsJsonObject())
-            .filter(node -> "ability.trigger_content_ability".equals(node.get("id").getAsString()))
+            .filter(node -> "ability_trigger_content_ability".equals(node.get("id").getAsString()))
             .findFirst()
             .orElseThrow();
         JsonObject triggerPin = triggerNode.getAsJsonArray("inputs").asList().stream()

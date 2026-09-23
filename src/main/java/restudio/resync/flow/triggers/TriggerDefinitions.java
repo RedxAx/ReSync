@@ -65,14 +65,14 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "block_break", eventClass = BlockBreakEvent.class, priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockBreakEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.is_cancelled", event.isCancelled());
     }
 
     @FlowTrigger(eventType = "block_place", eventClass = BlockPlaceEvent.class, priority = EventPriority.HIGHEST)
     public void onBlockPlace(BlockPlaceEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.placed_against", event.getBlockAgainst());
         vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.against_location", event.getBlockAgainst() != null ? event.getBlockAgainst().getLocation() : null);
@@ -326,7 +326,7 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "block_redstone", eventClass = BlockRedstoneEvent.class, playerEvent = false)
     public void onBlockRedstone(BlockRedstoneEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.old_power", event.getOldCurrent());
         vars.put("event.new_power", event.getNewCurrent());
@@ -334,7 +334,7 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "block_physics", eventClass = BlockPhysicsEvent.class, playerEvent = false)
     public void onBlockPhysics(BlockPhysicsEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
     }
 
@@ -350,7 +350,7 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "block_grow", eventClass = BlockGrowEvent.class, playerEvent = false)
     public void onBlockGrow(BlockGrowEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.new_state", event.getNewState().getType());
     }
@@ -384,28 +384,28 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "block_dispense", eventClass = BlockDispenseEvent.class, playerEvent = false)
     public void onBlockDispense(BlockDispenseEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.item", event.getItem());
     }
 
     @FlowTrigger(eventType = "block_fade", eventClass = BlockFadeEvent.class, playerEvent = false)
     public void onBlockFade(BlockFadeEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.new_state", event.getNewState().getType());
         vars.put("event.location", event.getBlock().getLocation());
     }
 
     @FlowTrigger(eventType = "block_form", eventClass = BlockFormEvent.class, playerEvent = false)
     public void onBlockForm(BlockFormEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.new_state", event.getNewState().getType());
         vars.put("event.location", event.getBlock().getLocation());
     }
 
     @FlowTrigger(eventType = "block_spread", eventClass = BlockSpreadEvent.class, playerEvent = false)
     public void onBlockSpread(BlockSpreadEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.new_block", event.getNewState().getBlock());
         vars.put("event.location", event.getBlock().getLocation());
     }
@@ -419,13 +419,13 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "leaves_decay", eventClass = LeavesDecayEvent.class, playerEvent = false)
     public void onLeavesDecay(LeavesDecayEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
     }
 
     @FlowTrigger(eventType = "sign_change", eventClass = SignChangeEvent.class)
     public void onSignChange(SignChangeEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.lines", event.getLines());
     }
@@ -446,7 +446,7 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "note_play", eventClass = NotePlayEvent.class, playerEvent = false)
     public void onNotePlay(NotePlayEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.instrument", (int) event.getInstrument().getType());
         vars.put("event.note", (int) event.getNote().getId());
@@ -454,14 +454,14 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "block_piston_extend", eventClass = BlockPistonExtendEvent.class, playerEvent = false)
     public void onBlockPistonExtend(BlockPistonExtendEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.length", event.getLength());
     }
 
     @FlowTrigger(eventType = "block_piston_retract", eventClass = BlockPistonRetractEvent.class, playerEvent = false)
     public void onBlockPistonRetract(BlockPistonRetractEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
     }
 
@@ -474,7 +474,7 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "structure_spawn", eventClass = BlockGrowEvent.class, playerEvent = false, ignoreCancelled = true)
     public void onStructureSpawn(BlockGrowEvent event, Map<String, Object> vars) {
-        vars.put("event.block", event.getBlock());
+        vars.put("event.block", event.getBlock().getState());
         vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.structure_type", event.getNewState().getType().name());
         vars.put("event.world_name", event.getBlock().getWorld().getName());

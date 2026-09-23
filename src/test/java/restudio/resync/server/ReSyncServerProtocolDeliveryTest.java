@@ -11,7 +11,9 @@ import restudio.resync.flow.catalog.CatalogVersion;
 import restudio.resync.flow.identity.CapabilityId;
 import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.InspectorFieldId;
+import restudio.resync.flow.identity.OperationId;
 import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
 import restudio.resync.flow.identity.ServerId;
 import restudio.resync.flow.protocol.OptionInvalidation;
 import restudio.resync.flow.protocol.OptionPage;
@@ -23,8 +25,10 @@ import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.FrameSender;
 import restudio.resync.protocol.FrameHeader;
 import restudio.resync.protocol.MessageType;
+import restudio.resync.protocol.ProtocolEnvelopeBoundary;
 import restudio.resync.protocol.ReSyncProtocolContract;
 import restudio.resync.protocol.messages.ErrorMessage;
+import restudio.resync.protocol.messages.ProtocolEnvelopeMessage;
 import restudio.resync.queue.RateLimiter;
 import restudio.resync.security.ClientIdentity;
 import sun.misc.Unsafe;
@@ -263,10 +267,54 @@ class ReSyncServerProtocolDeliveryTest {
         }
     }
 
+    @Test
+    void saturatedIngressReturnsCorrelatedRejectionWithoutClosingTheTransport() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (Fixture fixture = new Fixture(sender)) {
+            assertTrue(fixture.mailbox.admitOutbound(fixture.connection, fixture.session, new byte[]{1},
+                fixture::currentSession, () -> true, () -> {
+                    entered.countDown();
+                    await(release);
+                    return FrameSender.SendResult.ACCEPTED;
+                }).accepted());
+            assertTrue(entered.await(2, TimeUnit.SECONDS));
+            assertTrue(fixture.mailbox.admitOutbound(fixture.connection, fixture.session, new byte[]{2},
+                fixture::currentSession, () -> true, () -> FrameSender.SendResult.ACCEPTED).accepted());
+
+            ProtocolEnvelope<Map<String, Object>> request = optionRequest(fixture.epoch.get());
+            fixture.handleEncoded(new ProtocolEnvelopeBoundary().encode(request));
+
+            assertEquals(1, sender.attempts.get());
+            assertEquals(0, sender.closes.get());
+            ProtocolEnvelopeMessage message = (ProtocolEnvelopeMessage) fixture.codec.decodePayload(
+                fixture.codec.decodeFrame(sender.lastFrame.get()));
+            ProtocolEnvelope<Map<String, Object>> rejection = new ProtocolEnvelopeBoundary().decode(message.getPayload());
+            assertEquals(ProtocolEnvelope.Status.REJECTED, rejection.status());
+            assertEquals(request.requestId(), rejection.requestId());
+            assertEquals(request.correlationId(), rejection.correlationId());
+            assertEquals(ProtocolRejectionCode.RESOURCE_READ_UNAVAILABLE.wireValue(),
+                ((ProtocolBody.ControlResponse) rejection.body()).values().get("rejectionCode"));
+        } finally {
+            release.countDown();
+        }
+    }
+
     private static ProtocolEnvelope<Map<String, Object>> optionPage(long epoch) {
         OptionPage page = new OptionPage(SOURCE, QUERY, 1L, "page:1", List.of(), null,
             true, List.of());
         return envelope(ProtocolEnvelope.Kind.RESPONSE, epoch, new ProtocolBody.OptionPageResponse(page));
+    }
+
+    private static ProtocolEnvelope<Map<String, Object>> optionRequest(long epoch) {
+        UUID correlation = UUID.randomUUID();
+        return new ProtocolEnvelope<>(ProtocolEnvelope.Kind.REQUEST, new CatalogVersion(1, 0), UUID.randomUUID(),
+            UUID.randomUUID(), correlation, correlation, SERVER, null, 0L, epoch, null,
+            ContractRef.of(new OwnerId("restudio.resync"), OperationId.of("control.test")), Set.of(),
+            ContractRef.of(new OwnerId("restudio.resync"), ResourceTypeId.of("control.request")), null, null, false,
+            null, null, null, null, null, 0L, ProtocolEnvelope.Status.ACCEPTED, List.of(), Map.of(),
+            new ProtocolBody.ControlRequest("test", Map.of("value", true)));
     }
 
     private static ProtocolEnvelope<Map<String, Object>> invalidation(long epoch) {
@@ -392,10 +440,24 @@ class ReSyncServerProtocolDeliveryTest {
             ProtocolEnvelopeDispatchBoundary boundary = new ProtocolEnvelopeDispatchBoundary(
                 new AuthorityEpoch(epoch::get), (ignoredConnection, ignoredSession, ignoredEnvelope) ->
                     ProtocolEnvelopeDispatchResult.accepted());
+            set(server, "protocolEnvelopeDispatch", boundary);
             mailbox = new ProtocolEnvelopeMailbox(boundary,
                 ProtocolEnvelopeMailbox.Limits.standard(2, 8, Codec.DEFAULT_MAX_DECOMPRESSED_PAYLOAD_BYTES));
             set(server, "protocolEnvelopeMailbox", mailbox);
             mailbox.activate(connection, session);
+        }
+
+        private void handleEncoded(byte[] payload) throws Exception {
+            Class<?> ingressType = Arrays.stream(ReSyncServer.class.getDeclaredClasses())
+                .filter(type -> type.getSimpleName().equals("ProtocolIngress"))
+                .findFirst().orElseThrow();
+            var constructor = ingressType.getDeclaredConstructor(Session.class, long.class);
+            constructor.setAccessible(true);
+            Object ingress = constructor.newInstance(session, epoch.get());
+            Method method = ReSyncServer.class.getDeclaredMethod("handleEncodedProtocolEnvelope", ConnectionInfo.class,
+                byte[].class, ProtocolEnvelopeMailbox.PayloadDecoder.class, ingressType);
+            method.setAccessible(true);
+            method.invoke(server, connection, payload, (ProtocolEnvelopeMailbox.PayloadDecoder) encoded -> encoded, ingress);
         }
 
         private boolean currentSession(ConnectionInfo candidate, Session candidateSession) {
@@ -483,6 +545,7 @@ class ReSyncServerProtocolDeliveryTest {
 
     private static final class RecordingSender implements FrameSender {
         private final AtomicInteger attempts = new AtomicInteger();
+        private final AtomicInteger closes = new AtomicInteger();
         private final AtomicReference<byte[]> lastFrame = new AtomicReference<>();
 
         @Override
@@ -493,6 +556,7 @@ class ReSyncServerProtocolDeliveryTest {
 
         @Override
         public void close(int code, String reason) {
+            closes.incrementAndGet();
         }
     }
 }

@@ -15,7 +15,7 @@ class AdvancementModuleTickResidencyTest {
         String source = Files.readString(Path.of("src/main/java/restudio/resync/modules/AdvancementModule.java"));
         assertTrue(source.contains("private Map<String, JsonObject> admitTrees()"));
         assertTrue(source.contains("residentSnapshot"));
-        assertTrue(source.contains("if (residentSnapshot != null)"));
+        assertTrue(source.contains("current.generation() == generation"));
         assertTrue(source.contains("storage.readSnapshot(ReSyncResourceCatalog.ADVANCEMENT_TREE)"));
         assertFalse(source.contains("storage.isCurrent(residentSnapshot)"));
         assertFalse(source.contains("storage.listIds(ReSyncResourceCatalog.ADVANCEMENT_TREE)"));

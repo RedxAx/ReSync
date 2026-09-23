@@ -79,7 +79,7 @@
   },
   {
     "id": "time_current_ticks",
-    "displayName": "Current Server Ticks",
+    "displayName": "Current World Full Time",
     "description": "Read the full server tick count for a loaded world or the first loaded world when no world is selected.",
     "domain": "core",
     "family": "time",

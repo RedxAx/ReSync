@@ -1,5 +1,7 @@
 package restudio.resync.modules.flow;
 
+import com.google.gson.Gson;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.flow.data.FlowGraph;
@@ -13,11 +15,13 @@ import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
 import restudio.resync.flow.validation.FlowGraphValidator;
+import restudio.resync.storage.AssetTransactionCoordinator;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -27,12 +31,21 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommandResourceMigrationTest {
+    private final List<AssetTransactionCoordinator> coordinators = new ArrayList<>();
+
     @TempDir
     Path tempDir;
 
+    @AfterEach
+    void tearDown() throws Exception {
+        for (AssetTransactionCoordinator coordinator : coordinators.reversed()) {
+            coordinator.close();
+        }
+    }
+
     @Test
-    void legacyCommandPathsMoveIntoCommandGraphOnce() {
-        FlowStorage storage = new FlowStorage(tempDir.toFile());
+    void legacyCommandPathsMoveIntoCommandGraphOnce() throws IOException {
+        FlowStorage storage = storage();
         FlowGraph command = new FlowGraph();
         command.setId("Name_Color");
         command.setResourceType("command");
@@ -56,8 +69,8 @@ class CommandResourceMigrationTest {
     }
 
     @Test
-    void malformedLegacyCommandContextDoesNotAbortInitialization() {
-        FlowStorage storage = new FlowStorage(tempDir.toFile());
+    void malformedLegacyCommandContextDoesNotAbortInitialization() throws IOException {
+        FlowStorage storage = storage();
         FlowGraph command = new FlowGraph();
         command.setId("broken_command");
         command.setResourceType("command");
@@ -72,7 +85,7 @@ class CommandResourceMigrationTest {
 
     @Test
     void invalidLegacyGraphDoesNotAbortInitializationOrMutateCachedGraph() throws IOException {
-        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowStorage storage = storage();
         FlowGraph command = new FlowGraph();
         command.setId("legacy_command");
         command.setResourceType("command");
@@ -90,5 +103,11 @@ class CommandResourceMigrationTest {
 
         assertNull(storage.getGraph("command", "legacy_command").getNodes().get("start").getInputValues().get("command"));
         assertTrue(Files.readString(tempDir.resolve("assets/.migrations/command-bindings-v1.json")).contains("legacy_command"));
+    }
+
+    private FlowStorage storage() throws IOException {
+        AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(tempDir.resolve("assets"), new Gson());
+        coordinators.add(coordinator);
+        return new FlowStorage(tempDir.toFile(), coordinator);
     }
 }

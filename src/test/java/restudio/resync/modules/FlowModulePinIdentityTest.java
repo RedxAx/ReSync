@@ -3,26 +3,47 @@ package restudio.resync.modules;
 import org.junit.jupiter.api.Test;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowTypeRef;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.catalog.CatalogBindingProof;
+import restudio.resync.flow.catalog.CatalogCompiler;
+import restudio.resync.flow.catalog.CatalogContribution;
 import restudio.resync.flow.catalog.CatalogNodeDescriptor;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.handler.generic.ConversionHandler;
 import restudio.resync.flow.identity.InspectorFieldId;
 import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.ProviderId;
 import restudio.resync.flow.inspector.InspectorOptionSource;
 import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.registry.NodeDefinitionRegistry;
+import restudio.resync.flow.runtime.RuntimeBinding;
+import restudio.resync.flow.runtime.RuntimeBindingRegistry;
 import restudio.resync.flow.runtime.RuntimeOperationDescriptor;
+import restudio.resync.flow.runtime.RuntimeProviderDescriptor;
+import restudio.resync.flow.runtime.RuntimeResult;
+import restudio.resync.flow.runtime.RuntimeSemantics;
+import restudio.resync.flow.type.ConversionGraph;
+import restudio.resync.flow.type.TypeExpr;
+import restudio.resync.flow.type.TypeReference;
+import restudio.resync.api.OptionCatalogProvider;
+import restudio.resync.api.OptionCatalogRegistry;
+import restudio.resync.api.RuntimeDataRegistry;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class FlowModulePinIdentityTest {
@@ -91,6 +112,86 @@ class FlowModulePinIdentityTest {
             new LinkedHashMap<>(), new LinkedHashMap<>(), optionSources, new ArrayList<>(), handlers()));
     }
 
+    @Test
+    void contextualOptionProvidersPublishTypedDependenciesAndDefaults() {
+        OwnerId owner = OwnerId.of("fixture");
+        OptionCatalogRegistry catalogs = new OptionCatalogRegistry(new RuntimeDataRegistry());
+        assertTrue(catalogs.register(provider("server:runtime_data:source", Set.of("data_type"))));
+        assertTrue(catalogs.register(provider("server:runtime_data:category", Set.of("data_type", "source", "sources"))));
+        NodeDefinition definition = new NodeDefinition.Builder("fixture:items", "Items", NodeDefinition.NodeCategory.DATA)
+            .owner("fixture")
+            .description("Selects item sources and categories.")
+            .handler("ExplicitPinHandler")
+            .handlerConfig(Map.of("operation", "run"))
+            .input(new NodeDefinition.PinBuilder("data_type", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.INPUT, FlowDataType.STRING).defaultValue("item")
+                .description("Selects the runtime data domain.").build())
+            .input(new NodeDefinition.PinBuilder("source", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.INPUT, FlowDataType.STRING)
+                .optionsSource("server:runtime_data:source").optional(true)
+                .description("Selects one runtime item source.").build())
+            .input(new NodeDefinition.PinBuilder("sources", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.INPUT, FlowDataType.LIST)
+                .typeRef(FlowTypeRef.parse("list<string>")).optional(true)
+                .description("Selects multiple runtime item sources.").build())
+            .input(new NodeDefinition.PinBuilder("category", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.INPUT, FlowDataType.STRING)
+                .optionsSource("server:runtime_data:category").optional(true)
+                .description("Selects one runtime item category.").build())
+            .build();
+        Map<String, InspectorOptionSource> options = new LinkedHashMap<>();
+
+        FlowModule.catalogNode(owner, definition, new LinkedHashMap<>(), new LinkedHashMap<>(), options,
+            new ArrayList<>(), handlers(), catalogs);
+
+        InspectorOptionSource source = options.get("server-runtime-data-source");
+        InspectorOptionSource category = options.get("server-runtime-data-category");
+        assertNotNull(source);
+        assertNotNull(category);
+        assertEquals(Set.of("data_type"), source.querySchema().dependencies().keySet());
+        assertEquals("item", source.querySchema().dependencies().get("data_type").defaultValue().value());
+        assertEquals(Set.of("data_type", "source", "sources"), category.querySchema().dependencies().keySet());
+    }
+
+    @Test
+    void stringToNumberPublishesOneExecutableImplicitConversion() {
+        HandlerRegistry handlers = new HandlerRegistry();
+        new ConversionHandler().registerTo(handlers);
+        NodeDefinition definition = new NodeDefinition.Builder("to_number", "To Number", NodeDefinition.NodeCategory.DATA)
+            .owner("restudio.resync")
+            .description("Converts numeric text to a number.")
+            .handler("ConversionHandler")
+            .handlerConfig(Map.of("operation", "to_number"))
+            .input(new NodeDefinition.PinBuilder("value", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.INPUT, FlowDataType.STRING)
+                .description("Provides numeric text to convert into a number.").build())
+            .output(new NodeDefinition.PinBuilder("number", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.OUTPUT, FlowDataType.NUMBER)
+                .description("Returns the converted numeric value.").build())
+            .build();
+
+        NodeDefinitionRegistry definitions = new NodeDefinitionRegistry(false);
+        definitions.register(definition);
+        List<CatalogContribution> contributions = FlowModule.buildCatalogContributions(definitions, handlers, null,
+            List.of(), FlowModule.CATALOG_CONTRACT_VERSION);
+        ConversionGraph.ConversionEdge conversion = contributions.getFirst().conversions().getFirst();
+        RuntimeOperationDescriptor requirement = FlowModule.runtimeOperationDescriptor(definition, handlers);
+        RuntimeBindingRegistry bindings = new RuntimeBindingRegistry();
+        ContractRef<ProviderId> provider = ContractRef.of(OwnerId.of("restudio.resync"), ProviderId.of("flow"));
+        bindings.activate(new RuntimeProviderDescriptor(provider, "1.0.0", 0, 0,
+            RuntimeSemantics.UnloadPolicy.DRAIN), List.of(RuntimeBinding.available(requirement, provider, "1.0.0",
+            ignored -> CompletableFuture.completedFuture(RuntimeResult.success()))));
+        var compiled = new CatalogCompiler(FlowModule.CATALOG_CONTRACT_VERSION, CatalogBindingProof.live(bindings))
+            .compile(contributions, 1L);
+
+        assertEquals(TypeExpr.named(TypeReference.of("builtin", "string")), conversion.source());
+        assertEquals(TypeExpr.named(TypeReference.of("builtin", "number")), conversion.target());
+        assertEquals("to_number", conversion.operation().id().value());
+        assertEquals(ConversionGraph.Losslessness.LOSSY, conversion.losslessness());
+        assertEquals(ConversionGraph.FailureBehavior.INFALLIBLE, conversion.failure());
+        assertTrue(compiled.accepted(), compiled.diagnostics().toString());
+    }
+
     private NodeDefinition definition(boolean reordered) {
         NodeDefinition.PinDefinition amount = pin("amount", "Amount", NodeDefinition.PinDirection.INPUT, FlowDataType.NUMBER);
         NodeDefinition.PinDefinition mode = pin("mode", "Mode Label", NodeDefinition.PinDirection.INPUT, FlowDataType.STRING);
@@ -147,5 +248,29 @@ class FlowModulePinIdentityTest {
             }
         });
         return handlers;
+    }
+
+    private OptionCatalogProvider provider(String sourceId, Set<String> contextKeys) {
+        return new OptionCatalogProvider() {
+            @Override
+            public String sourceId() {
+                return sourceId;
+            }
+
+            @Override
+            public Set<String> contextKeys() {
+                return contextKeys;
+            }
+
+            @Override
+            public String revision() {
+                return "1";
+            }
+
+            @Override
+            public List<String> values() {
+                return List.of();
+            }
+        };
     }
 }

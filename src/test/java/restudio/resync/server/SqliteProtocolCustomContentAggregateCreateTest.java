@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -88,6 +89,8 @@ class SqliteProtocolCustomContentAggregateCreateTest {
             CustomContentStorage contentStorage = new CustomContentStorage(null, temporary,
                 attributes, LegacyRuntimeActivationGate.runtime(temporary), gate, coordinator);
             try {
+                AtomicReference<FlowResourceMutationStamp> admittedIdentity = new AtomicReference<>();
+                contentStorage.setGraphAdmission((definition, intended) -> admittedIdentity.set(intended));
                 FlowResourceRegistry registry = new FlowResourceRegistry();
                 new FlowResourcePacketRouter(flowStorage, contentStorage, null, null, null, null, null,
                     registry, ignored -> {
@@ -130,6 +133,9 @@ class SqliteProtocolCustomContentAggregateCreateTest {
                     assertEquals(Map.of("minecraft:enchantment_glint_override", false),
                         contentStorage.get("steel-wand").getComponents());
                     assertEquals(contentMutation, contentStorage.readMutationStamp("steel-wand").mutationId());
+                    assertEquals(contentMutation, admittedIdentity.get().mutationId());
+                    assertEquals(1L, admittedIdentity.get().revision());
+                    assertEquals(contentCreate.payloadHash().canonicalText(), admittedIdentity.get().payloadHash());
                     assertEquals(contentMutation, adapter(registry, ReSyncResourceCatalog.PROJECT_METADATA)
                         .readMutationStamp(SERVER.canonicalText()).mutationId());
                     assertTrue(Files.isRegularFile(temporary.resolve("assets/Content/Items/steel-wand.json")));
@@ -156,6 +162,30 @@ class SqliteProtocolCustomContentAggregateCreateTest {
                     assertTrue(contentStorage.create(storageValue, contentMutation, 0L, presentation,
                         contentCreate.payloadHash().canonicalText()).replayed());
                     assertEquals(contentSequence, coordinator.read(snapshot -> snapshot.rootSequence()).longValue());
+
+                    CustomContentDefinition rejectedDefinition = CustomContentGraphAdapter.toDefinition(
+                        CustomContentGraphAdapter.createContentGraph("rejected-item", "item", "Rejected Item"));
+                    Map<String, Object> rejectedPayload = GSON.fromJson(adapter.serialize(rejectedDefinition), Map.class);
+                    UUID rejectedMutation = UUID.fromString("25000000-0000-4000-8000-000000000002");
+                    ResourceCreateRequest<Map<String, Object>> rejectedCreate = create(
+                        resource(ReSyncResourceCatalog.CUSTOM_CONTENT, "rejected-item"), rejectedPayload,
+                        rejectedMutation, new ResourcePresentationIntent(
+                            "Rejected Item", "Content/Items/rejected-item.json", 9));
+                    ProtocolEnvelope<Map<String, Object>> rejectedRequest = envelope(
+                        resource(ReSyncResourceCatalog.CUSTOM_CONTENT, "rejected-item"), rejectedCreate);
+                    contentStorage.setGraphAdmission((value, intended) -> {
+                        throw new IllegalArgumentException("The item graph cannot run");
+                    });
+                    ProtocolEnvelopeDispatchResult rejectedResult = mutate(authority, rejectedRequest);
+                    assertFalse(rejectedResult.handled());
+                    assertEquals("RESOURCE_OPERATION_FAILED", rejectedResult.code());
+                    assertEquals("The item graph cannot run", rejectedResult.message());
+                    assertFalse(rejectedResult.message().contains("durable recovery"));
+                    assertEquals(rejectedResult, mutate(authority, rejectedRequest));
+                    assertEquals(contentSequence, coordinator.read(snapshot -> snapshot.rootSequence()).longValue());
+                    assertFalse(Files.exists(temporary.resolve("assets/Content/Items/rejected-item.json")));
+                    contentStorage.setGraphAdmission((value, intended) -> {
+                    });
 
                     assertTypedCreate(authority, registry, coordinator, flowStorage, ReSyncResourceCatalog.GUI, "menu",
                         new GuiDefinition("menu", "Main Menu", 3), "Main Menu", "Interfaces/Gui/menu.json", 3,

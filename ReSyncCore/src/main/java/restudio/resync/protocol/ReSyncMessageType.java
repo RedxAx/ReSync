@@ -9,7 +9,8 @@ public enum ReSyncMessageType {
     HEARTBEAT(ReSyncProtocolContract.MESSAGE_HEARTBEAT),
     ACK(ReSyncProtocolContract.MESSAGE_ACK),
     ERROR(ReSyncProtocolContract.MESSAGE_ERROR),
-    CHANNEL_REGISTRY(ReSyncProtocolContract.MESSAGE_CHANNEL_REGISTRY);
+    CHANNEL_REGISTRY(ReSyncProtocolContract.MESSAGE_CHANNEL_REGISTRY),
+    PROTOCOL_ENVELOPE(ReSyncProtocolContract.MESSAGE_PROTOCOL_ENVELOPE);
 
     private final byte value;
 

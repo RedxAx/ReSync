@@ -17,6 +17,8 @@ import restudio.resync.network.paper.ReSyncNetworkAgent;
 import restudio.resync.network.paper.state.NetworkPlayerStateConfig;
 import restudio.resync.network.paper.state.NetworkPlayerStateCoordinator;
 import restudio.resync.migration.FreshRootProvenance;
+import restudio.resync.migration.LegacyInstallBoundary;
+import restudio.resync.migration.ReSyncDataFixer;
 import restudio.resync.migration.ReSyncPersistenceCoordinator;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
@@ -28,6 +30,7 @@ import restudio.resync.upgrade.AssetCoordinatorMigration;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -42,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ReSync extends JavaPlugin {
+    private static final ReSyncDataFixer DATA_FIXER = new ReSyncDataFixer(1, List.of());
     private static ReSync instance;
     private WebSocketServer wsServer;
     private ReSyncTlsIdentity.Prepared tlsIdentity;
@@ -102,12 +106,33 @@ public class ReSync extends JavaPlugin {
             if (pluginRoot == null) {
                 throw new IOException("ReSync Data Root Has No Parent");
             }
+            Path coordinationRoot = pluginRoot.resolve(".resync-coordination");
+            LegacyInstallBoundary.Result legacy = LegacyInstallBoundary.prepare(originalDataRoot, coordinationRoot);
+            if (legacy.archived()) {
+                Log.warn("Pre-rewrite ReSync data was archived at " + legacy.dataBackup() + ". ReSync will start with clean data.");
+            }
             ReSyncPersistenceCoordinator.PreparedBootstrap prepared = ReSyncPersistenceCoordinator.bootstrapPrepared(
-                originalDataRoot, pluginRoot.resolve(".resync-coordination"));
+                originalDataRoot, coordinationRoot);
             persistence = prepared.coordinator();
             preparedDataRoot = prepared.activeRoot();
             long activationReady = System.nanoTime();
-            assetMigration = prepareAssetMigration(persistence, preparedDataRoot);
+            boolean freshBootstrap = persistence.freshBootstrap();
+            ReSyncDataFixer.Result dataFix;
+            if (freshBootstrap) {
+                FreshRootProvenance provenance = persistence.freshRootProvenance()
+                    .orElseThrow(() -> new IOException("Fresh ReSync Persistence Has No Provenance"));
+                assetMigration = AssetCoordinatorMigration.prepareEmptyUnconsumed(coordinationRoot, provenance);
+                dataFix = persistence.prepareDataFixes(DATA_FIXER, true);
+                provenance.consume(assetMigration.artifactHash());
+            } else {
+                dataFix = persistence.prepareDataFixes(DATA_FIXER, false);
+                assetMigration = prepareAssetMigration(persistence, dataFix.activeRoot());
+            }
+            preparedDataRoot = dataFix.activeRoot();
+            if (dataFix.changed()) {
+                Log.info("ReSync data upgraded from version " + dataFix.sourceVersion() + " to " + dataFix.targetVersion()
+                    + " using " + String.join(", ", dataFix.appliedFixes()));
+            }
             long assetMigrationReady = System.nanoTime();
             config = ConfigLoader.load(preparedDataRoot);
             long configReady = System.nanoTime();
@@ -127,14 +152,16 @@ public class ReSync extends JavaPlugin {
             return;
         }
 
-        if (config.getTls().isEnabled()) {
-            try {
+        try {
+            if (config.getTls().isEnabled()) {
                 tlsIdentity = ReSyncTlsIdentity.prepare(preparedDataRoot, config.getTls());
                 Log.info("ReSync TLS identity ready with SPKI fingerprint " + tlsIdentity.metadata().spkiFingerprint());
-            } catch (Exception exception) {
-                closeBootstrap(persistence, exception);
-                throw new IllegalStateException("ReSync TLS Setup Failed", exception);
             }
+            persistence.register(tlsIdentity == null ? ReSyncTlsIdentity.persistence(preparedDataRoot, config.getTls())
+                : tlsIdentity.persistence());
+        } catch (Exception exception) {
+            closeBootstrap(persistence, exception);
+            throw new IllegalStateException("ReSync TLS Setup Failed", exception);
         }
 
         boolean persistenceAdopted = false;
@@ -258,7 +285,7 @@ public class ReSync extends JavaPlugin {
     private static boolean expectedDisconnect(Throwable throwable) {
         Throwable current = throwable;
         while (current != null) {
-            if (current instanceof java.net.SocketException
+            if (current instanceof SocketException
                 && "Connection reset".equalsIgnoreCase(current.getMessage())) {
                 return true;
             }
@@ -294,11 +321,6 @@ public class ReSync extends JavaPlugin {
                                                                           Path activeRoot) throws IOException {
         Path coordinationRoot = persistence.coordinationRoot();
         Path artifact = coordinationRoot.resolve(AssetCoordinatorMigration.ARTIFACT_RELATIVE_PATH).toAbsolutePath().normalize();
-        FreshRootProvenance provenance = persistence.freshRootProvenance().orElse(null);
-        if (provenance != null) {
-            provenance.verify(coordinationRoot, activeRoot);
-            return AssetCoordinatorMigration.prepareEmpty(coordinationRoot, provenance);
-        }
         if (Files.exists(artifact, LinkOption.NOFOLLOW_LINKS)) {
             return AssetCoordinatorMigration.load(coordinationRoot);
         }

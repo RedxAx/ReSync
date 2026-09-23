@@ -3,6 +3,11 @@ package restudio.resync.customization;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import restudio.resync.modules.AdvancementModule;
+import restudio.resync.modules.flow.FlowResourceAdapter;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -92,6 +98,33 @@ class ReSyncJsonResourceStorageTest {
         assertEquals(deleteMutation, deleted.mutationId());
         assertEquals(live.payloadHash(), deleted.payloadHash());
         assertTrue(deleted.deleted());
+    }
+
+    @Test
+    void reportsInterceptorValidationBeforeAnyResourceWrite() throws Exception {
+        MockBukkit.mock();
+        JavaPlugin plugin = MockBukkit.createMockPlugin();
+        storage = storage(plugin);
+        JsonObject value = new JsonObject();
+        value.addProperty("id", "invalid-npc");
+        value.addProperty("entityType", "player");
+        ReSyncJsonResourceStorage.ResourceMutationInterceptor validator = new ReSyncJsonResourceStorage.ResourceMutationInterceptor() {
+            @Override
+            public void beforeSave(String type, JsonObject candidate) {
+                throw new IllegalArgumentException("Player NPCs do not support entity AI");
+            }
+        };
+        storage.addInterceptor(validator);
+
+        FlowResourceAdapter.PreCommitRejection rejection = assertThrows(
+            FlowResourceAdapter.PreCommitRejection.class,
+            () -> storage.save(ReSyncResourceCatalog.NPC_DEFINITION, value, UUID.randomUUID(), 0L));
+        assertEquals("Player NPCs do not support entity AI", rejection.getMessage());
+        assertNull(storage.readMutationStamp(ReSyncResourceCatalog.NPC_DEFINITION, "invalid-npc"));
+
+        storage.removeInterceptor(validator);
+        storage.save(ReSyncResourceCatalog.NPC_DEFINITION, value, UUID.randomUUID(), 0L);
+        assertEquals(1L, storage.readMutationStamp(ReSyncResourceCatalog.NPC_DEFINITION, "invalid-npc").revision());
     }
 
     @Test
@@ -336,6 +369,42 @@ class ReSyncJsonResourceStorageTest {
 
         assertThrows(IllegalArgumentException.class, () -> new ReSyncJsonResourceStorage(plugin,
             LegacyRuntimeActivationGate.runtime(scope), wrongGate, coordinator));
+    }
+
+    @Test
+    void advancementEventTreesFollowCommittedEditsAndStorageRebinds() throws Exception {
+        MockBukkit.mock();
+        JavaPlugin plugin = MockBukkit.createMockPlugin();
+        storage = storage(plugin);
+        AdvancementModule module = new AdvancementModule();
+        Field field = AdvancementModule.class.getDeclaredField("storage");
+        field.setAccessible(true);
+        field.set(module, storage);
+        storage.addListener(module);
+        Method read = AdvancementModule.class.getDeclaredMethod("admitTrees");
+        read.setAccessible(true);
+        JsonObject tree = JsonParser.parseString("""
+            {"id":"events","enabled":true,"nodes":{"root":{"enabled":true,"display":{"icon":"minecraft:stone"},
+            "criteria":{"break":{"trigger":"break_block"}}}}}
+            """).getAsJsonObject();
+        storage.save(ReSyncResourceCatalog.ADVANCEMENT_TREE, tree);
+        Object first = read.invoke(module);
+        assertSame(first, read.invoke(module));
+        tree.getAsJsonObject("nodes").getAsJsonObject("root").getAsJsonObject("criteria")
+            .getAsJsonObject("break").addProperty("trigger", "place_block");
+        storage.save(ReSyncResourceCatalog.ADVANCEMENT_TREE, tree);
+        Map<?, ?> updated = (Map<?, ?>) read.invoke(module);
+        assertEquals("place_block", ((JsonObject) updated.get("events")).getAsJsonObject("nodes").getAsJsonObject("root")
+            .getAsJsonObject("criteria").getAsJsonObject("break").get("trigger").getAsString());
+        storage.delete(ReSyncResourceCatalog.ADVANCEMENT_TREE, "events");
+        assertTrue(((Map<?, ?>) read.invoke(module)).isEmpty());
+        storage.save(ReSyncResourceCatalog.ADVANCEMENT_TREE, tree);
+        assertFalse(((Map<?, ?>) read.invoke(module)).isEmpty());
+        Path replacement = tempDir.resolve("replacement");
+        storage.rebindPersistence(replacement, coordinator(replacement));
+        assertTrue(((Map<?, ?>) read.invoke(module)).isEmpty());
+        storage.quiescePersistence();
+        assertTrue(((Map<?, ?>) read.invoke(module)).isEmpty());
     }
 
     private ReSyncJsonResourceStorage storage(JavaPlugin plugin) throws Exception {

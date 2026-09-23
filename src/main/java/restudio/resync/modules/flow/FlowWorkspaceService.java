@@ -28,6 +28,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.Locale;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
+import java.util.function.BiPredicate;
+import restudio.resync.flow.workspace.CoreWorkspaceDocument;
 
 public final class FlowWorkspaceService {
     private static final int MAX_PATCHES = GraphWorkspacePatchEngine.MAX_OPERATIONS;
@@ -50,12 +54,13 @@ public final class FlowWorkspaceService {
     private final FlowPacketSender sender;
     private final FlowResourceRegistry resources;
     private final CoreGraphWorkspaceDocumentProvider coreGraphs;
-    private final GraphWorkspacePatchEngine corePatches = new GraphWorkspacePatchEngine();
     private final Map<String, FlowWorkspaceDocumentProvider> documentProviders = new ConcurrentHashMap<>();
     private final Gson gson = new Gson();
     private final Map<String, Workspace> workspaces = new ConcurrentHashMap<>();
     private final Map<String, ReentrantLock> authorityLocks = new ConcurrentHashMap<>();
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
+    private BiPredicate<Session, WorkspaceAuthority> authorityAdmission;
+    private final Map<String, WorkspaceAuthority> workspaceAuthorities = new ConcurrentHashMap<>();
     private final Map<String, ProtocolEditability> editability = new ConcurrentHashMap<>();
     private final Map<FlowResourceKey, WorkspaceCompletion> pendingCompletions = new ConcurrentHashMap<>();
     private final AtomicBoolean shutdown = new AtomicBoolean();
@@ -88,6 +93,15 @@ public final class FlowWorkspaceService {
         String type = normalizeType(request.type());
         String resourceId = safe(request.resourceId());
         String key = key(type, resourceId);
+        if (isCoreGraphWorkspace(type) && authorityAdmission != null) {
+            WorkspaceAuthority claim = new WorkspaceAuthority(request.catalogKey(), request.authorityEpoch(), request.documentVersion());
+            if (!authorityAdmission.test(session, claim)) {
+                sender.sendWorkspaceResync(session, gson.toJson(new ResyncEvent(type, resourceId, "Workspace Authority Changed")));
+                return;
+            }
+            workspaceAuthorities.put(editabilityKey(session, type, resourceId), claim);
+            setEditability(session, type, resourceId, ProtocolEditability.EDITABLE);
+        }
         ReentrantLock authority = authorityLock(type, resourceId);
         authority.lock();
         try {
@@ -126,6 +140,13 @@ public final class FlowWorkspaceService {
         }
     }
 
+    public record WorkspaceAuthority(String catalogKey, long authorityEpoch, int documentVersion) {
+    }
+
+    public void setAuthorityAdmission(BiPredicate<Session, WorkspaceAuthority> admission) {
+        authorityAdmission = admission;
+    }
+
     public void setEditability(Session session, String type, String resourceId, ProtocolEditability value) {
         if (session == null || type == null || type.isBlank() || resourceId == null || resourceId.isBlank() || value == null) {
             throw new IllegalArgumentException("Workspace editability requires a session, resource, and negotiated value");
@@ -146,7 +167,7 @@ public final class FlowWorkspaceService {
         if (!valid(request) || request.patches() == null || request.patches().isEmpty() || request.patches().size() > MAX_PATCHES
             || request.patches().stream().anyMatch(patch -> !validClientPatch(patch)
                 && !(isCoreGraphWorkspace(safe(request.type())) && patch != null && "array_reorder".equals(patch.op())))
-            || (request != null && isCoreGraphWorkspace(safe(request.type())) && request.patches().stream().anyMatch(patch -> !validCorePatch(patch)))) {
+            ) {
             sender.sendWorkspaceResync(session, gson.toJson(new ResyncEvent(request != null ? request.type() : "", request != null ? request.resourceId() : "", "Invalid Operation")));
             return;
         }
@@ -188,7 +209,9 @@ public final class FlowWorkspaceService {
                             resyncReason = "Invalid Operation";
                         }
                         if (resyncReason == null) {
-                            request.patches().stream().map(this::copy).forEach(workspace.pendingPatches::add);
+                            if (!isCoreGraphWorkspace(type)) {
+                                request.patches().stream().map(this::copy).forEach(workspace.pendingPatches::add);
+                            }
                             event = workspace.revision.advance(request.operationId(), payloadHash, sequence ->
                                 new OperationEvent(type, resourceId, sequence, safe(request.operationId()), session.getSessionId(),
                                     identity(session), payloadHash, List.copyOf(request.patches())));
@@ -379,7 +402,16 @@ public final class FlowWorkspaceService {
                     return;
                 }
                 try {
-                    workspace.document = rebase(type, latest, workspace.pendingPatches);
+                    if (isCoreGraphWorkspace(type)) {
+                        CoreWorkspaceDocument base = CoreWorkspaceDocument.decode(GsonJsonValues.convert(workspace.baseDocument));
+                        CoreWorkspaceDocument draft = CoreWorkspaceDocument.decode(GsonJsonValues.convert(workspace.document));
+                        CoreWorkspaceDocument committed = CoreWorkspaceDocument.decode(GsonJsonValues.convert(latest));
+                        workspace.document = JsonParser.parseString(base.rebase(draft, committed).encode().canonicalText()).getAsJsonObject();
+                        workspace.baseDocument = latest;
+                        workspace.pendingPatches.clear();
+                    } else {
+                        workspace.document = rebase(type, latest, workspace.pendingPatches);
+                    }
                 } catch (RuntimeException exception) {
                     reason = "Workspace Rebase Conflict";
                 }
@@ -409,7 +441,7 @@ public final class FlowWorkspaceService {
                                                              String type, String resourceId) {
         requireCoreMutation(session, type, resourceId);
         CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
-        boundary.decode(canonicalEnvelope, resource);
+        CoreGraphStorageBoundary.Decoded submitted = boundary.decode(canonicalEnvelope, resource);
         Workspace workspace = workspaces.get(key(type, resourceId));
         if (workspace != null) {
             workspace.commitLock.lock();
@@ -417,6 +449,18 @@ public final class FlowWorkspaceService {
         try {
             if (workspace != null && !isWorkspaceMember(workspace, session)) {
                 throw new IllegalStateException("Core workspace save requires membership in the current workspace");
+            }
+            JsonObject preparedDraft = null;
+            if (workspace != null) {
+                synchronized (workspace) {
+                    if (workspaces.get(key(type, resourceId)) != workspace || workspace.deleted) {
+                        throw new IllegalStateException("Core workspace changed before save");
+                    }
+                    CoreWorkspaceDocument base = CoreWorkspaceDocument.decode(GsonJsonValues.convert(workspace.baseDocument));
+                    CoreWorkspaceDocument draft = CoreWorkspaceDocument.decode(GsonJsonValues.convert(workspace.document));
+                    CoreWorkspaceDocument committed = new CoreWorkspaceDocument(submitted.graphDocument(), submitted.functionSourceDocument());
+                    preparedDraft = JsonParser.parseString(base.rebase(draft, committed).encode().canonicalText()).getAsJsonObject();
+                }
             }
             CoreGraphStorageBoundary.Decoded saved;
             workspaceSaveCommit.set(true);
@@ -436,7 +480,8 @@ public final class FlowWorkspaceService {
                     if (workspaces.get(key(type, resourceId)) != workspace || workspace.deleted) {
                         throw new IllegalStateException("Core workspace changed during save");
                     }
-                    workspace.document = persisted;
+                    workspace.document = preparedDraft;
+                    workspace.baseDocument = persisted;
                     workspace.pendingPatches.clear();
                     targets = members(workspace, null);
                 }
@@ -635,6 +680,8 @@ public final class FlowWorkspaceService {
     }
 
     private void leave(Session session, String key) {
+        workspaceAuthorities.remove(session.getSessionId() + '\u0000' + key);
+        editability.remove(session.getSessionId() + '\u0000' + key);
         Workspace workspace = workspaces.get(key);
         if (workspace == null) {
             return;
@@ -879,7 +926,7 @@ public final class FlowWorkspaceService {
             throw new IllegalArgumentException("Core workspace document must be an object");
         }
         List<WorkspacePatch<JsonValue>> converted = patches.stream().map(this::corePatch).toList();
-        JsonValue.JsonObject next = rebase ? corePatches.rebase(object, converted) : corePatches.apply(object, converted);
+        JsonValue.JsonObject next = CoreWorkspaceDocument.decode(object).apply(converted).encode();
         return JsonParser.parseString(next.canonicalText()).getAsJsonObject();
     }
 
@@ -1053,14 +1100,6 @@ public final class FlowWorkspaceService {
         return content != null ? content.getGraph() : null;
     }
 
-    private boolean validCorePatch(WorkspacePatch<JsonElement> patch) {
-        try {
-            return corePatches.valid(corePatch(patch));
-        } catch (RuntimeException exception) {
-            return false;
-        }
-    }
-
     private FlowResourceMutationLease.DeferredCompletion persistGraphHandle(String type, String resourceId, FlowGraph graph,
                                                                             Runnable beforeVisible, Runnable afterVisible) {
         if (resources == null) {
@@ -1103,7 +1142,7 @@ public final class FlowWorkspaceService {
     }
 
     private String normalizeType(String value) {
-        return safe(value).toLowerCase(java.util.Locale.ROOT);
+        return safe(value).toLowerCase(Locale.ROOT);
     }
 
     private String editabilityKey(Session session, String type, String resourceId) {
@@ -1113,6 +1152,12 @@ public final class FlowWorkspaceService {
     private ProtocolEditability editability(Session session, String type, String resourceId) {
         if (!isCoreGraphWorkspace(type)) {
             return ProtocolEditability.EDITABLE;
+        }
+        if (session != null && authorityAdmission != null) {
+            WorkspaceAuthority claim = workspaceAuthorities.get(editabilityKey(session, type, resourceId));
+            if (claim == null || !authorityAdmission.test(session, claim)) {
+                return ProtocolEditability.REJECTED;
+            }
         }
         return session != null ? editability.getOrDefault(editabilityKey(session, type, resourceId), ProtocolEditability.REJECTED)
             : ProtocolEditability.REJECTED;
@@ -1129,7 +1174,7 @@ public final class FlowWorkspaceService {
         payload.add("patches", JsonParser.parseString(gson.toJson(patches)));
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(GsonJsonValues.convert(payload).canonicalBytes()));
-        } catch (java.security.NoSuchAlgorithmException exception) {
+        } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
@@ -1147,7 +1192,7 @@ public final class FlowWorkspaceService {
         }
     }
 
-    private record JoinRequest(String type, String resourceId) {
+    private record JoinRequest(String type, String resourceId, String catalogKey, long authorityEpoch, int documentVersion) {
     }
 
     private record OperationRequest(String type, String resourceId, String operationId, long baseSequence,
@@ -1305,6 +1350,7 @@ public final class FlowWorkspaceService {
         private final String type;
         private final String resourceId;
         private JsonObject document;
+        private JsonObject baseDocument;
         private final Set<String> members = ConcurrentHashMap.newKeySet();
         private final Map<String, AwarenessEvent> awareness = new ConcurrentHashMap<>();
         private final List<WorkspacePatch<JsonElement>> pendingPatches = new ArrayList<>();
@@ -1316,6 +1362,7 @@ public final class FlowWorkspaceService {
             this.type = type;
             this.resourceId = resourceId;
             this.document = document;
+            this.baseDocument = document.deepCopy();
         }
     }
 }

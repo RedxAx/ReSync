@@ -14,7 +14,6 @@ import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.FlowRuntime;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.SchedulePattern;
-import restudio.resync.flow.migration.IdCompatibilityLayer;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.flow.identity.FunctionParameterId;
 import restudio.resync.flow.identity.PinId;
@@ -65,8 +64,6 @@ public final class FlowGraphValidator {
     private final FlowGraphValidationRegistry extensionValidators;
     private final Clock clock;
     private final BiConsumer<FlowGraph, FlowGraphValidationResult> diagnosticSink;
-    private final IdCompatibilityLayer compatibility;
-    private final boolean legacyAliasesEnabled;
 
     public FlowGraphValidator(NodeDefinitionRegistry definitions, HandlerRegistry handlers, TypeAdapterRegistry adapters, OptionCatalogRegistry catalogs) {
         this(definitions, handlers, adapters, catalogs, null);
@@ -105,8 +102,6 @@ public final class FlowGraphValidator {
         this.extensionValidators = extensionValidators;
         this.clock = clock != null ? clock : Clock.systemUTC();
         this.diagnosticSink = diagnosticSink;
-        this.legacyAliasesEnabled = legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyAliases();
-        this.compatibility = legacyAliasesEnabled ? new IdCompatibilityLayer() : null;
     }
 
     public FlowGraphValidationResult validate(FlowGraph graph) {
@@ -207,7 +202,7 @@ public final class FlowGraphValidator {
                 diagnostics.add(error("NODE_TYPE_REQUIRED", graphId, nodeId, "", "Node type is required", "Select a registered node type"));
                 continue;
             }
-            String canonicalType = legacyAliasesEnabled ? compatibility.mapToNew(type) : type;
+            String canonicalType = type;
             NodeDefinition definition = definitions != null ? definitions.get(canonicalType) : null;
             if (definition == null) {
                 diagnostics.add(error("NODE_DEFINITION_MISSING", graphId, nodeId, "", "Node definition is unavailable: " + type, "Install the required extension or migrate the node"));

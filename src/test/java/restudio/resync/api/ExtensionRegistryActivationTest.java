@@ -110,6 +110,90 @@ class ExtensionRegistryActivationTest {
     }
 
     @Test
+    void completeRegistryStateRemainsEquivalentAfterCaptureRoundTrip() {
+        ExtensionRegistryActivation.State first = fullState(1, "alpha");
+        NodeDefinitionRegistry definitions = first.nodeDefinitions();
+        HandlerRegistry handlers = first.handlers();
+        PropertyRegistry properties = first.properties();
+        OptionCatalogRegistry catalogs = first.optionCatalogs();
+        RuntimeDataRegistry runtimeData = first.runtimeData();
+        FlowValueCodecRegistry codecs = first.valueCodecs();
+        TypeAdapterRegistry adapters = first.typeAdapters();
+        FlowGraphValidationRegistry validators = first.validators();
+        FlowResourceRegistry resources = first.resources();
+        ReSyncExtensionData extensionData = first.extensionData();
+        FlowEventRegistry events = first.events();
+        FlowRegistry flows = first.flowRegistry();
+        ExtensionRegistryActivation activation = new ExtensionRegistryActivation(first);
+        activation.bind(definitions, handlers, properties, catalogs, runtimeData, codecs, adapters, validators, resources,
+            extensionData, events, flows);
+        ExtensionRegistryActivation.State equivalent = ExtensionRegistryActivation.capture(2, definitions, handlers,
+            properties, catalogs, runtimeData, codecs, adapters, validators, resources, extensionData, events, flows);
+
+        assertTrue(first.semanticallyEquals(equivalent));
+    }
+
+    @Test
+    void runtimeAvailabilityAndRevisionDoNotChangeRegistrationIdentity() {
+        AtomicBoolean available = new AtomicBoolean();
+        AtomicInteger revision = new AtomicInteger();
+        RuntimeDataAdapter<String> adapter = new RuntimeDataAdapter<>() {
+            @Override
+            public String id() {
+                return "mutable:adapter";
+            }
+
+            @Override
+            public String domain() {
+                return "mutable";
+            }
+
+            @Override
+            public FlowTypeRef valueType() {
+                return FlowTypeRef.simple("string");
+            }
+
+            @Override
+            public Class<String> valueClass() {
+                return String.class;
+            }
+
+            @Override
+            public boolean available() {
+                return available.get();
+            }
+
+            @Override
+            public String revision() {
+                return Integer.toString(revision.get());
+            }
+
+            @Override
+            public List<RuntimeDataRecord> records(RuntimeDataQuery query) {
+                return List.of();
+            }
+
+            @Override
+            public String resolve(RuntimeDataRecord record, int amount) {
+                return "";
+            }
+        };
+        RuntimeDataRegistry runtimeData = new RuntimeDataRegistry();
+        assertTrue(runtimeData.register(adapter));
+        assertTrue(runtimeData.adapters("mutable").isEmpty());
+        ExtensionRegistryActivation.State first = ExtensionRegistryActivation.capture(1, null, null, null, null,
+            runtimeData, null, null, null, null, null, null, null);
+
+        available.set(true);
+        revision.incrementAndGet();
+        assertEquals(1, runtimeData.adapters("mutable").size());
+        ExtensionRegistryActivation.State observed = ExtensionRegistryActivation.capture(2, null, null, null, null,
+            runtimeData, null, null, null, null, null, null, null);
+
+        assertTrue(first.semanticallyEquals(observed));
+    }
+
+    @Test
     void catalogRegistrationFingerprintDoesNotReadValuesAndStillTracksProviderReplacement() {
         RuntimeDataRegistry runtime = new RuntimeDataRegistry();
         OptionCatalogRegistry catalogs = new OptionCatalogRegistry(runtime);

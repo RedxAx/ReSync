@@ -19,6 +19,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class CanonicalJsonTest {
     @Test
+    void stringSlicesPreserveEscapesUnicodeAndValidation() {
+        String text = "plain 😀 \"quoted\" \\ slash\nline";
+        String canonical = CanonicalJson.canonicalize(Map.of("a", "plain 😀", "b", text));
+        assertEquals(Map.of("a", "plain 😀", "b", text),
+            CanonicalJson.parse(canonical.getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IllegalArgumentException.class,
+            () -> CanonicalJson.parse("\"bad\nvalue\"".getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IllegalArgumentException.class,
+            () -> CanonicalJson.parse("\"unfinished".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
     void gate0bGoldensAndContractOrdering() throws Exception {
         for (int index = 1; index <= 7; index++) {
             Path golden = Path.of("src", "test", "resources", "restudio", "resync", "flow", "canonical", "goldens", "G-00" + index);

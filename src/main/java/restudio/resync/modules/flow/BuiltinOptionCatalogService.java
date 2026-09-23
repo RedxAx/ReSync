@@ -9,6 +9,7 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.Sound;
+import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.block.Biome;
@@ -93,6 +94,7 @@ public final class BuiltinOptionCatalogService {
         catalog("zombie_nautilus_variant", false),
         catalog("gamemode", false),
         catalog("instrument", true),
+        catalog("item_tag", true),
         catalog("jukebox_song", true),
         catalog("material", true),
         catalog("named_text_color", false),
@@ -540,6 +542,7 @@ public final class BuiltinOptionCatalogService {
                 .distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
             case "block" -> blocks();
             case "instrument" -> registryKeysByField("INSTRUMENT");
+            case "item_tag" -> itemTags();
             case "jukebox_song" -> registryKeysByField("JUKEBOX_SONG");
             case "trim_material" -> registryKeysByField("TRIM_MATERIAL");
             case "trim_pattern" -> registryKeysByField("TRIM_PATTERN");
@@ -567,6 +570,14 @@ public final class BuiltinOptionCatalogService {
     private List<String> customContentRecipeItemValuesForProjection() {
         CustomContentService service = customContentService.get();
         return service != null ? service.recipeItemCatalogForProjection().stream().map(OptionCatalogItem::value).toList() : List.of();
+    }
+
+    private List<String> itemTags() {
+        List<String> values = new ArrayList<>();
+        for (Tag<Material> tag : Bukkit.getTags(Tag.REGISTRY_ITEMS, Material.class)) {
+            values.add("#" + tag.getKey().asString());
+        }
+        return values.stream().distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
     }
 
     private FlowTypeRef catalogRuntimeType(String key) {

@@ -17,6 +17,7 @@ import restudio.resync.migration.MigrationPaths;
 import restudio.resync.migration.MigrationReportsPersistenceParticipant;
 import restudio.resync.migration.RecipeMigrationReportContract;
 import restudio.resync.modules.flow.FlowResourceMutationStamp;
+import restudio.resync.modules.flow.FlowResourceAdapter;
 import restudio.resync.resources.AssetFileFormat;
 import restudio.resync.resources.JsonAssetInventory;
 import restudio.resync.resources.JsonAssetStore;
@@ -74,6 +75,7 @@ public class ReSyncJsonResourceStorage {
     private final AssetPersistenceGate assetsGate;
     private final AssetInventoryFactory assetInventoryFactory;
     private volatile PersistenceState persistenceState = PersistenceState.OPEN;
+    private volatile long snapshotGeneration;
     private final ReentrantReadWriteLock persistenceFence = new ReentrantReadWriteLock(true);
     private RecipeMigrationReportContract.Report pendingRecipeMigrationReport;
     private MigrationReportsPersistenceParticipant migrationReportsAuthority;
@@ -314,6 +316,7 @@ public class ReSyncJsonResourceStorage {
         coordinator = sharedCoordinator;
         legacyRuntimeGate = candidateLegacyRuntimeGate;
         coordinatorListener = admittedListener;
+        snapshotGeneration++;
         pendingRecipeMigrationReport = null;
         iconDataCache.clear();
         closeStores(previous.values(), null);
@@ -409,6 +412,9 @@ public class ReSyncJsonResourceStorage {
                 "rule", "rule.contains", "rule.action", "rule.replacement", "rule.channel", "rule.flowId", "privateMessages",
                 "privateMessages.sender", "privateMessages.receiver", "privateMessages.spy", "privateMessages.privateMessageFlow",
                 "mention", "mention.template", "mention.mentionFlow", "ignore", "ignore.players", "enabled");
+            case ReSyncResourceCatalog.COMPONENT_BUILDER -> Set.of(
+                "id", "folder", "name", "displayName", "description", "enabled", "scope", "scope.kind",
+                "scope.value", "components");
             case ReSyncResourceCatalog.MOTD_PROFILE -> Set.of(
                 "id", "folder", "line1", "line2", "priority", "playerCountMode", "onlinePlayers", "maxPlayers", "icon",
                 "iconData", "iconHash", "enabled");
@@ -517,6 +523,13 @@ public class ReSyncJsonResourceStorage {
         try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
             return requireStore(type).listIds();
         }
+    }
+
+    public long snapshotGeneration() {
+        if (!persistenceMutationOpen()) {
+            throw new IllegalStateException("JSON resource snapshots are unavailable while persistence is closed");
+        }
+        return snapshotGeneration;
     }
 
     public long committedSequence() {
@@ -830,14 +843,19 @@ public class ReSyncJsonResourceStorage {
         JsonObject working = value == null ? null : value.deepCopy();
         String safeId = id(working);
         try {
-            normalizeAssetId(working, safeId);
-            validate(type, working);
-            if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
-                RecipeSchemaNormalizer.normalize(working);
-            }
-            byte[] motdIcon = ReSyncResourceCatalog.MOTD_PROFILE.equals(type) ? prepareMotdIcon(working) : null;
-            if (safeId == null || safeId.isBlank()) {
-                throw new IllegalArgumentException("Invalid JSON resource id");
+            byte[] motdIcon;
+            try {
+                normalizeAssetId(working, safeId);
+                validate(type, working);
+                if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
+                    RecipeSchemaNormalizer.normalize(working);
+                }
+                motdIcon = ReSyncResourceCatalog.MOTD_PROFILE.equals(type) ? prepareMotdIcon(working) : null;
+                if (safeId == null || safeId.isBlank()) {
+                    throw new IllegalArgumentException("Invalid JSON resource id");
+                }
+            } catch (IllegalArgumentException rejection) {
+                throw new FlowResourceAdapter.PreCommitRejection(rejection);
             }
             JsonAssetStore.AssetStamp before;
             long beforeGeneration;
@@ -845,15 +863,20 @@ public class ReSyncJsonResourceStorage {
                 before = store.readStamp(safeId);
                 beforeGeneration = store.cacheGeneration();
             }
-            for (ResourceMutationInterceptor interceptor : interceptors) {
-                interceptor.beforeSave(type, working);
-            }
-            if (!safeId.equals(id(working))) {
-                throw new IllegalArgumentException("JSON resource identity changed during save: " + safeId);
-            }
-            Path iconPath = motdIcon == null ? null : resolveIconPath(text(working, "icon"));
-            if (motdIcon != null && iconPath == null) {
-                throw new IllegalArgumentException("MOTD icon target must be inside coordinated asset storage");
+            Path iconPath;
+            try {
+                for (ResourceMutationInterceptor interceptor : interceptors) {
+                    interceptor.beforeSave(type, working);
+                }
+                if (!safeId.equals(id(working))) {
+                    throw new IllegalArgumentException("JSON resource identity changed during save: " + safeId);
+                }
+                iconPath = motdIcon == null ? null : resolveIconPath(text(working, "icon"));
+                if (motdIcon != null && iconPath == null) {
+                    throw new IllegalArgumentException("MOTD icon target must be inside coordinated asset storage");
+                }
+            } catch (IllegalArgumentException rejection) {
+                throw new FlowResourceAdapter.PreCommitRejection(rejection);
             }
             Map<Path, byte[]> binaryWrites = motdIcon == null ? Map.of() : Map.of(iconPath, motdIcon);
             try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {

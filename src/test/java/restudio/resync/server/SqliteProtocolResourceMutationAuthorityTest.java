@@ -60,6 +60,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -77,6 +80,35 @@ class SqliteProtocolResourceMutationAuthorityTest {
         new ResourceTypeId(ReSyncResourceCatalog.CUSTOM_CONTENT));
     private static final ContractRef<ResourceTypeId> FUNCTION_TYPE = ContractRef.of(new OwnerId("restudio.resync"),
         new ResourceTypeId(ReSyncResourceCatalog.FUNCTION));
+
+    @Test
+    void handshakeCapabilityDoesNotWaitForMutationAwaitingServerThread(@TempDir Path directory) throws Exception {
+        CountingAdapter adapter = new CountingAdapter(new ConcurrentHashMap<>());
+        CountDownLatch saving = new CountDownLatch(1);
+        CountDownLatch serverTask = new CountDownLatch(1);
+        adapter.beforeSave = () -> {
+            saving.countDown();
+            try {
+                assertTrue(serverTask.await(5, TimeUnit.SECONDS));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(interrupted);
+            }
+        };
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry(adapter), directory);
+             var workers = Executors.newFixedThreadPool(2)) {
+            var mutation = workers.submit(() -> mutate(authority, create(resource("handshake"), "Saved")));
+            assertTrue(saving.await(5, TimeUnit.SECONDS));
+            try {
+                assertTrue(workers.submit(authority::durable).get(1, TimeUnit.SECONDS));
+            } finally {
+                serverTask.countDown();
+            }
+            assertTrue(mutation.get(5, TimeUnit.SECONDS).handled());
+            authority.closeMutationAdmission();
+            assertFalse(authority.durable());
+        }
+    }
 
     @Test
     void aggregateCreateReplaysExactPrimaryAndMetadataResultAfterMetadataAdvanceAndRestart(@TempDir Path directory) throws Exception {
@@ -343,7 +375,7 @@ class SqliteProtocolResourceMutationAuthorityTest {
             assertEquals(ProtocolRejectionCode.RESOURCE_MUTATION_PENDING.legacyValue(), pending.code());
         }
 
-        adapter.validationFailure = "Malformed pending aggregate payload";
+        adapter.deserializationFailure = "The graph reported opaque unavailable";
         try (SqliteProtocolResourceMutationAuthority authority = new SqliteProtocolResourceMutationAuthority(registry, SERVER,
             database, CoreGraphResourceAuthority.unavailable(), ProtocolResourceAuthorizer.serverGranted(),
             AuthorityEpoch.fixed(1L), storage)) {
@@ -352,7 +384,7 @@ class SqliteProtocolResourceMutationAuthorityTest {
             assertTrue(authority.durable());
             assertFalse(replay.handled());
             assertEquals(422, replay.transportCode());
-            assertEquals("Malformed pending aggregate payload", replay.message());
+            assertEquals("The graph reported opaque unavailable", replay.message());
             assertEquals(1, storage.creates);
             assertEquals(0, storage.publications);
         }
@@ -365,7 +397,7 @@ class SqliteProtocolResourceMutationAuthorityTest {
                 assertTrue(result.next());
                 assertEquals("REJECTED", result.getString(1));
                 assertEquals(ProtocolRejectionCode.RESOURCE_OPERATION_FAILED.legacyValue(), result.getString(2));
-                assertEquals("Malformed pending aggregate payload", result.getString(3));
+                assertEquals("The graph reported opaque unavailable", result.getString(3));
             }
         }
     }
@@ -405,6 +437,56 @@ class SqliteProtocolResourceMutationAuthorityTest {
             assertTrue(authority.durable());
             assertEquals(2, storage.creates);
             assertEquals(1, storage.publications);
+        }
+    }
+
+    @Test
+    void aggregateCreateRejectsRepeatedStorageFailureWhenNoAtomicCommitExists(@TempDir Path directory) throws Exception {
+        CountingAdapter adapter = new CountingAdapter(new ConcurrentHashMap<>());
+        FlowResourceRegistry registry = registry(adapter);
+        ServerResourceLocator resource = resource("storage-recovery-failure");
+        UUID mutationId = UUID.randomUUID();
+        CanonicalPayload<Map<String, Object>> canonical = ResourcePayloadCodecs.json().canonicalize(
+            Map.of("id", resource.id(), "name", "Storage Recovery Failure"));
+        ProtocolEnvelope<Map<String, Object>> request = envelope(resource,
+            new ResourceCreateRequest<>(resource, canonical, mutationId, new ResourcePresentationIntent("Storage Recovery Failure",
+                "Content/GUI/storage-recovery-failure.json", 1)),
+            ReSyncProtocolContract.GENERIC_RESOURCE_CONTRACT_VERSION);
+        AggregateStorage storage = new AggregateStorage();
+        storage.failuresBeforeCreate = 1;
+        Path database = directory.resolve("resource.db");
+
+        try (SqliteProtocolResourceMutationAuthority authority = new SqliteProtocolResourceMutationAuthority(registry, SERVER,
+            database, CoreGraphResourceAuthority.unavailable(), ProtocolResourceAuthorizer.serverGranted(),
+            AuthorityEpoch.fixed(1L), storage)) {
+            ProtocolEnvelopeDispatchResult pending = mutate(authority, request);
+
+            assertFalse(pending.handled());
+            assertEquals(ProtocolRejectionCode.RESOURCE_MUTATION_PENDING.legacyValue(), pending.code());
+        }
+
+        storage.failuresBeforeCreate = 1;
+        try (SqliteProtocolResourceMutationAuthority authority = new SqliteProtocolResourceMutationAuthority(registry, SERVER,
+            database, CoreGraphResourceAuthority.unavailable(), ProtocolResourceAuthorizer.serverGranted(),
+            AuthorityEpoch.fixed(1L), storage)) {
+            ProtocolEnvelopeDispatchResult replay = mutate(authority, request);
+
+            assertTrue(authority.durable());
+            assertFalse(replay.handled());
+            assertEquals(422, replay.transportCode());
+            assertEquals("Injected pre-commit failure", replay.message());
+        }
+
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             PreparedStatement statement = connection.prepareStatement(
+                 "SELECT status, error_code, error_message FROM resource_mutation_receipt WHERE mutation_id = ?")) {
+            statement.setString(1, mutationId.toString());
+            try (var result = statement.executeQuery()) {
+                assertTrue(result.next());
+                assertEquals("REJECTED", result.getString(1));
+                assertEquals(ProtocolRejectionCode.RESOURCE_OPERATION_FAILED.legacyValue(), result.getString(2));
+                assertEquals("Injected pre-commit failure", result.getString(3));
+            }
         }
     }
 
@@ -814,6 +896,55 @@ class SqliteProtocolResourceMutationAuthorityTest {
             ProtocolBody.ResourceDocumentResponse body = assertInstanceOf(ProtocolBody.ResourceDocumentResponse.class, saved.response().body());
             assertEquals(2, body.document().revision());
             assertEquals("Updated", ((Map<?, ?>) body.document().payload()).get("name"));
+        }
+        assertEquals(2, adapter.saves);
+    }
+
+    @Test
+    void rejectedSaveDoesNotBlockAValidSave(@TempDir Path directory) {
+        CountingAdapter adapter = new CountingAdapter(new ConcurrentHashMap<>());
+        FlowResourceRegistry registry = registry(adapter);
+        ServerResourceLocator resource = resource("invalid-player-npc");
+
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
+            assertTrue(mutate(authority, create(resource, "Draft")).handled());
+            adapter.validationFailure = "Player NPCs do not support entity AI";
+            ProtocolEnvelopeDispatchResult rejected = mutate(authority, save(resource, 1, "Invalid"));
+            assertFalse(rejected.handled());
+            assertEquals("Player NPCs do not support entity AI", rejected.message());
+            adapter.validationFailure = null;
+            ProtocolEnvelopeDispatchResult saved = mutate(authority, save(resource, 1, "Valid"));
+            assertTrue(saved.handled(), saved.code() + ": " + saved.message());
+            assertEquals(2L, authority.load(resource).revision());
+        }
+        assertEquals(2, adapter.saves);
+    }
+
+    @Test
+    void recoveryRejectsAnUnappliedInvalidSaveAndUnblocksTheResource(@TempDir Path directory) {
+        CountingAdapter adapter = new CountingAdapter(new ConcurrentHashMap<>());
+        FlowResourceRegistry registry = registry(adapter);
+        ServerResourceLocator resource = resource("pending-invalid-player-npc");
+        ProtocolEnvelope<Map<String, Object>> invalid = save(resource, 1, "Invalid");
+
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
+            assertTrue(mutate(authority, create(resource, "Draft")).handled());
+            adapter.failuresBeforeSave = 1;
+            ProtocolEnvelopeDispatchResult pending = mutate(authority, invalid);
+            assertFalse(pending.handled());
+            assertEquals("RESOURCE_MUTATION_PENDING", pending.code());
+        }
+
+        adapter.validationFailure = "Player NPCs do not support entity AI";
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
+            assertTrue(authority.durable());
+            ProtocolEnvelopeDispatchResult replay = mutate(authority, invalid);
+            assertFalse(replay.handled());
+            assertEquals("Player NPCs do not support entity AI", replay.message());
+            adapter.validationFailure = null;
+            ProtocolEnvelopeDispatchResult saved = mutate(authority, save(resource, 1, "Valid"));
+            assertTrue(saved.handled(), saved.code() + ": " + saved.message());
+            assertEquals(2L, authority.load(resource).revision());
         }
         assertEquals(2, adapter.saves);
     }
@@ -1654,6 +1785,7 @@ class SqliteProtocolResourceMutationAuthorityTest {
         private int failuresBeforeSave;
         private int failuresBeforeGet;
         private Runnable afterSaveMutation;
+        private Runnable beforeSave;
         private boolean exactIdentity = true;
         private StampMismatch stampMismatch;
         private FlowResourceMutationAdmission observedAdmission;
@@ -1696,7 +1828,7 @@ class SqliteProtocolResourceMutationAuthorityTest {
         @Override
         public JsonObject deserialize(String json) {
             if (deserializationFailure != null) {
-                throw new IllegalArgumentException(deserializationFailure);
+                throw new IllegalStateException(deserializationFailure);
             }
             return new Gson().fromJson(json, JsonObject.class);
         }
@@ -1730,6 +1862,9 @@ class SqliteProtocolResourceMutationAuthorityTest {
 
         @Override
         public void save(JsonObject value, UUID mutationId, long expectedRevision) {
+            if (beforeSave != null) {
+                beforeSave.run();
+            }
             if (failuresBeforeSave > 0) {
                 failuresBeforeSave--;
                 throw new IllegalStateException("Injected save failure");

@@ -108,6 +108,7 @@ import restudio.resync.flow.catalog.CatalogRuntimeActivation;
 import restudio.resync.flow.catalog.CatalogSnapshot;
 import restudio.resync.flow.catalog.CatalogSourceIngestor;
 import restudio.resync.flow.catalog.CatalogStartupIndex;
+import restudio.resync.flow.catalog.CatalogFunctionShape;
 import restudio.resync.flow.catalog.CatalogVersion;
 import restudio.resync.flow.catalog.CatalogCanonicalizer;
 import restudio.resync.flow.diagnostic.Diagnostic;
@@ -128,6 +129,7 @@ import restudio.resync.flow.inspector.InspectorFallback;
 import restudio.resync.flow.inspector.InspectorOptionSource;
 import restudio.resync.flow.inspector.InspectorCapability;
 import restudio.resync.flow.inspector.InspectorValueSchema;
+import restudio.resync.flow.inspector.OptionQuerySchemaV1;
 import restudio.resync.flow.runtime.RuntimeFailureContract;
 import restudio.resync.flow.runtime.CompiledRuntimeContext;
 import restudio.resync.flow.CompiledRuntimeValueCodec;
@@ -157,6 +159,7 @@ import restudio.resync.flow.cache.CatalogCacheKey;
 import restudio.resync.flow.cache.CatalogPublicationReceipt;
 import restudio.resync.flow.cache.CatalogPublicationReceiptStore;
 import restudio.resync.flow.type.CodecDescriptor;
+import restudio.resync.flow.type.ConversionGraph;
 import restudio.resync.flow.type.TypeDescriptor;
 import restudio.resync.flow.type.TypeExpr;
 import restudio.resync.flow.type.TypeReference;
@@ -193,6 +196,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -737,6 +741,13 @@ public class FlowModule implements Module {
         this.catalogPublicationHandler = new FlowCatalogPublicationPacketHandler(sender, catalogPublicationTransport,
             publicationReceiptStore, subscribedSessions);
         this.catalogPublicationPolicy = new FlowCatalogPublicationPolicy(subscribedSessions, catalogPublicationHandler);
+        this.workspaces.setAuthorityAdmission((session, claim) -> session != null && claim != null
+            && claim.documentVersion() == 1 && authorityEpoch.acceptsTyped(claim.authorityEpoch())
+            && session.getConnection() != null && session.getConnection().hasProtocolResourceAccess()
+            && session.getConnection().getNegotiatedFlowCapabilities().contains("live_workspace")
+            && catalogPublicationHandler.catalogPublicationForSession(session)
+                .filter(publication -> publication.authoringPublication() != null
+                    && publication.key().canonicalText().equals(claim.catalogKey())).isPresent());
         this.nodeRegistryHandler.requireTypedCatalogPublicationAuthority();
         activateCoreMutationSubscribers();
     }
@@ -2830,12 +2841,21 @@ public class FlowModule implements Module {
             optionCatalogRegistry.providers().stream().filter(provider -> "custom_content".equals(provider.providerId()))
                 .map(OptionCatalogProvider::sourceId).forEach(providerOptionQuerySourceChange);
         }
-        providerOptionQuerySourceChange.accept(RuntimeDataOptionCatalogService.CATEGORY_SOURCE);
         OptionCatalogCaptureExecutor captureExecutor = optionCatalogCaptureExecutor;
         if (captureExecutor != null) {
             RuntimeDataOptionCatalogService.refresh(optionCatalogRegistry, captureExecutor, CustomContentItemDataAdapter.ID)
-                .whenComplete((ignored, failure) -> optionCatalogHandler.broadcastCatalog(RuntimeDataOptionCatalogService.CATEGORY_SOURCE));
+                .whenComplete((ignored, failure) -> publishRuntimeDataCategoryRefresh(failure));
+        } else {
+            publishRuntimeDataCategoryRefresh(null);
         }
+    }
+
+    private void publishRuntimeDataCategoryRefresh(Throwable failure) {
+        if (failure != null) {
+            Log.warn("Runtime data category catalog refresh failed: " + failure.getMessage());
+        }
+        providerOptionQuerySourceChange.accept(RuntimeDataOptionCatalogService.CATEGORY_SOURCE);
+        optionCatalogHandler.broadcastCatalog(RuntimeDataOptionCatalogService.CATEGORY_SOURCE);
     }
 
     public void setProviderOptionQuerySourceChange(Consumer<String> sourceChange) {
@@ -2847,6 +2867,13 @@ public class FlowModule implements Module {
         optionCatalogCaptureExecutor = Objects.requireNonNull(captureExecutor, "Option catalog capture executor is required");
         optionCatalogRegistry.bindCapture(captureExecutor::capture);
         optionCatalogHandler.setCaptureExecutor(captureExecutor);
+    }
+
+    CompletionStage<Void> prepareRuntimeDataCategories() {
+        OptionCatalogCaptureExecutor captureExecutor = Objects.requireNonNull(optionCatalogCaptureExecutor,
+            "Option catalog capture executor is required");
+        return RuntimeDataOptionCatalogService.prewarm(optionCatalogRegistry, captureExecutor)
+            .whenComplete((ignored, failure) -> publishRuntimeDataCategoryRefresh(failure));
     }
 
     public int getSubscribedSessionCount() {
@@ -3714,9 +3741,11 @@ public class FlowModule implements Module {
     private List<CatalogContribution> buildCatalogContributions(List<CatalogSourceIngestor.CatalogSource> sources) {
         ExtensionRegistryActivation activation = definitionRegistry.activation();
         if (activation != null) {
-            return activation.readConsistent(ignored -> buildCatalogContributions(definitionRegistry, handlerRegistry, extensionData, sources));
+            return activation.readConsistent(ignored -> buildCatalogContributions(definitionRegistry, handlerRegistry,
+                extensionData, sources, catalogCompiler.contractVersion(), null, optionCatalogRegistry));
         }
-        return buildCatalogContributions(definitionRegistry, handlerRegistry, extensionData, sources);
+        return buildCatalogContributions(definitionRegistry, handlerRegistry, extensionData, sources,
+            catalogCompiler.contractVersion(), null, optionCatalogRegistry);
     }
 
     private CatalogBuild buildStartupCatalog(List<CatalogSourceIngestor.CatalogSource> sources) {
@@ -3724,9 +3753,9 @@ public class FlowModule implements Module {
         ExtensionRegistryActivation activation = definitionRegistry.activation();
         List<CatalogContribution> contributions = activation != null
             ? activation.readConsistent(ignored -> buildCatalogContributions(definitionRegistry, handlerRegistry,
-                extensionData, sources, catalogCompiler.contractVersion(), runtimeDescriptors))
+                extensionData, sources, catalogCompiler.contractVersion(), runtimeDescriptors, optionCatalogRegistry))
             : buildCatalogContributions(definitionRegistry, handlerRegistry, extensionData, sources,
-                catalogCompiler.contractVersion(), runtimeDescriptors);
+                catalogCompiler.contractVersion(), runtimeDescriptors, optionCatalogRegistry);
         Map<RuntimeOperationDescriptor, NodeDefinition> runtimeDefinitions = new LinkedHashMap<>();
         runtimeDescriptors.forEach((definition, descriptor) -> runtimeDefinitions.putIfAbsent(descriptor, definition));
         return new CatalogBuild(contributions, runtimeDefinitions);
@@ -3742,14 +3771,24 @@ public class FlowModule implements Module {
                                                                   HandlerRegistry handlers,
                                                                   ReSyncExtensionData contributionData,
                                                                   List<CatalogSourceIngestor.CatalogSource> sources) {
-        return buildCatalogContributions(definitionsRegistry, handlers, contributionData, sources, catalogCompiler.contractVersion());
+        return buildCatalogContributions(definitionsRegistry, handlers, contributionData, sources,
+            catalogCompiler.contractVersion(), null, optionCatalogRegistry);
     }
 
     static List<CatalogContribution> buildCatalogContributions(NodeDefinitionRegistry definitionsRegistry,
                                                                HandlerRegistry handlers, ReSyncExtensionData contributionData,
                                                                List<CatalogSourceIngestor.CatalogSource> sources,
                                                                CatalogVersion contractVersion) {
-        return buildCatalogContributions(definitionsRegistry, handlers, contributionData, sources, contractVersion, null);
+        return buildCatalogContributions(definitionsRegistry, handlers, contributionData, sources, contractVersion, null, null);
+    }
+
+    static List<CatalogContribution> buildCatalogContributions(NodeDefinitionRegistry definitionsRegistry,
+                                                               HandlerRegistry handlers, ReSyncExtensionData contributionData,
+                                                               List<CatalogSourceIngestor.CatalogSource> sources,
+                                                               CatalogVersion contractVersion,
+                                                               OptionCatalogRegistry optionCatalogs) {
+        return buildCatalogContributions(definitionsRegistry, handlers, contributionData, sources, contractVersion, null,
+            optionCatalogs);
     }
 
     private static List<CatalogContribution> buildCatalogContributions(NodeDefinitionRegistry definitionsRegistry,
@@ -3757,7 +3796,8 @@ public class FlowModule implements Module {
                                                                        ReSyncExtensionData contributionData,
                                                                        List<CatalogSourceIngestor.CatalogSource> sources,
                                                                        CatalogVersion contractVersion,
-                                                                       Map<NodeDefinition, RuntimeOperationDescriptor> runtimeDescriptors) {
+                                                                       Map<NodeDefinition, RuntimeOperationDescriptor> runtimeDescriptors,
+                                                                       OptionCatalogRegistry optionCatalogs) {
         Map<OwnerId, List<NodeDefinition>> grouped = new LinkedHashMap<>();
         Map<OwnerId, List<TypeDescriptor>> groupedTypes = catalogTypes();
         List<NodeDefinition> sourceDefinitions = new ArrayList<>(definitionsRegistry.getAllDefinitions().values());
@@ -3787,7 +3827,7 @@ public class FlowModule implements Module {
             List<CatalogNodeDescriptor> nodes = new ArrayList<>();
             for (NodeDefinition definition : grouped.getOrDefault(owner, List.of())) {
                 nodes.add(catalogNode(owner, definition, categories, capabilities, optionSources, runtimeRequirements,
-                    handlers, runtimeDescriptors));
+                    handlers, runtimeDescriptors, optionCatalogs));
             }
             List<TypeDescriptor> types = groupedTypes.getOrDefault(owner, List.of());
             if (!types.isEmpty()) {
@@ -3805,6 +3845,7 @@ public class FlowModule implements Module {
             contributions.add(CatalogContribution.builder(owner, sourceVersion, contractRange, provenance)
                 .definitions(nodes)
                 .types(types)
+                .conversions(catalogConversions(owner, grouped.getOrDefault(owner, List.of()), handlers))
                 .categories(new ArrayList<>(categories.values()))
                 .capabilities(new ArrayList<>(capabilities.values()))
                 .optionSources(new ArrayList<>(optionSources.values()))
@@ -3812,11 +3853,36 @@ public class FlowModule implements Module {
                 .build());
         }
         List<CatalogContribution> authored = ingestAuthoredCatalogSources(sources, sourceDefinitions, handlers,
-            contractVersion, runtimeDescriptors);
+            contractVersion, runtimeDescriptors, optionCatalogs);
         if (authored.isEmpty()) {
             return List.copyOf(contributions);
         }
         return mergeGeneratedAndAuthoredContributions(contributions, authored);
+    }
+
+    static List<ConversionGraph.ConversionEdge> catalogConversions(OwnerId owner,
+                                                                   List<NodeDefinition> definitions,
+                                                                   HandlerRegistry handlers) {
+        if (!"restudio.resync".equals(owner.value())) {
+            return List.of();
+        }
+        NodeDefinition definition = definitions.stream()
+            .filter(value -> "to_number".equals(nodeLocalId(owner, value)))
+            .findFirst()
+            .orElse(null);
+        if (definition == null) {
+            return List.of();
+        }
+        RuntimeOperationDescriptor requirement = runtimeOperationDescriptor(definition, handlers);
+        TypeExpr source = TypeExpr.named(TypeReference.of("builtin", "string"));
+        TypeExpr target = TypeExpr.named(TypeReference.of("builtin", "number"));
+        if (!requirement.inputs().equals(List.of(source)) || !requirement.outputs().equals(List.of(target))) {
+            throw new IllegalStateException("String To Number Runtime Signature Is Invalid");
+        }
+        return List.of(new ConversionGraph.ConversionEdge(
+            TypeReference.of(owner.value(), "string-to-number"), source, target, 1,
+            ConversionGraph.Losslessness.LOSSY, ConversionGraph.FailureBehavior.INFALLIBLE,
+            requirement.capability(), requirement.operation()));
     }
 
     private static Map<OwnerId, List<TypeDescriptor>> catalogTypes() {
@@ -4066,7 +4132,8 @@ public class FlowModule implements Module {
         List<NodeDefinition> sourceDefinitions,
         HandlerRegistry handlers,
         CatalogVersion contractVersion,
-        Map<NodeDefinition, RuntimeOperationDescriptor> runtimeDescriptors
+        Map<NodeDefinition, RuntimeOperationDescriptor> runtimeDescriptors,
+        OptionCatalogRegistry optionCatalogs
     ) {
         if (sources == null || sources.isEmpty()) {
             return List.of();
@@ -4076,7 +4143,7 @@ public class FlowModule implements Module {
         for (NodeDefinition definition : sourceDefinitions) {
             OwnerId owner = catalogOwner(definition);
             definitions.put(authoredNodeKey(owner, nodeLocalId(owner, definition)), definition);
-            collectAuthoredOptionSources(owner, definition, options);
+            collectAuthoredOptionSources(owner, definition, options, optionCatalogs);
         }
         List<CatalogCategoryDescriptor> categories = authoredCategories(sourceDefinitions);
         Map<OwnerId, List<CatalogContribution>> byOwner = new LinkedHashMap<>();
@@ -4147,22 +4214,31 @@ public class FlowModule implements Module {
 
     static void collectAuthoredOptionSources(OwnerId owner, NodeDefinition definition,
                                              Map<InspectorFieldId, InspectorOptionSource> options) {
+        collectAuthoredOptionSources(owner, definition, options, null);
+    }
+
+    private static void collectAuthoredOptionSources(OwnerId owner, NodeDefinition definition,
+                                                     Map<InspectorFieldId, InspectorOptionSource> options,
+                                                     OptionCatalogRegistry optionCatalogs) {
         for (NodeDefinition.PinDefinition pin : definition.getInputs()) {
-            collectAuthoredOptionSource(owner, pin, options);
+            collectAuthoredOptionSource(owner, definition, pin, options, optionCatalogs);
         }
         for (NodeDefinition.PinDefinition pin : definition.getOutputs()) {
-            collectAuthoredOptionSource(owner, pin, options);
+            collectAuthoredOptionSource(owner, definition, pin, options, optionCatalogs);
         }
     }
 
-    private static void collectAuthoredOptionSource(OwnerId owner, NodeDefinition.PinDefinition pin,
-                                                    Map<InspectorFieldId, InspectorOptionSource> options) {
+    private static void collectAuthoredOptionSource(OwnerId owner, NodeDefinition definition,
+                                                    NodeDefinition.PinDefinition pin,
+                                                    Map<InspectorFieldId, InspectorOptionSource> options,
+                                                    OptionCatalogRegistry optionCatalogs) {
         String source = pin.getOptionsSource();
         if (source == null || source.isBlank()) {
             return;
         }
         TypeExpr type = typeExpression(pin.getTypeRef());
-        InspectorOptionSource option = catalogOptionSource(owner, source, type);
+        InspectorOptionSource option = catalogOptionSource(owner, source, type,
+            optionQuerySchema(source, definition, optionCatalogs));
         InspectorFieldId id = option.id();
         InspectorOptionSource previous = options.putIfAbsent(id, option);
         if (previous != null && !previous.equals(option)) {
@@ -4171,6 +4247,11 @@ public class FlowModule implements Module {
     }
 
     static InspectorOptionSource catalogOptionSource(OwnerId owner, String source, TypeExpr type) {
+        return catalogOptionSource(owner, source, type, OptionQuerySchemaV1.empty());
+    }
+
+    private static InspectorOptionSource catalogOptionSource(OwnerId owner, String source, TypeExpr type,
+                                                              OptionQuerySchemaV1 querySchema) {
         String optionId = derivedLocalId(source, "option-source");
         String capabilityId = derivedLocalId("options." + optionId, "option-capability");
         return new InspectorOptionSource(
@@ -4178,10 +4259,40 @@ public class FlowModule implements Module {
             text(optionId, "Options"),
             description("Provides server-authored options for " + optionId + " values."),
             type,
-            Map.of(),
+            querySchema,
             ContractRef.of(owner, CapabilityId.of(capabilityId)),
             100,
             optionId);
+    }
+
+    private static OptionQuerySchemaV1 optionQuerySchema(String source, NodeDefinition definition,
+                                                         OptionCatalogRegistry optionCatalogs) {
+        OptionCatalogProvider provider = optionCatalogs != null ? optionCatalogs.provider(source) : null;
+        Set<String> keys = provider != null && provider.contextKeys() != null ? provider.contextKeys() : Set.of();
+        if (keys.isEmpty()) {
+            return OptionQuerySchemaV1.empty();
+        }
+        Map<String, OptionQuerySchemaV1.Field> context = new LinkedHashMap<>();
+        Map<String, OptionQuerySchemaV1.Field> dependencies = new LinkedHashMap<>();
+        for (String key : keys.stream().filter(Objects::nonNull).filter(value -> !value.isBlank()).sorted().toList()) {
+            TypeExpr fieldType = optionQueryType(definition, key);
+            TypedValue defaultValue = "data_type".equals(key)
+                ? TypedValue.value(fieldType, "item") : null;
+            OptionQuerySchemaV1.Field field = new OptionQuerySchemaV1.Field(fieldType, false, defaultValue);
+            (key.startsWith("$") ? context : dependencies).put(key, field);
+        }
+        return new OptionQuerySchemaV1(null, context, dependencies);
+    }
+
+    private static TypeExpr optionQueryType(NodeDefinition definition, String key) {
+        if (definition != null) {
+            for (NodeDefinition.PinDefinition pin : definition.getInputs()) {
+                if (pin != null && pin.getId() != null && pin.getId().canonicalText().equals(key)) {
+                    return typeExpression(pin.getTypeRef());
+                }
+            }
+        }
+        return TypeExpr.named(TypeReference.of("builtin", "string"));
     }
 
     private static List<RuntimeOperationDescriptor> runtimeRequirementsForOwner(OwnerId owner,
@@ -4205,7 +4316,8 @@ public class FlowModule implements Module {
                                               Map<String, CatalogCapabilityDescriptor> capabilities,
                                               Map<String, InspectorOptionSource> optionSources,
                                               List<RuntimeOperationDescriptor> runtimeRequirements) {
-        return catalogNode(owner, definition, categories, capabilities, optionSources, runtimeRequirements, handlerRegistry);
+        return catalogNode(owner, definition, categories, capabilities, optionSources, runtimeRequirements,
+            handlerRegistry, optionCatalogRegistry);
     }
 
     static CatalogNodeDescriptor catalogNode(OwnerId owner, NodeDefinition definition,
@@ -4214,8 +4326,17 @@ public class FlowModule implements Module {
                                              Map<String, InspectorOptionSource> optionSources,
                                              List<RuntimeOperationDescriptor> runtimeRequirements,
                                              HandlerRegistry handlers) {
+        return catalogNode(owner, definition, categories, capabilities, optionSources, runtimeRequirements, handlers, null);
+    }
+
+    static CatalogNodeDescriptor catalogNode(OwnerId owner, NodeDefinition definition,
+                                             Map<String, CatalogCategoryDescriptor> categories,
+                                             Map<String, CatalogCapabilityDescriptor> capabilities,
+                                             Map<String, InspectorOptionSource> optionSources,
+                                             List<RuntimeOperationDescriptor> runtimeRequirements,
+                                             HandlerRegistry handlers, OptionCatalogRegistry optionCatalogs) {
         return catalogNode(owner, definition, categories, capabilities, optionSources,
-            requirement -> addRuntimeRequirement(runtimeRequirements, requirement), handlers);
+            requirement -> addRuntimeRequirement(runtimeRequirements, requirement), handlers, optionCatalogs);
     }
 
     private static CatalogNodeDescriptor catalogNode(OwnerId owner, NodeDefinition definition,
@@ -4224,7 +4345,7 @@ public class FlowModule implements Module {
                                                      Map<String, InspectorOptionSource> optionSources,
                                                      Map<RuntimeBindingKey, RuntimeOperationDescriptor> runtimeRequirements,
                                                      HandlerRegistry handlers) {
-        return catalogNode(owner, definition, categories, capabilities, optionSources, runtimeRequirements, handlers, null);
+        return catalogNode(owner, definition, categories, capabilities, optionSources, runtimeRequirements, handlers, null, null);
     }
 
     private static CatalogNodeDescriptor catalogNode(OwnerId owner, NodeDefinition definition,
@@ -4233,14 +4354,15 @@ public class FlowModule implements Module {
                                                      Map<String, InspectorOptionSource> optionSources,
                                                      Map<RuntimeBindingKey, RuntimeOperationDescriptor> runtimeRequirements,
                                                      HandlerRegistry handlers,
-                                                     Map<NodeDefinition, RuntimeOperationDescriptor> runtimeDescriptors) {
+                                                     Map<NodeDefinition, RuntimeOperationDescriptor> runtimeDescriptors,
+                                                     OptionCatalogRegistry optionCatalogs) {
         return catalogNode(owner, definition, categories, capabilities, optionSources,
             requirement -> {
                 addRuntimeRequirement(runtimeRequirements, requirement);
                 if (runtimeDescriptors != null) {
                     runtimeDescriptors.put(definition, requirement);
                 }
-            }, handlers);
+            }, handlers, optionCatalogs);
     }
 
     private static CatalogNodeDescriptor catalogNode(OwnerId owner, NodeDefinition definition,
@@ -4248,7 +4370,8 @@ public class FlowModule implements Module {
                                                      Map<String, CatalogCapabilityDescriptor> capabilities,
                                                      Map<String, InspectorOptionSource> optionSources,
                                                      Consumer<RuntimeOperationDescriptor> runtimeRequirementSink,
-                                                     HandlerRegistry handlers) {
+                                                     HandlerRegistry handlers,
+                                                     OptionCatalogRegistry optionCatalogs) {
         String nodeId = nodeLocalId(owner, definition);
         String categoryId = exactLocalId(definition.getCategory() != null ? definition.getCategory().getId() : "utility", "category");
         CatalogCategoryDescriptor category = categories.computeIfAbsent(categoryId,
@@ -4264,10 +4387,12 @@ public class FlowModule implements Module {
         List<CatalogNodeDescriptor.Pin> pins = new ArrayList<>();
         Set<PinId> pinIds = new HashSet<>();
         for (NodeDefinition.PinDefinition pin : definition.getInputs()) {
-            pins.add(catalogPin(owner, pin, CatalogNodeDescriptor.Direction.INPUT, pinIds, capabilities, optionSources));
+            pins.add(catalogPin(owner, definition, pin, CatalogNodeDescriptor.Direction.INPUT, pinIds, capabilities,
+                optionSources, optionCatalogs));
         }
         for (NodeDefinition.PinDefinition pin : definition.getOutputs()) {
-            pins.add(catalogPin(owner, pin, CatalogNodeDescriptor.Direction.OUTPUT, pinIds, capabilities, optionSources));
+            pins.add(catalogPin(owner, definition, pin, CatalogNodeDescriptor.Direction.OUTPUT, pinIds, capabilities,
+                optionSources, optionCatalogs));
         }
         List<CatalogNodeDescriptor.Branch> branches = List.of(new CatalogNodeDescriptor.Branch("failure", "Failure",
             "Reports that this flow capability could not complete.", List.of(new CatalogNodeDescriptor.Case("failure", "Failure",
@@ -4333,10 +4458,12 @@ public class FlowModule implements Module {
         };
     }
 
-    private static CatalogNodeDescriptor.Pin catalogPin(OwnerId owner, NodeDefinition.PinDefinition source,
+    private static CatalogNodeDescriptor.Pin catalogPin(OwnerId owner, NodeDefinition definition,
+                                                        NodeDefinition.PinDefinition source,
                                                         CatalogNodeDescriptor.Direction direction, Set<PinId> usedIds,
                                                         Map<String, CatalogCapabilityDescriptor> capabilities,
-                                                        Map<String, InspectorOptionSource> optionSources) {
+                                                        Map<String, InspectorOptionSource> optionSources,
+                                                        OptionCatalogRegistry optionCatalogs) {
         PinId pinId = source.getId();
         if (!usedIds.add(pinId)) {
             throw new IllegalArgumentException("Duplicate Flow catalog pin ID: " + pinId.value());
@@ -4346,7 +4473,8 @@ public class FlowModule implements Module {
         ContractRef<CapabilityId> editor = ContractRef.of(owner, CapabilityId.of(editorId));
         ContractRef<InspectorFieldId> optionSource = null;
         if (source.getOptionsSource() != null && !source.getOptionsSource().isBlank()) {
-            InspectorOptionSource option = catalogOptionSource(owner, source.getOptionsSource(), type);
+            InspectorOptionSource option = catalogOptionSource(owner, source.getOptionsSource(), type,
+                optionQuerySchema(source.getOptionsSource(), definition, optionCatalogs));
             String optionId = option.id().value();
             String capabilityId = option.capability().id().value();
             capabilities.computeIfAbsent(capabilityId,
@@ -4441,11 +4569,23 @@ public class FlowModule implements Module {
             pins.add(new RuntimeOperationDescriptor.Pin(pin.getId(), RuntimeOperationDescriptor.Direction.OUTPUT,
                 typeExpression(pin.getTypeRef())));
         }
+        if (localFunction(definition)) {
+            operation = CatalogFunctionShape.operation(pins);
+        }
         RuntimeSemantics semantics = runtimeSemantics(owner, handler, definition, runtimeHandler, pins);
         return new RuntimeOperationDescriptor(handler, ContractRef.of(owner, operation), pins, semantics, unknown);
     }
 
+    private static boolean localFunction(NodeDefinition definition) {
+        return CustomFunctionCallHandler.HANDLER_ID.equals(definition.getHandler())
+            && definition.getId() != null && definition.getId().startsWith(CustomFunctionNodeDefinitions.NODE_PREFIX)
+            && definition.getSchemaVersion() == 1 && "local".equals(definition.getHandlerConfig().get("functionNamespace"));
+    }
+
     private static String handlerCapabilityId(NodeDefinition definition, String nodeId, HandlerRegistry handlers) {
+        if (localFunction(definition)) {
+            return CatalogFunctionShape.capability(ContractRef.of(catalogOwner(definition), NodeId.of(nodeId))).id().value();
+        }
         String handler = defaultText(definition.getHandler(), "");
         String source = definition.isTrigger()
             ? "event." + defaultText(definition.getEventType(), nodeId)

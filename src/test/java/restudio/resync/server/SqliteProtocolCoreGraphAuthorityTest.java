@@ -12,6 +12,9 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.catalog.CatalogVersion;
 import restudio.resync.flow.command.CommandGraphContract;
+import restudio.resync.flow.diagnostic.Diagnostic;
+import restudio.resync.flow.diagnostic.DiagnosticPhase;
+import restudio.resync.flow.diagnostic.DiagnosticSeverity;
 import restudio.resync.flow.function.FunctionLocator;
 import restudio.resync.flow.function.FunctionRevision;
 import restudio.resync.flow.function.FunctionSignature;
@@ -294,6 +297,75 @@ class SqliteProtocolCoreGraphAuthorityTest {
     }
 
     @Test
+    void settlesCoreValidationRejectionsWithoutLeavingPendingRecovery(@TempDir Path directory) {
+        FlowStorage storage = storage(directory);
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        registry.addCoreMutationListener(ignored -> {
+        });
+        ServerResourceLocator resource = resource("flow", "core-validation-rejection");
+        UUID createMutation = UUID.fromString("10101010-1010-4010-8010-101010101010");
+        UUID saveMutation = UUID.fromString("20202020-2020-4020-8020-202020202020");
+        CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
+        CoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER);
+
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory, core)) {
+            assertTrue(mutate(authority, create(resource, graph(resource, 1L), createMutation, boundary)).handled());
+        }
+
+        CoreGraphMutationValidationException rejection = catalogValidationRejection();
+        ProtocolEnvelope<Map<String, Object>> request = save(resource, graph(resource, 2L), 1L, saveMutation, boundary);
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory,
+            new ThrowBeforeSaveCoreAuthority(core, rejection))) {
+            ProtocolEnvelopeDispatchResult result = mutate(authority, request);
+            assertFalse(result.handled());
+            assertEquals("PROTO.RESOURCE_OPERATION_FAILED", result.code(), result.message());
+            assertTrue(result.message().contains("CATALOG.SELECTOR_UNRESOLVED"));
+            assertTrue(authority.durable());
+            assertEquals("REJECTED", receiptStatus(directory, saveMutation));
+
+            ProtocolEnvelopeDispatchResult replay = mutate(authority, request);
+            assertFalse(replay.handled());
+            assertEquals(result.code(), replay.code());
+            assertEquals(result.message(), replay.message());
+        }
+    }
+
+    @Test
+    void settlesPreviouslyPendingCoreValidationRejectionsDuringStartup(@TempDir Path directory) {
+        FlowStorage storage = storage(directory);
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        registry.addCoreMutationListener(ignored -> {
+        });
+        ServerResourceLocator resource = resource("flow", "core-validation-recovery");
+        UUID createMutation = UUID.fromString("30303030-3030-4030-8030-303030303030");
+        UUID saveMutation = UUID.fromString("40404040-4040-4040-8040-404040404040");
+        CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
+        CoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER);
+        ProtocolEnvelope<Map<String, Object>> request = save(resource, graph(resource, 2L), 1L, saveMutation, boundary);
+
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory, core)) {
+            assertTrue(mutate(authority, create(resource, graph(resource, 1L), createMutation, boundary)).handled());
+        }
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory,
+            new ThrowBeforeSaveCoreAuthority(core, new IllegalStateException("Injected ambiguous pre-apply failure")))) {
+            ProtocolEnvelopeDispatchResult pending = mutate(authority, request);
+            assertFalse(pending.handled());
+            assertEquals("RESOURCE_MUTATION_PENDING", pending.code());
+            assertEquals("PENDING", receiptStatus(directory, saveMutation), pending.message());
+        }
+
+        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory,
+            new ThrowBeforeSaveCoreAuthority(core, catalogValidationRejection()))) {
+            assertTrue(authority.durable());
+            assertEquals("REJECTED", receiptStatus(directory, saveMutation));
+            ProtocolEnvelopeDispatchResult replay = mutate(authority, request);
+            assertFalse(replay.handled());
+            assertEquals("PROTO.RESOURCE_OPERATION_FAILED", replay.code());
+            assertTrue(replay.message().contains("CATALOG.SELECTOR_UNRESOLVED"));
+        }
+    }
+
+    @Test
     void isolatesTransitionAndFanoutFailuresAfterTheAppliedCommit(@TempDir Path directory) {
         FlowStorage storage = storage(directory);
         FlowResourceRegistry registry = new FlowResourceRegistry();
@@ -473,6 +545,14 @@ class SqliteProtocolCoreGraphAuthorityTest {
         return envelope(resource, new ResourceActivateRequest(resource, revision, state, mutationId));
     }
 
+    private static ProtocolEnvelope<Map<String, Object>> save(ServerResourceLocator resource, GraphDocument graph,
+                                                               long expectedRevision, UUID mutationId,
+                                                               CoreGraphStorageBoundary boundary) {
+        byte[] bytes = boundary.encode(graph, new CoreGraphStorageBoundary.AssetMetadata(
+            resource.resourceType().value(), expectedRevision + 1L, mutationId, ResourceActivationState.ACTIVE), resource);
+        return envelope(resource, new ResourceSaveRequest<>(resource, expectedRevision, payload(bytes), mutationId));
+    }
+
     private static ProtocolEnvelope<Map<String, Object>> duplicate(ServerResourceLocator source,
                                                                    ServerResourceLocator target, long revision,
                                                                    UUID mutationId) {
@@ -588,6 +668,15 @@ class SqliteProtocolCoreGraphAuthorityTest {
         };
     }
 
+    private static CoreGraphMutationValidationException catalogValidationRejection() {
+        Diagnostic diagnostic = Diagnostic.builder("CATALOG.SELECTOR_UNRESOLVED", DiagnosticSeverity.ERROR,
+                DiagnosticPhase.CAPABILITY, "selector-unresolved")
+            .messageKey(ContractRef.of(OWNER, new CapabilityId("catalog-validation")))
+            .correlationId(UUID.fromString("50505050-5050-4050-8050-505050505050"))
+            .build();
+        return new CoreGraphMutationValidationException(List.of(diagnostic));
+    }
+
     private record ResourceDocumentView(ServerResourceLocator resource, long revision, UUID mutationId,
                                         ContentHash payloadHash, boolean deleted, Map<String, Object> payload,
                                         ResourceActivationState activationState) {
@@ -631,6 +720,55 @@ class SqliteProtocolCoreGraphAuthorityTest {
                 throw new IllegalStateException("Injected post-apply failure");
             }
             return saved;
+        }
+
+        @Override
+        public CoreGraphStorageBoundary.CoreGraphTombstone delete(ServerResourceLocator resource, UUID mutationId,
+                                                                    long expectedRevision, ContentHash payloadChecksum) {
+            return delegate.delete(resource, mutationId, expectedRevision, payloadChecksum);
+        }
+
+        @Override
+        public CoreGraphStorageBoundary.Decoded activate(ServerResourceLocator resource,
+                                                           ResourceActivationState activationState, UUID mutationId,
+                                                           long expectedRevision, ContentHash payloadChecksum) {
+            return delegate.activate(resource, activationState, mutationId, expectedRevision, payloadChecksum);
+        }
+    }
+
+    private static final class ThrowBeforeSaveCoreAuthority implements CoreGraphResourceAuthority {
+        private final CoreGraphResourceAuthority delegate;
+        private final RuntimeException failure;
+
+        private ThrowBeforeSaveCoreAuthority(CoreGraphResourceAuthority delegate, RuntimeException failure) {
+            this.delegate = delegate;
+            this.failure = failure;
+        }
+
+        @Override
+        public boolean available() {
+            return delegate.available();
+        }
+
+        @Override
+        public Optional<CoreGraphStorageBoundary.Decoded> load(ServerResourceLocator resource) {
+            return delegate.load(resource);
+        }
+
+        @Override
+        public List<CoreGraphResourceAuthority.CoreGraphResourceState> list(String type) {
+            return delegate.list(type);
+        }
+
+        @Override
+        public Optional<CoreGraphResourceAuthority.CoreGraphResourceState> state(ServerResourceLocator resource) {
+            return delegate.state(resource);
+        }
+
+        @Override
+        public CoreGraphStorageBoundary.Decoded save(ServerResourceLocator resource, byte[] canonicalEnvelope,
+                                                       UUID mutationId, long expectedRevision, ContentHash payloadChecksum) {
+            throw failure;
         }
 
         @Override

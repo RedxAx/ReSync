@@ -72,8 +72,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 
-public class AdvancementModule implements Module, Listener, ReSyncJsonResourceStorage.ResourceMutationInterceptor {
+public class AdvancementModule implements Module, Listener, ReSyncJsonResourceStorage.ResourceMutationInterceptor, ReSyncJsonResourceStorage.ResourceListener {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("advancements", "Advancements").withDependencies("flow");
     private final AdvancementTreeValidator validator = new AdvancementTreeValidator();
     private AdvancementRuntimeBridge bridge;
@@ -85,9 +86,11 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     private FlowExecutor flowExecutor;
     private BukkitTask pollingTask;
     private JavaPlugin plugin;
-    private ReSyncJsonResourceStorage.ResourceSnapshot residentSnapshot;
-    private Map<String, JsonObject> residentTrees = Map.of();
-    private long residentRootSequence = Long.MIN_VALUE;
+    private final AtomicLong treeGeneration = new AtomicLong();
+    private volatile TreeSnapshot residentSnapshot;
+
+    private record TreeSnapshot(long generation, long storageGeneration, ReSyncJsonResourceStorage.ResourceSnapshot stamp, Map<String, JsonObject> trees) {
+    }
 
     public AdvancementModule() {
         this(PaperPlayerDataMutationAdmission.shared());
@@ -115,6 +118,7 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         predicates = new AdvancementPredicateEvaluator(customContent);
         bridge = new PaperAdvancementRuntimeBridge(customContent, playerDataAdmission);
         storage.addInterceptor(this);
+        storage.addListener(this);
         context.registerService(AdvancementModule.class, this);
         context.registerService(AdvancementService.class, service);
     }
@@ -141,6 +145,8 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     @Override
     public void stop(ModuleContext context) {
         HandlerList.unregisterAll(this);
+        storage.removeListener(this);
+        storage.removeInterceptor(this);
         invalidateTrees();
         if (bridge.supported()) {
             bridge.replace(Map.of());
@@ -571,32 +577,44 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         if (storage == null) {
             return Map.of();
         }
-        long sequence;
+        long storageGeneration;
         try {
-            sequence = storage.committedSequence();
+            storageGeneration = storage.snapshotGeneration();
+            storage.committedSequence();
         } catch (RuntimeException failed) {
             invalidateTrees();
             return Map.of();
         }
-        if (residentSnapshot != null) {
-            residentRootSequence = sequence;
-            return residentTrees;
+        while (true) {
+            long generation = treeGeneration.get();
+            TreeSnapshot current = residentSnapshot;
+            if (current != null && current.generation() == generation && current.storageGeneration() == storageGeneration) {
+                return current.trees();
+            }
+            ReSyncJsonResourceStorage.ResourceSnapshot snapshot = storage.readSnapshot(ReSyncResourceCatalog.ADVANCEMENT_TREE);
+            Map<String, JsonObject> trees = new LinkedHashMap<>();
+            for (ReSyncJsonResourceStorage.ResourceSnapshotValue value : snapshot.values()) {
+                trees.put(value.id(), value.value());
+            }
+            if (generation == treeGeneration.get() && storageGeneration == storage.snapshotGeneration()) {
+                TreeSnapshot admitted = new TreeSnapshot(generation, storageGeneration, snapshot, Map.copyOf(trees));
+                residentSnapshot = admitted;
+                return admitted.trees();
+            }
+            storageGeneration = storage.snapshotGeneration();
         }
-        ReSyncJsonResourceStorage.ResourceSnapshot snapshot = storage.readSnapshot(ReSyncResourceCatalog.ADVANCEMENT_TREE);
-        Map<String, JsonObject> trees = new LinkedHashMap<>();
-        for (ReSyncJsonResourceStorage.ResourceSnapshotValue value : snapshot.values()) {
-            trees.put(value.id(), value.value());
+    }
+
+    @Override
+    public void resourceChanged(String type, String id, JsonObject value, boolean deleted) {
+        if (ReSyncResourceCatalog.ADVANCEMENT_TREE.equals(type)) {
+            invalidateTrees();
         }
-        residentSnapshot = snapshot;
-        residentTrees = Map.copyOf(trees);
-        residentRootSequence = snapshot.rootSequence();
-        return residentTrees;
     }
 
     private void invalidateTrees() {
+        treeGeneration.incrementAndGet();
         residentSnapshot = null;
-        residentTrees = Map.of();
-        residentRootSequence = Long.MIN_VALUE;
     }
 
     private void requireSupported() {

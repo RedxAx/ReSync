@@ -179,6 +179,29 @@ public final class CatalogCachePublicationCodec implements CanonicalCodec<Catalo
         return decode(CanonicalCodec.decodeValidated(input, CanonicalLimits.catalog()));
     }
 
+    public ValidatedPublication decodeValidatedPublication(byte[] input) {
+        byte[] stableInput = Objects.requireNonNull(input, "Canonical publication bytes are required").clone();
+        return new ValidatedPublication(decodeBytes(stableInput), stableInput);
+    }
+
+    public static final class ValidatedPublication {
+        private final CatalogCachePublication publication;
+        private final byte[] canonicalBytes;
+
+        private ValidatedPublication(CatalogCachePublication publication, byte[] canonicalBytes) {
+            this.publication = Objects.requireNonNull(publication, "Catalog publication is required");
+            this.canonicalBytes = Objects.requireNonNull(canonicalBytes, "Canonical publication bytes are required").clone();
+        }
+
+        public CatalogCachePublication publication() {
+            return publication;
+        }
+
+        public byte[] canonicalBytes() {
+            return canonicalBytes.clone();
+        }
+    }
+
     public CatalogCachePublication decodeText(String input) {
         return decode(CanonicalCodec.decodeValidated(input, CanonicalLimits.catalog()));
     }
@@ -193,7 +216,7 @@ public final class CatalogCachePublicationCodec implements CanonicalCodec<Catalo
             known.put("requiredCapabilities", entry.requiredCapabilities().stream()
                 .map(IdentityCodec::encode).toList());
             known.put("opaque", entry.opaque());
-            known.put("data", CanonicalCodec.decode(entry.data().canonicalBytes(), CanonicalLimits.catalog()));
+            known.put("data", entry.data().canonicalValue());
         }
         return object(known, entry.unknown());
     }

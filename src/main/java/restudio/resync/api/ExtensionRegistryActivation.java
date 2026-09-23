@@ -607,11 +607,11 @@ public final class ExtensionRegistryActivation {
                     + ":" + incarnationFingerprint(provider)).toList()) : List.of());
             result.put("catalogDiagnostics", optionCatalogs != null ? sorted(optionCatalogs.diagnostics().stream()
                 .map(diagnostic -> diagnostic.code() + ":" + diagnostic.sourceId() + ":" + diagnostic.message()).toList()) : List.of());
-            result.put("runtimeData", runtimeData != null ? sorted(runtimeData.domains().stream()
-                .flatMap(domain -> runtimeData.adapters(domain).stream().map(adapter -> domain + ":" + adapter.id() + ":" + adapter.valueType() + ":"
-                    + adapter.valueClass().getName() + ":" + adapter.capabilities() + ":" + adapter.available() + ":"
-                    + (adapter instanceof OptionCatalogRuntimeDataAdapter ? "catalog-capture" : adapter.revision())
-                    + ":" + incarnationFingerprint(adapter))).toList()) : List.of());
+            result.put("runtimeData", runtimeData != null ? sorted(runtimeData.registeredAdapters().stream()
+                .map(adapter -> adapter.domain() + ":" + adapter.id() + ":" + adapter.valueType() + ":"
+                    + adapter.valueClass().getName() + ":" + adapter.capabilities() + ":"
+                    + classLoaderFingerprint(adapter.getClass().getClassLoader()) + ":" + incarnationFingerprint(adapter))
+                .toList()) : List.of());
             result.put("codecs", valueCodecs != null ? sorted(valueCodecs.codecs().values().stream()
                 .map(codec -> codec.id() + ":" + codec.version() + ":" + incarnationFingerprint(codec)).toList()) : List.of());
             result.put("codecAliases", valueCodecs != null ? sorted(valueCodecs.aliases().entrySet().stream()

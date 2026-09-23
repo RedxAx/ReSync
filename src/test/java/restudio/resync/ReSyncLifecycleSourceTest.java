@@ -42,4 +42,17 @@ class ReSyncLifecycleSourceTest {
         assertTrue(serverSource.contains("persistence.retryClose()"));
         assertTrue(serverSource.contains("networkShutdownPrepared"));
     }
+
+    @Test
+    void heartbeatKeepsConnectionAndAuthenticatedSessionAlive() throws IOException {
+        String source = Files.readString(Path.of("src/main/java/restudio/resync/server/ReSyncServer.java"));
+        int start = source.indexOf("private void handleHeartbeat");
+        int end = source.indexOf("private void sendError", start);
+
+        assertTrue(start >= 0 && end > start);
+        String heartbeat = source.substring(start, end);
+        assertTrue(heartbeat.contains("connectionManager.updateHeartbeat(info);"));
+        assertTrue(heartbeat.contains("Session session = sessionManager.getSession(info);"));
+        assertTrue(heartbeat.contains("session.updateActivity();"));
+    }
 }

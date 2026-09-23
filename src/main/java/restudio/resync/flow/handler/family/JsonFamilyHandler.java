@@ -1,15 +1,19 @@
 package restudio.resync.flow.handler.family;
 
 import org.bukkit.World;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Container;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
@@ -19,6 +23,7 @@ import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowTypeRef;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.ItemWriteback;
 import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.ItemStackPropertySelector;
 import restudio.resync.flow.handler.HandlerRegistry;
@@ -28,14 +33,18 @@ import restudio.resync.flow.registry.NodeDefinition;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class JsonFamilyHandler implements NodeHandler {
+    private static final Map<Material, String> BLOCK_DISPLAY_NAMES = new ConcurrentHashMap<>();
     private static final Set<String> OPERATIONS = Set.of("get", "set", "has", "do", "execute");
     private final String familyId;
     private final PropertyRegistry propertyRegistry;
@@ -80,6 +89,9 @@ public class JsonFamilyHandler implements NodeHandler {
             throw new IllegalArgumentException("Property " + familyId + "." + property + " does not support action " + normalizedAction);
         }
         Object target = resolveTarget(ctx, node);
+        if (target instanceof BlockState state && Set.of("set", "do", "execute").contains(normalizedAction)) {
+            target = state.getBlock();
+        }
         if (target == null) {
             throw new IllegalArgumentException("Target is required for " + familyId + "." + property);
         }
@@ -135,7 +147,10 @@ public class JsonFamilyHandler implements NodeHandler {
             }
             case "entity" -> ctx.getInputValue(node, "target", Entity.class, null);
             case "world" -> ctx.getInputValue(node, "target", World.class, null);
-            case "block" -> ctx.getInputValue(node, "target", Block.class, null);
+            case "block" -> {
+                Object raw = ctx.getRuntime().resolveInput(node, "target");
+                yield raw instanceof BlockState ? raw : ctx.getInputValue(node, "target", Block.class, null);
+            }
             case "inventory" -> ctx.getInputValue(node, "target", Inventory.class, null);
             case "itemstack" -> ctx.getInputValue(node, "target", ItemStack.class, null);
             default -> null;
@@ -256,24 +271,58 @@ public class JsonFamilyHandler implements NodeHandler {
     }
 
     private Object readBlockValue(Object target, String property) {
-        if (!(target instanceof Block block)) {
+        BlockState snapshot = target instanceof BlockState state ? state : null;
+        Block block = snapshot != null ? snapshot.getBlock() : target instanceof Block value ? value : null;
+        if (block == null) {
             return MissingValue.INSTANCE;
         }
+        Material material = snapshot != null ? snapshot.getType() : block.getType();
         return switch (property) {
-            case "type" -> block.getType().name();
-            case "data" -> block.getBlockData().getAsString();
-            case "state" -> block.getState().getBlockData().getAsString();
+            case "type" -> material.name();
+            case "display_name" -> blockDisplayName(material);
+            case "translation_key" -> material.translationKey();
+            case "key" -> material.getKey().toString();
+            case "data", "state" -> (snapshot != null ? snapshot.getBlockData() : block.getBlockData()).getAsString();
             case "location" -> block.getLocation();
             case "world" -> block.getWorld();
             case "x" -> block.getX();
             case "y" -> block.getY();
             case "z" -> block.getZ();
-            case "is_solid" -> block.isSolid();
-            case "is_liquid" -> block.isLiquid();
-            case "is_air" -> block.isEmpty();
+            case "is_solid" -> material.isSolid();
+            case "is_liquid" -> material == Material.WATER || material == Material.LAVA;
+            case "is_air" -> material.isAir();
+            case "is_occluding" -> material.isOccluding();
+            case "is_flammable" -> material.isFlammable();
+            case "is_burnable" -> material.isBurnable();
+            case "has_gravity" -> material.hasGravity();
+            case "hardness" -> material.getHardness();
+            case "blast_resistance" -> material.getBlastResistance();
+            case "slipperiness" -> material.getSlipperiness();
+            case "light_level" -> block.getLightLevel();
+            case "light_from_sky" -> block.getLightFromSky();
+            case "light_from_blocks" -> block.getLightFromBlocks();
+            case "biome" -> block.getBiome();
+            case "temperature" -> block.getTemperature();
+            case "humidity" -> block.getHumidity();
+            case "power" -> block.getBlockPower();
+            case "is_powered" -> block.isBlockPowered();
+            case "is_indirectly_powered" -> block.isBlockIndirectlyPowered();
+            case "is_passable" -> block.isPassable();
             case "container_items" -> readContainerItems(block);
             default -> MissingValue.INSTANCE;
         };
+    }
+
+    private static String blockDisplayName(Material material) {
+        return BLOCK_DISPLAY_NAMES.computeIfAbsent(material, JsonFamilyHandler::formatBlockDisplayName);
+    }
+
+    private static String formatBlockDisplayName(Material material) {
+        String[] words = material.name().toLowerCase(Locale.ROOT).split("_");
+        for (int index = 0; index < words.length; index++) {
+            words[index] = Character.toUpperCase(words[index].charAt(0)) + words[index].substring(1);
+        }
+        return String.join(" ", words);
     }
 
     private Object readInventoryValue(Object target, String property) {
@@ -302,7 +351,8 @@ public class JsonFamilyHandler implements NodeHandler {
             case "display_name" -> meta != null && meta.hasDisplayName() ? meta.getDisplayName() : "";
             case "lore" -> meta != null && meta.hasLore() ? meta.getLore() : List.of();
             case "durability" -> meta instanceof Damageable damageable ? damageable.getDamage() : 0;
-            case "max_durability" -> item.getType().getMaxDurability();
+            case "max_durability" -> meta instanceof Damageable damageable && damageable.hasMaxDamage()
+                ? damageable.getMaxDamage() : item.getType().getMaxDurability();
             case "enchantments" -> enchantments(item);
             case "custom_model_data" -> meta != null && meta.hasCustomModelData() ? meta.getCustomModelData() : 0;
             case "unbreakable" -> meta != null && meta.isUnbreakable();
@@ -342,7 +392,16 @@ public class JsonFamilyHandler implements NodeHandler {
     }
 
     private void setValue(FlowContext ctx, FlowNode node, Object target, String property) {
-        Object value = ctx.getInputValue(node, "value", Object.class, null);
+        Object value = ctx.getInputValue(node, "itemstack".equals(familyId) ? "set_" + property : "value",
+            Object.class, null);
+        if (target instanceof ItemStack item && "itemstack".equals(familyId)) {
+            Consumer<ItemStack> writeback = ItemWriteback.resolve(ctx, node, item);
+            setItemStackValue(item, property, value);
+            writeback.accept(item);
+            ctx.setOutput(node, "item", item);
+            ctx.setOutput(node, "success", true);
+            return;
+        }
         if (target instanceof LivingEntity living && setLivingAfterDamage(ctx, living, property, value)) {
             ctx.setOutput(node, "success", true);
             return;
@@ -365,6 +424,127 @@ public class JsonFamilyHandler implements NodeHandler {
             throw failure;
         }
         throw new IllegalStateException("No runtime writer exists for advertised property " + familyId + "." + property);
+    }
+
+    private void setItemStackValue(ItemStack item, String property, Object value) {
+        switch (property) {
+            case "type" -> {
+                String materialName = requiredString(value, property);
+                Material material = Material.matchMaterial(materialName);
+                if (material == null || !material.isItem()) {
+                    throw new IllegalArgumentException("Unknown item material: " + materialName);
+                }
+                item.setType(material);
+            }
+            case "amount" -> item.setAmount(integer(value, property, 1, item.getMaxStackSize()));
+            case "display_name" -> updateItemMeta(item, meta -> meta.setDisplayName(requiredString(value, property)));
+            case "lore" -> updateItemMeta(item, meta -> meta.setLore(strings(value, property)));
+            case "durability" -> updateItemMeta(item, meta -> {
+                if (!(meta instanceof Damageable damageable)) {
+                    throw new IllegalArgumentException("Item does not support durability: " + item.getType());
+                }
+                int maximum = damageable.hasMaxDamage() ? damageable.getMaxDamage() : item.getType().getMaxDurability();
+                damageable.setDamage(integer(value, property, 0, Math.max(0, maximum)));
+            });
+            case "max_durability" -> updateItemMeta(item, meta -> {
+                if (!(meta instanceof Damageable damageable)) {
+                    throw new IllegalArgumentException("Item does not support maximum durability: " + item.getType());
+                }
+                int maximum = integer(value, property, 1, Integer.MAX_VALUE);
+                damageable.setMaxDamage(maximum);
+                if (damageable.getDamage() > maximum) {
+                    damageable.setDamage(maximum);
+                }
+            });
+            case "enchantments" -> setEnchantments(item, value);
+            case "custom_model_data" -> updateItemMeta(item,
+                meta -> meta.setCustomModelData(integer(value, property, 0, Integer.MAX_VALUE)));
+            case "unbreakable" -> updateItemMeta(item, meta -> meta.setUnbreakable(requiredBoolean(value, property)));
+            case "repair_cost" -> updateItemMeta(item, meta -> {
+                if (!(meta instanceof Repairable repairable)) {
+                    throw new IllegalArgumentException("Item does not support a repair cost: " + item.getType());
+                }
+                repairable.setRepairCost(integer(value, property, 0, Integer.MAX_VALUE));
+            });
+            case "item_flags" -> updateItemMeta(item, meta -> {
+                meta.removeItemFlags(meta.getItemFlags().toArray(ItemFlag[]::new));
+                List<ItemFlag> flags = strings(value, property).stream().map(flag -> {
+                    try {
+                        return ItemFlag.valueOf(flag.strip().toUpperCase(Locale.ROOT));
+                    } catch (IllegalArgumentException exception) {
+                        throw new IllegalArgumentException("Unknown item flag: " + flag, exception);
+                    }
+                }).toList();
+                meta.addItemFlags(flags.toArray(ItemFlag[]::new));
+            });
+            case "localized_name" -> updateItemMeta(item,
+                meta -> meta.setLocalizedName(requiredString(value, property)));
+            default -> throw new IllegalStateException("No runtime writer exists for advertised property itemstack." + property);
+        }
+    }
+
+    private void setEnchantments(ItemStack item, Object value) {
+        if (!(value instanceof Map<?, ?> enchantments)) {
+            throw new IllegalArgumentException("Property itemstack.enchantments requires an enchantment map");
+        }
+        Map<Enchantment, Integer> resolved = new LinkedHashMap<>();
+        enchantments.forEach((key, level) -> {
+            String id = requiredString(key, "enchantments").strip().toLowerCase(Locale.ROOT);
+            NamespacedKey namespacedKey = id.contains(":") ? NamespacedKey.fromString(id) : NamespacedKey.minecraft(id);
+            Enchantment enchantment = namespacedKey != null ? Enchantment.getByKey(namespacedKey) : null;
+            if (enchantment == null) {
+                throw new IllegalArgumentException("Unknown enchantment: " + id);
+            }
+            resolved.put(enchantment, integer(level, "enchantments." + id, 1, Integer.MAX_VALUE));
+        });
+        new ArrayList<>(item.getEnchantments().keySet()).forEach(item::removeEnchantment);
+        resolved.forEach(item::addUnsafeEnchantment);
+    }
+
+    private void updateItemMeta(ItemStack item, Consumer<ItemMeta> mutation) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            throw new IllegalArgumentException("Item does not support metadata: " + item.getType());
+        }
+        mutation.accept(meta);
+        if (!item.setItemMeta(meta)) {
+            throw new IllegalArgumentException("Item metadata is incompatible with " + item.getType());
+        }
+    }
+
+    private String requiredString(Object value, String property) {
+        if (value == null) {
+            throw new IllegalArgumentException("Property itemstack." + property + " requires a value");
+        }
+        return String.valueOf(value);
+    }
+
+    private boolean requiredBoolean(Object value, String property) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        throw new IllegalArgumentException("Property itemstack." + property + " requires true or false");
+    }
+
+    private int integer(Object value, String property, int minimum, int maximum) {
+        if (!(value instanceof Number number)) {
+            throw new IllegalArgumentException("Property itemstack." + property + " requires a number");
+        }
+        double decimal = number.doubleValue();
+        if (!Double.isFinite(decimal) || decimal != Math.rint(decimal) || decimal < minimum || decimal > maximum) {
+            throw new IllegalArgumentException("Property itemstack." + property + " must be a whole number from "
+                + minimum + " to " + maximum);
+        }
+        return (int) decimal;
+    }
+
+    private List<String> strings(Object value, String property) {
+        if (!(value instanceof Iterable<?> values)) {
+            throw new IllegalArgumentException("Property itemstack." + property + " requires a text list");
+        }
+        List<String> result = new ArrayList<>();
+        values.forEach(entry -> result.add(requiredString(entry, property)));
+        return result;
     }
 
     private boolean executeAction(FlowContext ctx, Object target, String property) {

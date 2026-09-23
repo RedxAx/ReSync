@@ -279,14 +279,15 @@ public class OptionCatalogRegistry {
         OptionCatalogCapture capture(OptionCatalogProvider provider, OptionCatalogQuery query) {
             Objects.requireNonNull(provider, "Option catalog provider is required");
             Objects.requireNonNull(query, "Option catalog query is required");
-            if (provider.captureAffinity() == OptionCatalogProvider.CaptureAffinity.UNSUPPORTED) {
+            OptionCatalogProvider.CaptureAffinity affinity = provider.captureAffinity(query);
+            if (affinity == OptionCatalogProvider.CaptureAffinity.UNSUPPORTED) {
                 throw new CaptureUnavailable("unsupported", "Option catalog provider does not expose a coherent capture");
             }
             if (!bound) {
                 return captureCaller(provider, query);
             }
             if (provider instanceof PreparedCaptureProvider prepared
-                && provider.captureAffinity() == OptionCatalogProvider.CaptureAffinity.IO) {
+                && affinity == OptionCatalogProvider.CaptureAffinity.IO) {
                 return Objects.requireNonNull(prepared.preparedCapture(query), "Prepared option catalog capture is required");
             }
             return Objects.requireNonNull(access.capture(provider, query), "Option catalog capture is required");
@@ -298,7 +299,7 @@ public class OptionCatalogRegistry {
         }
 
         private static OptionCatalogCapture captureCaller(OptionCatalogProvider provider, OptionCatalogQuery query) {
-            if (provider.captureAffinity() != OptionCatalogProvider.CaptureAffinity.CALLER) {
+            if (provider.captureAffinity(query) != OptionCatalogProvider.CaptureAffinity.CALLER) {
                 throw new CaptureUnavailable("unavailable", "Option catalog provider requires an affinity capture executor");
             }
             return provider.capture(query);

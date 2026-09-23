@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
-import restudio.resync.flow.migration.FlowNodeMigrationMap;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.UuidHandler;
 
@@ -32,10 +31,6 @@ class UuidCatalogTest {
         assertEquals(IDS, source.asList().stream().map(element -> element.getAsJsonObject().get("id").getAsString()).toList());
         assertEquals(IDS.size(), rawById.size());
         assertFalse(rawById.containsKey("uuid.random"));
-        Map<String, String> compatibility = FlowNodeMigrationMap.load();
-        assertEquals("uuid_generate", compatibility.get("uuid.random"));
-        assertTrue(IDS.stream().noneMatch(compatibility::containsKey), compatibility.toString());
-
         HandlerRegistry handlers = new HandlerRegistry();
         new UuidHandler().registerTo(handlers);
         NodeDefinitionLoader loader = new NodeDefinitionLoader();

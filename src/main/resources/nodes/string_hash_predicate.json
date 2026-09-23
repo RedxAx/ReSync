@@ -151,7 +151,7 @@
   },
   {
     "id": "string_contains",
-    "displayName": "Contains",
+    "displayName": "Text Contains",
     "description": "Check whether text contains a substring. Each missing or null input is treated as empty text.",
     "domain": "core",
     "family": "string",

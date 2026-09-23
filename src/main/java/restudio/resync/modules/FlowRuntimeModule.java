@@ -827,6 +827,7 @@ public class FlowRuntimeModule implements Module {
             }
             settleCatalog(activation, delegate::activeCatalogRuntimeActivation, catalogSettlement);
             customContentExecution.refreshAll();
+            delegate.prepareRuntimeDataCategories().toCompletableFuture().join();
             compiledPlanRepository.initialize();
             delegate.completeStartupActivation(verified);
             delegateReady = System.nanoTime();
@@ -2500,7 +2501,7 @@ public class FlowRuntimeModule implements Module {
         new WorldActionHandler().registerTo(handlerRegistry);
         new WorldGenFlowHandler(worldGenOperations).registerTo(handlerRegistry);
         new BlockActionHandler().registerTo(handlerRegistry);
-        new InventoryActionHandler().registerTo(handlerRegistry);
+        new InventoryActionHandler(customContentService, jsonResourceStorage, serverId).registerTo(handlerRegistry);
         new ReSyncRuntimeResourceHandler(resourceRegistry).registerTo(handlerRegistry);
         new MiscHandler().registerTo(handlerRegistry);
         new RestoredNodeHandler().registerTo(handlerRegistry);

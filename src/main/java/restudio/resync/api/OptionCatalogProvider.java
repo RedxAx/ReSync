@@ -20,6 +20,10 @@ public interface OptionCatalogProvider {
         return CaptureAffinity.UNSUPPORTED;
     }
 
+    default CaptureAffinity captureAffinity(OptionCatalogQuery query) {
+        return captureAffinity();
+    }
+
     default OptionCatalogCapture capture(OptionCatalogQuery query) {
         throw new UnsupportedOperationException("Option catalog provider does not expose a coherent capture");
     }

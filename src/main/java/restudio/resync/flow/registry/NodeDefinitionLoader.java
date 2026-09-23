@@ -247,7 +247,6 @@ public class NodeDefinitionLoader {
             stream.filter(Files::isRegularFile)
                 .filter(p -> p.toString().endsWith(".json"))
                 .filter(p -> !p.getFileName().toString().startsWith("_"))
-                .filter(p -> acceptPath(p.toString(), source))
                 .forEach(p -> {
                     try (InputStream is = Files.newInputStream(p)) {
                         results.addAll(parse(is, p.toString(), source));
@@ -269,9 +268,6 @@ public class NodeDefinitionLoader {
                     continue;
                 }
                 if (!name.startsWith(normalized) || !name.endsWith(".json")) {
-                    continue;
-                }
-                if (!acceptPath(name, source)) {
                     continue;
                 }
                 String fileName = name.substring(name.lastIndexOf('/') + 1);
@@ -333,7 +329,6 @@ public class NodeDefinitionLoader {
             stream.filter(Files::isRegularFile)
                   .filter(p -> p.toString().endsWith(".json"))
                   .filter(p -> !p.getFileName().toString().startsWith("_"))
-                  .filter(p -> acceptPath(p.toString(), selectedSource))
                   .forEach(p -> {
                       try (InputStream is = Files.newInputStream(p)) {
                           results.addAll(parse(is, p.toString(), selectedSource));
@@ -348,22 +343,6 @@ public class NodeDefinitionLoader {
         return results;
     }
 
-    private boolean acceptPath(String path, CatalogSource source) {
-        if (source != CatalogSource.REPLACEMENT || path == null) {
-            return true;
-        }
-        String normalized = path.replace('\\', '/').toLowerCase(Locale.ROOT);
-        String[] segments = normalized.split("/+", -1);
-        for (int index = 0; index + 1 < segments.length; index++) {
-            if ("nodes".equals(segments[index]) && "migrated".equals(segments[index + 1])) {
-                addDiagnostic(NodeDefinitionDiagnostic.Severity.WARNING, "CATALOG.LEGACY_ACTIVE", path, -1, "",
-                    "Migration-only node definitions are unavailable to the replacement runtime");
-                return false;
-            }
-        }
-        return true;
-    }
-
     public List<NodeDefinition> parse(InputStream inputStream) {
         return parse(inputStream, "stream");
     }
@@ -373,9 +352,6 @@ public class NodeDefinitionLoader {
     }
 
     public List<NodeDefinition> parseReplacement(InputStream inputStream, String source) {
-        if (!acceptPath(source, CatalogSource.REPLACEMENT)) {
-            return List.of();
-        }
         return parse(inputStream, source, CatalogSource.REPLACEMENT);
     }
 
@@ -1285,6 +1261,7 @@ public class NodeDefinitionLoader {
             case "scoreboard" -> "scoreboard_id";
             case "tab" -> "tab_id";
             case "chat" -> "chat_id";
+            case "component_builder" -> "component_builder_id";
             case "motd_profile" -> "motd_profile_id";
             case "message_rule" -> "message_rule_id";
             case "recipe_definition" -> "recipe_id";

@@ -298,7 +298,7 @@ public final class CanonicalJson {
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT);
         try {
-            ByteBuffer encoded = encoder.encode(CharBuffer.wrap(value, start, end));
+            ByteBuffer encoded = encoder.encode(CharBuffer.wrap(value.substring(start, end)));
             if (encoded.remaining() > maximumBytes) {
                 throw new IllegalArgumentException("UTF-8 input exceeds " + maximumBytes + " bytes");
             }
@@ -911,6 +911,20 @@ public final class CanonicalJson {
         private ParsedString parseStringToken() {
             countToken();
             require('"');
+            int start = position;
+            while (position < input.length()) {
+                char current = input.charAt(position);
+                if (current == '"') {
+                    String value = input.substring(start, position++);
+                    validateUnicode(value, limits.stringCodePoints(), "String");
+                    return new ParsedString(value, canonicalStringBytes(value));
+                }
+                if (current == '\\' || current < 0x20) {
+                    break;
+                }
+                position++;
+            }
+            position = start;
             StringBuilder result = new StringBuilder();
             while (position < input.length()) {
                 char current = input.charAt(position++);

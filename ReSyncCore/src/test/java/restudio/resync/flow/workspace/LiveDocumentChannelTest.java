@@ -501,6 +501,44 @@ class LiveDocumentChannelTest {
         assertTrue(listener.resyncReasons.isEmpty());
     }
 
+    @Test
+    void preparedPublicationRejectsRemoteEditsResnapshotsAndReconnects() {
+        LiveDocumentChannel<String, String, String, String> channel = new LiveDocumentChannel<>();
+        WorkspaceTarget target = new WorkspaceTarget("flow", "shared");
+        RecordingTransport transport = new RecordingTransport();
+        List<LiveDocumentChannel.PublicationStamp> stamps = new ArrayList<>();
+        RecordingListener listener = new RecordingListener() {
+            @Override
+            public void onSnapshot(LiveDocumentChannel.Snapshot<String, String, String> snapshot) {
+                stamps.add(snapshot.stamp());
+            }
+
+            @Override
+            public void onOperation(LiveDocumentChannel.Operation<String, String> operation, boolean own) {
+                stamps.add(operation.stamp());
+            }
+        };
+        channel.bind(transport);
+        channel.join(target, listener);
+        channel.connect(1L);
+        channel.acceptSnapshot(new LiveDocumentChannel.Snapshot<>(target, 0L, "original", List.of()), 1L, 1L);
+        LiveDocumentChannel.PublicationStamp original = stamps.getLast();
+        channel.acceptOperation(new LiveDocumentChannel.Operation<>(target, 1L, "peer", "peer", "Peer", "remote"), 1L, 1L);
+        assertEquals("", channel.publishOperation(target, original, "stale"));
+        LiveDocumentChannel.PublicationStamp current = stamps.getLast();
+        assertFalse(channel.publishOperation(target, current, "current").isBlank());
+        channel.acceptResync(target, "Resource Updated", 1L, 1L);
+        channel.acceptSnapshot(new LiveDocumentChannel.Snapshot<>(target, 1L, "saved", List.of()), 1L, 1L);
+        assertEquals("", channel.publishOperation(target, current, "stale snapshot"));
+        LiveDocumentChannel.PublicationStamp saved = stamps.getLast();
+        channel.disconnect("Disconnected");
+        channel.connect(2L);
+        channel.acceptSnapshot(new LiveDocumentChannel.Snapshot<>(target, 1L, "saved", List.of()), 2L, 1L);
+        assertEquals("", channel.publishOperation(target, saved, "old connection"));
+        assertFalse(channel.publishOperation(target, stamps.getLast(), "reconnected").isBlank());
+        assertEquals(2, transport.operationIds.size());
+    }
+
     private static class RecordingListener implements LiveDocumentChannel.Listener<String, String, String, String> {
         private final List<String> snapshots = new ArrayList<>();
         private final List<Boolean> ownOperations = new ArrayList<>();

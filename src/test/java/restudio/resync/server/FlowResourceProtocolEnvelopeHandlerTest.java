@@ -3,6 +3,8 @@ package restudio.resync.server;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import restudio.resync.core.ConnectionInfo;
 import restudio.resync.core.ConnectionState;
 import restudio.resync.core.Session;
@@ -207,16 +209,18 @@ class FlowResourceProtocolEnvelopeHandlerTest {
         assertEquals("Authoring templates are available only for server-owned Core graph resources", rejection.getMessage());
     }
 
-    @Test
-    void acceptsNormalResourceRequestAtGenericResourceContractVersion() {
+    @ParameterizedTest
+    @ValueSource(strings = {"gui", "component_builder"})
+    void acceptsNormalResourceRequestAtGenericResourceContractVersion(String typeId) {
         FlowResourceRegistry registry = new FlowResourceRegistry();
         Map<String, JsonObject> values = new ConcurrentHashMap<>();
         JsonObject stored = new JsonObject();
         stored.addProperty("id", "main");
         stored.addProperty("name", "Draft");
         values.put("main", stored);
-        registry.register(new FixtureAdapter(values));
-        ServerResourceLocator resource = resource("main");
+        registry.register(new FixtureAdapter(values, typeId));
+        ServerResourceLocator resource = new ServerResourceLocator(SERVER,
+            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of(typeId)), "main");
         FlowResourceProtocolEnvelopeHandler handler = new FlowResourceProtocolEnvelopeHandler(registry, SERVER,
             ProtocolResourceMutationAuthority.failClosed(), ProtocolResourceAuthorizer.serverGranted(), AuthorityEpoch.fixed(1L));
         ProtocolEnvelope<Map<String, Object>> request = loadRequest(SERVER, resource,
@@ -231,17 +235,18 @@ class FlowResourceProtocolEnvelopeHandlerTest {
         assertEquals(ReSyncProtocolContract.GENERIC_RESOURCE_CONTRACT_VERSION, result.response().contractVersion());
     }
 
-    @Test
-    void acceptsPagePayloadTypeForGenericResourceList() {
+    @ParameterizedTest
+    @ValueSource(strings = {"gui", "component_builder"})
+    void acceptsPagePayloadTypeForGenericResourceList(String typeId) {
         FlowResourceRegistry registry = new FlowResourceRegistry();
         Map<String, JsonObject> values = new ConcurrentHashMap<>();
         JsonObject stored = new JsonObject();
         stored.addProperty("id", "main");
         stored.addProperty("name", "Draft");
         values.put("main", stored);
-        registry.register(new FixtureAdapter(values));
+        registry.register(new FixtureAdapter(values, typeId));
         ContractRef<ResourceTypeId> type = ContractRef.of(new OwnerId("restudio.resync"),
-            new ResourceTypeId(ReSyncResourceCatalog.GUI));
+            new ResourceTypeId(typeId));
         ResourceListRequest list = new ResourceListRequest(type, null, 100, null);
         ProtocolEnvelope<Map<String, Object>> request = new ProtocolEnvelope<>(ProtocolEnvelope.Kind.REQUEST,
             ReSyncProtocolContract.GENERIC_RESOURCE_CONTRACT_VERSION, UUID.randomUUID(), REQUEST_UUID, UUID.randomUUID(),
@@ -771,14 +776,20 @@ class FlowResourceProtocolEnvelopeHandlerTest {
 
     private static final class FixtureAdapter implements FlowResourceAdapter<JsonObject> {
         private final Map<String, JsonObject> values;
+        private final String typeId;
 
         private FixtureAdapter(Map<String, JsonObject> values) {
+            this(values, ReSyncResourceCatalog.GUI);
+        }
+
+        private FixtureAdapter(Map<String, JsonObject> values, String typeId) {
             this.values = values;
+            this.typeId = typeId;
         }
 
         @Override
         public ReSyncManagedResource descriptor() {
-            return ReSyncResourceCatalog.byType(ReSyncResourceCatalog.GUI);
+            return ReSyncResourceCatalog.byType(typeId);
         }
 
         @Override

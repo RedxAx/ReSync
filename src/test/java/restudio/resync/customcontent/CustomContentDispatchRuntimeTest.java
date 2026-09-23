@@ -18,6 +18,7 @@ import restudio.flow.data.CustomContentGraphAdapter;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowSerializer;
 import restudio.resync.flow.CompiledCoreFlowExecutionBridge;
 import restudio.resync.flow.CompiledGraphMaterializer;
 import restudio.resync.flow.CompiledGraphMetadataProvider;
@@ -62,6 +63,7 @@ import restudio.resync.flow.inspector.InspectorValueSchema;
 import restudio.resync.flow.inspector.OptionQuerySchemaV1;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.flow.protocol.ResourceActivationState;
+import restudio.resync.flow.resource.ResourcePayloadCodecs;
 import restudio.resync.flow.runtime.CompiledRuntimeContext;
 import restudio.resync.flow.runtime.FlowRuntimeExecutionBoundary;
 import restudio.resync.flow.runtime.RuntimeAuditBoundary;
@@ -79,9 +81,10 @@ import restudio.resync.flow.runtime.RuntimeSemantics;
 import restudio.resync.flow.type.TypeExpr;
 import restudio.resync.flow.type.TypeReference;
 import restudio.resync.flow.type.TypedValue;
-import restudio.resync.server.FlowStorageCoreGraphResourceAuthority;
-import restudio.resync.server.CoreGraphMutationValidator;
+import restudio.resync.modules.flow.FlowResourceMutationStamp;
 import restudio.resync.protocol.ReSyncProtocolContract;
+import restudio.resync.server.CoreGraphMutationValidator;
+import restudio.resync.server.FlowStorageCoreGraphResourceAuthority;
 import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.storage.CanonicalProjectMetadataFixture;
@@ -99,6 +102,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -192,6 +196,18 @@ class CustomContentDispatchRuntimeTest {
             if (coordinator != null) coordinator.close();
             MockBukkit.unmock();
         }
+    }
+
+    @Test
+    void firstCreateAdmissionUsesTheIntendedDurableIdentity() {
+        CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(
+            CustomContentGraphAdapter.createContentGraph("first-item", "item", "First Item"));
+        Map<String, Object> payload = new Gson().fromJson(FlowSerializer.serializeCustomContent(content), Map.class);
+        String payloadHash = ResourcePayloadCodecs.json().hashPayload(payload).canonicalText();
+        FlowResourceMutationStamp intended = new FlowResourceMutationStamp("custom_content", "first-item", 1L,
+            UUID.fromString("60000000-0000-4000-8000-000000000006"), payloadHash, false);
+
+        assertDoesNotThrow(() -> contentExecution.admit(content, intended));
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import restudio.resync.contract.identity.IdentityCodec;
 import restudio.resync.flow.CoreGraphStorageBoundary;
 import restudio.resync.flow.catalog.CatalogCanonicalizer;
+import restudio.resync.flow.catalog.CatalogFunctionShape;
 import restudio.resync.flow.catalog.CatalogSnapshot;
 import restudio.resync.flow.function.FunctionRevision;
 import restudio.resync.flow.function.FunctionSignature;
@@ -14,6 +15,9 @@ import restudio.resync.flow.function.FunctionSourceDocument;
 import restudio.resync.flow.graph.GraphDocument;
 import restudio.resync.flow.graph.GraphNode;
 import restudio.resync.flow.identity.CatalogBinding;
+import restudio.resync.flow.identity.CapabilityId;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.NodeId;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.storage.StorageSafety;
@@ -34,6 +38,7 @@ import java.util.UUID;
 public final class CoreCatalogEvolution {
     static final String ID = "core-catalog-evolution-v1";
     static final String ACTOR = ID;
+    static final String FUNCTION_ID = "core-function-capability-rebind-v1";
     static final String COMMAND = "restudio.resync/event.command";
     static final String STRUCTURE_ID = "core-catalog-evolution-v2";
     static final String STRUCTURE = "restudio.resync/structure_delete";
@@ -66,6 +71,15 @@ public final class CoreCatalogEvolution {
         }
         JsonObject root = JsonParser.parseString(content).getAsJsonObject();
         id = root.get("id").getAsString();
+        if (FUNCTION_ID.equals(id)) {
+            sourceChecksum = null;
+            targetChecksum = null;
+            exactTarget = null;
+            sources = Set.of();
+            blockedDefinitions = Set.of();
+            changes = List.of();
+            return;
+        }
         if (!ID.equals(id) && !STRUCTURE_ID.equals(id) && !REBIND_ID.equals(id)
             && !RESOURCE_DECLARATION_ID.equals(id)) {
             throw new IllegalArgumentException("Core catalog evolution registration identity is invalid");
@@ -128,6 +142,14 @@ public final class CoreCatalogEvolution {
         changes = List.copyOf(parsed);
     }
 
+    public static CoreCatalogEvolution functions() {
+        return Registered.FUNCTIONS;
+    }
+
+    boolean requiresSourceReceipt() {
+        return FUNCTION_ID.equals(id);
+    }
+
     public static CoreCatalogEvolution load() {
         return Registered.VALUE;
     }
@@ -142,7 +164,7 @@ public final class CoreCatalogEvolution {
     }
 
     static boolean isActor(String actor) {
-        return ID.equals(actor) || STRUCTURE_ID.equals(actor) || REBIND_ID.equals(actor)
+        return FUNCTION_ID.equals(actor) || ID.equals(actor) || STRUCTURE_ID.equals(actor) || REBIND_ID.equals(actor)
             || RESOURCE_DECLARATION_ID.equals(actor);
     }
 
@@ -164,7 +186,7 @@ public final class CoreCatalogEvolution {
 
     public Optional<Proof> bootstrapProof(CatalogBinding persistedBinding, CatalogBinding candidateBinding,
                                           String canonicalContent) {
-        if (persistedBinding == null || candidateBinding == null
+        if (FUNCTION_ID.equals(id) || persistedBinding == null || candidateBinding == null
             || !targetChecksum.equals(candidateBinding.catalogChecksum())) {
             return Optional.empty();
         }
@@ -186,6 +208,16 @@ public final class CoreCatalogEvolution {
         if (!binding.equals(new CatalogBinding(snapshot.generation(), snapshot.contentChecksum(),
             snapshot.bindingManifestHash()))) {
             throw new IllegalArgumentException("Evolution target binding does not match the catalog");
+        }
+        if (FUNCTION_ID.equals(id)) {
+            Map<String, Integer> functions = new LinkedHashMap<>();
+            snapshot.definitions().forEach(owned -> {
+                if (CatalogFunctionShape.from(owned.key().owner(), owned.descriptor()).isPresent()
+                    && CatalogFunctionShape.capability(ContractRef.of(owned.key().owner(), owned.descriptor().id())).equals(owned.descriptor().handler().capability())) {
+                    functions.put(owned.key().canonicalText(), owned.descriptor().schemaVersion());
+                }
+            });
+            return new Proof(this, binding, functions);
         }
         return proveContent(snapshot.canonicalContent(), binding);
     }
@@ -441,7 +473,8 @@ public final class CoreCatalogEvolution {
     }
 
     boolean accepts(CatalogBinding source, CatalogBinding target) {
-        return sources.contains(source) && registeredTarget(target) && target.generation() > source.generation();
+        return FUNCTION_ID.equals(id) ? source != null && target != null && target.generation() > source.generation()
+            : sources.contains(source) && registeredTarget(target) && target.generation() > source.generation();
     }
 
     private void requireTarget(CatalogBinding target) {
@@ -451,7 +484,7 @@ public final class CoreCatalogEvolution {
     }
 
     private boolean registeredTarget(CatalogBinding target) {
-        return target != null && targetChecksum.equals(target.catalogChecksum())
+        return !FUNCTION_ID.equals(id) && target != null && targetChecksum.equals(target.catalogChecksum())
             && (exactTarget == null || exactTarget.equals(target))
             && sources.stream().anyMatch(source -> target.generation() > source.generation());
     }
@@ -507,7 +540,7 @@ public final class CoreCatalogEvolution {
             throw new IllegalArgumentException("Core graph source binding is not registered for evolution");
         }
         List<GraphNode> nodes = graph.nodes().stream().map(node -> {
-            if (identityProjection()) {
+            if (identityProjection() || FUNCTION_ID.equals(id)) {
                 return node;
             }
             if (STRUCTURE_ID.equals(id)) {
@@ -530,7 +563,8 @@ public final class CoreCatalogEvolution {
         }).toList();
         long revision = Math.addExact(source.envelope().assetRevision(), 1L);
         GraphDocument evolved = new GraphDocument(graph.schemaVersion(), graph.resource(), revision, target,
-            graph.requiredCapabilities(), nodes, graph.connections(), graph.passthroughs(), graph.variables(), graph.functions(), graph.unknown());
+            FUNCTION_ID.equals(id) ? functionCapabilities(graph) : graph.requiredCapabilities(),
+            nodes, graph.connections(), graph.passthroughs(), graph.variables(), graph.functions(), graph.unknown());
         CoreGraphStorageBoundary.AssetMetadata metadata = new CoreGraphStorageBoundary.AssetMetadata(
             source.envelope().resourceType(), revision, mutationId, source.envelope().assetActivationState());
         CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
@@ -543,6 +577,33 @@ public final class CoreCatalogEvolution {
             signature.inputs(), signature.outputs(), signature.unknown());
         FunctionSourceDocument document = new FunctionSourceDocument(evolvedSignature, evolved, function.unknown());
         return boundary.decode(boundary.encode(document, metadata, graph.resource()), graph.resource());
+    }
+
+    private static Map<ContractRef<CapabilityId>, ContractRef<NodeId>> functionRequirements(GraphDocument graph) {
+        Map<ContractRef<CapabilityId>, ContractRef<NodeId>> result = new LinkedHashMap<>();
+        Set<ContractRef<NodeId>> definitions = new LinkedHashSet<>();
+        graph.nodes().forEach(node -> definitions.add(node.definition()));
+        for (ContractRef<CapabilityId> capability : graph.requiredCapabilities()) {
+            List<ContractRef<NodeId>> matches = definitions.stream()
+                .filter(node -> CatalogFunctionShape.legacyCapability(capability, node)).toList();
+            if (matches.size() > 1) {
+                throw new IllegalArgumentException("Historical Function capability identity is ambiguous");
+            }
+            if (matches.size() == 1) {
+                result.put(capability, matches.getFirst());
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private static Set<ContractRef<CapabilityId>> functionCapabilities(GraphDocument graph) {
+        Map<ContractRef<CapabilityId>, ContractRef<NodeId>> changes = functionRequirements(graph);
+        Set<ContractRef<CapabilityId>> capabilities = new LinkedHashSet<>(graph.requiredCapabilities());
+        changes.forEach((previous, node) -> {
+            capabilities.remove(previous);
+            capabilities.add(CatalogFunctionShape.capability(node));
+        });
+        return Set.copyOf(capabilities);
     }
 
     private boolean projectionEligible(GraphDocument graph) {
@@ -601,6 +662,20 @@ public final class CoreCatalogEvolution {
         }
 
         public boolean eligible(CoreGraphStorageBoundary.Decoded source) {
+            if (FUNCTION_ID.equals(evolution.id)) {
+                if (source == null || source.envelope().assetFormatVersion() != CoreGraphStorageBoundary.CURRENT_ASSET_FORMAT_VERSION) {
+                    return false;
+                }
+                GraphDocument graph = CoreCatalogCompatibilityRebind.graph(source);
+                if (!evolution.accepts(graph.catalogBinding(), target)) {
+                    return false;
+                }
+                Map<ContractRef<CapabilityId>, ContractRef<NodeId>> requirements = functionRequirements(graph);
+                return !requirements.isEmpty() && requirements.values().stream().allMatch(node ->
+                    Objects.equals(sourceVersions.get(node.canonicalText()), 1)
+                        && graph.nodes().stream().filter(instance -> instance.definition().equals(node))
+                            .allMatch(instance -> instance.definitionVersion() == 1));
+            }
             return source != null && source.envelope().assetFormatVersion() == CoreGraphStorageBoundary.CURRENT_ASSET_FORMAT_VERSION
                 && evolution.accepts(CoreCatalogCompatibilityRebind.graph(source).catalogBinding(), target)
                 && evolution.projectionEligible(CoreCatalogCompatibilityRebind.graph(source))
@@ -684,7 +759,9 @@ public final class CoreCatalogEvolution {
 
     private static final class Registered {
         private static final CoreCatalogEvolution VALUE = read(RESOURCE, REGISTRATION_HASH);
-        private static final List<CoreCatalogEvolution> ALL = List.of(VALUE,
+        private static final CoreCatalogEvolution FUNCTIONS = read(
+            "/restudio/resync/migration/core-function-capability-rebind-v1.json", new ContentHash("3dbaac39e42f14ab288915c9acbf71c825e12a234e0bca7161817fcc69b5a973"));
+        private static final List<CoreCatalogEvolution> ALL = List.of(VALUE, FUNCTIONS,
             read("/restudio/resync/migration/core-catalog-evolution-v2.json", new ContentHash(
                 "dd095d09369965822a9ebb068ebd06bff82ef8d5e9df73d7821bd232fd5c00e9")),
             read("/restudio/resync/migration/core-catalog-evolution-v3.json", new ContentHash(

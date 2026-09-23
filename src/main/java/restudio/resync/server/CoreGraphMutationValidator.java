@@ -132,7 +132,7 @@ public final class CoreGraphMutationValidator {
             if (activation == null || activationSupplier.get() != activation) {
                 throw new IllegalStateException("Active catalog changed while obtaining evolution authority");
             }
-            CoreCatalogEvolution evolution = CoreCatalogEvolution.select(binding).orElse(null);
+            CoreCatalogEvolution evolution = CoreCatalogEvolution.select(binding).orElse(CoreCatalogEvolution.functions());
             if (evolution == null) {
                 discardEvolutionCache(observed);
                 return Optional.empty();

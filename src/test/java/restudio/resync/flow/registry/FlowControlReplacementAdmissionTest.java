@@ -3,12 +3,10 @@ package restudio.resync.flow.registry;
 import org.junit.jupiter.api.Test;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.FlowControlHandler;
-import restudio.resync.flow.migration.IdCompatibilityLayer;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -49,17 +47,5 @@ class FlowControlReplacementAdmissionTest {
         assertTrue(validator.validate(whileDefinition).valid(), validator.validate(whileDefinition).errors().toString());
         assertTrue(loader.getDiagnostics().stream().noneMatch(value -> value.severity() == NodeDefinitionDiagnostic.Severity.ERROR),
             loader.getDiagnostics().toString());
-    }
-
-    @Test
-    void activeFlowControlIdsAreNotMigrationKeys() {
-        IdCompatibilityLayer compatibility = new IdCompatibilityLayer();
-
-        assertEquals("if", compatibility.mapToNew("if"));
-        assertEquals("loop_while", compatibility.mapToNew("loop_while"));
-        assertFalse(compatibility.getAllMappings().containsKey("if"));
-        assertFalse(compatibility.getAllMappings().containsKey("loop_while"));
-        assertFalse(compatibility.hasMapping("if"));
-        assertFalse(compatibility.hasMapping("loop_while"));
     }
 }

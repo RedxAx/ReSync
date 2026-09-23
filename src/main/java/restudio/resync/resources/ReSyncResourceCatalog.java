@@ -18,6 +18,7 @@ public final class ReSyncResourceCatalog {
     public static final String CUSTOM_CONTENT = "custom_content";
     public static final String PROJECT_METADATA = "project_metadata";
     public static final String CHAT = "chat";
+    public static final String COMPONENT_BUILDER = "component_builder";
     public static final String MOTD_PROFILE = "motd_profile";
     public static final String MESSAGE_RULE = "message_rule";
     public static final String RECIPE_DEFINITION = "recipe_definition";

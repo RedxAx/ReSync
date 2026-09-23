@@ -40,7 +40,7 @@ public interface OptionCatalogCaptureExecutor extends AutoCloseable {
         return (provider, query) -> {
             Objects.requireNonNull(provider, "Option catalog provider is required");
             Objects.requireNonNull(query, "Option catalog query is required");
-            if (provider.captureAffinity() != OptionCatalogProvider.CaptureAffinity.CALLER) {
+            if (provider.captureAffinity(query) != OptionCatalogProvider.CaptureAffinity.CALLER) {
                 throw new UnsupportedOperationException("Option provider requires an unavailable capture executor");
             }
             return Objects.requireNonNull(provider.capture(query), "Option catalog capture is required");
@@ -78,7 +78,7 @@ public interface OptionCatalogCaptureExecutor extends AutoCloseable {
         @Override
         public OptionCatalogCapture capture(OptionCatalogProvider provider, OptionCatalogQuery query) {
             require(provider, query);
-            return switch (provider.captureAffinity()) {
+            return switch (provider.captureAffinity(query)) {
                 case CALLER -> required(provider.capture(query));
                 case IO -> {
                     if (serverMainThread.getAsBoolean()) {
@@ -95,7 +95,7 @@ public interface OptionCatalogCaptureExecutor extends AutoCloseable {
         @Override
         public CompletionStage<OptionCatalogCapture> captureAsync(OptionCatalogProvider provider, OptionCatalogQuery query) {
             require(provider, query);
-            return switch (provider.captureAffinity()) {
+            return switch (provider.captureAffinity(query)) {
                 case CALLER -> completed(provider, query);
                 case IO -> submitIo(provider, query).completion();
                 case SERVER_MAIN -> serverMainThread.getAsBoolean() ? completed(provider, query) : submitMain(provider, query).completion();

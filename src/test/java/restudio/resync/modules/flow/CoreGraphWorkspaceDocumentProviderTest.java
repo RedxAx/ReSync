@@ -87,12 +87,16 @@ class CoreGraphWorkspaceDocumentProviderTest {
             uuid("44444444-4444-4444-8444-444444444444"), 0L);
         CoreGraphWorkspaceDocumentProvider provider = new CoreGraphWorkspaceDocumentProvider(storage);
         JsonObject draft = provider.load("function", "compute");
-        draft.addProperty("futureEdit", true);
+        draft.getAsJsonObject("graph").addProperty("futureEdit", true);
 
         provider.persist("function", "compute", draft, uuid("55555555-5555-4555-8555-555555555555"), 1L);
         FunctionSourceDocument saved = storage.getCoreGraph("function", "compute").orElseThrow().functionSourceDocument();
 
         assertEquals(2L, saved.graph().revision());
+        JsonObject conflicting = draft.deepCopy();
+        conflicting.getAsJsonObject("signature").addProperty("futureSignature", false);
+        assertThrows(IllegalStateException.class, () -> provider.persist("function", "compute", conflicting,
+            uuid("55555555-5555-4555-8555-555555555555"), 1L));
         assertEquals(2L, saved.signature().revision().value());
         assertEquals(true, saved.signature().unknown().get("futureSignature"));
         assertEquals(true, saved.unknown().get("futureSource"));

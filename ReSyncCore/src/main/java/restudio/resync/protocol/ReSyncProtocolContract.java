@@ -456,6 +456,13 @@ public final class ReSyncProtocolContract {
         )
         ),
         new ResourceContract(
+            "component_builder",
+            "Component Builder",
+            "Content/Component Builders",
+            true,
+            null
+        ),
+        new ResourceContract(
             "motd_profile",
             "MOTD Profile",
             "Customization/MOTDs",

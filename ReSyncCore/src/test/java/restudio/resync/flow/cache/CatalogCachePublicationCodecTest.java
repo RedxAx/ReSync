@@ -39,6 +39,23 @@ class CatalogCachePublicationCodecTest {
     }
 
     @Test
+    void validatedPublicationRetainsCanonicalInputAfterCallerMutation() {
+        CatalogCachePublicationCodec codec = new CatalogCachePublicationCodec();
+        CatalogCachePublication publication = smallPublication();
+        byte[] input = codec.encodeBytes(publication);
+        byte[] expected = input.clone();
+
+        CatalogCachePublicationCodec.ValidatedPublication validated = codec.decodeValidatedPublication(input);
+        input[0] = '[';
+        byte[] exposed = validated.canonicalBytes();
+        exposed[0] = '[';
+
+        assertEquals(publication, validated.publication());
+        assertArrayEquals(expected, validated.canonicalBytes());
+        assertThrows(IllegalArgumentException.class, () -> codec.decodeValidatedPublication(input));
+    }
+
+    @Test
     void decodeRejectsNormalizedEntryStateAlias() {
         CatalogCachePublicationCodec codec = new CatalogCachePublicationCodec();
         JsonValue.JsonObject encoded = codec.encode(smallPublication());
@@ -68,6 +85,25 @@ class CatalogCachePublicationCodecTest {
         List<JsonValue> reversedEntries = new ArrayList<>(((JsonValue.JsonArray) ordered.value("entries")).values());
         Collections.reverse(reversedEntries);
         assertThrows(IllegalArgumentException.class, () -> codec.decode(replaceEntries(ordered, reversedEntries)));
+    }
+
+    @Test
+    void opaqueValueAndBytesRemainConsistentAfterCallerMutation() {
+        byte[] input = "{\"nested\":[{\"value\":1}]}".getBytes(StandardCharsets.UTF_8);
+        byte[] expected = input.clone();
+        CatalogCacheOpaque opaque = CatalogCacheOpaque.of(input);
+        input[0] = '[';
+        byte[] exposed = opaque.canonicalBytes();
+        exposed[0] = '[';
+
+        assertArrayEquals(expected, opaque.canonicalBytes());
+        assertArrayEquals(expected, opaque.canonicalValue().canonicalBytes());
+        JsonValue.JsonObject object = (JsonValue.JsonObject) opaque.canonicalValue();
+        assertThrows(UnsupportedOperationException.class, () -> object.fields().clear());
+        JsonValue.JsonArray nested = (JsonValue.JsonArray) object.value("nested");
+        assertThrows(UnsupportedOperationException.class, () -> nested.values().clear());
+        assertThrows(UnsupportedOperationException.class,
+            () -> ((JsonValue.JsonObject) nested.values().getFirst()).fields().clear());
     }
 
     @Test

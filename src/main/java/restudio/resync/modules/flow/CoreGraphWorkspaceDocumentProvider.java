@@ -9,6 +9,7 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.function.FunctionRevision;
 import restudio.resync.flow.function.FunctionSignature;
 import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.workspace.CoreWorkspaceDocument;
 import restudio.resync.flow.graph.GraphDocument;
 import restudio.resync.flow.graph.GraphDocumentCodec;
 import restudio.resync.flow.identity.ServerResourceLocator;
@@ -48,7 +49,7 @@ final class CoreGraphWorkspaceDocumentProvider {
             ServerResourceLocator expected = current(type, resourceId).graph().resource();
             CoreGraphStorageBoundary.Decoded decoded = boundary.decodeText(payload, expected);
             GraphDocument graph = graph(decoded);
-            return matches(graph, type, resourceId) ? json(graph) : null;
+            return matches(graph, type, resourceId) ? document(decoded) : null;
         } catch (RuntimeException ignored) {
             return null;
         }
@@ -61,9 +62,10 @@ final class CoreGraphWorkspaceDocumentProvider {
 
     JsonObject persist(String type, String resourceId, JsonObject document, UUID mutationId, long expectedRevision) {
         Loaded current = current(type, resourceId);
-        GraphDocument submitted = decode(document);
+        CoreWorkspaceDocument submittedDocument = CoreWorkspaceDocument.decode(jsonValue(document));
+        GraphDocument submitted = submittedDocument.document();
         if (mutationId.toString().equals(current.decoded().envelope().assetMutationId())) {
-            if (expectedRevision != current.decoded().envelope().assetRevision() - 1L || !sameReplay(submitted, current.graph())) {
+            if (expectedRevision != current.decoded().envelope().assetRevision() - 1L || !sameReplay(submittedDocument, current.decoded())) {
                 throw new IllegalStateException("Workspace mutation ID was already committed with different state");
             }
             return document(current.decoded());
@@ -79,7 +81,7 @@ final class CoreGraphWorkspaceDocumentProvider {
         GraphDocument next = withRevision(submitted, nextRevision);
         CoreGraphStorageBoundary.Decoded saved;
         if (current.decoded().functionSourceDocument() != null) {
-            FunctionSourceDocument source = withGraph(current.decoded().functionSourceDocument(), next, nextRevision);
+            FunctionSourceDocument source = withGraph(Objects.requireNonNull(submittedDocument.source(), "Function source is required"), next, nextRevision);
             saved = storage.saveCoreGraph(source, current.decoded().envelope().assetActivationState(), mutationId, expectedRevision);
         } else {
             saved = storage.saveCoreGraph(next, current.decoded().envelope().assetActivationState(), mutationId, expectedRevision);
@@ -87,17 +89,23 @@ final class CoreGraphWorkspaceDocumentProvider {
         return document(saved);
     }
 
-    private boolean sameReplay(GraphDocument submitted, GraphDocument current) {
-        if (!submitted.resource().equals(current.resource())) {
+    private boolean sameReplay(CoreWorkspaceDocument submitted, CoreGraphStorageBoundary.Decoded current) {
+        CoreWorkspaceDocument committed = new CoreWorkspaceDocument(current.graphDocument(), current.functionSourceDocument());
+        GraphDocument graph = submitted.document();
+        GraphDocument saved = committed.document();
+        if (!graph.resource().equals(saved.resource()) || (submitted.source() == null) != (committed.source() == null)) {
             return false;
         }
-        if (submitted.canonicalJson().equals(current.canonicalJson())) {
+        if (submitted.encode().equals(committed.encode())) {
             return true;
         }
-        if (submitted.revision() == Long.MAX_VALUE || submitted.revision() + 1L != current.revision()) {
+        if (graph.revision() == Long.MAX_VALUE || graph.revision() + 1L != saved.revision()) {
             return false;
         }
-        return withRevision(submitted, current.revision()).canonicalJson().equals(current.canonicalJson());
+        GraphDocument normalized = withRevision(graph, saved.revision());
+        CoreWorkspaceDocument replay = submitted.source() == null ? new CoreWorkspaceDocument(normalized, null)
+            : new CoreWorkspaceDocument(null, withGraph(submitted.source(), normalized, saved.revision()));
+        return replay.encode().equals(committed.encode());
     }
 
     private Loaded current(String type, String resourceId) {
@@ -143,7 +151,8 @@ final class CoreGraphWorkspaceDocumentProvider {
     }
 
     private JsonObject document(CoreGraphStorageBoundary.Decoded decoded) {
-        return json(graph(decoded));
+        return JsonParser.parseString(new CoreWorkspaceDocument(decoded.graphDocument(), decoded.functionSourceDocument())
+            .encode().canonicalText()).getAsJsonObject();
     }
 
     private JsonObject json(GraphDocument graph) {

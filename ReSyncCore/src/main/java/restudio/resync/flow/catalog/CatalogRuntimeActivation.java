@@ -361,6 +361,12 @@ public final class CatalogRuntimeActivation {
             if (previousSignature.equals(nextSignature)) {
                 continue;
             }
+            Optional<CatalogFunctionShape> previousFunction = CatalogFunctionShape.from(identity.ownerId(), previous);
+            Optional<CatalogFunctionShape> nextFunction = CatalogFunctionShape.from(identity.ownerId(), next);
+            if (previousFunction.isPresent() && nextFunction.isPresent()
+                && previousFunction.orElseThrow().accepts(nextFunction.orElseThrow())) {
+                continue;
+            }
             if (next.schemaVersion() <= previous.schemaVersion()) {
                 throw new IllegalArgumentException("Candidate Catalog Pin Identity Changes Require A Monotonic Schema Advance");
             }

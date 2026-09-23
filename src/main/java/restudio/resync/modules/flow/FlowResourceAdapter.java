@@ -12,6 +12,12 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface FlowResourceAdapter<T> {
+    final class PreCommitRejection extends RuntimeException {
+        public PreCommitRejection(IllegalArgumentException cause) {
+            super(cause.getMessage(), cause);
+        }
+    }
+
     String AUTHORITATIVE_MUTATION_IDENTITY_UNAVAILABLE =
         "Authoritative resource mutation identity durability is unavailable";
 

@@ -148,7 +148,10 @@ public final class ProviderOptionQueryService implements AutoCloseable {
         } catch (OptionQueryAuthority.Rejected rejection) {
             throw rejection;
         } catch (RuntimeException exception) {
-            throw rejected(ProtocolRejectionCode.RESOURCE_READ_UNAVAILABLE, "Authoritative option provider capture failed", exception);
+            String detail = exception.getMessage();
+            String diagnostic = detail == null || detail.isBlank() ? "Authoritative option provider capture failed"
+                : "Authoritative option provider capture failed: " + detail;
+            throw rejected(ProtocolRejectionCode.RESOURCE_READ_UNAVAILABLE, diagnostic, exception);
         }
         if (!"available".equalsIgnoreCase(capture.status())) {
             String diagnostic = capture.diagnostic().isBlank() ? "Authoritative option provider is unavailable" : capture.diagnostic();

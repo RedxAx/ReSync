@@ -10,6 +10,8 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Villager;
 import restudio.resync.advancement.AdvancementTreeValidator;
 import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.customcontent.ComponentBuilderDefinition;
+import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.resources.ReSyncResourceCatalog;
@@ -22,6 +24,7 @@ import restudio.resync.storage.StorageSafety;
 
 import java.util.Locale;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -61,10 +64,24 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
             case ReSyncResourceCatalog.DIALOG -> validateDialogDefinition(value);
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> advancementTreeValidator.validate(Map.of(text(value, "id"), value));
             case ReSyncResourceCatalog.TEXT_TEMPLATE -> validateText(value);
+            case ReSyncResourceCatalog.COMPONENT_BUILDER -> validateComponentBuilder(value);
             case ReSyncResourceCatalog.VARIABLE_DEFINITION -> validateVariableDefinition(value);
             case ReSyncResourceCatalog.TIMER_DEFINITION -> TimerDefinition.from(value, rawText(value, "id"));
             case ReSyncResourceCatalog.SCHEDULE_DEFINITION -> validateScheduleDefinition(value);
             default -> validateCommonStructure(value);
+        }
+    }
+
+    private void validateComponentBuilder(JsonObject value) {
+        ComponentBuilderDefinition definition = ComponentBuilderDefinition.from(value);
+        if (definition.validationMaterial().isBlank()) {
+            return;
+        }
+        List<Map<String, Object>> errors = new ItemAttributeSchemaService().validate(
+            definition.validationMaterial(), definition.components());
+        if (!errors.isEmpty()) {
+            Object message = errors.getFirst().get("message");
+            throw new IllegalArgumentException(message != null ? message.toString() : "Component Builder is invalid");
         }
     }
 

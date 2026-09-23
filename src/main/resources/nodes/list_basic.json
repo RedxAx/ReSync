@@ -280,7 +280,7 @@
   },
   {
     "id": "list_contains",
-    "displayName": "Contains",
+    "displayName": "List Contains",
     "description": "Check whether a list contains a value. Missing or null list input uses an empty list, and missing or null value input uses null.",
     "domain": "core",
     "family": "list",

@@ -36,6 +36,7 @@ class CatalogResourceSelectorAcceptanceTest {
     private static Manifest cachedManifest;
     private static final Set<String> NON_RESOURCE_OPTION_SOURCES = Set.of(
         "server:custom_content:provider",
+        "server:custom_content:recipe_item",
         "server:luckperms:permission",
         "server:minecraft:advancement",
         "server:minecraft:attribute",
@@ -80,7 +81,7 @@ class CatalogResourceSelectorAcceptanceTest {
         assertEquals("6748", manifest.metadata().get("baselineActivePins"));
         assertEquals("3440", manifest.metadata().get("baselineActiveInputs"));
         assertEquals("3308", manifest.metadata().get("baselineActiveOutputs"));
-        assertEquals("127", manifest.metadata().get("baselineCatalogBackedResourceSelectors"));
+        assertEquals("128", manifest.metadata().get("baselineCatalogBackedResourceSelectors"));
         assertEquals("resource<restudio.resync:{type}>", manifest.metadata().get("authoritativeTypeSyntax"));
         assertEquals("true", manifest.metadata().get("legacyColumnsAreEvidenceOnly"));
     }

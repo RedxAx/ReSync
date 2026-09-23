@@ -6,6 +6,7 @@ import restudio.resync.flow.identity.CapabilityId;
 import restudio.resync.flow.identity.ContractRef;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -129,12 +130,35 @@ class ReSyncProtocolContractTest {
     }
 
     @Test
+    void workspacePacketsCannotBeInterpretedAsResourcePackets() {
+        Set<Byte> workspacePackets = Set.of(ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_JOIN,
+            ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_LEAVE, ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_SNAPSHOT,
+            ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_OPERATION, ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_AWARENESS,
+            ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_RESYNC, ReSyncProtocolContract.FLOW_PACKET_COLLABORATION_CHAT);
+        for (ReSyncProtocolContract.ResourceContract resource : ReSyncProtocolContract.RESOURCE_CONTRACTS) {
+            ReSyncProtocolContract.ResourceFlowPackets packets = resource.flowPackets();
+            if (packets == null) {
+                continue;
+            }
+            for (byte packet : List.of(packets.request(), packets.listRequest(), packets.data(), packets.list(),
+                packets.save(), packets.delete(), packets.saveAck())) {
+                assertFalse(workspacePackets.contains(packet), resource.typeId() + " shadows workspace packet " + (packet & 0xFF));
+            }
+        }
+    }
+
+    @Test
     void preservesResourcePacketMappings() {
-        assertEquals(24, ReSyncProtocolContract.RESOURCE_CONTRACTS.length);
+        assertEquals(25, ReSyncProtocolContract.RESOURCE_CONTRACTS.length);
         assertResource("flow", "Flow", "Blueprints/Flows", false, 0x01, 0x09, 0x02, 0x0A, 0x03, 0x08, 0x07);
         assertResource("function", "Function", "Blueprints/Functions", false, 0xE7, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED);
         assertResource("command", "Command", "Blueprints/Commands", false, 0xEE, 0xEF, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4);
         assertResource("custom_content", "Custom Content", "Content/Items", false, 0x30, 0x36, 0x32, 0x31, 0x33, 0x34, 0x35);
+        var componentBuilder = ReSyncProtocolContract.resource("component_builder");
+        assertEquals("Component Builder", componentBuilder.displayName());
+        assertEquals("Content/Component Builders", componentBuilder.defaultFolder());
+        assertTrue(componentBuilder.jsonStorageSupported());
+        assertNull(componentBuilder.flowPackets());
         assertResource("dialog", "Dialog", "Content/Dialogs", true, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA);
         assertResource("loot_table", "Loot Table", "Content/Loot Tables", true, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF, 0xD0, 0xD1);
         assertEquals("WorldGen", ReSyncProtocolContract.resource("worldgen").displayName());

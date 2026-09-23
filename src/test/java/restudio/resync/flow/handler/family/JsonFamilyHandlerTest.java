@@ -379,6 +379,80 @@ class JsonFamilyHandlerTest {
         }
 
         @Test
+        void itemPropertiesKeepsOneFamilyWithMatchingGetAndSetTypes() {
+            NodeDefinition definition = definitions.get("itemstack.properties");
+            assertNotNull(definition);
+            assertEquals("Item Properties", definition.getDisplayName());
+            assertEquals(NodeDefinition.NodeKind.FAMILY, definition.getKind());
+            assertEquals(List.of("get", "has", "set"),
+                FlowRuntime.resolveInputPin(definition, "action").getOptions());
+
+            Map<String, FlowTypeRef> getters = new LinkedHashMap<>();
+            definition.getOutputs().stream()
+                .filter(pin -> "get".equals(pin.getVisibleWhen().get("action")))
+                .forEach(pin -> getters.put(pin.getName(), pin.getTypeRef()));
+            assertFalse(getters.isEmpty());
+            getters.forEach((property, type) -> {
+                NodeDefinition.PinDefinition setter = FlowRuntime.resolveInputPin(definition, "set_" + property);
+                assertNotNull(setter, property);
+                assertEquals(type, setter.getTypeRef(), property);
+                assertEquals("set", setter.getVisibleWhen().get("action"), property);
+                assertEquals(property, setter.getVisibleWhen().get("property"), property);
+            });
+
+            NodeDefinition bulkComponents = definitions.get("itemstack.item_apply_components");
+            assertNotNull(bulkComponents);
+            assertTrue(bulkComponents.isHidden());
+            assertEquals("Apply Item Components", bulkComponents.getDisplayName());
+        }
+
+        @Test
+        void itemPropertiesSetWritesEveryAdvertisedProperty() {
+            ItemStack item = new ItemStack(Material.DIAMOND_SWORD);
+
+            set("amount", item, 1);
+            set("display_name", item, "Blade");
+            set("lore", item, List.of("first", "second"));
+            set("max_durability", item, 2000);
+            set("durability", item, 17);
+            set("enchantments", item, Map.of("minecraft:sharpness", 4));
+            set("custom_model_data", item, 42);
+            set("unbreakable", item, true);
+            set("repair_cost", item, 7);
+            set("item_flags", item, List.of("HIDE_ATTRIBUTES", "HIDE_ENCHANTS"));
+            set("localized_name", item, "item.fixture.blade");
+
+            assertEquals(1, item.getAmount());
+            assertEquals("Blade", read(item, "display_name"));
+            assertEquals(List.of("first", "second"), read(item, "lore"));
+            assertEquals(2000, read(item, "max_durability"));
+            assertEquals(17, read(item, "durability"));
+            assertEquals(Map.of("minecraft:sharpness", 4), read(item, "enchantments"));
+            assertEquals(42, read(item, "custom_model_data"));
+            assertEquals(true, read(item, "unbreakable"));
+            assertEquals(7, read(item, "repair_cost"));
+            assertEquals(List.of("HIDE_ATTRIBUTES", "HIDE_ENCHANTS"), read(item, "item_flags"));
+
+            ItemStack changedType = new ItemStack(Material.STICK);
+            set("type", changedType, "minecraft:diamond");
+            assertEquals(Material.DIAMOND, changedType.getType());
+        }
+
+        @Test
+        void itemPropertiesSetCommitsDetachedHeldItemBackToThePlayer() {
+            player.getInventory().setItemInMainHand(new ItemStack(Material.STICK, 1));
+            Object detached = roundTrip(TypeExpr.named(TypeReference.of("builtin", "itemstack")),
+                player.getInventory().getItemInMainHand());
+            Query query = prepare("itemstack.properties", "amount", detached, "set");
+            query.node().getInputValues().put("set_amount", 11.0);
+
+            query.execute();
+
+            assertEquals(true, query.context().getOutput(query.node(), "success"));
+            assertEquals(11, player.getInventory().getItemInMainHand().getAmount());
+        }
+
+        @Test
         void itemSelectorUsesAuthoredPropertyBeforeHandlerConfiguration() {
             ItemStack item = new ItemStack(Material.DIAMOND_SWORD);
             ItemMeta meta = item.getItemMeta();
@@ -499,6 +573,19 @@ class JsonFamilyHandlerTest {
             FlowRuntime runtime = new FlowRuntime(graph, new TypeAdapterRegistry(), Map.of(), Map.of(), definitions);
             assertSame(definition, runtime.getDefinition(node));
             return new Query(node, new FlowContext(runtime, player, null), handlers.getHandler(definition.getHandler()));
+        }
+
+        private void set(String property, ItemStack item, Object value) {
+            Query query = prepare("itemstack.properties", property, item, "set");
+            query.node().getInputValues().put("set_" + property, value);
+            query.execute();
+            assertSame(item, query.context().getOutput(query.node(), "item"));
+            assertEquals(true, query.context().getOutput(query.node(), "success"));
+        }
+
+        private Object read(ItemStack item, String property) {
+            Query query = query("itemstack.properties", property, item);
+            return query.context().getOutput(query.node(), property);
         }
 
         private static Object roundTrip(TypeExpr type, Object value) {

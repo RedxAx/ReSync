@@ -8,19 +8,23 @@ import org.junit.jupiter.api.io.TempDir;
 import restudio.resync.flow.resource.ResourcePayloadCodecs;
 import restudio.resync.migration.ReSyncPersistenceCoordinator;
 import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.storage.AssetIntegrityService;
 import restudio.resync.storage.AssetTransactionCoordinator.AssetDelta;
 import restudio.resync.storage.AssetTransactionCoordinator.AssetKey;
+import restudio.resync.storage.AssetTransactionCoordinator.Missing;
 import restudio.resync.storage.AssetTransactionCoordinator.ProjectDelta;
 import restudio.resync.storage.AssetTransactionCoordinator.Snapshot;
 import restudio.resync.storage.ProjectMetadataLineage;
 import restudio.resync.storage.StorageSafety;
 import restudio.resync.upgrade.AssetCoordinatorMigration;
+import restudio.resync.worldgen.WorldGenGeneratedRebuildRecipe;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 
@@ -49,6 +53,10 @@ class FreshProjectMetadataBootstrapTest {
                 assertEquals(1L, snapshot.rootSequence());
                 assertEquals(1L, snapshot.project().revision());
                 assertEquals(identity.serverId().canonicalText(), snapshot.metadata().document().get("serverId").getAsString());
+                assertTrue(snapshot.metadata().document().getAsJsonArray("resources").isEmpty());
+                assertTrue(snapshot.metadata().document().getAsJsonArray("folders").isEmpty());
+                assertEquals(AssetIntegrityService.Status.HEALTHY,
+                    new AssetIntegrityService(coordinator.canonicalRoot()).scan(0).status());
                 assertTrue(snapshot.state(LINEAGE_KEY).isPresent());
                 JsonObject lineage = GSON.fromJson(Files.readString(lineagePath(fixture.activeRoot())), JsonObject.class);
                 assertEquals(identity.serverId().canonicalText(), lineage.get("id").getAsString());
@@ -224,6 +232,118 @@ class FreshProjectMetadataBootstrapTest {
         }
     }
 
+    @Test
+    void normalizesOnlyTheProvenEmptyOlderBootstrapThroughOneTransaction(@TempDir Path temporary) throws Exception {
+        try (FreshFixture fixture = freshFixture(temporary)) {
+            ServerIdentityStore identity = ServerIdentityStore.open(fixture.activeRoot().resolve(ServerIdentityStore.FILE_NAME));
+            try (AssetTransactionCoordinator coordinator = fixture.openAssets()) {
+                seedCanonicalPair(coordinator, identity.serverId().canonicalText());
+                Snapshot beforeRecipe = coordinator.read(current -> current);
+                Path recipe = coordinator.canonicalRoot().resolve(".durability/worldgen-generated-rebuild-recipe.v1");
+                byte[] recipeBytes = WorldGenGeneratedRebuildRecipe.capture(List.of()).encodedBytes();
+                coordinator.transact(new AssetTransactionCoordinator.TransactionRequest(UUID.randomUUID(), beforeRecipe.project(),
+                    List.of(AssetDelta.write(WorldGenGeneratedRebuildRecipe.ASSET_KEY, recipe, Missing.INSTANCE, recipeBytes)), List.of()));
+                Snapshot before = coordinator.read(current -> current);
+                assertEquals(2L, before.rootSequence());
+                assertEquals(AssetIntegrityService.Status.DEGRADED,
+                    new AssetIntegrityService(coordinator.canonicalRoot()).scan(0).status());
+
+                fixture.preflight().ensure(identity, coordinator, GSON);
+
+                Snapshot normalized = coordinator.read(current -> current);
+                assertEquals(3L, normalized.rootSequence());
+                assertEquals(2L, normalized.project().revision());
+                assertTrue(normalized.metadata().document().getAsJsonArray("resources").isEmpty());
+                assertTrue(normalized.metadata().document().getAsJsonArray("folders").isEmpty());
+                assertEquals(identity.serverId().canonicalText(), normalized.metadata().document().get("serverId").getAsString());
+                assertEquals(before.state(WorldGenGeneratedRebuildRecipe.ASSET_KEY), normalized.state(WorldGenGeneratedRebuildRecipe.ASSET_KEY));
+                assertArrayEquals(recipeBytes, Files.readAllBytes(recipe));
+                JsonObject lineage = GSON.fromJson(Files.readString(lineagePath(fixture.activeRoot())), JsonObject.class);
+                assertEquals(2L, lineage.get("revision").getAsLong());
+                assertEquals(ResourcePayloadCodecs.json().hashPayload(
+                    GSON.fromJson(normalized.metadata().serializedJson(), Map.class)).canonicalText(), lineage.get("payloadHash").getAsString());
+                assertEquals(AssetIntegrityService.Status.HEALTHY,
+                    new AssetIntegrityService(coordinator.canonicalRoot()).scan(0).status());
+                byte[] projectBytes = Files.readAllBytes(coordinator.canonicalRoot().resolve("project.json"));
+                byte[] lineageBytes = Files.readAllBytes(lineagePath(fixture.activeRoot()));
+
+                fixture.preflight().ensure(identity, coordinator, GSON);
+
+                assertEquals(3L, coordinator.read(Snapshot::rootSequence));
+                assertArrayEquals(projectBytes, Files.readAllBytes(coordinator.canonicalRoot().resolve("project.json")));
+                assertArrayEquals(lineageBytes, Files.readAllBytes(lineagePath(fixture.activeRoot())));
+            }
+        }
+    }
+
+    @Test
+    void existingUnknownMalformedAndPopulatedIndexesAreNeverReplaced(@TempDir Path temporary) throws Exception {
+        List<String> documents = List.of("{\"resources\":{}}", "{\"resources\":null}",
+            "{\"resources\":[{\"type\":\"gui\",\"id\":\"kept\",\"path\":\"GUIs\"}],\"folders\":[{\"path\":\"GUIs\"}]}",
+            "{\"folders\":[{\"path\":\"User Folder\"}]}", "{\"unknown\":{\"value\":true}}");
+        for (int index = 0; index < documents.size(); index++) {
+            try (FreshFixture fixture = freshFixture(Files.createDirectory(temporary.resolve("case-" + index)))) {
+                ServerIdentityStore identity = ServerIdentityStore.open(fixture.activeRoot().resolve(ServerIdentityStore.FILE_NAME));
+                try (AssetTransactionCoordinator coordinator = fixture.openAssets()) {
+                    seedCanonicalPair(coordinator, identity.serverId().canonicalText(), GSON.fromJson(documents.get(index), JsonObject.class));
+                    byte[] project = Files.readAllBytes(coordinator.canonicalRoot().resolve("project.json"));
+                    byte[] lineage = Files.readAllBytes(lineagePath(fixture.activeRoot()));
+
+                    fixture.preflight().ensure(identity, coordinator, GSON);
+
+                    assertEquals(1L, coordinator.read(Snapshot::rootSequence));
+                    assertArrayEquals(project, Files.readAllBytes(coordinator.canonicalRoot().resolve("project.json")));
+                    assertArrayEquals(lineage, Files.readAllBytes(lineagePath(fixture.activeRoot())));
+                }
+            }
+        }
+    }
+
+    @Test
+    void missingIndexWithACommittedUserAssetIsPreservedForExplicitRecovery(@TempDir Path temporary) throws Exception {
+        try (FreshFixture fixture = freshFixture(temporary)) {
+            ServerIdentityStore identity = ServerIdentityStore.open(fixture.activeRoot().resolve(ServerIdentityStore.FILE_NAME));
+            try (AssetTransactionCoordinator coordinator = fixture.openAssets()) {
+                seedCanonicalPair(coordinator, identity.serverId().canonicalText());
+                Snapshot snapshot = coordinator.read(current -> current);
+                Path asset = coordinator.canonicalRoot().resolve("kept.json");
+                byte[] content = "{\"id\":\"kept\",\"userValue\":42}".getBytes(StandardCharsets.UTF_8);
+                coordinator.transact(new AssetTransactionCoordinator.TransactionRequest(UUID.randomUUID(), snapshot.project(),
+                    List.of(AssetDelta.write(new AssetKey("gui", "kept"), asset, Missing.INSTANCE, content)), List.of()));
+                byte[] project = Files.readAllBytes(coordinator.canonicalRoot().resolve("project.json"));
+                byte[] lineage = Files.readAllBytes(lineagePath(fixture.activeRoot()));
+
+                fixture.preflight().ensure(identity, coordinator, GSON);
+
+                assertEquals(2L, coordinator.read(Snapshot::rootSequence));
+                assertArrayEquals(project, Files.readAllBytes(coordinator.canonicalRoot().resolve("project.json")));
+                assertArrayEquals(lineage, Files.readAllBytes(lineagePath(fixture.activeRoot())));
+                assertArrayEquals(content, Files.readAllBytes(asset));
+            }
+        }
+    }
+
+    @Test
+    void untrackedUserFilesPreventEmptyIndexNormalization(@TempDir Path temporary) throws Exception {
+        try (FreshFixture fixture = freshFixture(temporary)) {
+            ServerIdentityStore identity = ServerIdentityStore.open(fixture.activeRoot().resolve(ServerIdentityStore.FILE_NAME));
+            try (AssetTransactionCoordinator coordinator = fixture.openAssets()) {
+                seedCanonicalPair(coordinator, identity.serverId().canonicalText());
+                Path note = coordinator.canonicalRoot().resolve("user-note.txt");
+                Files.writeString(note, "Preserve User Data");
+                byte[] project = Files.readAllBytes(coordinator.canonicalRoot().resolve("project.json"));
+                byte[] lineage = Files.readAllBytes(lineagePath(fixture.activeRoot()));
+
+                fixture.preflight().ensure(identity, coordinator, GSON);
+
+                assertEquals(1L, coordinator.read(Snapshot::rootSequence));
+                assertArrayEquals(project, Files.readAllBytes(coordinator.canonicalRoot().resolve("project.json")));
+                assertArrayEquals(lineage, Files.readAllBytes(lineagePath(fixture.activeRoot())));
+                assertEquals("Preserve User Data", Files.readString(note));
+            }
+        }
+    }
+
     private static FreshFixture freshFixture(Path temporary) throws Exception {
         Path coordinationRoot = temporary.resolve("coordination");
         ReSyncPersistenceCoordinator persistence = ReSyncPersistenceCoordinator.bootstrap(
@@ -251,10 +371,15 @@ class FreshProjectMetadataBootstrapTest {
     }
 
     private static void seedCanonicalPair(AssetTransactionCoordinator coordinator, String serverId) throws IOException {
+        seedCanonicalPair(coordinator, serverId, new JsonObject());
+    }
+
+    private static void seedCanonicalPair(AssetTransactionCoordinator coordinator, String serverId, JsonObject additional) throws IOException {
         Snapshot snapshot = coordinator.read(current -> current);
         UUID mutationId = UUID.randomUUID();
-        List<ProjectDelta> deltas = List.of(
-            ProjectDelta.set(List.of("serverId"), new JsonPrimitive(serverId)));
+        List<ProjectDelta> deltas = new ArrayList<>();
+        deltas.add(ProjectDelta.set(List.of("serverId"), new JsonPrimitive(serverId)));
+        additional.entrySet().forEach(entry -> deltas.add(ProjectDelta.set(List.of(entry.getKey()), entry.getValue())));
         AssetDelta lineage = ProjectMetadataLineage.writer(coordinator.canonicalRoot(), GSON)
             .write(snapshot, deltas, mutationId);
         coordinator.transact(new AssetTransactionCoordinator.TransactionRequest(

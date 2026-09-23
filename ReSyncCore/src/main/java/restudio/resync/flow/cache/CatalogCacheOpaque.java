@@ -10,21 +10,21 @@ import java.util.Objects;
 
 public final class CatalogCacheOpaque {
     private final byte[] canonicalBytes;
+    private final JsonValue canonicalValue;
 
     public CatalogCacheOpaque(byte[] canonicalBytes) {
-        this(ownedCopy(canonicalBytes), false);
+        this(ownedCopy(canonicalBytes), null);
     }
 
-    private CatalogCacheOpaque(byte[] canonicalBytes, boolean trustedCanonicalJson) {
+    private CatalogCacheOpaque(byte[] canonicalBytes, JsonValue canonicalValue) {
         if (canonicalBytes.length == 0) {
             throw new IllegalArgumentException("Canonical opaque bytes cannot be empty");
         }
         if (canonicalBytes.length > CanonicalLimits.standard().opaqueSubtreeBytes()) {
             throw new IllegalArgumentException("Canonical opaque data exceeds the configured limit");
         }
-        if (!trustedCanonicalJson) {
-            CanonicalCodec.decode(canonicalBytes, CanonicalLimits.catalog());
-        }
+        this.canonicalValue = canonicalValue == null
+            ? CanonicalCodec.decode(canonicalBytes, CanonicalLimits.catalog()) : canonicalValue;
         this.canonicalBytes = canonicalBytes;
     }
 
@@ -34,12 +34,16 @@ public final class CatalogCacheOpaque {
 
     static CatalogCacheOpaque fromCanonicalJson(JsonValue value) {
         Objects.requireNonNull(value, "Canonical JSON value is required");
-        return new CatalogCacheOpaque(value.canonicalBytes(CanonicalLimits.catalog()), true);
+        return new CatalogCacheOpaque(value.canonicalBytes(CanonicalLimits.catalog()), value);
     }
 
     static CatalogCacheOpaque fromCanonicalJson(CanonicalCodec.ValidatedJson validated, JsonValue value) {
         Objects.requireNonNull(validated, "Validated canonical JSON is required");
-        return new CatalogCacheOpaque(validated.canonicalBytes(value), true);
+        return new CatalogCacheOpaque(validated.canonicalBytes(value), value);
+    }
+
+    public JsonValue canonicalValue() {
+        return canonicalValue;
     }
 
     public byte[] canonicalBytes() {

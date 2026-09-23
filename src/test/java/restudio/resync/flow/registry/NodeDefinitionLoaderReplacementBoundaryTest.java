@@ -1,75 +1,14 @@
 package restudio.resync.flow.registry;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NodeDefinitionLoaderReplacementBoundaryTest {
-    @TempDir
-    Path temporary;
-
-    @Test
-    void replacementSourceExcludesMigratedDefinitionsWhileCompatibilitySourceRetainsThem() throws Exception {
-        Path nodes = temporary.resolve("nodes");
-        Files.createDirectories(nodes.resolve("migrated"));
-        Files.writeString(nodes.resolve("active.json"), definition("replacement.node"));
-        Files.writeString(nodes.resolve("migrated").resolve("legacy.json"), definition("legacy.node"));
-
-        NodeDefinitionLoader replacementLoader = new NodeDefinitionLoader();
-        List<NodeDefinition> replacement = replacementLoader.loadReplacementFromDirectory(nodes);
-
-        assertEquals(List.of("replacement.node"), replacement.stream().map(NodeDefinition::getId).toList());
-        assertTrue(replacementLoader.getDiagnostics().stream().anyMatch(value -> "CATALOG.LEGACY_ACTIVE".equals(value.code())));
-
-        List<NodeDefinition> compatibility = new NodeDefinitionLoader().loadFromDirectory(nodes);
-        assertEquals(List.of("legacy.node", "replacement.node"), compatibility.stream().map(NodeDefinition::getId).sorted().toList());
-    }
-
-    @Test
-    void replacementSourceRejectsRelativeAndJarMigrationPathLabels() {
-        String source = definition("legacy.node");
-        for (String sourcePath : List.of("nodes/migrated/legacy.json", "jar:file:/plugins/resync.jar!/nodes/migrated/legacy.json")) {
-            NodeDefinitionLoader loader = new NodeDefinitionLoader();
-            List<NodeDefinition> definitions = loader.parseReplacement(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)), sourcePath);
-
-            assertTrue(definitions.isEmpty(), sourcePath);
-            assertTrue(loader.getDiagnostics().stream().anyMatch(value -> "CATALOG.LEGACY_ACTIVE".equals(value.code())), sourcePath);
-        }
-    }
-
-    @Test
-    void replacementStreamRejectsMigrationPathBeforeParsing() {
-        NodeDefinitionLoader loader = new NodeDefinitionLoader();
-
-        List<NodeDefinition> definitions = loader.parseReplacement(
-            new ByteArrayInputStream("not-json".getBytes(StandardCharsets.UTF_8)), "nodes/migrated/stream.json");
-
-        assertTrue(definitions.isEmpty());
-        assertTrue(loader.getDiagnostics().stream().anyMatch(value -> "CATALOG.LEGACY_ACTIVE".equals(value.code())));
-        assertTrue(loader.getDiagnostics().stream().noneMatch(value -> "FILE_PARSE_FAILED".equals(value.code())));
-    }
-
-    @Test
-    void replacementClasspathSourceDoesNotExposeMigratedDefinitions() {
-        List<NodeDefinition> definitions = new NodeDefinitionLoader().loadReplacementFromClasspath("nodes");
-
-        assertTrue(definitions.stream()
-            .map(NodeDefinition::getAuthoredMetadata)
-            .map(AuthoredNodeMetadata::sourceProvenance)
-            .map(AuthoredSourceProvenance::sourceUri)
-            .map(value -> value.replace('\\', '/').toLowerCase(Locale.ROOT))
-            .noneMatch(value -> value.startsWith("nodes/migrated/") || value.contains("/nodes/migrated/")));
-    }
-
     @Test
     void authoredAutomationReplacementSourceLoadsWithoutFallbackDiagnostics() {
         NodeDefinitionLoader loader = new NodeDefinitionLoader();

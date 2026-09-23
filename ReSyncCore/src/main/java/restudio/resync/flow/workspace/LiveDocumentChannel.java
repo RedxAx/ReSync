@@ -48,6 +48,8 @@ public final class LiveDocumentChannel<D, O, A, I> {
     private long connectionGeneration = Long.MIN_VALUE;
     private long transportEpoch;
     private long membershipEpoch;
+    private long publicationVersion;
+    private final Map<WorkspaceTarget, PublicationStamp> publicationStamps = new HashMap<>();
     private boolean accepting;
 
     public synchronized long bind(Transport<O, A> transport) {
@@ -68,6 +70,7 @@ public final class LiveDocumentChannel<D, O, A, I> {
         }
         long activeConnectionEpoch = ++connectionEpoch;
         sequences.clear();
+        publicationStamps.clear();
         resyncing.clear();
         joinAuthorities.clear();
         for (WorkspaceTarget target : List.copyOf(listeners.keySet())) {
@@ -87,6 +90,7 @@ public final class LiveDocumentChannel<D, O, A, I> {
         connectionState = ConnectionState.CONNECTED;
         long activeConnectionEpoch = ++connectionEpoch;
         sequences.clear();
+        publicationStamps.clear();
         resyncing.clear();
         joinAuthorities.clear();
         for (WorkspaceTarget target : List.copyOf(listeners.keySet())) {
@@ -106,6 +110,7 @@ public final class LiveDocumentChannel<D, O, A, I> {
         long disconnectedEpoch = ++connectionEpoch;
         long disconnectedSourceEpoch = transportEpoch;
         sequences.clear();
+        publicationStamps.clear();
         resyncing.clear();
         joinAuthorities.clear();
         String message = reason != null && !reason.isBlank() ? reason : "Disconnected";
@@ -167,11 +172,19 @@ public final class LiveDocumentChannel<D, O, A, I> {
         listenerEpochs.remove(target);
         membershipEpochs.remove(target);
         sequences.remove(target);
+        publicationStamps.remove(target);
         resyncing.remove(target);
         if (joined) {
             transport.leave(target);
         }
         return true;
+    }
+
+    public synchronized String publishOperation(WorkspaceTarget target, PublicationStamp expected, O operation) {
+        if (expected == null || !expected.equals(publicationStamps.get(target)) || resyncing.contains(target)) {
+            return "";
+        }
+        return publishOperation(target, operation);
     }
 
     public synchronized String publishOperation(WorkspaceTarget target, O operation) {
@@ -245,13 +258,16 @@ public final class LiveDocumentChannel<D, O, A, I> {
             return;
         }
         sequences.put(target, snapshot.sequence());
+        PublicationStamp stamp = new PublicationStamp(connectionEpoch, transportEpoch, ++publicationVersion, snapshot.sequence());
+        publicationStamps.put(target, stamp);
+        Snapshot<D, A, I> stamped = new Snapshot<>(target, snapshot.sequence(), snapshot.document(), snapshot.awareness(), stamp);
         resyncing.remove(target);
         for (Map.Entry<Listener<D, O, A, I>, Long> delivery : deliveryListeners.entrySet()) {
             Listener<D, O, A, I> listener = delivery.getKey();
             if (!active(authority, target, listener, delivery.getValue())) {
                 continue;
             }
-            dispatch(authority, target, listener, delivery.getValue(), () -> listener.onSnapshot(snapshot));
+            dispatch(authority, target, listener, delivery.getValue(), () -> listener.onSnapshot(stamped));
             if (snapshot.awareness() == null) {
                 continue;
             }
@@ -297,12 +313,16 @@ public final class LiveDocumentChannel<D, O, A, I> {
             return;
         }
         sequences.put(target, operation.sequence());
+        PublicationStamp stamp = new PublicationStamp(connectionEpoch, transportEpoch, ++publicationVersion, operation.sequence());
+        publicationStamps.put(target, stamp);
+        Operation<O, I> stamped = new Operation<>(target, operation.sequence(), operation.operationId(),
+            operation.authorSessionId(), operation.author(), operation.operation(), stamp);
         boolean pending = pendingOperations.remove(operation.operationId(), target);
         boolean own = pending || publishing;
         for (Map.Entry<Listener<D, O, A, I>, Long> delivery : deliveryListeners.entrySet()) {
             if (active(authority, target, delivery.getKey(), delivery.getValue())) {
                 dispatch(authority, target, delivery.getKey(), delivery.getValue(),
-                    () -> delivery.getKey().onOperation(operation, own));
+                    () -> delivery.getKey().onOperation(stamped, own));
             }
         }
     }
@@ -484,12 +504,21 @@ public final class LiveDocumentChannel<D, O, A, I> {
         boolean publishAwareness(WorkspaceTarget target, A awareness);
     }
 
+    public record PublicationStamp(long connection, long transport, long version, long sequence) {
+    }
+
     public record Snapshot<D, A, I>(WorkspaceTarget target, long sequence, D document,
-                                    List<Awareness<A, I>> awareness) {
+                                    List<Awareness<A, I>> awareness, PublicationStamp stamp) {
+        public Snapshot(WorkspaceTarget target, long sequence, D document, List<Awareness<A, I>> awareness) {
+            this(target, sequence, document, awareness, null);
+        }
     }
 
     public record Operation<O, I>(WorkspaceTarget target, long sequence, String operationId,
-                                  String authorSessionId, I author, O operation) {
+                                  String authorSessionId, I author, O operation, PublicationStamp stamp) {
+        public Operation(WorkspaceTarget target, long sequence, String operationId, String authorSessionId, I author, O operation) {
+            this(target, sequence, operationId, authorSessionId, author, operation, null);
+        }
     }
 
     public record Awareness<A, I>(WorkspaceTarget target, String authorSessionId, I author, A state,

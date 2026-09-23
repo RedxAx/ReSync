@@ -87,7 +87,7 @@ public class PaperAdvancementRuntimeBridge implements AdvancementRuntimeBridge {
                     continue;
                 }
                 AdvancementProgress progress = player.getAdvancementProgress(advancement);
-                if (!progress.getAwardedCriteria().contains(ROOT_CRITERION)) {
+                if (!progress.getAwardedCriteria().contains(ROOT_CRITERION)) {  
                     progress.awardCriteria(ROOT_CRITERION);
                 }
             }

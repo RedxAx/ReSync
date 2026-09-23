@@ -1954,7 +1954,12 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
                 return FlowOperationResult.failure("RESOURCE_NOT_FOUND", "Resource not found: " + id,
                     Map.of("resourceType", typeId, "resourceId", id, "operation", operation));
             }
-            adapter.validate(value);
+            try {
+                adapter.validate(value);
+            } catch (IllegalArgumentException rejection) {
+                return FlowOperationResult.failure("RESOURCE_PAYLOAD_INVALID", failureMessage(rejection),
+                    Map.of("resourceType", typeId, "operation", operation));
+            }
             String expectedHash = exact ? expectedPayloadHash(context) : "";
             if (exact) {
                 adapter.save(value, context.exactMutationId(), context.expectedRevision());
@@ -1967,6 +1972,9 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
             notifySaved(adapter, value);
             return new FlowOperationResult<>(true, reference(registration, id, true), "", "",
                 mutationDetails(typeId, id, !existed, existed, false, adapter, refresh));
+        } catch (FlowResourceAdapter.PreCommitRejection rejection) {
+            return FlowOperationResult.failure("RESOURCE_PAYLOAD_INVALID", failureMessage(rejection),
+                Map.of("resourceType", typeId, "operation", operation));
         } catch (RuntimeException exception) {
             return FlowOperationResult.failure("RESOURCE_" + operation.toUpperCase(Locale.ROOT) + "_FAILED", failureMessage(exception),
                 Map.of("resourceType", typeId, "operation", operation));

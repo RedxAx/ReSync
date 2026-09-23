@@ -7,6 +7,7 @@ import restudio.flow.data.FlowOperationResult;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.registry.ActiveNodeDefinitionSource;
 import restudio.resync.flow.registry.NodeDefinitionDiagnostic;
 import restudio.resync.flow.registry.NodeDefinitionLoader;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
@@ -15,7 +16,6 @@ import restudio.resync.migration.PersistenceRootReadiness;
 import restudio.resync.migration.ReSyncPersistenceCoordinator;
 import restudio.resync.server.ReSyncPersistenceTopology;
 import restudio.resync.server.ReSyncUncoveredWriterInventory;
-import restudio.resync.upgrade.UpgradeNodeDefinitionSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,7 +43,7 @@ class ManagedFlowFileUnavailableCatalogTest {
 
         assertNotNull(handlers.getHandler("FileHandler"));
         NodeDefinitionLoader loader = new NodeDefinitionLoader();
-        Path fileDefinitionSource = UpgradeNodeDefinitionSource.root().resolve("file.json");
+        Path fileDefinitionSource = ActiveNodeDefinitionSource.root().resolve("file.json");
         List<NodeDefinition> fileDefinitions;
         try (var input = Files.newInputStream(fileDefinitionSource)) {
             fileDefinitions = loader.parse(input, fileDefinitionSource.toString()).stream()

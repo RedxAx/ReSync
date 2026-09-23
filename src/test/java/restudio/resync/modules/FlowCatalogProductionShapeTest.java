@@ -1,6 +1,25 @@
 package restudio.resync.modules;
 
 import org.junit.jupiter.api.Test;
+import com.google.gson.JsonParser;
+import restudio.resync.flow.CoreGraphStorageBoundary;
+import restudio.resync.flow.catalog.CatalogSnapshot;
+import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.graph.GraphNode;
+import restudio.resync.flow.graph.GraphValidator;
+import restudio.resync.flow.graph.OpaqueData;
+import restudio.resync.flow.identity.CatalogBinding;
+import restudio.resync.flow.identity.FunctionParameterId;
+import restudio.resync.flow.identity.NodeInstanceId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.flow.protocol.ResourceActivationState;
+import restudio.resync.flow.runtime.RuntimeBindingRegistry.RuntimeProviderContribution;
+import restudio.resync.server.CoreCatalogEvolution;
+import java.lang.reflect.Method;
+import java.util.UUID;
+
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowTypeRef;
@@ -35,6 +54,7 @@ import restudio.resync.flow.runtime.RuntimeBindingRegistry;
 import restudio.resync.flow.runtime.RuntimeOperationDescriptor;
 import restudio.resync.flow.runtime.RuntimeProviderDescriptor;
 import restudio.resync.flow.runtime.RuntimeResult;
+import restudio.resync.flow.runtime.RuntimeRegistrySnapshot;
 import restudio.resync.flow.runtime.RuntimeSemantics;
 import restudio.resync.flow.type.TypeExpr;
 import restudio.resync.flow.type.TypeReference;
@@ -225,8 +245,8 @@ class FlowCatalogProductionShapeTest {
         RuntimeOperationDescriptor requirement = FlowModule.runtimeOperationDescriptor(definition, handlers);
 
         assertEquals("custom_function:library:calculate_reward", definition.getId());
-        assertEquals("custom_function_call", requirement.operation().id().value());
-        assertTrue(requirement.capability().id().value().contains("library"));
+        assertTrue(requirement.operation().id().value().startsWith("function-shape-"));
+        assertTrue(requirement.capability().id().value().startsWith("function-call-"));
         assertEquals("server", definition.getHandlerConfig().get("functionOwner"));
         assertEquals("local", definition.getHandlerConfig().get("functionNamespace"));
 
@@ -324,6 +344,87 @@ class FlowCatalogProductionShapeTest {
 
         assertFalse(result.accepted());
         assertSame(previous, activation.active());
+    }
+
+    @Test
+    void registeredFunctionOutputsRefreshAndOldCallersRebindWithoutChangingTheirGraph() throws Exception {
+        FlowGraph graph = new FlowGraph();
+        graph.setId("functonRedxAx");
+        graph.setFunction(true);
+        graph.setFunctionOwner("restudio.resync");
+        HandlerRegistry handlers = new HandlerRegistry();
+        new CustomFunctionCallHandler().registerTo(handlers);
+        NodeDefinition previous = CustomFunctionNodeDefinitions.buildDefinition(graph);
+        RuntimeOperationDescriptor initialRequirement = FlowModule.runtimeOperationDescriptor(previous, handlers);
+        ContractRef<ProviderId> provider = ContractRef.of(OwnerId.of("resync"), ProviderId.of("flow"));
+        RuntimeProviderDescriptor descriptor = new RuntimeProviderDescriptor(provider, "1.0.0", 0, 0, RuntimeSemantics.UnloadPolicy.DRAIN);
+        RuntimeBindingRegistry registry = new RuntimeBindingRegistry();
+        registry.activate(descriptor, List.of(RuntimeBinding.available(initialRequirement, provider, "1.0.0",
+            ignored -> CompletableFuture.completedFuture(RuntimeResult.success()))));
+        CatalogSnapshot initial = functionCatalog(previous, handlers, registry.snapshot(), 1);
+        CatalogRuntimeActivation activation = new CatalogRuntimeActivation(initial, registry.snapshot());
+        FunctionParameterId parameter = FunctionParameterId.deterministic("registered-output");
+        graph.setFunctionOutputs(List.of(new FlowGraph.FunctionParameter(parameter, "result", FlowDataType.STRING)));
+        NodeDefinition next = CustomFunctionNodeDefinitions.buildDefinition(graph);
+        RuntimeOperationDescriptor requirement = FlowModule.runtimeOperationDescriptor(next, handlers);
+        assertEquals(initialRequirement.capability(), requirement.capability());
+        var replacement = registry.prepareReplacement(List.of(new RuntimeProviderContribution(descriptor,
+            List.of(RuntimeBinding.available(requirement, provider, "1.0.0",
+                ignored -> CompletableFuture.completedFuture(RuntimeResult.success()))))), List.of(provider));
+        CatalogSnapshot candidate = functionCatalog(next, handlers, replacement.preview(), 2);
+        assertTrue(activation.activate(candidate, replacement, null).committed());
+        var owned = candidate.definitions().getFirst();
+        assertTrue(owned.descriptor().pins().stream().anyMatch(pin -> pin.id().value().equals("function-output-" + parameter.canonicalText())));
+        ContractRef<NodeId> nodeId = ContractRef.of(owned.key().owner(), owned.descriptor().id());
+        Method suffix = FlowModule.class.getDeclaredMethod("executionIdentitySuffix", NodeDefinition.class, String.class, HandlerRegistry.class);
+        suffix.setAccessible(true);
+        Method encode = FlowModule.class.getDeclaredMethod("derivedLocalId", String.class, String.class);
+        encode.setAccessible(true);
+        String legacy = (String) encode.invoke(null, "handler.CustomFunctionCallHandler."
+            + suffix.invoke(null, previous, nodeId.id().value(), handlers) + "." + nodeId.id().value(), "handler");
+        ContractRef<CapabilityId> oldCapability = ContractRef.of(nodeId.owner(), CapabilityId.of(legacy));
+        GraphNode call = new GraphNode(NodeInstanceId.deterministic("registered-caller"), nodeId, 1, Map.of());
+        ServerResourceLocator resource = new ServerResourceLocator(ServerId.deterministic("registered-output-server"),
+            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("flow")), "caller");
+        GraphDocument caller = new GraphDocument(new CatalogVersion(1, 0), resource, 1,
+            new CatalogBinding(initial.generation(), initial.contentChecksum(), initial.bindingManifestHash()),
+            Set.of(oldCapability), List.of(call), List.of(), List.of(), List.of(), List.of(), OpaqueData.empty());
+        CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
+        CoreGraphStorageBoundary.Decoded source = boundary.decode(boundary.encode(caller,
+            new CoreGraphStorageBoundary.AssetMetadata("flow", 1, UUID.randomUUID(), ResourceActivationState.INACTIVE)), resource);
+        var proof = CoreCatalogEvolution.functions().prove(candidate,
+            new CatalogBinding(candidate.generation(), candidate.contentChecksum(), candidate.bindingManifestHash()));
+        assertTrue(proof.eligible(source));
+        var rebound = proof.project(source, UUID.randomUUID());
+        assertEquals(Set.of(requirement.capability()), rebound.graphDocument().requiredCapabilities());
+        assertEquals(JsonParser.parseString(caller.canonicalJson()).getAsJsonObject().get("nodes"),
+            JsonParser.parseString(rebound.graphDocument().canonicalJson()).getAsJsonObject().get("nodes"));
+        assertEquals(caller.connections(), rebound.graphDocument().connections());
+        var validation = new GraphValidator().validate(rebound.graphDocument(), candidate, registry.snapshot().manifest());
+        assertTrue(validation.valid(), validation.diagnostics().toString());
+        assertFalse(proof.eligible(rebound));
+        graph.setFunctionVersion(19);
+        assertEquals(requirement.capability(), FlowModule.runtimeOperationDescriptor(CustomFunctionNodeDefinitions.buildDefinition(graph), handlers).capability());
+        graph.setFunctionOutputs(List.of(new FlowGraph.FunctionParameter(parameter, "result", FlowDataType.NUMBER)));
+        NodeDefinition incompatible = CustomFunctionNodeDefinitions.buildDefinition(graph);
+        RuntimeOperationDescriptor incompatibleRequirement = FlowModule.runtimeOperationDescriptor(incompatible, handlers);
+        var rejected = registry.prepareReplacement(List.of(new RuntimeProviderContribution(descriptor,
+            List.of(RuntimeBinding.available(incompatibleRequirement, provider, "1.0.0",
+                ignored -> CompletableFuture.completedFuture(RuntimeResult.success()))))), List.of(provider));
+        CatalogSnapshot incompatibleCatalog = functionCatalog(incompatible, handlers, rejected.preview(), 3);
+        assertThrows(IllegalArgumentException.class, () -> activation.stage(incompatibleCatalog, rejected, null));
+        rejected.close();
+        assertSame(candidate, activation.catalog());
+    }
+
+    private CatalogSnapshot functionCatalog(NodeDefinition definition, HandlerRegistry handlers,
+                                            RuntimeRegistrySnapshot runtime, long generation) {
+        NodeDefinitionRegistry definitions = new NodeDefinitionRegistry(false);
+        definitions.register(CustomFunctionNodeDefinitions.PLUGIN_ID, definition);
+        var compilation = new CatalogCompiler(FlowModule.CATALOG_CONTRACT_VERSION, CatalogBindingProof.snapshot(runtime))
+            .compile(FlowModule.buildCatalogContributions(definitions, handlers, null, List.of(), FlowModule.CATALOG_CONTRACT_VERSION), generation);
+        assertTrue(compilation.accepted(), compilation.diagnostics().toString());
+        return compilation.snapshot().orElseThrow();
     }
 
     private HandlerRegistry productionHandlers() {

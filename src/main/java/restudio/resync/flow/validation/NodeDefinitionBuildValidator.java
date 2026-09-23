@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import restudio.flow.data.FlowTypeRef;
-import restudio.resync.flow.migration.FlowNodeMigrationMap;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.io.IOException;
@@ -25,7 +24,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public final class NodeDefinitionBuildValidator {
-    public static final String NODE_DEFINITIONS_PROPERTY = "resync.upgrade.node-definitions";
     private static final Set<String> KNOWN_DATA_TYPES = Set.of("execution", "any", "string", "number", "boolean");
     private static final Set<String> CLOCK_DOMAINS = Set.of("wall_time", "monotonic_elapsed", "server_ticks", "world_day_time");
     private static final Pattern OPTION_SOURCE_ID = Pattern.compile("[a-z0-9_.-]+(?::[a-z0-9_.-]+)+");
@@ -42,10 +40,7 @@ public final class NodeDefinitionBuildValidator {
 
     public static void main(String[] args) throws IOException {
         Path projectDir = args.length > 0 ? Path.of(args[0]).toAbsolutePath().normalize() : Path.of("").toAbsolutePath().normalize();
-        Path nodeRoot = resolveNodeRoot(projectDir, args);
-        Path migrationMap = projectDir.resolve("ReSyncCore/src/main/resources")
-            .resolve(FlowNodeMigrationMap.RESOURCE.substring(1));
-        Path productionNodeRoot = projectDir.resolve("src/main/resources/nodes");
+        Path nodeRoot = projectDir.resolve("src/main/resources/nodes");
         Path sourceRoot = projectDir.resolve("src/main/java");
 
         List<String> errors = new ArrayList<>();
@@ -53,10 +48,10 @@ public final class NodeDefinitionBuildValidator {
         Map<String, Set<String>> handlerOperations = loadHandlerOperations(sourceRoot.resolve("restudio/resync/flow/handler"));
         Set<String> handlerIds = loadHandlerIds(sourceRoot.resolve("restudio/resync/flow/handler"), handlerOperations);
         List<JsonObject> definitions = loadDefinitions(nodeRoot, errors);
-        List<JsonObject> productionDefinitions = loadDefinitions(productionNodeRoot, errors);
 
         validateDefinitions(definitions, dataTypes, handlerIds, handlerOperations, errors);
-        validateMigrationMap(migrationMap, productionDefinitions, errors);
+        validateRuntimeRequirementKeys(definitions, errors);
+        validateOptionSourceTypes(definitions, errors);
 
         System.out.println("definitions=" + definitions.size()
             + " handlers=" + handlerIds.size()
@@ -68,19 +63,6 @@ public final class NodeDefinitionBuildValidator {
             errors.stream().limit(100).forEach(error -> System.err.println("[node-definition-validation] " + error));
             throw new IllegalStateException("Node definition validation failed with " + errors.size() + " error(s)");
         }
-    }
-
-    private static Path resolveNodeRoot(Path projectDir, String[] args) throws IOException {
-        String configured = args.length > 1 ? args[1] : System.getProperty(NODE_DEFINITIONS_PROPERTY);
-        if (configured == null || configured.isBlank()) {
-            throw new IllegalArgumentException("A production node definition directory is required as the second argument or through -D" + NODE_DEFINITIONS_PROPERTY);
-        }
-        Path candidate = Path.of(configured);
-        Path nodeRoot = (candidate.isAbsolute() ? candidate : projectDir.resolve(candidate)).toAbsolutePath().normalize();
-        if (!Files.isDirectory(nodeRoot)) {
-            throw new IOException("Production node definition directory is missing: " + nodeRoot);
-        }
-        return nodeRoot;
     }
 
     private static Set<String> loadDataTypes(Path flowDataType) throws IOException {
@@ -160,6 +142,10 @@ public final class NodeDefinitionBuildValidator {
 
     private static List<JsonObject> loadDefinitions(Path nodeRoot, List<String> errors) throws IOException {
         List<JsonObject> definitions = new ArrayList<>();
+        if (!Files.isDirectory(nodeRoot)) {
+            errors.add("missing active node catalog " + nodeRoot);
+            return definitions;
+        }
         try (Stream<Path> paths = Files.walk(nodeRoot)) {
             paths.filter(Files::isRegularFile)
                 .filter(path -> path.getFileName().toString().endsWith(".json"))
@@ -234,32 +220,137 @@ public final class NodeDefinitionBuildValidator {
         }
     }
 
-    private static void validateMigrationMap(Path migrationMap, List<JsonObject> definitions, List<String> errors) throws IOException {
-        if (!Files.exists(migrationMap)) {
-            errors.add("missing migration map " + migrationMap);
-            return;
-        }
-        Set<String> ids = new HashSet<>();
+    static void validateRuntimeRequirementKeys(List<JsonObject> definitions, List<String> errors) {
+        Map<String, RuntimeRequirementSource> requirements = new HashMap<>();
         for (JsonObject definition : definitions) {
-            String id = string(definition, "id");
-            if (id != null && !id.isBlank()) {
-                ids.add(id);
-            }
-        }
-        JsonElement root = JsonParser.parseString(Files.readString(migrationMap, StandardCharsets.UTF_8));
-        if (!root.isJsonObject()) {
-            errors.add("migration map is not a JSON object");
-            return;
-        }
-        for (Map.Entry<String, JsonElement> entry : root.getAsJsonObject().entrySet()) {
-            if (!entry.getValue().isJsonPrimitive()) {
-                errors.add("migration map target for " + entry.getKey() + " is not a string");
+            String owner = string(definition, "owner");
+            String capability = string(definition, "handlerCapability");
+            JsonObject handlerConfig = definition.has("handlerConfig") && definition.get("handlerConfig").isJsonObject()
+                ? definition.getAsJsonObject("handlerConfig") : null;
+            String operation = handlerConfig != null ? string(handlerConfig, "operation") : null;
+            if (capability == null || capability.isBlank() || operation == null || operation.isBlank()) {
                 continue;
             }
-            String target = entry.getValue().getAsString();
-            if (!ids.contains(target)) {
-                errors.add("migration map target missing for " + entry.getKey() + " -> " + target);
+            String key = (owner == null || owner.isBlank() ? "builtin" : owner) + "/" + capability + "#"
+                + (owner == null || owner.isBlank() ? "builtin" : owner) + "/" + operation;
+            RuntimeRequirementSource source = new RuntimeRequirementSource(string(definition, "id"), runtimeShape(definition));
+            RuntimeRequirementSource previous = requirements.putIfAbsent(key, source);
+            if (previous != null && !previous.shape().equals(source.shape())) {
+                errors.add("conflicting runtime requirement " + key + " for " + previous.id() + " and " + source.id());
             }
+        }
+    }
+
+    private static JsonObject runtimeShape(JsonObject definition) {
+        JsonObject shape = new JsonObject();
+        copy(definition, shape, "handler");
+        copy(definition, shape, "handlerConfig");
+        copy(definition, shape, "kind");
+        copy(definition, shape, "destructive");
+        copy(definition, shape, "sensitive");
+        copy(definition, shape, "auditPolicy");
+        copy(definition, shape, "confirmationPolicy");
+        shape.add("inputs", runtimePins(definition, "inputs"));
+        shape.add("outputs", runtimePins(definition, "outputs"));
+        return shape;
+    }
+
+    private static JsonArray runtimePins(JsonObject definition, String key) {
+        JsonArray result = new JsonArray();
+        if (!definition.has(key) || !definition.get(key).isJsonArray()) {
+            return result;
+        }
+        for (JsonElement element : definition.getAsJsonArray(key)) {
+            if (!element.isJsonObject()) {
+                result.add(element.deepCopy());
+                continue;
+            }
+            JsonObject pin = element.getAsJsonObject();
+            JsonObject runtimePin = new JsonObject();
+            copy(pin, runtimePin, "id");
+            copy(pin, runtimePin, "pinType");
+            copy(pin, runtimePin, "dataType");
+            copy(pin, runtimePin, "optionsSource");
+            result.add(runtimePin);
+        }
+        return result;
+    }
+
+    private static void copy(JsonObject source, JsonObject target, String key) {
+        if (source.has(key)) {
+            target.add(key, source.get(key).deepCopy());
+        }
+    }
+
+    private record RuntimeRequirementSource(String id, JsonObject shape) {
+    }
+
+    static void validateOptionSourceTypes(List<JsonObject> definitions, List<String> errors) {
+        Map<String, OptionSourceType> sources = new HashMap<>();
+        for (JsonObject definition : definitions) {
+            validateOptionSourceTypes(definition, "inputs", sources, errors);
+            validateOptionSourceTypes(definition, "outputs", sources, errors);
+        }
+    }
+
+    private static void validateOptionSourceTypes(JsonObject definition, String direction,
+                                                  Map<String, OptionSourceType> sources, List<String> errors) {
+        if (!definition.has(direction) || !definition.get(direction).isJsonArray()) {
+            return;
+        }
+        String nodeId = string(definition, "id");
+        for (JsonElement element : definition.getAsJsonArray(direction)) {
+            if (!element.isJsonObject()) {
+                continue;
+            }
+            JsonObject pin = element.getAsJsonObject();
+            String type = canonicalType(string(pin, "dataType"));
+            String source = string(pin, "optionsSource");
+            if (source == null || source.isBlank()) {
+                source = inferredOptionSource(type);
+            }
+            if (source == null || source.isBlank()) {
+                continue;
+            }
+            String pinId = string(pin, "id");
+            if (pinId == null || pinId.isBlank()) {
+                pinId = string(pin, "name");
+            }
+            OptionSourceType candidate = new OptionSourceType(nodeId, pinId, type);
+            OptionSourceType previous = sources.putIfAbsent(source, candidate);
+            if (previous != null && !previous.type().equals(candidate.type())) {
+                errors.add("conflicting option source value type " + source + " for " + previous.location()
+                    + " (" + previous.type() + ") and " + candidate.location() + " (" + candidate.type() + ")");
+            }
+        }
+    }
+
+    private static String canonicalType(String expression) {
+        try {
+            return FlowTypeRef.parse(expression == null || expression.isBlank() ? "any" : expression).toString();
+        } catch (IllegalArgumentException exception) {
+            return expression == null ? "any" : expression;
+        }
+    }
+
+    private static String inferredOptionSource(String type) {
+        return switch (type) {
+            case "material" -> "server:minecraft:material";
+            case "gamemode" -> "server:minecraft:gamemode";
+            case "difficulty" -> "server:minecraft:difficulty";
+            case "potion_effect" -> "server:minecraft:potion_effect";
+            case "sound" -> "server:minecraft:sound";
+            case "advancement" -> "server:minecraft:advancement";
+            case "biome" -> "server:minecraft:biome";
+            case "entity_type" -> "server:minecraft:entity_type";
+            case "enchantment" -> "server:minecraft:enchantment";
+            default -> null;
+        };
+    }
+
+    private record OptionSourceType(String nodeId, String pinId, String type) {
+        private String location() {
+            return nodeId + "." + pinId;
         }
     }
 

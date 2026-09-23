@@ -9,6 +9,7 @@ import restudio.resync.flow.catalog.CatalogNodeDescriptor;
 import restudio.resync.flow.catalog.CatalogNodeDescriptor.Lifecycle;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.handler.generic.InventoryActionHandler;
 import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.NodeId;
 import restudio.resync.flow.identity.OwnerId;
@@ -20,6 +21,8 @@ import restudio.resync.flow.runtime.RuntimeOperationDescriptor;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +35,28 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class ReplacementCatalogDescriptorBridgeTest {
+    @Test
+    void productionItemstackDefinitionsHaveCompatibleSharedRuntimeRequirements() throws Exception {
+        NodeDefinitionLoader loader = new NodeDefinitionLoader();
+        List<NodeDefinition> definitions;
+        try (var input = Files.newInputStream(Path.of("src/main/resources/nodes/itemstack.json"))) {
+            definitions = loader.parseReplacement(input, "nodes/itemstack.json");
+        }
+        HandlerRegistry handlers = new HandlerRegistry();
+        new InventoryActionHandler().registerTo(handlers);
+        List<RuntimeOperationDescriptor> runtimeRequirements = new ArrayList<>();
+        Map<String, CatalogCategoryDescriptor> categories = new LinkedHashMap<>();
+        Map<String, CatalogCapabilityDescriptor> capabilities = new LinkedHashMap<>();
+        Map<String, InspectorOptionSource> optionSources = new LinkedHashMap<>();
+
+        definitions.stream()
+            .filter(definition -> "InventoryActionHandler".equals(definition.getHandler()))
+            .forEach(definition -> FlowModule.catalogNode(OwnerId.of(definition.getOwner()), definition, categories,
+                capabilities, optionSources, runtimeRequirements, handlers));
+
+        assertFalse(runtimeRequirements.isEmpty());
+    }
+
     @Test
     void authoredAutomationFieldsReachCoreDescriptorsWithoutLegacyInference() {
         NodeDefinitionLoader loader = new NodeDefinitionLoader();

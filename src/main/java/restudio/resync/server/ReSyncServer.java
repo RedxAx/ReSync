@@ -971,7 +971,8 @@ public class ReSyncServer {
                             if (flowModule != null) {
                                 flowModule.refreshSharedResource(resource.type(), resource.resourceId(), resource.deleted());
                             }
-                        });
+                        }, preparedAgent.persistenceDrain(),
+                        () -> moduleContext.getService(AssetTransactionCoordinator.class));
                 }
                 if (loaded.pathsEnabled()) {
                     Path serverDirectory = operatorDataRoot.getParent() == null ? null : operatorDataRoot.getParent().getParent();

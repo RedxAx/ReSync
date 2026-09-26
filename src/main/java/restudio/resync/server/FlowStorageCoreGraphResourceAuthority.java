@@ -403,7 +403,7 @@ public final class FlowStorageCoreGraphResourceAuthority implements CoreGraphRes
         boolean replay = observation.coordinator().committedAsset(key)
             .filter(asset -> asset.state() instanceof AssetTransactionCoordinator.Live)
             .map(asset -> mutationId.toString().equals(asset.mutationId().value())).orElse(false);
-        if (!replay && optionCatalogs != null && !catalogCompatibilityRebind(resource, requested, mutationId)) {
+        if (!replay && optionCatalogs != null && !trustedCatalogProjection(resource, requested, mutationId)) {
             Objects.requireNonNull(proof, "Core graph option validation requires catalog admission");
             OptionCatalogRegistry catalogs = Objects.requireNonNull(optionCatalogs.get(),
                 "Core graph option catalogs are unavailable");
@@ -417,8 +417,8 @@ public final class FlowStorageCoreGraphResourceAuthority implements CoreGraphRes
         return observation;
     }
 
-    private boolean catalogCompatibilityRebind(ServerResourceLocator resource,
-                                               CoreGraphStorageBoundary.Decoded requested, UUID mutationId) {
+    private boolean trustedCatalogProjection(ServerResourceLocator resource,
+                                             CoreGraphStorageBoundary.Decoded requested, UUID mutationId) {
         if (requested == null || mutationId == null
             || !mutationId.toString().equals(requested.envelope().assetMutationId())) {
             return false;
@@ -433,8 +433,19 @@ public final class FlowStorageCoreGraphResourceAuthority implements CoreGraphRes
             return false;
         }
         Optional<CoreGraphStorageBoundary.Decoded> current = load(resource);
-        return current.filter(source -> CoreCatalogCompatibilityRebind.exactProjection(resource, source, requested, target))
-            .isPresent();
+        if (current.isEmpty()) {
+            return false;
+        }
+        CoreGraphStorageBoundary.Decoded source = current.orElseThrow();
+        if (CoreCatalogCompatibilityRebind.exactProjection(resource, source, requested, target)) {
+            return true;
+        }
+        if (target.equals(CoreCatalogCompatibilityRebind.graph(source).catalogBinding())) {
+            return false;
+        }
+        CoreCatalogEvolution.Proof evolution = mutationValidator.activeEvolution().orElse(null);
+        return evolution != null && evolution.target().equals(target)
+            && evolution.matchesProjection(source, requested, mutationId);
     }
 
     private CoreGraphStorageBoundary.Decoded requireLoaded(ServerResourceLocator resource) {

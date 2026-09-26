@@ -26,6 +26,7 @@ import restudio.resync.flow.protocol.ProtocolRejectionCode;
 import restudio.resync.flow.protocol.ResourcePresentationIntent;
 import restudio.resync.flow.resource.ResourcePayloadCodecs;
 import restudio.resync.migration.MigrationPaths;
+import restudio.resync.modules.flow.FlowResourceAdapter;
 import restudio.resync.modules.flow.FlowResourceMutationStamp;
 import restudio.resync.resources.JsonAssetInventory;
 import restudio.resync.resources.JsonAssetStore;
@@ -333,12 +334,18 @@ public class CustomContentStorage implements AutoCloseable {
     }
 
     public void save(CustomContentDefinition definition) {
-        saveMutation(definition, UUID.randomUUID(), -1L, true);
+        saveMutation(definition, UUID.randomUUID(), -1L, true, null);
     }
 
     public void save(CustomContentDefinition definition, UUID mutationId, long expectedRevision) {
         requireMutationRequest(mutationId, expectedRevision);
-        saveMutation(definition, mutationId, expectedRevision, false);
+        saveMutation(definition, mutationId, expectedRevision, false, null);
+    }
+
+    public void save(CustomContentDefinition definition, UUID mutationId, long expectedRevision, String expectedPayloadHash) {
+        requireMutationRequest(mutationId, expectedRevision);
+        saveMutation(definition, mutationId, expectedRevision, false,
+            Objects.requireNonNull(expectedPayloadHash, "Expected payload hash is required"));
     }
 
     public void save(CustomContentDefinition definition, long expectedRevision, UUID mutationId) {
@@ -395,7 +402,7 @@ public class CustomContentStorage implements AutoCloseable {
     }
 
     private void saveMutation(CustomContentDefinition definition, UUID mutationId, long expectedRevision,
-                              boolean normalizeComponents) {
+                              boolean normalizeComponents, String expectedPayloadHash) {
         if (definition == null) {
             throw new IllegalArgumentException("Invalid custom content definition");
         }
@@ -420,7 +427,9 @@ public class CustomContentStorage implements AutoCloseable {
             try {
                 Snapshot snapshot = assetStore.coordinatorSnapshot();
                 List<JsonAssetStore.PreparedMutation> mutations = new ArrayList<>();
-                mutations.add(assetStore.prepareSave(snapshot, definition, Map.of(), mutationId, expectedRevision));
+                mutations.add(expectedPayloadHash == null
+                    ? assetStore.prepareSave(snapshot, definition, Map.of(), mutationId, expectedRevision)
+                    : assetStore.prepareSave(snapshot, definition, Map.of(), mutationId, expectedRevision, expectedPayloadHash));
                 List<String> malformedAliases = malformedFlowAliases(definition, mutationId);
                 for (String malformedAlias : malformedAliases) {
                     mutations.add(assetStore.prepareDelete(snapshot, malformedAlias, mutationId, -1L));
@@ -431,6 +440,8 @@ public class CustomContentStorage implements AutoCloseable {
                 }
             } catch (ResourceRevisionConflictException exception) {
                 throw exception;
+            } catch (IllegalArgumentException rejection) {
+                throw new FlowResourceAdapter.PreCommitRejection(rejection);
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to save custom content: " + safeId, e);
             }

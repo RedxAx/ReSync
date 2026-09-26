@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -689,6 +690,16 @@ public final class CoreCatalogEvolution {
                 throw new IllegalArgumentException("Core graph does not match the proven evolution source catalog");
             }
             return evolution.projectReceipt(source, target, mutationId);
+        }
+
+        boolean matchesProjection(CoreGraphStorageBoundary.Decoded source, CoreGraphStorageBoundary.Decoded candidate,
+                                  UUID mutationId) {
+            if (source == null || candidate == null || mutationId == null || !eligible(source)
+                || !mutationId.equals(mutationId(source))) {
+                return false;
+            }
+            CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
+            return Arrays.equals(boundary.encode(project(source, mutationId)), boundary.encode(candidate));
         }
 
         UUID mutationId(CoreGraphStorageBoundary.Decoded source) {

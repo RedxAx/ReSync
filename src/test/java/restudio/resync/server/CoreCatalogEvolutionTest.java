@@ -244,6 +244,21 @@ class CoreCatalogEvolutionTest {
     }
 
     @Test
+    void provenEvolutionMatchesOnlyItsExactDurableProjection() {
+        CoreCatalogEvolution.Proof proof = CACHE_FIXTURE.evolution().proveContent(CACHE_FIXTURE.content(), CACHE_FIXTURE.target());
+        CatalogBinding binding = CACHE_FIXTURE.evolution().sources().stream()
+            .filter(value -> value.generation() == 54L).findFirst().orElseThrow();
+        CoreGraphStorageBoundary.Decoded source = source("command", "proven-projection", true, binding);
+        UUID mutationId = proof.mutationId(source);
+        CoreGraphStorageBoundary.Decoded projected = proof.project(source, mutationId);
+
+        assertTrue(proof.matchesProjection(source, projected, mutationId));
+        assertFalse(proof.matchesProjection(source, projected, UUID.randomUUID()));
+        CoreGraphStorageBoundary.Decoded other = source("command", "different-projection", true, binding);
+        assertFalse(proof.matchesProjection(other, projected, proof.mutationId(other)));
+    }
+
+    @Test
     void authenticatesExactResourceDeclarationEvolution() throws Exception {
         CoreCatalogEvolution.Proof proof = resourceDeclarationProof();
         CoreCatalogEvolution evolution = proof.evolution();

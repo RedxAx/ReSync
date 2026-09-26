@@ -1834,7 +1834,7 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
                 }
                 if (exact) {
                     String expectedHash = expectedPayloadHash(context);
-                    adapter.save(updated, context.exactMutationId(), context.expectedRevision());
+                    adapter.save(updated, context.exactMutationId(), context.expectedRevision(), expectedHash);
                     verifyExactStamp(typeId, resourceId, context.expectedRevision() + 1L, context.exactMutationId(), expectedHash,
                         false, adapter, updated);
                 } else {
@@ -1962,7 +1962,7 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
             }
             String expectedHash = exact ? expectedPayloadHash(context) : "";
             if (exact) {
-                adapter.save(value, context.exactMutationId(), context.expectedRevision());
+                adapter.save(value, context.exactMutationId(), context.expectedRevision(), expectedHash);
                 verifyExactStamp(typeId, id, context.expectedRevision() + 1L, context.exactMutationId(), expectedHash,
                     false, adapter, value);
             } else {
@@ -2040,7 +2040,7 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
                 if (adapter.supportsAggregateCreate()) {
                     duplicateAggregate(typeId, targetId, copy, context, adapter);
                 } else {
-                    adapter.save(copy, context.exactMutationId(), 0L);
+                    adapter.save(copy, context.exactMutationId(), 0L, expectedHash);
                 }
                 verifyExactStamp(typeId, targetId, 1L, context.exactMutationId(), expectedHash,
                     false, adapter, copy);

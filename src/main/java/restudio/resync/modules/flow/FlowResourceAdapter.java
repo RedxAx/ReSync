@@ -8,10 +8,22 @@ import restudio.resync.resources.ReSyncManagedResource;
 import restudio.resync.server.AggregateResourceCreateStorage;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
 public interface FlowResourceAdapter<T> {
+    record MutationObservation(FlowResourceMutationStamp stamp, long projectRevision, String projectHash,
+                               long persistenceGeneration) {
+        public MutationObservation {
+            stamp = Objects.requireNonNull(stamp, "Mutation stamp is required");
+            if (projectRevision < 0L || persistenceGeneration < 0L) {
+                throw new IllegalArgumentException("Mutation observation revisions cannot be negative");
+            }
+            projectHash = Objects.requireNonNull(projectHash, "Project hash is required");
+        }
+    }
+
     final class PreCommitRejection extends RuntimeException {
         public PreCommitRejection(IllegalArgumentException cause) {
             super(cause.getMessage(), cause);
@@ -30,6 +42,11 @@ public interface FlowResourceAdapter<T> {
     }
 
     List<String> listIds();
+
+    default boolean coordinatedNetworkScan() {
+        return false;
+    }
+
 
     T deserialize(String json);
 
@@ -51,6 +68,10 @@ public interface FlowResourceAdapter<T> {
         throw authoritativeMutationIdentityUnavailable();
     }
 
+    default void save(T value, UUID mutationId, long expectedRevision, String expectedPayloadHash) {
+        save(value, mutationId, expectedRevision);
+    }
+
     default void delete(String id, UUID mutationId, long expectedRevision) {
         throw authoritativeMutationIdentityUnavailable();
     }
@@ -67,6 +88,10 @@ public interface FlowResourceAdapter<T> {
 
     default FlowResourceMutationStamp readMutationStamp(String id) {
         throw authoritativeMutationIdentityUnavailable();
+    }
+
+    default MutationObservation readMutationObservation(String id) {
+        return null;
     }
 
     default void completePostCommitRecovery(String id, UUID mutationId, long revision, boolean deleted) {

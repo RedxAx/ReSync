@@ -212,13 +212,6 @@ public class WorldManagementModule implements Module, WorldManagementListener {
     }
 
     @Override
-    public void onTick() {
-        if (worldManagementService != null) {
-            worldManagementService.tick();
-        }
-    }
-
-    @Override
     public void onMessage(WorldChannelMessage message) {
         broadcast(message);
     }

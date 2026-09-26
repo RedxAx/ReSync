@@ -554,6 +554,44 @@ class SqliteCoreCatalogEvolutionTest {
     }
 
     @Test
+    void reopensAProvenEvolutionRejectedByAnEarlierStartup(@TempDir Path root) throws Exception {
+        Fixture fixture = fixture(root, List.of("command"), true);
+        fixture.core().activate();
+        fixture.core().failureStage = 1;
+        assertThrows(IllegalStateException.class, fixture::open);
+        execute(fixture.database(), "UPDATE resource_mutation_receipt SET status = 'REJECTED', "
+            + "error_code = 'PROTO.RESOURCE_OPERATION_FAILED', error_message = 'CATALOG.SELECTOR_UNRESOLVED' "
+            + "WHERE actor_id = 'core-catalog-evolution-v1'");
+        fixture.core().failureStage = 0;
+
+        try (SqliteProtocolResourceMutationAuthority authority = fixture.open()) {
+            assertTrue(authority.durable());
+            assertEquals(7L, authority.load(fixture.resource()).revision());
+        }
+
+        assertEquals(1L, count(fixture.database(), "resource_mutation_receipt",
+            "actor_id = 'core-catalog-evolution-v1' AND status = 'APPLIED' AND transition_published = 1"));
+        assertEquals(0L, count(fixture.database(), "resource_mutation_receipt", "status = 'PENDING'"));
+    }
+
+    @Test
+    void rejectedEvolutionWithTamperedProofCannotBeReopened(@TempDir Path root) throws Exception {
+        Fixture fixture = fixture(root, List.of("command"), true);
+        fixture.core().activate();
+        fixture.core().failureStage = 1;
+        assertThrows(IllegalStateException.class, fixture::open);
+        execute(fixture.database(), "UPDATE resource_mutation_receipt SET status = 'REJECTED', "
+            + "error_code = 'PROTO.RESOURCE_OPERATION_FAILED', error_message = 'CATALOG.SELECTOR_UNRESOLVED' "
+            + "WHERE actor_id = 'core-catalog-evolution-v1'");
+        execute(fixture.database(), "UPDATE core_catalog_evolution_receipt SET proof_hash = 'invalid'");
+        fixture.core().failureStage = 0;
+
+        assertThrows(IllegalStateException.class, fixture::open);
+        assertEquals(6L, fixture.core().current.get(fixture.resource()).envelope().assetRevision());
+        assertEquals(1L, count(fixture.database(), "resource_mutation_receipt", "status = 'REJECTED'"));
+    }
+
+    @Test
     void acceptsAnAlreadyAppliedAssetOnlyAfterAuthenticatingThePendingProof(@TempDir Path root) throws Exception {
         Fixture fixture = fixture(root, List.of("flow"), true);
         fixture.core().activate();

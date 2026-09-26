@@ -6,9 +6,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.CustomContentGraphAdapter;
+import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowSerializer;
 import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.flow.protocol.ResourcePresentationIntent;
+import restudio.resync.flow.resource.ResourcePayloadCodecs;
+import restudio.resync.modules.flow.FlowResourceAdapter;
 import restudio.resync.modules.flow.FlowResourceMutationStamp;
 import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.storage.AssetPersistenceGate;
@@ -17,8 +20,10 @@ import restudio.resync.storage.CanonicalProjectMetadataFixture;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -34,6 +39,40 @@ class CustomContentStorageMutationIdentityTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void exactSaveRetainsEditorPassthroughPinIdentity() throws Exception {
+        AssetPersistenceGate gate = new AssetPersistenceGate(tempDir);
+        try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(tempDir.resolve("assets"), new Gson())) {
+            CanonicalProjectMetadataFixture.seed(coordinator);
+            CustomContentStorage storage = new CustomContentStorage(tempDir.toFile(), gate, coordinator);
+            try {
+                CustomContentDefinition definition = definition("durable_item", "Durable Item");
+                FlowGraph.EditorPassthrough passthrough = new FlowGraph.EditorPassthrough("source", "nearby_player");
+                passthrough.setInputPinId("nearby_player");
+                passthrough.setInputPinDisplayName("Nearby Player");
+                definition.getGraph().getEditorPassthroughs().add(passthrough);
+                String expectedHash = ResourcePayloadCodecs.json().hashPayload(
+                    new Gson().fromJson(FlowSerializer.serializeCustomContent(definition), Map.class)).canonicalText();
+                byte[] metadataBefore = Files.readAllBytes(tempDir.resolve("assets/project.json"));
+
+                assertThrows(FlowResourceAdapter.PreCommitRejection.class,
+                    () -> storage.save(definition, SAVE_MUTATION, 0L, "0".repeat(64)));
+                assertNull(storage.readMutationStamp("durable_item"));
+                assertArrayEquals(metadataBefore, Files.readAllBytes(tempDir.resolve("assets/project.json")));
+
+                storage.save(definition, SAVE_MUTATION, 0L, expectedHash);
+
+                assertEquals(expectedHash, storage.readMutationStamp("durable_item").payloadHash());
+                FlowGraph.EditorPassthrough readback = storage.get("durable_item").getGraph().getEditorPassthroughs().getFirst();
+                assertEquals("nearby_player", readback.getInputPinId());
+                assertEquals("Nearby Player", readback.getInputPinDisplayName());
+            } finally {
+                gate.quiesce();
+                storage.close();
+            }
+        }
+    }
 
     @Test
     void aggregateCreateReusesDeletedContentIdentityWithRetainedRevision() throws Exception {

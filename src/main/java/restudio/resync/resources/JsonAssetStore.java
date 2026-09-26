@@ -794,7 +794,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
         try (MutationLease ignored = acquireMutationLease()) {
             Snapshot snapshot = coordinatorSnapshot();
             ProjectResourceEdit edit = presentationEdit(safeId, presentation);
-            PreparedMutation plan = prepareSave(snapshot, value, writes, mutationId, expectedRevision, edit, true);
+            PreparedMutation plan = prepareSave(snapshot, value, writes, mutationId, expectedRevision, edit, true, null);
             PreparedCommit committed = commitPreparedInternal(mutationId, snapshot, List.of(plan), true);
             AssetProjectMetadata projectMetadata = snapshot.metadata().apply(committed.projectDeltas().stream()
                 .map(delta -> new AssetProjectMetadata.Delta(delta.path(), delta.value(), delta.remove()))
@@ -1147,12 +1147,18 @@ public class JsonAssetStore<T> implements AutoCloseable {
 
     public PreparedMutation prepareSave(Snapshot snapshot, T value, Map<Path, byte[]> binaryWrites,
                                         UUID mutationId, long expectedRevision) {
-        return prepareSave(snapshot, value, binaryWrites, mutationId, expectedRevision, null, false);
+        return prepareSave(snapshot, value, binaryWrites, mutationId, expectedRevision, null, false, null);
+    }
+
+    public PreparedMutation prepareSave(Snapshot snapshot, T value, Map<Path, byte[]> binaryWrites,
+                                        UUID mutationId, long expectedRevision, String expectedPayloadHash) {
+        return prepareSave(snapshot, value, binaryWrites, mutationId, expectedRevision, null, false,
+            Objects.requireNonNull(expectedPayloadHash, "Expected payload hash is required"));
     }
 
     private PreparedMutation prepareSave(Snapshot snapshot, T value, Map<Path, byte[]> binaryWrites,
                                          UUID mutationId, long expectedRevision, ProjectResourceEdit requestedEdit,
-                                         boolean createOnly) {
+                                         boolean createOnly, String expectedPayloadHash) {
         requireOpen();
         requireMutationId(mutationId);
         requireExpectedRevision(expectedRevision);
@@ -1195,6 +1201,9 @@ public class JsonAssetStore<T> implements AutoCloseable {
             long nextRevision = Math.addExact(current.revision(), 1L);
             JsonObject existing = current instanceof Live ? existingPayload(snapshot, key, safeId) : new JsonObject();
             String json = assetJson(value, existing, nextRevision, mutationId, auxiliaryWritesHash(writes));
+            if (expectedPayloadHash != null && !expectedPayloadHash.equals(canonicalPayloadHash(json))) {
+                throw new IllegalArgumentException("The resource changed during validation. Save it again with the current editor.");
+            }
             Path target = requestedEdit != null && !(current instanceof Live)
                 ? presentationAssetPath(safeId, requestedEdit.path())
                 : snapshot.path(key).orElseGet(() -> defaultAssetPath(safeId, value));

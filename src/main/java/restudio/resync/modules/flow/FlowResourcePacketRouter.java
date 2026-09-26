@@ -237,6 +237,12 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean coordinatedNetworkScan() {
+                return storage.coordinatedNetworkScanAvailable();
+            }
+
+
+            @Override
             public FlowGraph deserialize(String json) {
                 FlowGraph graph = FlowSerializer.deserialize(json);
                 requireGraphIdentity(storage, graph, resourceType);
@@ -389,6 +395,11 @@ public class FlowResourcePacketRouter {
             @Override
             public List<String> listIds() {
                 return storage.listProjectIds();
+            }
+
+            @Override
+            public boolean coordinatedNetworkScan() {
+                return true;
             }
 
             @Override
@@ -697,6 +708,11 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean coordinatedNetworkScan() {
+                return storage.coordinatedNetworkScanAvailable();
+            }
+
+            @Override
             public GuiDefinition deserialize(String json) {
                 return FlowSerializer.deserializeGui(json);
             }
@@ -849,6 +865,12 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean coordinatedNetworkScan() {
+                return storage.coordinatedNetworkScanAvailable();
+            }
+
+
+            @Override
             public ScoreboardDefinition deserialize(String json) {
                 return FlowSerializer.deserializeScoreboard(json);
             }
@@ -988,6 +1010,12 @@ public class FlowResourcePacketRouter {
             public List<String> listIds() {
                 return storage.listTabIds();
             }
+
+            @Override
+            public boolean coordinatedNetworkScan() {
+                return storage.coordinatedNetworkScanAvailable();
+            }
+
 
             @Override
             public TabDefinition deserialize(String json) {
@@ -1133,6 +1161,11 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean coordinatedNetworkScan() {
+                return true;
+            }
+
+            @Override
             public CustomContentDefinition deserialize(String json) {
                 return storage.repairMalformedFlowIdentity(FlowSerializer.deserializeCustomContent(json));
             }
@@ -1173,6 +1206,12 @@ public class FlowResourcePacketRouter {
             public void save(CustomContentDefinition value, UUID mutationId, long expectedRevision) {
                 requireAuthoritativeMutationIdentity(supportsAuthoritativeMutationIdentity());
                 storage.save(value, mutationId, expectedRevision);
+            }
+
+            @Override
+            public void save(CustomContentDefinition value, UUID mutationId, long expectedRevision, String expectedPayloadHash) {
+                requireAuthoritativeMutationIdentity(supportsAuthoritativeMutationIdentity());
+                storage.save(value, mutationId, expectedRevision, expectedPayloadHash);
             }
 
             @Override
@@ -1373,6 +1412,18 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public MutationObservation readMutationObservation(String id) {
+                FlowStorage.ProjectMetadataObservation observation = storage.readProjectMetadataObservation(id);
+                if (observation == null || observation.identity() == null) {
+                    return null;
+                }
+                FlowResourceMutationStamp stamp = resourceMutationStamp(observation.identity(),
+                    ReSyncResourceCatalog.PROJECT_METADATA, storage.projectMetadataResourceId());
+                return new MutationObservation(stamp, observation.projectRevision(), observation.projectHash(),
+                    observation.persistenceGeneration());
+            }
+
+            @Override
             public FlowResourceMutationStamp recoverProjectMetadataLineage(UUID sourceMutationId, String sourceType,
                                                                             String sourceId, long sourceRevision,
                                                                             String sourceHash,
@@ -1522,6 +1573,11 @@ public class FlowResourcePacketRouter {
             @Override
             public List<String> listIds() {
                 return storage.listIds(type);
+            }
+
+            @Override
+            public boolean coordinatedNetworkScan() {
+                return true;
             }
 
             @Override

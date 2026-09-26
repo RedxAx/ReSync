@@ -16,6 +16,11 @@ import restudio.resync.network.NetworkResourcePage;
 import restudio.resync.network.NetworkResourceQuery;
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig.ResourceConflictPolicy;
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig.ResourcePolicy;
+import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.storage.AssetTransactionCoordinator.AssetKey;
+import restudio.resync.storage.AssetTransactionCoordinator.CommittedAsset;
+import restudio.resync.storage.AssetTransactionCoordinator.Live;
+import restudio.resync.storage.AssetTransactionCoordinator.Snapshot;
 
 import java.nio.charset.StandardCharsets;
 import java.io.IOException;
@@ -26,10 +31,13 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -38,6 +46,7 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     private final ReSync plugin;
     private final ReSyncNetworkAgent agent;
     private final FlowResourceRegistry registry;
+    private final Supplier<AssetTransactionCoordinator> coordinator;
     private final ResourcePolicy policy;
     private final NetworkResourceManifestStore manifest;
     private final NetworkPersistenceDrainController persistenceDrain;
@@ -46,10 +55,13 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     private final Consumer<NetworkResource> refresh;
     private final Map<String, CompletableFuture<Void>> work = new ConcurrentHashMap<>();
     private final Map<String, PendingMutation> pending = new ConcurrentHashMap<>();
+    private final Set<CompletableFuture<LocalSnapshot>> snapshots = ConcurrentHashMap.newKeySet();
     private final Object lifecycleMonitor = new Object();
     private final AtomicBoolean synchronizing = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean persistenceQuiesced = new AtomicBoolean();
+    private final AtomicLong localGeneration = new AtomicLong();
+    private final AtomicInteger synchronizationFailures = new AtomicInteger();
     private final ThreadLocal<Boolean> applying = ThreadLocal.withInitial(() -> false);
     private volatile boolean ready;
     private volatile String startupFailure;
@@ -59,9 +71,14 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     }
 
     public NetworkResourceSynchronizer(ReSync plugin, ReSyncNetworkAgent agent, FlowResourceRegistry registry, ResourcePolicy policy, Path dataDirectory, Consumer<NetworkResource> refresh, NetworkPersistenceDrainController persistenceDrain) {
+        this(plugin, agent, registry, policy, dataDirectory, refresh, persistenceDrain, () -> null);
+    }
+
+    public NetworkResourceSynchronizer(ReSync plugin, ReSyncNetworkAgent agent, FlowResourceRegistry registry, ResourcePolicy policy, Path dataDirectory, Consumer<NetworkResource> refresh, NetworkPersistenceDrainController persistenceDrain, Supplier<AssetTransactionCoordinator> coordinator) {
         this.plugin = plugin;
         this.agent = agent;
         this.registry = registry;
+        this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.policy = policy == null ? ResourcePolicy.disabled() : policy;
         this.manifest = new NetworkResourceManifestStore(dataDirectory);
         this.persistenceDrain = persistenceDrain;
@@ -196,6 +213,7 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
         if (closed.get() || applying.get() || persistenceQuiesced.get() || !policy.includes(type)) {
             return;
         }
+        localGeneration.incrementAndGet();
         submitLocal(new PendingMutation(type, resourceId, payload == null ? new byte[0] : payload.getBytes(StandardCharsets.UTF_8), false));
     }
 
@@ -204,11 +222,13 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
         if (closed.get() || applying.get() || persistenceQuiesced.get() || !policy.includes(type)) {
             return;
         }
+        localGeneration.incrementAndGet();
         submitLocal(new PendingMutation(type, resourceId, new byte[0], true));
     }
 
     @Override
     public void onConnected() {
+        synchronizationFailures.set(0);
         synchronize();
     }
 
@@ -250,11 +270,30 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
             }
             if (throwable != null) {
                 Log.warn("ReSync network resource synchronization failed: " + rootMessage(throwable));
+                scheduleRetry();
                 return;
             }
+            synchronizationFailures.set(0);
             ready = true;
             flushPending();
         });
+    }
+
+    private void scheduleRetry() {
+        if (closed.get() || persistenceQuiesced.get() || !agent.connected()) {
+            return;
+        }
+        int failures = synchronizationFailures.updateAndGet(previous -> Math.min(previous + 1, 6));
+        long delay = Math.min(600L, 20L << (failures - 1));
+        try {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!ready) {
+                    synchronize();
+                }
+            }, delay);
+        } catch (RuntimeException exception) {
+            Log.warn("ReSync network resource synchronization retry could not be scheduled: " + rootMessage(exception));
+        }
     }
 
     private CompletableFuture<List<NetworkResourceMetadata>> fetchRemote(NetworkResourceQuery query, List<NetworkResourceMetadata> resources) {
@@ -267,32 +306,36 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
         });
     }
 
-    private CompletableFuture<Map<String, LocalResource>> snapshotLocal() {
-        CompletableFuture<Map<String, LocalResource>> result = new CompletableFuture<>();
+    private CompletableFuture<LocalSnapshot> snapshotLocal() {
+        return snapshotLocal(0);
+    }
+
+    private CompletableFuture<LocalSnapshot> snapshotLocal(int retries) {
+        CompletableFuture<LocalSnapshot> result = new CompletableFuture<>();
+        snapshots.add(result);
+        result.whenComplete((unused, failure) -> snapshots.remove(result));
         synchronized (lifecycleMonitor) {
             if (closed.get() || persistenceQuiesced.get()) {
-                return CompletableFuture.failedFuture(new IllegalStateException("ReSync network resource persistence is quiesced"));
+                result.completeExceptionally(new IllegalStateException("ReSync network resource persistence is quiesced"));
+                return result;
             }
             try {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     try {
-                        Map<String, LocalResource> resources = new LinkedHashMap<>();
-                        for (FlowResourceAdapter<?> adapter : registry.adapters()) {
-                            if (!syncable(adapter)) {
-                                continue;
-                            }
+                        long generation = localGeneration.get();
+                        List<FlowResourceAdapter<?>> adapters = List.copyOf(registry.adapters());
+                        AssetTransactionCoordinator active = coordinator.get();
+                        List<FlowResourceAdapter<?>> staged = active == null ? List.of() : adapters.stream()
+                            .filter(adapter -> syncable(adapter) && adapter.coordinatedNetworkScan()).toList();
+                        List<FlowResourceAdapter<?>> immediate = adapters.stream().filter(adapter -> !staged.contains(adapter)).toList();
+                        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                             try {
-                                for (String id : adapter.listIds()) {
-                                    LocalResource resource = local(adapter, id);
-                                    if (resource != null) {
-                                        resources.put(resource.key(), resource);
-                                    }
-                                }
+                                ScanPlan plan = plan(active, staged, immediate, generation);
+                                Bukkit.getScheduler().runTask(plugin, () -> captureBatch(plan, 0, new LinkedHashMap<>(), result, retries));
                             } catch (RuntimeException exception) {
-                                Log.warn("Read ReSync resource catalog failed for " + adapter.descriptor().typeId() + ": " + rootMessage(exception));
+                                result.completeExceptionally(exception);
                             }
-                        }
-                        result.complete(Map.copyOf(resources));
+                        });
                     } catch (RuntimeException exception) {
                         result.completeExceptionally(exception);
                     }
@@ -304,7 +347,155 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
         return result;
     }
 
-    private CompletableFuture<Void> reconcile(List<NetworkResourceMetadata> remoteResources, Map<String, LocalResource> localResources) {
+    private ScanPlan plan(AssetTransactionCoordinator active, List<FlowResourceAdapter<?>> staged,
+                          List<FlowResourceAdapter<?>> immediate, long generation) {
+        if (active == null || staged.isEmpty()) {
+            return new ScanPlan(active, active == null ? 0L : active.committedSequence(), generation,
+                List.of(), immediate, Map.of(), Map.of());
+        }
+        return active.read(snapshot -> {
+            Map<String, FlowResourceAdapter<?>> byType = new LinkedHashMap<>();
+            staged.forEach(adapter -> byType.put(adapter.descriptor().typeId(), adapter));
+            List<ScanItem> items = new ArrayList<>();
+            Map<String, CommittedAsset> identities = new LinkedHashMap<>();
+            snapshot.states().forEach((key, state) -> {
+                FlowResourceAdapter<?> adapter = byType.get(key.type());
+                if (adapter == null) {
+                    return;
+                }
+                identities.put(NetworkResourceManifestStore.key(key.type(), key.id()), snapshotIdentity(snapshot, key));
+                if (state instanceof Live) {
+                    items.add(new ScanItem(adapter, key.id()));
+                }
+            });
+            items.sort((left, right) -> {
+                int type = left.adapter().descriptor().typeId().compareTo(right.adapter().descriptor().typeId());
+                return type != 0 ? type : left.id().compareTo(right.id());
+            });
+            return new ScanPlan(active, snapshot.rootSequence(), generation, List.copyOf(items), immediate,
+                Map.copyOf(identities), Map.copyOf(byType));
+        });
+    }
+
+    private void captureBatch(ScanPlan plan, int index, Map<String, SerializedResource> captured,
+                              CompletableFuture<LocalSnapshot> result, int retries) {
+        if (result.isDone()) {
+            return;
+        }
+        try {
+            requireCurrent(plan);
+            long deadline = System.nanoTime() + 2_000_000L;
+            int next = index;
+            while (next < plan.items().size() && next - index < 16 && (next == index || System.nanoTime() < deadline)) {
+                ScanItem item = plan.items().get(next++);
+                SerializedResource resource = captured(item.adapter(), item.id());
+                if (resource != null) {
+                    captured.put(resource.key(), resource);
+                }
+            }
+            if (next < plan.items().size()) {
+                int continuation = next;
+                Bukkit.getScheduler().runTask(plugin, () -> captureBatch(plan, continuation, captured, result, retries));
+            } else {
+                captured.putAll(captureLocalResources(plan.immediate()));
+                requireCurrent(plan);
+                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> finishSnapshot(plan, captured, result, retries));
+            }
+        } catch (RuntimeException exception) {
+            if (exception instanceof StaleSnapshotException) {
+                retrySnapshot(result, retries);
+            } else {
+                result.completeExceptionally(exception);
+            }
+        }
+    }
+
+    private void finishSnapshot(ScanPlan plan, Map<String, SerializedResource> captured,
+                                CompletableFuture<LocalSnapshot> result, int retries) {
+        if (result.isDone()) {
+            return;
+        }
+        try {
+            Map<String, LocalResource> resources = materialize(captured);
+            requireCurrent(plan);
+            result.complete(new LocalSnapshot(resources, plan.coordinator(), plan.identities(), plan.adapters()));
+        } catch (StaleSnapshotException exception) {
+            retrySnapshot(result, retries);
+        } catch (RuntimeException exception) {
+            result.completeExceptionally(exception);
+        }
+    }
+
+    private void retrySnapshot(CompletableFuture<LocalSnapshot> result, int retries) {
+        if (retries >= 2) {
+            result.completeExceptionally(new StaleSnapshotException());
+            return;
+        }
+        snapshotLocal(retries + 1).whenComplete((retry, failure) -> {
+            if (failure == null) {
+                result.complete(retry);
+            } else {
+                result.completeExceptionally(failure);
+            }
+        });
+    }
+
+    private void requireCurrent(ScanPlan plan) {
+        if (closed.get() || persistenceQuiesced.get() || localGeneration.get() != plan.generation()
+            || plan.coordinator() != coordinator.get()
+            || plan.coordinator() != null && plan.coordinator().committedSequence() != plan.sequence()) {
+            throw new StaleSnapshotException();
+        }
+        plan.adapters().forEach((type, adapter) -> {
+            if (registry.get(type) != adapter) {
+                throw new StaleSnapshotException();
+            }
+        });
+    }
+
+    static CommittedAsset snapshotIdentity(Snapshot snapshot, AssetKey key) {
+        return new CommittedAsset(snapshot.states().get(key), snapshot.paths().get(key), snapshot.lineages().get(key));
+    }
+
+    Map<String, LocalResource> scanLocalResources() {
+        return materialize(captureLocalResources());
+    }
+
+    private Map<String, SerializedResource> captureLocalResources() {
+        return captureLocalResources(List.copyOf(registry.adapters()));
+    }
+
+    private Map<String, SerializedResource> captureLocalResources(List<FlowResourceAdapter<?>> adapters) {
+        Map<String, SerializedResource> resources = new LinkedHashMap<>();
+        for (FlowResourceAdapter<?> adapter : adapters) {
+            if (!syncable(adapter)) {
+                continue;
+            }
+            try {
+                for (String id : adapter.listIds()) {
+                    SerializedResource resource = captured(adapter, id);
+                    if (resource != null) {
+                        resources.put(resource.key(), resource);
+                    }
+                }
+            } catch (RuntimeException exception) {
+                throw new IllegalStateException("Read ReSync resource catalog failed for " + adapter.descriptor().typeId(), exception);
+            }
+        }
+        return Map.copyOf(resources);
+    }
+
+    private Map<String, LocalResource> materialize(Map<String, SerializedResource> captured) {
+        Map<String, LocalResource> resources = new LinkedHashMap<>();
+        captured.forEach((key, resource) -> {
+            byte[] bytes = resource.payload().getBytes(StandardCharsets.UTF_8);
+            resources.put(key, new LocalResource(resource.type(), resource.resourceId(), NetworkPayloads.sha256(bytes), bytes));
+        });
+        return Map.copyOf(resources);
+    }
+
+    private CompletableFuture<Void> reconcile(List<NetworkResourceMetadata> remoteResources, LocalSnapshot snapshot) {
+        Map<String, LocalResource> localResources = snapshot.resources();
         Map<String, NetworkResourceMetadata> remote = new LinkedHashMap<>();
         remoteResources.stream().filter(this::syncable).forEach(metadata -> remote.put(metadata.key(), metadata));
         Map<String, NetworkResourceManifestStore.Entry> known = manifest.snapshot();
@@ -321,44 +512,50 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
             NetworkResourceMetadata authoritative = remote.get(key);
             LocalResource local = localResources.get(key);
             NetworkResourceManifestStore.Entry previous = known.get(key);
-            chain = chain.thenCompose(unused -> reconcile(key, authoritative, local, previous));
+            chain = chain.thenCompose(unused -> {
+                snapshot.requireCurrent(key, coordinator, registry);
+                return reconcile(key, authoritative, local, previous, snapshot);
+            });
         }
         return chain;
     }
 
-    private CompletableFuture<Void> reconcile(String key, NetworkResourceMetadata remote, LocalResource local, NetworkResourceManifestStore.Entry known) {
+    private CompletableFuture<Void> reconcile(String key, NetworkResourceMetadata remote, LocalResource local, NetworkResourceManifestStore.Entry known, LocalSnapshot snapshot) {
         if (remote == null) {
             if (local != null) {
-                return publish(new PendingMutation(local.type(), local.resourceId(), local.payload(), false), 0);
+                return publish(new PendingMutation(local.type(), local.resourceId(), local.payload(), false), 0, snapshot);
             }
             if (known != null) {
-                return publish(new PendingMutation(known.type(), known.resourceId(), new byte[0], true), 0);
+                return publish(new PendingMutation(known.type(), known.resourceId(), new byte[0], true), 0, snapshot);
             }
             return CompletableFuture.completedFuture(null);
         }
         if (known == null) {
             if (local == null || policy.conflictPolicy() == ResourceConflictPolicy.NETWORK_WINS) {
-                return pull(remote);
+                return pull(remote, snapshot);
             }
-            return publish(mutation(local, remote), remote.revision());
+            return publish(mutation(local, remote), remote.revision(), snapshot);
         }
         boolean localChanged = !matches(local, known);
         boolean remoteChanged = !matches(remote, known);
         if (localChanged && remoteChanged) {
-            return policy.conflictPolicy() == ResourceConflictPolicy.NETWORK_WINS ? pull(remote) : publish(mutation(local, remote), remote.revision());
+            return policy.conflictPolicy() == ResourceConflictPolicy.NETWORK_WINS ? pull(remote, snapshot) : publish(mutation(local, remote), remote.revision(), snapshot);
         }
         if (remoteChanged) {
-            return pull(remote);
+            return pull(remote, snapshot);
         }
         if (localChanged) {
-            return publish(mutation(local, remote), remote.revision());
+            return publish(mutation(local, remote), remote.revision(), snapshot);
         }
         manifest.put(remote);
         return CompletableFuture.completedFuture(null);
     }
 
-    private CompletableFuture<Void> pull(NetworkResourceMetadata metadata) {
-        return agent.getResource(metadata.type(), metadata.resourceId()).thenCompose(resource -> resource.map(this::apply).orElseGet(() -> CompletableFuture.completedFuture(null)));
+    private CompletableFuture<Void> pull(NetworkResourceMetadata metadata, LocalSnapshot snapshot) {
+        return agent.getResource(metadata.type(), metadata.resourceId()).thenCompose(resource -> {
+            snapshot.requireCurrent(metadata.key(), coordinator, registry);
+            return resource.map(value -> apply(value, snapshot)).orElseGet(() -> CompletableFuture.completedFuture(null));
+        });
     }
 
     private CompletableFuture<Void> publish(PendingMutation mutation) {
@@ -367,12 +564,24 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     }
 
     private CompletableFuture<Void> publish(PendingMutation mutation, long expectedRevision) {
-        return publish(mutation, expectedRevision, 0);
+        return publish(mutation, expectedRevision, null);
     }
 
-    private CompletableFuture<Void> publish(PendingMutation mutation, long expectedRevision, int conflictAttempts) {
+    private CompletableFuture<Void> publish(PendingMutation mutation, long expectedRevision, LocalSnapshot snapshot) {
+        return publish(mutation, expectedRevision, 0, snapshot);
+    }
+
+    private CompletableFuture<Void> publish(PendingMutation mutation, long expectedRevision, int conflictAttempts,
+                                            LocalSnapshot snapshot) {
         if (persistenceQuiesced.get()) {
             return CompletableFuture.failedFuture(new IllegalStateException("ReSync network resource persistence is quiesced"));
+        }
+        if (snapshot != null) {
+            try {
+                snapshot.requireCurrent(mutation.key(), coordinator, registry);
+            } catch (StaleSnapshotException exception) {
+                return CompletableFuture.failedFuture(exception);
+            }
         }
         if (!agent.connected()) {
             pending.put(mutation.key(), mutation);
@@ -380,29 +589,42 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
         }
         NetworkResourceMutation request = new NetworkResourceMutation(mutation.type(), mutation.resourceId(), expectedRevision, mutation.payload(), mutation.deleted());
         return agent.setResource(request).thenAccept(resource -> {
+            if (snapshot != null) {
+                snapshot.requireCurrent(mutation.key(), coordinator, registry);
+            }
             manifest.put(resource.metadata());
             pending.remove(mutation.key(), mutation);
         }).exceptionallyCompose(throwable -> {
+            if (staleSnapshot(throwable)) {
+                return CompletableFuture.failedFuture(throwable);
+            }
             if (!rootMessage(throwable).contains("Network Resource Revision Conflict")) {
-                pending.put(mutation.key(), mutation);
+                pending.putIfAbsent(mutation.key(), mutation);
                 return CompletableFuture.failedFuture(throwable);
             }
             return agent.getResource(mutation.type(), mutation.resourceId()).thenCompose(authoritative -> {
+            if (snapshot != null) {
+                snapshot.requireCurrent(mutation.key(), coordinator, registry);
+            }
             if (authoritative.isEmpty()) {
-                pending.put(mutation.key(), mutation);
+                pending.putIfAbsent(mutation.key(), mutation);
                 return CompletableFuture.completedFuture(null);
             }
             pending.remove(mutation.key(), mutation);
             NetworkResource current = authoritative.get();
             if (policy.conflictPolicy() == ResourceConflictPolicy.LOCAL_WINS && conflictAttempts < LOCAL_CONFLICT_RETRIES) {
-                return publish(mutation, current.revision(), conflictAttempts + 1);
+                return publish(mutation, current.revision(), conflictAttempts + 1, snapshot);
             }
-            return apply(current);
+            return apply(current, snapshot);
             });
         });
     }
 
     private CompletableFuture<Void> apply(NetworkResource resource) {
+        return apply(resource, null);
+    }
+
+    private CompletableFuture<Void> apply(NetworkResource resource, LocalSnapshot snapshot) {
         if (persistenceQuiesced.get()) {
             return CompletableFuture.failedFuture(new IllegalStateException("ReSync network resource persistence is quiesced"));
         }
@@ -413,6 +635,14 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
             }
             try {
                 Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (snapshot != null) {
+                        try {
+                            snapshot.requireCurrent(resource.metadata().key(), coordinator, registry);
+                        } catch (RuntimeException exception) {
+                            result.completeExceptionally(exception);
+                            return;
+                        }
+                    }
                     FlowResourceAdapter<?> adapter = registry.get(resource.type());
                     if (!syncable(adapter)) {
                         result.complete(null);
@@ -420,6 +650,12 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
                     }
                     applying.set(true);
                     try {
+                        NetworkResourceManifestStore.Entry known = manifest.get(resource.type(), resource.resourceId());
+                        if (known != null && resource.revision() < known.revision()) {
+                            result.complete(null);
+                            return;
+                        }
+                        localGeneration.incrementAndGet();
                         if (resource.deleted()) {
                             if (adapter.get(resource.resourceId()) != null) {
                                 FlowOperationResult<?> deleted = registry.delete(resource.type(), resource.resourceId(), FlowResourceMutationContext.system());
@@ -502,6 +738,7 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     private void closeAdmissionForDrain() {
         ready = false;
         persistenceQuiesced.set(true);
+        snapshots.forEach(snapshot -> snapshot.completeExceptionally(new IllegalStateException("ReSync network resource persistence is quiesced")));
     }
 
     private void prepareBukkitAdmission() {
@@ -536,14 +773,13 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
         }
     }
 
-    private LocalResource local(FlowResourceAdapter<?> adapter, String id) {
+    private SerializedResource captured(FlowResourceAdapter<?> adapter, String id) {
         Object value = adapter.get(id);
         if (value == null) {
             return null;
         }
         String payload = serialize(adapter, value);
-        byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
-        return new LocalResource(adapter.descriptor().typeId(), id, NetworkPayloads.sha256(bytes), bytes);
+        return new SerializedResource(adapter.descriptor().typeId(), id, payload);
     }
 
     private boolean syncable(NetworkResourceMetadata metadata) {
@@ -587,9 +823,61 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
         return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
     }
 
+    private boolean staleSnapshot(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof StaleSnapshotException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
     private record LocalResource(String type, String resourceId, String payloadHash, byte[] payload) {
         private String key() {
             return NetworkResourceManifestStore.key(type, resourceId);
+        }
+    }
+
+    private record SerializedResource(String type, String resourceId, String payload) {
+        private String key() {
+            return NetworkResourceManifestStore.key(type, resourceId);
+        }
+    }
+
+    private record ScanItem(FlowResourceAdapter<?> adapter, String id) {
+    }
+
+    private record ScanPlan(AssetTransactionCoordinator coordinator, long sequence, long generation,
+                            List<ScanItem> items, List<FlowResourceAdapter<?>> immediate,
+                            Map<String, CommittedAsset> identities,
+                            Map<String, FlowResourceAdapter<?>> adapters) {
+    }
+
+    private record LocalSnapshot(Map<String, LocalResource> resources, AssetTransactionCoordinator coordinator,
+                                 Map<String, CommittedAsset> identities,
+                                 Map<String, FlowResourceAdapter<?>> adapters) {
+        private void requireCurrent(String key, Supplier<AssetTransactionCoordinator> currentCoordinator,
+                                    FlowResourceRegistry registry) {
+            int separator = key.indexOf('\u0000');
+            if (separator < 1 || !adapters.containsKey(key.substring(0, separator))) {
+                return;
+            }
+            String type = key.substring(0, separator);
+            if (coordinator != currentCoordinator.get() || registry.get(type) != adapters.get(type)) {
+                throw new StaleSnapshotException();
+            }
+            AssetKey asset = new AssetKey(type, key.substring(separator + 1));
+            if (!Objects.equals(identities.get(key), coordinator.committedAsset(asset).orElse(null))) {
+                throw new StaleSnapshotException();
+            }
+        }
+    }
+
+    private static final class StaleSnapshotException extends IllegalStateException {
+        private StaleSnapshotException() {
+            super("ReSync resources changed during network snapshot");
         }
     }
 

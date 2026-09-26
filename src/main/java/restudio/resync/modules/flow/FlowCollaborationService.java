@@ -25,6 +25,8 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
     private final FlowPacketSender sender;
     private final Gson gson = new Gson();
     private final ConcurrentHashMap<String, Presence> presence = new ConcurrentHashMap<>();
+    private final Object presenceLock = new Object();
+    private long presenceRevision;
     private final ConcurrentHashMap<String, Long> lastMessages = new ConcurrentHashMap<>();
     private final ThreadLocal<Session> actor = new ThreadLocal<>();
     private final ThreadLocal<Boolean> resourceEventsSuppressed = ThreadLocal.withInitial(() -> false);
@@ -35,14 +37,18 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
     }
 
     public void subscribe(Session session) {
-        presence.put(session.getSessionId(), presence(session, Update.inactive()));
-        publishPresence();
+        synchronized (presenceLock) {
+            presence.put(session.getSessionId(), presence(session, Update.inactive()));
+            publishPresence();
+        }
     }
 
     public void cleanup(Session session) {
-        presence.remove(session.getSessionId());
+        synchronized (presenceLock) {
+            presence.remove(session.getSessionId());
+            publishPresence();
+        }
         lastMessages.remove(session.getSessionId());
-        publishPresence();
     }
 
     public void handleUpdate(Session session, ByteBuffer buffer) {
@@ -54,8 +60,10 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
             sender.sendError(session, "INVALID_PRESENCE", "Presence update is invalid");
             return;
         }
-        presence.put(session.getSessionId(), presence(session, update != null ? update : Update.inactive()));
-        publishPresence();
+        synchronized (presenceLock) {
+            presence.put(session.getSessionId(), presence(session, update != null ? update : Update.inactive()));
+            publishPresence();
+        }
     }
 
     public void handleMessage(Session session, ByteBuffer buffer) {
@@ -167,40 +175,54 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
     }
 
     private void publishPresence() {
+        long revision = ++presenceRevision;
         ArrayList<Presence> collaborators = new ArrayList<>(presence.values());
         collaborators.sort(Comparator.comparing(value -> value.identity().displayName(), String.CASE_INSENSITIVE_ORDER));
         List<Presence> snapshot = List.copyOf(collaborators);
         for (Session session : sessions) {
             if (supports(session, "collaboration_presence")) {
-                String linkedClientId = linkedClientId(session.getClientId(), session.getCollaborationIdentity());
                 List<String> selfSessionIds = snapshot.stream()
-                    .filter(value -> linkedClientId.equals(linkedClientId(value.clientId(), value.identity())))
+                    .filter(value -> sameClient(session.getClientId(), value.clientId()))
                     .map(Presence::sessionId)
                     .toList();
                 List<Presence> remote = snapshot.stream()
-                    .filter(value -> !selfSessionIds.contains(value.sessionId()))
+                    .filter(value -> !selfSessionIds.contains(value.sessionId())
+                        && !("minecraft".equals(session.getCollaborationIdentity().source())
+                            && "minecraft".equals(value.identity().source())))
                     .toList();
-                sender.sendPresenceSnapshot(session, gson.toJson(new Snapshot(session.getSessionId(), session.getCollaborationIdentity(), selfSessionIds, remote)));
+                sender.sendPresenceSnapshot(session, gson.toJson(new Snapshot(session.getSessionId(), session.getCollaborationIdentity(), selfSessionIds, remote, revision)));
             }
         }
     }
 
-    private String linkedClientId(String clientId, CollaborationIdentity identity) {
+    private boolean sameClient(String leftClientId, String rightClientId) {
+        String left = leftClientId != null ? leftClientId.trim() : "";
+        String right = rightClientId != null ? rightClientId.trim() : "";
+        if (left.equals(right)) {
+            return true;
+        }
+        String leftBridge = bridgeClientId(left);
+        String rightBridge = bridgeClientId(right);
+        return leftBridge != null && rightBridge == null && leftBridge.equals(right)
+            || rightBridge != null && leftBridge == null && rightBridge.equals(left);
+    }
+
+    private String bridgeClientId(String clientId) {
         String value = clientId != null ? clientId.trim() : "";
-        if (identity == null || !"minecraft".equals(identity.source()) || !value.startsWith("bridge:")) {
-            return value;
+        if (!value.startsWith("bridge:")) {
+            return null;
         }
         int separator = value.indexOf(':', "bridge:".length());
         if (separator < 0) {
-            return value;
+            return null;
         }
         try {
             UUID.fromString(value.substring("bridge:".length(), separator));
         } catch (IllegalArgumentException exception) {
-            return value;
+            return null;
         }
         String directClientId = value.substring(separator + 1);
-        return directClientId.isBlank() ? value : directClientId;
+        return directClientId.isBlank() ? null : directClientId;
     }
 
     private void publishResource(Session source, boolean deleted, String type, String resourceId, String payload) {
@@ -245,7 +267,8 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
                             double x, double y, boolean active, boolean typing, int color, boolean customColor, long updatedAt) {
     }
 
-    private record Snapshot(String selfSessionId, CollaborationIdentity selfIdentity, List<String> selfSessionIds, List<Presence> collaborators) {
+    private record Snapshot(String selfSessionId, CollaborationIdentity selfIdentity, List<String> selfSessionIds, List<Presence> collaborators,
+                            long revision) {
     }
 
     private record ChatRequest(String message) {

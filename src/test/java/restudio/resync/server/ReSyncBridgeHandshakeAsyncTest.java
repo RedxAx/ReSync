@@ -114,7 +114,11 @@ class ReSyncBridgeHandshakeAsyncTest {
         long started = System.nanoTime();
         long elapsed;
         try {
-            invokeHandshake(fixture.server, connection, player, request());
+            HandshakeRequest request = request();
+            request.setCollaborationProfileJson("""
+                {"subjectId":"app-user","displayName":"App User","avatar":"https://example.com/avatar.png"}
+                """);
+            invokeHandshake(fixture.server, connection, player, request);
             elapsed = System.nanoTime() - started;
         } finally {
             forcedRelease.cancel(false);
@@ -186,6 +190,9 @@ class ReSyncBridgeHandshakeAsyncTest {
             ReSyncProtocolContract.OPTION_QUERIES_CAPABILITY.id().value()));
         assertNotNull(fixture.sessions.getSession(connection));
         assertTrue(fixture.sessions.getSession(connection).getClientId().startsWith("bridge:" + player.getUniqueId()));
+        assertEquals(player.getUniqueId().toString(), fixture.sessions.getSession(connection).getCollaborationIdentity().subjectId());
+        assertEquals(player.getName(), fixture.sessions.getSession(connection).getCollaborationIdentity().displayName());
+        assertEquals("minecraft", fixture.sessions.getSession(connection).getCollaborationIdentity().source());
         assertEquals(-1, fixture.sender.closeCode);
 
         Session oldSession = fixture.sessions.getSession(connection);

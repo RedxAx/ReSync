@@ -90,11 +90,11 @@ class FlowCollaborationServiceTest {
         Set<Session> sessions = ConcurrentHashMap.newKeySet();
         Session direct = session("direct", "remotely-device", "collaboration_presence");
         Session bridge = session("bridge", "bridge:15e748bd-d368-4bf8-a846-0936d51f405f:remotely-device", "collaboration_presence");
-        Session other = session("other", "bridge:32740ba5-aa56-4c20-bd1f-d56e011dd93b:remotely-device", "collaboration_presence");
+        Session other = session("other", "bridge:32740ba5-aa56-4c20-bd1f-d56e011dd93b:other-device", "collaboration_presence");
         CollaborationIdentity owner = new CollaborationIdentity("user", "Alex", "", "restudio");
         direct.setCollaborationIdentity(owner);
         bridge.setCollaborationIdentity(new CollaborationIdentity("user", "Alex", "", "minecraft"));
-        other.setCollaborationIdentity(new CollaborationIdentity("user", "Alex", "", "restudio"));
+        other.setCollaborationIdentity(new CollaborationIdentity("other", "Sam", "", "minecraft"));
         sessions.addAll(List.of(direct, bridge, other));
         RecordingSender sender = new RecordingSender(sessions);
         FlowCollaborationService service = new FlowCollaborationService(sessions, sender);
@@ -112,8 +112,58 @@ class FlowCollaborationServiceTest {
         JsonObject bridgeSnapshot = JsonParser.parseString(sender.presenceByRecipient.get("bridge")).getAsJsonObject();
         assertEquals(Set.of("direct", "bridge"), bridgeSnapshot.getAsJsonArray("selfSessionIds").asList().stream()
             .map(value -> value.getAsString()).collect(Collectors.toSet()));
-        assertEquals(Set.of("other"), bridgeSnapshot.getAsJsonArray("collaborators").asList().stream()
+        assertEquals(Set.of(), bridgeSnapshot.getAsJsonArray("collaborators").asList().stream()
             .map(value -> value.getAsJsonObject().get("sessionId").getAsString()).collect(Collectors.toSet()));
+    }
+
+    @Test
+    void minecraftPlayersOnlySeeRemotelyAppCollaborators() {
+        Set<Session> sessions = ConcurrentHashMap.newKeySet();
+        Session firstPlayer = session("first-player", "bridge:15e748bd-d368-4bf8-a846-0936d51f405f:first-device", "collaboration_presence");
+        Session secondPlayer = session("second-player", "bridge:32740ba5-aa56-4c20-bd1f-d56e011dd93b:second-device", "collaboration_presence");
+        Session app = session("app", "remotely-app", "collaboration_presence");
+        firstPlayer.setCollaborationIdentity(new CollaborationIdentity("first", "First", "", "minecraft"));
+        secondPlayer.setCollaborationIdentity(new CollaborationIdentity("second", "Second", "", "minecraft"));
+        app.setCollaborationIdentity(new CollaborationIdentity("app", "App", "", "restudio"));
+        sessions.addAll(List.of(firstPlayer, secondPlayer, app));
+        RecordingSender sender = new RecordingSender(sessions);
+        FlowCollaborationService service = new FlowCollaborationService(sessions, sender);
+
+        service.subscribe(firstPlayer);
+        service.subscribe(secondPlayer);
+        service.subscribe(app);
+
+        assertEquals(Set.of("app"), collaboratorIds(sender, "first-player"));
+        assertEquals(Set.of("app"), collaboratorIds(sender, "second-player"));
+        assertEquals(Set.of("first-player", "second-player"), collaboratorIds(sender, "app"));
+    }
+
+    @Test
+    void publishesOrderedPresenceForMinecraftBridgeAndDistinctAppClient() {
+        Set<Session> sessions = ConcurrentHashMap.newKeySet();
+        Session player = session("player", "bridge:15e748bd-d368-4bf8-a846-0936d51f405f:remotely-mod", "collaboration_presence");
+        Session app = session("app", "remotely-app", "collaboration_presence");
+        player.setCollaborationIdentity(new CollaborationIdentity("player", "Alex", "", "minecraft"));
+        app.setCollaborationIdentity(new CollaborationIdentity("app-user", "Sam", "", "restudio"));
+        sessions.addAll(List.of(player, app));
+        RecordingSender sender = new RecordingSender(sessions);
+        FlowCollaborationService service = new FlowCollaborationService(sessions, sender);
+
+        service.subscribe(player);
+        long firstRevision = JsonParser.parseString(sender.presenceByRecipient.get("player")).getAsJsonObject()
+            .get("revision").getAsLong();
+        service.subscribe(app);
+
+        JsonObject playerSnapshot = JsonParser.parseString(sender.presenceByRecipient.get("player")).getAsJsonObject();
+        JsonObject appSnapshot = JsonParser.parseString(sender.presenceByRecipient.get("app")).getAsJsonObject();
+        assertTrue(playerSnapshot.get("revision").getAsLong() > firstRevision);
+        assertEquals(playerSnapshot.get("revision").getAsLong(), appSnapshot.get("revision").getAsLong());
+        assertEquals(Set.of("player"), playerSnapshot.getAsJsonArray("selfSessionIds").asList().stream()
+            .map(value -> value.getAsString()).collect(Collectors.toSet()));
+        assertEquals(Set.of("app"), appSnapshot.getAsJsonArray("selfSessionIds").asList().stream()
+            .map(value -> value.getAsString()).collect(Collectors.toSet()));
+        assertEquals("app", playerSnapshot.getAsJsonArray("collaborators").get(0).getAsJsonObject().get("sessionId").getAsString());
+        assertEquals("player", appSnapshot.getAsJsonArray("collaborators").get(0).getAsJsonObject().get("sessionId").getAsString());
     }
 
     @Test
@@ -134,6 +184,12 @@ class FlowCollaborationServiceTest {
 
     private Session session(String id) {
         return session(id, "collaboration_chat");
+    }
+
+    private Set<String> collaboratorIds(RecordingSender sender, String sessionId) {
+        JsonObject snapshot = JsonParser.parseString(sender.presenceByRecipient.get(sessionId)).getAsJsonObject();
+        return snapshot.getAsJsonArray("collaborators").asList().stream()
+            .map(value -> value.getAsJsonObject().get("sessionId").getAsString()).collect(Collectors.toSet());
     }
 
     private Session session(String id, String capability) {

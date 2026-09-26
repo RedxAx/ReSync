@@ -16,6 +16,7 @@ import restudio.resync.flow.triggers.TriggerType;
 import restudio.resync.server.TemporaryLifecycleDiagnostics;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,9 +50,20 @@ public class SystemEventListener implements Listener {
     }
     
     public void registerTrigger(String eventType, String flowId) {
-        FlowGraph graph = storage.getGraph("flow", flowId);
+        if (flowId == null || flowId.isBlank()) {
+            warnRegistration(flowId, eventType, "TRIGGER.GRAPH_UNAVAILABLE", "graph-id-unavailable");
+            return;
+        }
+        FlowGraph graph;
+        try {
+            graph = storage.getGraph("flow", flowId);
+        } catch (RuntimeException failure) {
+            rejectFlow(flowId, eventType, failure);
+            return;
+        }
         if (graph == null) {
             warnRegistration(flowId, eventType, "TRIGGER.GRAPH_UNAVAILABLE", "graph-unavailable");
+            removeFlowBindings(flowId);
             return;
         }
         
@@ -61,13 +73,19 @@ public class SystemEventListener implements Listener {
         }
         if (startNode == null) {
             warnRegistration(flowId, eventType, "TRIGGER.START_NODE_UNAVAILABLE", "start-node-unavailable");
+            removeFlowBindings(flowId);
             return;
         }
-        graphSnapshots.put(flowId, graph);
         CompiledTriggerExecution execution = compiledExecution;
         if (execution != null) {
-            execution.prepare(graph);
+            try {
+                execution.prepare(graph);
+            } catch (RuntimeException failure) {
+                rejectFlow(flowId, eventType, failure);
+                return;
+            }
         }
+        graphSnapshots.put(flowId, graph);
         
         String key = normalizeEventKey(eventType);
         switch (key) {
@@ -144,8 +162,52 @@ public class SystemEventListener implements Listener {
     public void setCompiledExecution(CompiledTriggerExecution compiledExecution) {
         this.compiledExecution = compiledExecution;
         if (compiledExecution != null) {
-            graphSnapshots.values().forEach(compiledExecution::prepare);
+            for (Map.Entry<String, FlowGraph> entry : Map.copyOf(graphSnapshots).entrySet()) {
+                try {
+                    compiledExecution.prepare(entry.getValue());
+                } catch (RuntimeException failure) {
+                    rejectFlow(entry.getKey(), "system-event", failure);
+                }
+            }
         }
+    }
+
+    private void rejectFlow(String flowId, String eventType, RuntimeException failure) {
+        String reason = failure instanceof CompiledPlanAdmissionException admission
+            ? admission.reason().name().toLowerCase(Locale.ROOT) : failure.getClass().getSimpleName();
+        boolean reported = false;
+        if (triggerRegistry != null) {
+            for (TriggerType type : List.of(TriggerType.EVENT, TriggerType.SYSTEM)) {
+                for (TriggerBinding binding : triggerRegistry.getBindings(type)) {
+                    if (flowId.equals(binding.getFlowId()) && isSystemEvent(binding.getContext())) {
+                        warnRegistration(flowId, binding.getContext(), "TRIGGER.PLAN_UNAVAILABLE", reason);
+                        reported = true;
+                    }
+                }
+            }
+        }
+        if (!reported) {
+            warnRegistration(flowId, eventType, "TRIGGER.PLAN_UNAVAILABLE", reason);
+        }
+        removeFlowBindings(flowId);
+        CompiledTriggerExecution execution = compiledExecution;
+        if (execution != null) {
+            execution.retire("flow", flowId);
+        }
+    }
+
+    private void removeFlowBindings(String flowId) {
+        graphSnapshots.remove(flowId);
+        serverStartTriggers.remove(flowId);
+        serverStopTriggers.remove(flowId);
+        pluginEnableTriggers.remove(flowId);
+        pluginDisableTriggers.remove(flowId);
+        worldLoadTriggers.remove(flowId);
+        worldUnloadTriggers.remove(flowId);
+        chunkLoadTriggers.remove(flowId);
+        chunkUnloadTriggers.remove(flowId);
+        serverTickTriggers.remove(flowId);
+        serverSaveTriggers.remove(flowId);
     }
 
     CompletableFuture<Void> dispatch(FlowGraph graph, String startNodeId, Event event,
@@ -205,18 +267,37 @@ public class SystemEventListener implements Listener {
         if (flowId == null || flowId.isBlank()) {
             return;
         }
-        FlowGraph graph = storage.getGraph("flow", flowId);
+        FlowGraph graph;
+        try {
+            graph = storage.getGraph("flow", flowId);
+        } catch (RuntimeException failure) {
+            rejectFlow(flowId, "system-event", failure);
+            return;
+        }
         if (graph == null) {
-            graphSnapshots.remove(flowId);
+            removeFlowBindings(flowId);
             CompiledTriggerExecution execution = compiledExecution;
             if (execution != null) {
                 execution.retire("flow", flowId);
             }
         } else if (graphSnapshots.containsKey(flowId)) {
-            graphSnapshots.put(flowId, graph);
             CompiledTriggerExecution execution = compiledExecution;
             if (execution != null) {
-                execution.prepare(graph);
+                try {
+                    execution.prepare(graph);
+                } catch (RuntimeException failure) {
+                    rejectFlow(flowId, "system-event", failure);
+                    return;
+                }
+            }
+            graphSnapshots.put(flowId, graph);
+        } else if (triggerRegistry != null) {
+            for (TriggerType type : List.of(TriggerType.EVENT, TriggerType.SYSTEM)) {
+                for (TriggerBinding binding : triggerRegistry.getBindings(type)) {
+                    if (flowId.equals(binding.getFlowId()) && isSystemEvent(binding.getContext())) {
+                        registerTrigger(binding.getContext(), flowId);
+                    }
+                }
             }
         }
     }

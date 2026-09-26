@@ -63,7 +63,7 @@ public class RuntimeFlowDispatcher {
         }
         Map<String, Object> terminalIdentity = ingress;
         try {
-            FlowGraph graph = flowStorage.getGraph(flowId);
+            FlowGraph graph = flowStorage.getGraph("flow", flowId);
             if (graph == null || graph.getNodes() == null || graph.getNodes().isEmpty()) {
                 return reject(invocationId, started, ingress, "FLOW_NOT_FOUND", "Flow not found or empty: " + flowId,
                     "Select an executable Flow or restore the missing graph", Map.of("flowId", flowId));

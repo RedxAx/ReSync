@@ -69,18 +69,21 @@ import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FunctionCallSupport;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
+import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.text.ReTextService;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class RecipeModule implements Module, Listener {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("recipes", "Recipes").withDependencies("flow");
@@ -95,7 +98,10 @@ public class RecipeModule implements Module, Listener {
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final BoundedDiagnosticDeduplicator reportedRegistrationFailures = new BoundedDiagnosticDeduplicator(512);
     private final AtomicBoolean recipeReloadScheduled = new AtomicBoolean();
+    private final AtomicLong recipeChanges = new AtomicLong();
     private ReSyncJsonResourceStorage.ResourceListener recipeResourceListener;
+    private volatile RecipeIndex recipeIndex;
+    private RecipeIndex registeredIndex;
 
     public RecipeModule() {
         this(PaperPlayerDataMutationAdmission.shared());
@@ -146,12 +152,15 @@ public class RecipeModule implements Module, Listener {
             Bukkit.removeRecipe(key);
         }
         registered.clear();
+        recipeIndex = null;
+        registeredIndex = null;
     }
 
     void startRecipeLifecycle() {
         if (recipeResourceListener == null) {
             recipeResourceListener = (type, id, value, deleted) -> {
                 if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
+                    invalidateRecipeIndex();
                     requestRecipeReload();
                 }
             };
@@ -162,7 +171,7 @@ public class RecipeModule implements Module, Listener {
 
     private void requestRecipeReload() {
         if (Bukkit.isPrimaryThread()) {
-            reloadRecipes();
+            refreshRecipes();
             return;
         }
         if (!recipeReloadScheduled.compareAndSet(false, true)) {
@@ -170,22 +179,45 @@ public class RecipeModule implements Module, Listener {
         }
         Bukkit.getScheduler().runTask(plugin, () -> {
             recipeReloadScheduled.set(false);
-            reloadRecipes();
+            refreshRecipes();
         });
     }
 
     public void reloadRecipes() {
-        for (NamespacedKey key : registered) {
-            Bukkit.removeRecipe(key);
+        applyRecipes(true);
+    }
+
+    private void refreshRecipes() {
+        applyRecipes(false);
+    }
+
+    private void applyRecipes(boolean full) {
+        long change = recipeChanges.get();
+        RecipeIndex next = readRecipeIndex();
+        Map<NamespacedKey, List<RecipeEntry>> nextCandidates = registrationCandidates(next);
+        Map<NamespacedKey, List<RecipeEntry>> previousCandidates = registeredIndex == null
+            ? Map.of() : registrationCandidates(registeredIndex);
+        Set<NamespacedKey> changedKeys = new HashSet<>(previousCandidates.keySet());
+        changedKeys.addAll(nextCandidates.keySet());
+        if (!full && registeredIndex != null) {
+            changedKeys.removeIf(key -> sameCandidates(previousCandidates.get(key), nextCandidates.get(key)));
         }
-        registered.clear();
-        for (String id : storage.listIds(ReSyncResourceCatalog.RECIPE_DEFINITION)) {
+        if (change != recipeChanges.get() || next.generation() != storage.snapshotGeneration()) {
+            throw new IllegalStateException("Recipe authority changed before registration");
+        }
+        for (NamespacedKey key : changedKeys) {
+            if (registered.remove(key)) {
+                Bukkit.removeRecipe(key);
+            }
+        }
+        for (RecipeEntry entry : next.entries()) {
+            NamespacedKey key = key(entry.definition());
+            if (!changedKeys.contains(key)) {
+                continue;
+            }
+            String id = entry.id();
             try {
-                JsonObject definition = storage.get(ReSyncResourceCatalog.RECIPE_DEFINITION, id);
-                if (definition == null) {
-                    reportRegistrationFailure(id, "Persisted recipe could not be loaded", null);
-                    continue;
-                }
+                JsonObject definition = entry.definition();
                 if (!ResourceJson.bool(definition, "enabled", true) || manualCraftingRecipe(definition)) {
                     continue;
                 }
@@ -195,15 +227,102 @@ public class RecipeModule implements Module, Listener {
                     continue;
                 }
                 if (Bukkit.addRecipe(recipe)) {
-                    registered.add(key(definition));
+                    registered.add(key);
                 } else {
-                    reportRegistrationFailure(id, "Paper rejected or collided with the recipe key " + key(definition), null);
+                    reportRegistrationFailure(id, "Paper rejected or collided with the recipe key " + key, null);
                 }
             } catch (RuntimeException failure) {
                 String detail = failure.getMessage() != null && !failure.getMessage().isBlank() ? failure.getMessage() : failure.getClass().getSimpleName();
                 reportRegistrationFailure(id, "Recipe construction failed: " + detail, failure);
             }
         }
+        registeredIndex = next;
+        synchronized (this) {
+            if (change == recipeChanges.get() && next.generation() == storage.snapshotGeneration()) {
+                recipeIndex = next;
+            }
+        }
+    }
+
+    private Map<NamespacedKey, List<RecipeEntry>> registrationCandidates(RecipeIndex index) {
+        Map<NamespacedKey, List<RecipeEntry>> candidates = new LinkedHashMap<>();
+        for (RecipeEntry entry : index.entries()) {
+            JsonObject definition = entry.definition();
+            if (ResourceJson.bool(definition, "enabled", true) && !manualCraftingRecipe(definition)) {
+                candidates.computeIfAbsent(key(definition), ignored -> new ArrayList<>()).add(entry);
+            }
+        }
+        return candidates;
+    }
+
+    private boolean sameCandidates(List<RecipeEntry> previous, List<RecipeEntry> next) {
+        if (previous == null || next == null) {
+            return previous == next;
+        }
+        if (previous.size() != next.size()) {
+            return false;
+        }
+        for (int index = 0; index < previous.size(); index++) {
+            RecipeEntry oldEntry = previous.get(index);
+            RecipeEntry newEntry = next.get(index);
+            if (!oldEntry.id().equals(newEntry.id()) || !oldEntry.stamp().equals(newEntry.stamp())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private synchronized void invalidateRecipeIndex() {
+        recipeChanges.incrementAndGet();
+        recipeIndex = null;
+    }
+
+    private RecipeIndex readRecipeIndex() {
+        long generation = storage.snapshotGeneration();
+        ReSyncJsonResourceStorage.ResourceSnapshot snapshot = storage.readSnapshot(ReSyncResourceCatalog.RECIPE_DEFINITION);
+        if (generation != storage.snapshotGeneration() || !storage.isCurrent(snapshot)) {
+            throw new IllegalStateException("Recipe authority changed while loading the runtime index");
+        }
+        List<RecipeEntry> entries = new ArrayList<>(snapshot.values().size());
+        Map<NamespacedKey, RecipeEntry> byKey = new LinkedHashMap<>();
+        List<RecipeEntry> manual = new ArrayList<>();
+        List<RecipeEntry> campfire = new ArrayList<>();
+        for (ReSyncJsonResourceStorage.ResourceSnapshotValue value : snapshot.values()) {
+            RecipeEntry entry = new RecipeEntry(value.id(), value.stamp(), value.value());
+            JsonObject definition = entry.definition();
+            entries.add(entry);
+            byKey.putIfAbsent(key(definition), entry);
+            if (ResourceJson.bool(definition, "enabled", true) && manualCraftingRecipe(definition)) {
+                manual.add(entry);
+            }
+            String type = ResourceJson.string(definition, "type", "shaped").toLowerCase(Locale.ROOT);
+            if ("campfire".equals(type) || "campfire_cooking".equals(type)) {
+                campfire.add(entry);
+            }
+        }
+        return new RecipeIndex(generation, List.copyOf(entries), Map.copyOf(byKey), List.copyOf(manual), List.copyOf(campfire));
+    }
+
+    private RecipeIndex currentRecipeIndex() {
+        RecipeIndex current = recipeIndex;
+        if (current == null || current.generation() != storage.snapshotGeneration()) {
+            if (Bukkit.isPrimaryThread()) {
+                refreshRecipes();
+            } else {
+                long change = recipeChanges.get();
+                RecipeIndex next = readRecipeIndex();
+                synchronized (this) {
+                    if (change == recipeChanges.get() && next.generation() == storage.snapshotGeneration()) {
+                        recipeIndex = next;
+                    }
+                }
+            }
+            current = recipeIndex;
+        }
+        if (current == null) {
+            throw new IllegalStateException("Recipe runtime index is unavailable");
+        }
+        return current;
     }
 
     private void reportRegistrationFailure(String id, String message, Throwable failure) {
@@ -1065,11 +1184,8 @@ public class RecipeModule implements Module, Listener {
     }
 
     private JsonObject matchingManualCraftingDefinition(Player player, CraftingInventory inventory) {
-        for (String id : storage.listIds(ReSyncResourceCatalog.RECIPE_DEFINITION)) {
-            JsonObject definition = storage.get(ReSyncResourceCatalog.RECIPE_DEFINITION, id);
-            if (!ResourceJson.bool(definition, "enabled", true) || !manualCraftingRecipe(definition)) {
-                continue;
-            }
+        for (RecipeEntry entry : currentRecipeIndex().manual()) {
+            JsonObject definition = entry.definition();
             if (conditionsPass(definition, player, false) && ingredientsPass(definition, inventory)) {
                 return definition;
             }
@@ -1138,11 +1254,10 @@ public class RecipeModule implements Module, Listener {
     }
 
     private JsonObject matchingCampfireDefinition(ItemStack item, Player player, String worldName) {
-        for (String id : storage.listIds(ReSyncResourceCatalog.RECIPE_DEFINITION)) {
-            JsonObject definition = storage.get(ReSyncResourceCatalog.RECIPE_DEFINITION, id);
-            String type = ResourceJson.string(definition, "type", "shaped").toLowerCase(Locale.ROOT);
+        for (RecipeEntry entry : currentRecipeIndex().campfire()) {
+            JsonObject definition = entry.definition();
             JsonElement input = inputDefinition(definition);
-            if (("campfire".equals(type) || "campfire_cooking".equals(type)) && input != null && conditionsPass(definition, player) && blockConditionsPass(definition, worldName) && itemMatchesIgnoringAmount(input, item)) {
+            if (input != null && conditionsPass(definition, player) && blockConditionsPass(definition, worldName) && itemMatchesIgnoringAmount(input, item)) {
                 return definition;
             }
         }
@@ -1150,11 +1265,10 @@ public class RecipeModule implements Module, Listener {
     }
 
     private JsonObject matchingCampfireDefinition(ItemStack item, String worldName) {
-        for (String id : storage.listIds(ReSyncResourceCatalog.RECIPE_DEFINITION)) {
-            JsonObject definition = storage.get(ReSyncResourceCatalog.RECIPE_DEFINITION, id);
-            String type = ResourceJson.string(definition, "type", "shaped").toLowerCase(Locale.ROOT);
+        for (RecipeEntry entry : currentRecipeIndex().campfire()) {
+            JsonObject definition = entry.definition();
             JsonElement input = inputDefinition(definition);
-            if (("campfire".equals(type) || "campfire_cooking".equals(type)) && input != null && blockConditionsPass(definition, worldName) && itemMatchesIgnoringAmount(input, item)) {
+            if (input != null && blockConditionsPass(definition, worldName) && itemMatchesIgnoringAmount(input, item)) {
                 return definition;
             }
         }
@@ -1844,13 +1958,8 @@ public class RecipeModule implements Module, Listener {
         if (!(recipe instanceof Keyed keyed)) {
             return null;
         }
-        for (String id : storage.listIds(ReSyncResourceCatalog.RECIPE_DEFINITION)) {
-            JsonObject definition = storage.get(ReSyncResourceCatalog.RECIPE_DEFINITION, id);
-            if (key(definition).equals(keyed.getKey())) {
-                return definition;
-            }
-        }
-        return null;
+        RecipeEntry entry = currentRecipeIndex().byKey().get(keyed.getKey());
+        return entry != null ? entry.definition() : null;
     }
 
     private NamespacedKey key(JsonObject definition) {
@@ -1859,5 +1968,12 @@ public class RecipeModule implements Module, Listener {
     }
 
     private record IngredientUse(int slot, int amount) {
+    }
+
+    private record RecipeEntry(String id, JsonAssetStore.AssetStamp stamp, JsonObject definition) {
+    }
+
+    private record RecipeIndex(long generation, List<RecipeEntry> entries, Map<NamespacedKey, RecipeEntry> byKey,
+                               List<RecipeEntry> manual, List<RecipeEntry> campfire) {
     }
 }

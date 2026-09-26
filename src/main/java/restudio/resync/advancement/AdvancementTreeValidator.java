@@ -135,7 +135,8 @@ public class AdvancementTreeValidator {
 
     private void requireId(String id, String label) {
         if (id == null || !ID.matcher(id).matches()) {
-            throw new IllegalArgumentException(label + " ID must use lowercase letters, numbers, dots, dashes, or underscores");
+            throw new IllegalArgumentException("Minecraft requires lowercase advancement " + label.toLowerCase()
+                + " IDs. Use a-z, 0-9, dots, dashes, or underscores. For example, resync.");
         }
     }
 

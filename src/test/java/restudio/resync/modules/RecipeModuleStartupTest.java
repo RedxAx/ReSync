@@ -115,8 +115,79 @@ class RecipeModuleStartupTest {
         Recipe liveAdded = Bukkit.getRecipe(new NamespacedKey(plugin, "live_added"));
         assertEquals(Material.EMERALD, assertInstanceOf(ShapelessRecipe.class, liveAdded).getResult().getType());
 
+        runtimeStorage.save(ReSyncResourceCatalog.RECIPE_DEFINITION, recipe("""
+            {
+              "id": "live_added",
+              "enabled": true,
+              "type": "shapeless",
+              "output": {"material": "GOLD_INGOT"},
+              "ingredients": [{"material": "COBBLESTONE"}]
+            }
+            """));
+        Recipe updated = Bukkit.getRecipe(new NamespacedKey(plugin, "live_added"));
+        assertEquals(Material.GOLD_INGOT, assertInstanceOf(ShapelessRecipe.class, updated).getResult().getType());
+
+        runtimeStorage.save(ReSyncResourceCatalog.RECIPE_DEFINITION, recipe("""
+            {
+              "id": "live_added",
+              "enabled": false,
+              "type": "shapeless",
+              "output": {"material": "GOLD_INGOT"},
+              "ingredients": [{"material": "COBBLESTONE"}]
+            }
+            """));
+        assertNull(Bukkit.getRecipe(new NamespacedKey(plugin, "live_added")));
+
         runtimeStorage.delete(ReSyncResourceCatalog.RECIPE_DEFINITION, "live_added");
         assertNull(Bukkit.getRecipe(new NamespacedKey(plugin, "live_added")));
+    }
+
+    @Test
+    void collidingRecipeKeyFallsBackWhenOneDefinitionFailsOrIsDeleted() {
+        Path scope = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+        writer = new ReSyncJsonResourceStorage(plugin, LegacyRuntimeActivationGate.runtime(scope), assetsGate, coordinator);
+        writer.save(ReSyncResourceCatalog.RECIPE_DEFINITION, recipe("""
+            {
+              "id": "Collision",
+              "enabled": true,
+              "type": "shaped",
+              "output": {"material": "STONE"},
+              "shape": ["AAAA"],
+              "keys": {"A": {"material": "STICK"}}
+            }
+            """));
+        writer.save(ReSyncResourceCatalog.RECIPE_DEFINITION, recipe("""
+            {
+              "id": "collision",
+              "enabled": true,
+              "type": "shapeless",
+              "output": {"material": "DIAMOND"},
+              "ingredients": [{"material": "STICK"}]
+            }
+            """));
+
+        runtimeStorage = new ReSyncJsonResourceStorage(plugin, LegacyRuntimeActivationGate.runtime(scope), assetsGate, coordinator);
+        module = new RecipeModule(plugin, runtimeStorage);
+        module.startRecipeLifecycle();
+        NamespacedKey key = new NamespacedKey(plugin, "collision");
+        assertEquals(Material.DIAMOND, assertInstanceOf(ShapelessRecipe.class, Bukkit.getRecipe(key)).getResult().getType());
+
+        runtimeStorage.save(ReSyncResourceCatalog.RECIPE_DEFINITION, recipe("""
+            {
+              "id": "Collision",
+              "enabled": false,
+              "type": "shaped",
+              "output": {"material": "STONE"},
+              "shape": ["A"],
+              "keys": {"A": {"material": "STICK"}}
+            }
+            """));
+        assertEquals(Material.DIAMOND, assertInstanceOf(ShapelessRecipe.class, Bukkit.getRecipe(key)).getResult().getType());
+
+        runtimeStorage.delete(ReSyncResourceCatalog.RECIPE_DEFINITION, "Collision");
+        assertEquals(Material.DIAMOND, assertInstanceOf(ShapelessRecipe.class, Bukkit.getRecipe(key)).getResult().getType());
+        runtimeStorage.delete(ReSyncResourceCatalog.RECIPE_DEFINITION, "collision");
+        assertNull(Bukkit.getRecipe(key));
     }
 
     private JsonObject recipe(String json) {

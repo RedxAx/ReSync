@@ -33,6 +33,8 @@ import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.flow.protocol.ResourceActivationState;
 import restudio.resync.flow.command.CommandGraphMetadata;
 import restudio.resync.flow.triggers.TriggerRegistry;
+import restudio.resync.flow.triggers.TriggerBinding;
+import restudio.resync.flow.triggers.TriggerType;
 import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.server.CoreGraphMutationValidator;
@@ -370,6 +372,37 @@ class CompiledTriggerExecutionTest {
             assertEquals(1L, chain.stream().filter(value -> value.stage().equals("trigger_binding_selected")).count());
             assertEquals(0L, chain.stream().filter(value -> value.stage().equals("trigger_execution_terminal")).count());
             assertEquals(1, chain.stream().map(value -> value.identity().correlationId()).distinct().count());
+        } finally {
+            fixture.executor().shutdown();
+        }
+    }
+
+    @Test
+    void rejectedSystemEventBindingDoesNotDisableHealthyTickAndRecoversAfterAdmission() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        Fixture fixture = fixture((executor, invocation) -> {
+            calls.incrementAndGet();
+            return CompletableFuture.completedFuture(RuntimeResult.success());
+        }, "flow", "event.server.tick");
+        GraphDocument source = fixture.storage().getCoreGraph("flow", fixture.graph().getId()).orElseThrow().graphDocument();
+        ServerResourceLocator rejectedResource = new ServerResourceLocator(source.resource().serverId(), source.resource().type(),
+            "unadmitted-system-event");
+        GraphDocument rejected = new GraphDocument(rejectedResource, 1, source.catalogBinding(), source.nodes(), source.connections());
+        fixture.storage().saveCoreGraph(rejected, ResourceActivationState.ACTIVE, UUID.randomUUID(), 0);
+        TriggerRegistry registry = new TriggerRegistry(temporary.resolve("system-event-bindings.json").toFile());
+        registry.setBindings(List.of(
+            new TriggerBinding("unadmitted-tick", rejectedResource.id(), TriggerType.EVENT, "server_tick"),
+            new TriggerBinding("healthy-tick", fixture.graph().getId(), TriggerType.EVENT, "server_tick")));
+        SystemEventListener listener = new SystemEventListener(fixture.storage(), fixture.executor(), registry);
+        try {
+            listener.setCompiledExecution(fixture.execution());
+            listener.tick();
+            assertEquals(1, calls.get());
+
+            fixture.plans().reconcile(rejectedResource);
+            listener.refreshGraph(rejectedResource.id());
+            listener.tick();
+            assertEquals(3, calls.get());
         } finally {
             fixture.executor().shutdown();
         }

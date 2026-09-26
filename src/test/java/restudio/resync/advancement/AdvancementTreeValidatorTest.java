@@ -20,6 +20,26 @@ class AdvancementTreeValidatorTest {
     }
 
     @Test
+    void rejectsUppercaseTreeIdsWithMinecraftRule() {
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+            () -> validator.validate(Map.of("ReSync", JsonParser.parseString("""
+                {"id":"ReSync","nodes":{"root":{"parent":"","display":{"icon":"minecraft:stone"}}}}
+                """).getAsJsonObject())));
+        assertEquals("Minecraft requires lowercase advancement tree IDs. Use a-z, 0-9, dots, dashes, or underscores. For example, resync.",
+            failure.getMessage());
+    }
+
+    @Test
+    void rejectsUppercaseNodeIdsWithMinecraftRule() {
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+            () -> validator.validate(Map.of("resync", JsonParser.parseString("""
+                {"id":"resync","nodes":{"Root":{"parent":"","display":{"icon":"minecraft:stone"}}}}
+                """).getAsJsonObject())));
+        assertEquals("Minecraft requires lowercase advancement node IDs. Use a-z, 0-9, dots, dashes, or underscores. For example, resync.",
+            failure.getMessage());
+    }
+
+    @Test
     void rejectsCycles() {
         assertThrows(IllegalArgumentException.class, () -> validator.validate(Map.of("main", JsonParser.parseString("""
             {"id":"main","enabled":true,"nodes":{"root":{"enabled":true,"parent":"","display":{"icon":"minecraft:stone"}},"a":{"enabled":true,"parent":"b","display":{"icon":"minecraft:stone"}},"b":{"enabled":true,"parent":"a","display":{"icon":"minecraft:stone"}}}}

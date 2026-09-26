@@ -1,5 +1,6 @@
 package restudio.resync.flow;
 
+import restudio.resync.Log;
 import restudio.resync.flow.catalog.CatalogRuntimeActivation;
 import restudio.resync.flow.catalog.CatalogSnapshot;
 import restudio.resync.flow.function.FunctionParameterContract;
@@ -178,6 +179,7 @@ public final class ServerCompiledPlanRepository implements CompiledPlanAuthority
                 try {
                     prepared.put(admissionKey, prepare(state.resource(), state.revision(), sourceBinding, admissionEpoch));
                 } catch (CompiledPlanAdmissionException failure) {
+                    Log.warn("Compiled plan admission rejected for " + state.resource() + ": " + failure.getMessage(), failure);
                     if (cacheable(failure)) {
                         rejected.put(admissionKey, failure);
                     }
@@ -287,6 +289,7 @@ public final class ServerCompiledPlanRepository implements CompiledPlanAuthority
             prepared = prepare(event.resource(), event.revision(), activeBinding, admissionEpoch);
             admissionKey = new AdmissionKey(event.resource(), event.revision(), activeBinding);
         } catch (CompiledPlanAdmissionException failure) {
+            Log.warn("Compiled plan admission rejected for " + event.resource() + ": " + failure.getMessage(), failure);
             return true;
         }
         synchronized (lifecycle) {

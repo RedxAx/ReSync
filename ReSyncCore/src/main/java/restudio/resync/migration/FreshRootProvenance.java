@@ -51,7 +51,9 @@ public final class FreshRootProvenance {
                 throw new MigrationException("Fresh Root Provenance Does Not Match The ReSync Data Root");
             }
             if (existing.phase == Phase.CONSUMED) {
-                MigrationPaths.requireDirectory(source, "dataRoot");
+                if (Files.exists(source, LinkOption.NOFOLLOW_LINKS)) {
+                    MigrationPaths.requireDirectory(source, "dataRoot");
+                }
                 return null;
             }
             if (existing.phase == Phase.ACTIVE_EMPTY) {
@@ -67,8 +69,11 @@ public final class FreshRootProvenance {
             return null;
         }
         if (!empty(coordination)) {
-            Files.createDirectory(source);
-            return null;
+            Path pointer = coordination.resolve("restore-control").resolve("active-root");
+            if (Files.exists(pointer, LinkOption.NOFOLLOW_LINKS)) {
+                return null;
+            }
+            throw new MigrationException("ReSync Data Root Is Missing And No Active Root Is Recorded: " + source);
         }
         FreshRootProvenance beginning = write(proof, Phase.SOURCE_ABSENT, source, null, "", "", "", "");
         Files.createDirectory(source);
@@ -138,6 +143,20 @@ public final class FreshRootProvenance {
             || !current.originHash.equals(origin) || !current.artifactHash.equals(artifact)) {
             throw new MigrationException("Consumed Fresh Root Provenance Does Not Match The Active Root And Artifact");
         }
+    }
+
+    public static boolean recordsCurrentInstallation(Path coordinationRoot, Path expectedSourceRoot) throws IOException {
+        Path coordination = MigrationPaths.requireDirectory(coordinationRoot, "coordinationRoot");
+        Path source = MigrationPaths.requirePath(expectedSourceRoot, "dataRoot");
+        Path proof = coordination.resolve(FILE_NAME);
+        if (!Files.exists(proof, LinkOption.NOFOLLOW_LINKS)) {
+            return false;
+        }
+        FreshRootProvenance current = read(proof);
+        if (!current.sourceRoot.equals(source)) {
+            throw new MigrationException("Fresh Root Provenance Does Not Match The ReSync Data Root");
+        }
+        return current.phase == Phase.ACTIVE_EMPTY || current.phase == Phase.CONSUMED;
     }
 
     public Path proofPath() {

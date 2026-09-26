@@ -75,8 +75,14 @@ public final class ReSyncPersistenceCoordinator {
                                          FreshRootProvenance freshRootProvenance,
                                          RegistrationRootReader registrationRoots,
                                          boolean recoverActivation) throws IOException {
-        this.dataRoot = MigrationPaths.requireDirectory(dataRoot, "dataRoot");
         this.coordinationRoot = MigrationPaths.requirePath(coordinationRoot, "coordinationRoot");
+        this.dataRoot = MigrationPaths.requirePath(dataRoot, "dataRoot");
+        if (Files.exists(this.dataRoot, LinkOption.NOFOLLOW_LINKS)) {
+            MigrationPaths.requireDirectory(this.dataRoot, "dataRoot");
+        } else if (!Files.exists(this.coordinationRoot.resolve("restore-control").resolve("active-root"),
+            LinkOption.NOFOLLOW_LINKS)) {
+            throw new MigrationException("ReSync Data Root Is Missing And No Active Root Is Recorded: " + this.dataRoot);
+        }
         MigrationPaths.requireDistinctRoots(this.dataRoot, this.coordinationRoot);
         MigrationPaths.requireWritableParent(this.coordinationRoot);
         Files.createDirectories(this.coordinationRoot);

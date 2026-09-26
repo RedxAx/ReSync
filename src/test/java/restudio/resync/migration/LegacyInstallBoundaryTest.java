@@ -3,6 +3,7 @@ package restudio.resync.migration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.resync.contract.install.ReSyncInstallationStatus;
+import restudio.resync.upgrade.AssetAdoptionArtifactProducer;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -96,6 +97,28 @@ final class LegacyInstallBoundaryTest {
         assertFalse(result.archived());
         assertTrue(reports.owns(ReSyncDataFixer.versionPath(active)));
         assertFalse(Files.exists(temporary.resolve(LegacyInstallBoundary.STATUS_FILE)));
+    }
+
+    @Test
+    void missingVersionOnAProvenCurrentRootCannotBeMistakenForLegacyData() throws Exception {
+        Path data = temporary.resolve("ReSync");
+        Path coordination = temporary.resolve(".resync-coordination");
+        ReSyncPersistenceCoordinator.PreparedBootstrap prepared = ReSyncPersistenceCoordinator.bootstrapPrepared(data, coordination);
+        FreshRootProvenance provenance = prepared.coordinator().freshRootProvenance().orElseThrow();
+        String artifactHash = AssetAdoptionArtifactProducer.produceEmptyUnconsumed(coordination, provenance).artifactHash();
+        prepared.coordinator().prepareDataFixes(new ReSyncDataFixer(1, List.of()), true);
+        provenance.consume(artifactHash);
+        Files.delete(ReSyncDataFixer.versionPath(prepared.activeRoot()));
+        Files.writeString(prepared.activeRoot().resolve("important.txt"), "preserve");
+
+        LegacyInstallBoundary.Result result = LegacyInstallBoundary.prepare(data, coordination);
+
+        assertFalse(result.archived());
+        assertTrue(Files.exists(prepared.activeRoot().resolve("important.txt")));
+        assertFalse(Files.exists(temporary.resolve(LegacyInstallBoundary.STATUS_FILE)));
+        Files.writeString(temporary.resolve(LegacyInstallBoundary.RESET_MARKER), "");
+        assertThrows(MigrationException.class, () -> LegacyInstallBoundary.prepare(data, coordination));
+        assertTrue(Files.exists(prepared.activeRoot().resolve("important.txt")));
     }
 
     @Test

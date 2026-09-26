@@ -95,7 +95,8 @@ public final class LegacyInstallBoundary {
         }
         Path activeRoot = active.orElseThrow();
         boolean activeOccupied = nonEmpty(activeRoot);
-        boolean current = ReSyncDataFixer.installedVersion(activeRoot).isPresent();
+        boolean current = ReSyncDataFixer.installedVersion(activeRoot).isPresent()
+            || FreshRootProvenance.recordsCurrentInstallation(coordination, data);
         return new InstallState(current, occupied || activeOccupied);
     }
 

@@ -90,7 +90,8 @@ public final class ReSyncDataFixer {
         Path versionFile = versionPath(root);
         if (!Files.exists(versionFile, LinkOption.NOFOLLOW_LINKS)) {
             if (!allowCurrentBaseline) {
-                throw new MigrationException("ReSync Data Has No Current Format Version");
+                throw new MigrationException("ReSync Data Has No Current Format Version At " + versionFile
+                    + ". Preserve This Root And Restore A Verified Backup Before Restarting");
             }
             writeVersion(versionFile, currentVersion);
             return new Result(root, currentVersion, currentVersion, List.of(), false);

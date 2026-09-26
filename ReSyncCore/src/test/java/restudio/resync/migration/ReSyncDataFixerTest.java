@@ -119,6 +119,51 @@ final class ReSyncDataFixerTest {
             artifact.artifactHash());
     }
 
+    @Test
+    void consumedFreshProofUsesTheActiveRootWhenTheOriginalFolderIsGone() throws Exception {
+        Path source = temporary.resolve("removed-source");
+        Path coordination = temporary.resolve("removed-source-coordination");
+        ReSyncPersistenceCoordinator.PreparedBootstrap first = ReSyncPersistenceCoordinator.bootstrapPrepared(source, coordination);
+        FreshRootProvenance provenance = first.coordinator().freshRootProvenance().orElseThrow();
+        AssetAdoptionArtifactProducer.Result artifact = AssetAdoptionArtifactProducer.produceEmptyUnconsumed(coordination, provenance);
+        first.coordinator().prepareDataFixes(new ReSyncDataFixer(1, List.of()), true);
+        provenance.consume(artifact.artifactHash());
+        Files.delete(source);
+
+        ReSyncPersistenceCoordinator.PreparedBootstrap resumed = ReSyncPersistenceCoordinator.bootstrapPrepared(source, coordination);
+
+        assertEquals(first.activeRoot(), resumed.activeRoot());
+        assertFalse(Files.exists(source));
+        assertFalse(resumed.coordinator().freshBootstrap());
+    }
+
+    @Test
+    void missingSourceWithoutAnActivePointerDoesNotCreateAnEmptyInstallation() throws Exception {
+        Path source = temporary.resolve("lost-source");
+        Path coordination = Files.createDirectory(temporary.resolve("lost-source-coordination"));
+        Files.writeString(coordination.resolve("orphaned-state"), "unresolved");
+
+        assertThrows(MigrationException.class, () -> ReSyncPersistenceCoordinator.bootstrapPrepared(source, coordination));
+        assertFalse(Files.exists(source));
+    }
+
+    @Test
+    void unversionedExistingDataRemainsUntouched() throws Exception {
+        Path active = Files.createDirectory(temporary.resolve("unversioned-active"));
+        Path coordination = Files.createDirectory(temporary.resolve("unversioned-coordination"));
+        Path payload = active.resolve("important.txt");
+        Files.writeString(payload, "preserve");
+
+        MigrationException failure = assertThrows(MigrationException.class,
+            () -> new ReSyncDataFixer(1, List.of()).prepare(active, coordination, false, staged -> {
+                throw new AssertionError("Unversioned data cannot be activated");
+            }));
+
+        assertTrue(failure.getMessage().contains(ReSyncDataFixer.versionPath(active).toString()));
+        assertEquals("preserve", Files.readString(payload));
+        assertFalse(Files.exists(ReSyncDataFixer.versionPath(active)));
+    }
+
     private static ReSyncDataFix fix(String id, int sourceVersion, String value) {
         return new ReSyncDataFix() {
             @Override

@@ -136,6 +136,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     private final CoreGraphStorageBoundary coreBoundary = new CoreGraphStorageBoundary();
     private final ResourcePayloadCodec<Map<String, Object>> payloadCodec = ResourcePayloadCodecs.json();
     private final Map<UUID, State> coupledProjectMetadataRepairs = new LinkedHashMap<>();
+    private ProjectMetadataCache projectMetadataCache;
     private boolean recoveryBlocked;
     private String recoveryReason = "";
     private boolean mutationAdmissionClosed;
@@ -454,6 +455,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                         AggregateCreateState aggregate = applyAggregateCreate(appliedCommand, outcome, clientId, lease);
                         verifyPostApplyPrecondition(appliedCommand, pending);
                         MutationRow committed = commitAggregateApplied(pending, aggregate);
+                        cacheProjectMetadataAfterCommit(aggregate.projectMetadata());
                         TemporaryLifecycleDiagnostics.event("sqlite_mutation_commit", 0L,
                             TemporaryLifecycleDiagnostics.with(diagnosticIdentity, "operation", command.operationName(),
                                 "outcome", "committed", "durableCommitted", true, "receiptPersisted", true,
@@ -692,6 +694,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         if (persistenceState == PersistenceState.CLOSED) {
             return;
         }
+        projectMetadataCache = null;
         if (connection == null) {
             persistenceState = PersistenceState.CLOSED;
             publishDurability();
@@ -712,6 +715,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 failure.addSuppressed(exception);
             }
         } finally {
+            projectMetadataCache = null;
             coreReadAuthorityReady = false;
             persistenceState = PersistenceState.CLOSED;
             publishDurability();
@@ -817,6 +821,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         requireRegularDatabase(candidateDatabase);
 
         Connection previousConnection = connection;
+        projectMetadataCache = null;
         Path previousDatabase = databasePath;
         Path previousScope = activeScopeRoot;
         boolean previousRecoveryBlocked = recoveryBlocked;
@@ -1708,7 +1713,20 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                     continue;
                 }
                 UUID mutationId = proof.mutationId(source);
-                if (mutation(mutationId) != null) {
+                MutationRow registered = mutation(mutationId);
+                if (registered != null) {
+                    if (registered.status() == Status.REJECTED && CoreCatalogEvolution.isActor(registered.actorId())) {
+                        rearmRejectedEvolution(registered);
+                        recoverPending(Set.of());
+                        recoverCommittedCoreTransitions();
+                        MutationRow recovered = mutation(mutationId);
+                        if (recoveryBlocked || recovered == null || recovered.status() != Status.APPLIED
+                            || !publishedCoreReceipt(recovered)) {
+                            throw new IllegalStateException("Core catalog evolution recovery is incomplete: "
+                                + resource.canonicalText());
+                        }
+                        continue;
+                    }
                     throw new IllegalStateException("Core catalog evolution has an unresolved registered mutation: "
                         + resource.canonicalText());
                 }
@@ -1738,6 +1756,28 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         if (coreAuthority.activeCatalogEvolution().orElse(null) != proof
             || !proof.target().equals(coreAuthority.activeCatalogBinding().orElse(null))) {
             throw new IllegalStateException("Active Core catalog changed during evolution");
+        }
+    }
+
+    private void rearmRejectedEvolution(MutationRow rejected) {
+        MutationRow pending = new MutationRow(rejected.mutationId(), rejected.actorId(), rejected.fingerprint(),
+            rejected.operation(), rejected.requestedResource(), rejected.responseResource(), rejected.sourceResource(),
+            rejected.targetResource(), rejected.targetActivationState(), rejected.expectedRevision(),
+            rejected.preconditionHash(), Status.PENDING, rejected.resultRevision(), rejected.resultMutationId(),
+            rejected.resultHash(), rejected.resultDeleted(), rejected.resultActivationState(), rejected.resultPayload(),
+            rejected.sequence(), "", "", rejected.createdAt(), Instant.now().toEpochMilli(),
+            rejected.preconditionAssetHash(), rejected.preconditionCorePayloadHash(), rejected.preconditionCorePayloadKind(),
+            rejected.resultAssetHash(), rejected.resultCorePayloadHash(), rejected.resultCorePayloadKind());
+        verifyEvolutionReceipt(pending, true);
+        try {
+            connection.setAutoCommit(false);
+            writeMutation(pending, true);
+            connection.commit();
+        } catch (SQLException | RuntimeException failure) {
+            rollback();
+            throw new IllegalStateException("Failed To Reopen A Proven Core Catalog Evolution", failure);
+        } finally {
+            resetAutoCommit();
         }
     }
 
@@ -3123,6 +3163,9 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         try {
             applyCore(command, outcome);
         } catch (CoreGraphMutationValidationException rejection) {
+            if (CoreCatalogEvolution.isActor(row.actorId())) {
+                throw rejection;
+            }
             finishCoreValidationRejected(row, rejection);
             return;
         }
@@ -4337,6 +4380,9 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     }
 
     private void writeState(State state) throws SQLException {
+        if (isProjectMetadata(state.resource())) {
+            projectMetadataCache = null;
+        }
         try (PreparedStatement statement = connection.prepareStatement("""
             INSERT INTO resource_mutation_state(resource, revision, mutation_id, payload_hash, deleted, payload, activation_state,
                 asset_hash, core_payload_hash, core_payload_kind, updated_at)
@@ -4441,6 +4487,19 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             throw new IllegalStateException("Resource adapter is unavailable: " + resource.resourceType().value());
         }
         State persisted = state(resource);
+        FlowResourceAdapter.MutationObservation observation = adapter.readMutationObservation(resource.id());
+        ProjectMetadataCache cached = projectMetadataCache;
+        if (cached != null && cached.adapter() == adapter && cached.observation().equals(observation)
+            && sameResourceState(cached.state(), persisted) && matchesProjectMetadataObservation(persisted, observation)) {
+            return persisted;
+        }
+        State reconciled = synchronizeProjectMetadataFull(resource, adapter, persisted);
+        cacheProjectMetadata(adapter, reconciled);
+        return reconciled;
+    }
+
+    private State synchronizeProjectMetadataFull(ServerResourceLocator resource, FlowResourceAdapter<Object> adapter,
+                                                 State persisted) {
         State current = authoritativeState(resource, adapter);
         if (current == null) {
             if (persisted != null) {
@@ -4466,6 +4525,36 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         requireForwardProjectMetadataState(persisted, current);
         persistReconciledProjectMetadata(current);
         return current;
+    }
+
+    private void cacheProjectMetadataAfterCommit(State state) {
+        try {
+            cacheProjectMetadata(adapter(projectMetadataResource()), state);
+        } catch (RuntimeException exception) {
+            projectMetadataCache = null;
+            Log.warn("Project metadata observation was unavailable after commit: " + safeMessage(exception));
+        }
+    }
+
+    private void cacheProjectMetadata(FlowResourceAdapter<Object> adapter, State state) {
+        projectMetadataCache = null;
+        if (adapter == null || state == null) {
+            return;
+        }
+        FlowResourceAdapter.MutationObservation observation = adapter.readMutationObservation(state.resource().id());
+        if (matchesProjectMetadataObservation(state, observation)) {
+            projectMetadataCache = new ProjectMetadataCache(adapter, observation, state);
+        }
+    }
+
+    private boolean matchesProjectMetadataObservation(State state, FlowResourceAdapter.MutationObservation observation) {
+        if (state == null || observation == null || observation.stamp() == null) {
+            return false;
+        }
+        FlowResourceMutationStamp stamp = observation.stamp();
+        return state.resource().resourceType().value().equals(stamp.type()) && state.resource().id().equals(stamp.id())
+            && state.revision() == stamp.revision() && state.mutationId().equals(stamp.mutationId())
+            && state.payloadHash().equals(stamp.payloadHash()) && state.deleted() == stamp.deleted();
     }
 
     private State authoritativeState(ServerResourceLocator resource) {
@@ -6271,6 +6360,10 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                       boolean deleted, String payload, ResourceActivationState activationState) {
             this(resource, revision, mutationId, payloadHash, deleted, payload, activationState, null, null, null);
         }
+    }
+
+    private record ProjectMetadataCache(FlowResourceAdapter<Object> adapter,
+                                        FlowResourceAdapter.MutationObservation observation, State state) {
     }
 
     private record LegacyAdminChain(List<LegacyAdminTransition> transitions, String survivingCoreType, State baseline) {

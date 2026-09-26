@@ -13,6 +13,7 @@ import restudio.resync.storage.AssetTransactionCoordinator;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,6 +23,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowStorageGraphSnapshotTest {
     @TempDir
@@ -91,6 +94,31 @@ class FlowStorageGraphSnapshotTest {
 
             assertEquals(live.revision() + 1L, loaded.getResourceRevision());
             assertEquals("replacement.node", loaded.getNodes().get("replacement").getType());
+        }
+    }
+
+    @Test
+    void warmGraphUsesVerifiedResidentStateAndColdReadRejectsTamperedBytes() throws Exception {
+        try (AssetTransactionCoordinator coordinator = coordinator()) {
+            FlowStorage storage = new FlowStorage(tempDir.toFile(), coordinator);
+            FlowGraph graph = graph("resident-flow");
+            graph.getNodes().put("start", new FlowNode("original.node", 1, 1, Map.of()));
+            storage.saveGraph(graph);
+            storage.clearCache();
+
+            FlowGraph verified = storage.getGraph("flow", "resident-flow");
+            AssetTransactionCoordinator.AssetKey key = new AssetTransactionCoordinator.AssetKey("flow", "resident-flow");
+            Path file = coordinator.read(snapshot -> snapshot.path(key).orElseThrow());
+            String content = Files.readString(file);
+            assertTrue(content.contains("original.node"));
+            Files.writeString(file, content.replace("original.node", "tampered.node"));
+
+            FlowGraph warm = storage.getGraph("flow", "resident-flow");
+            assertEquals("original.node", warm.getNodes().get("start").getType());
+            assertNotSame(verified, warm);
+
+            storage.clearCache();
+            assertThrows(IllegalStateException.class, () -> storage.getGraph("flow", "resident-flow"));
         }
     }
 

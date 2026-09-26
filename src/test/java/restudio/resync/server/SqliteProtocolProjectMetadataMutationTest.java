@@ -6,6 +6,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.flow.data.FlowGraph;
@@ -231,6 +232,25 @@ class SqliteProtocolProjectMetadataMutationTest {
                 assertEquals(normalizationMutation, documents.getFirst().mutationId());
                 assertEquals(List.of(), documents.getFirst().payload().get("folders"));
                 assertEquals(List.of(), documents.getFirst().payload().get("resources"));
+            }
+        }
+    }
+
+    @Test
+    void warmMetadataReadRejectsProjectChangeWithoutLineage(@TempDir Path directory) throws Exception {
+        try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(directory.resolve("assets"), new Gson())) {
+            FlowStorage storage = storage(directory, coordinator);
+            storage.saveProjectMetadata("{\"serverId\":\"project\",\"resources\":[]}", UUID.randomUUID(), 0L);
+            try (SqliteProtocolResourceMutationAuthority authority = authority(registry(storage), directory)) {
+                assertEquals(1L, authority.list(SERVER, TYPE, "").getFirst().revision());
+                FlowStorage.ProjectMetadataObservation baseline = storage.readProjectMetadataObservation(SERVER.canonicalText());
+                AssetTransactionCoordinator.Snapshot snapshot = coordinator.read(current -> current);
+                coordinator.transact(new AssetTransactionCoordinator.TransactionRequest(UUID.randomUUID(), snapshot.project(),
+                    List.of(), List.of(AssetTransactionCoordinator.ProjectDelta.set(List.of("unknown"), new JsonPrimitive("drift")))));
+                FlowStorage.ProjectMetadataObservation changed = storage.readProjectMetadataObservation(SERVER.canonicalText());
+                assertEquals(baseline.identity(), changed.identity());
+                assertNotEquals(baseline.projectHash(), changed.projectHash());
+                assertThrows(IllegalStateException.class, () -> authority.list(SERVER, TYPE, ""));
             }
         }
     }
@@ -820,11 +840,14 @@ class SqliteProtocolProjectMetadataMutationTest {
             FlowResourceRegistry registry = registry(storage);
             try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
                 assertEquals(1L, authority.list(SERVER, TYPE, "").getFirst().revision());
+                FlowStorage.ProjectMetadataObservation baseline = storage.readProjectMetadataObservation(SERVER.canonicalText());
                 WorldGenProjectStorage worldGen = new WorldGenProjectStorage(directory.toFile(),
                     LegacyRuntimeActivationGate.runtime(directory), new AssetPersistenceGate(directory), coordinator);
                 WorldGenProject project = new WorldGenProject();
                 project.setId(projectId);
                 worldGen.saveProject(project, saveMutation, 0L, worldGenScope(project, saveMutation));
+                FlowStorage.ProjectMetadataObservation saved = storage.readProjectMetadataObservation(SERVER.canonicalText());
+                assertNotEquals(baseline.projectHash(), saved.projectHash());
                 assertEquals(2L, authority.list(SERVER, TYPE, "").getFirst().revision());
                 assertNotEquals(deleteMutation, deleteOperation);
                 worldGen.deleteProject(projectId, deleteMutation, 1L,

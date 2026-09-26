@@ -103,7 +103,7 @@ public class FlowStorage {
     private static final String PROJECT_METADATA_LINEAGE_ID = "project";
     private static final String PROJECT_METADATA_LINEAGE_FORMAT = "project-metadata-lineage-v1";
     private static final int MAX_TYPED_COMMAND_REFRESH_PROOFS = 256;
-    private final Map<String, FlowGraph> graphCache = new ConcurrentHashMap<>();
+    private final Map<String, CachedGraph> graphCache = new ConcurrentHashMap<>();
     private final CoreGraphStorageBoundary coreGraphStorage = new CoreGraphStorageBoundary();
     private final Map<String, GuiDefinition> guiCache = new ConcurrentHashMap<>();
     private final Map<String, ScoreboardDefinition> scoreboardCache = new ConcurrentHashMap<>();
@@ -139,6 +139,13 @@ public class FlowStorage {
     }
 
     private record CachedResourceIdentity(long revision, String mutationId, String resourceHash) {
+    }
+
+    private record GraphCacheStamp(AssetTransactionCoordinator coordinator, long generation, String type, String id,
+                                   long revision, String mutationId, String hash, Path path) {
+    }
+
+    private record CachedGraph(FlowGraph graph, GraphCacheStamp stamp) {
     }
 
     private record TypedCommandRefreshProof(ServerResourceLocator locator, long revision, UUID mutationId,
@@ -1779,6 +1786,14 @@ public class FlowStorage {
                 String resolvedType = resolveStoredGraphType(safeId);
                 return resolvedType.isBlank() ? null : getGraph(resolvedType, safeId);
             }
+            String cacheKey = assetIndexKey(requestedType, safeId);
+            CachedGraph resident = graphCache.get(cacheKey);
+            if (resident != null) {
+                if (currentGraphCacheStamp(resident.stamp(), requestedType, safeId)) {
+                    return resident.graph().copy();
+                }
+                graphCache.remove(cacheKey, resident);
+            }
             Path file = findAssetResourceFile(requestedType, safeId);
             if (file == null || !Files.exists(file)) {
                 return null;
@@ -1802,8 +1817,8 @@ public class FlowStorage {
                         }
                         AssetTransactionCoordinator.Snapshot coordinatorSnapshot = requireCoordinatedLiveFile(
                             coordinatedType, safeId, file);
-                        if (graphCacheIdentityMatches(graph, coordinatorSnapshot, coordinatedType, safeId, file, true)) {
-                            graphCache.put(assetIndexKey(coordinatedType, safeId), graph);
+                        if (graphCacheIdentityMatches(graph, coordinatorSnapshot, coordinatedType, safeId, file)) {
+                            cacheGraph(graph, coordinatorSnapshot, coordinatedType, safeId, file);
                         }
                         return graph.copy();
                     }
@@ -1815,10 +1830,9 @@ public class FlowStorage {
             AssetTransactionCoordinator.Snapshot coordinatorSnapshot;
             try {
                 coordinatorSnapshot = requireCoordinatedLiveFile(coordinatedType, safeId, file);
-                String cacheKey = assetIndexKey(coordinatedType, safeId);
-                FlowGraph cached = graphCache.get(cacheKey);
-                if (cached != null && graphCacheIdentityMatches(cached, coordinatorSnapshot, coordinatedType, safeId, file)) {
-                    return cached.copy();
+                CachedGraph cached = graphCache.get(cacheKey);
+                if (cached != null && graphCacheIdentityMatches(cached.graph(), coordinatorSnapshot, coordinatedType, safeId, file)) {
+                    return cached.graph().copy();
                 }
                 if (cached != null) {
                     graphCache.remove(cacheKey, cached);
@@ -1826,8 +1840,6 @@ public class FlowStorage {
             } catch (IOException exception) {
                 throw new IllegalStateException("Flow payload diverged from the shared asset coordinator: " + safeId, exception);
             }
-            String cacheKey = assetIndexKey(actualType.isBlank() ? "flow" : actualType, safeId);
-
             try {
                 if (!verifyGraphAsset(file, coordinatedType, safeId)) {
                     Log.warn("Flow integrity check failed: " + safeId);
@@ -1836,11 +1848,11 @@ public class FlowStorage {
                 String json = StorageSafety.readUtf8(file);
                 FlowGraph graph = FlowSerializer.deserialize(json);
                 applyResourceIdentity(graph, file);
-                if (!graphCacheIdentityMatches(graph, coordinatorSnapshot, coordinatedType, safeId, file, true)) {
+                if (!graphCacheIdentityMatches(graph, coordinatorSnapshot, coordinatedType, safeId, file)) {
                     Log.warn("Skipped caching flow without a matching coordinator identity: " + safeId);
                     return graph.copy();
                 }
-                graphCache.put(cacheKey, graph);
+                cacheGraph(graph, coordinatorSnapshot, coordinatedType, safeId, file);
                 return graph.copy();
             } catch (IOException | RuntimeException e) {
                 Log.warn("Failed to load flow: " + safeId + " - " + e.getMessage());
@@ -3424,7 +3436,7 @@ public class FlowStorage {
     public synchronized Map<String, FlowGraph> getGraphCache() {
         try (AssetPersistenceGate.MutationLease ignored = requirePersistenceReadOpen()) {
             Map<String, FlowGraph> snapshot = new LinkedHashMap<>();
-            graphCache.forEach((key, graph) -> snapshot.put(key, graph.copy()));
+            graphCache.forEach((key, graph) -> snapshot.put(key, graph.graph().copy()));
             return Map.copyOf(snapshot);
         }
     }
@@ -3552,6 +3564,26 @@ public class FlowStorage {
                 return null;
             }
             return projectMetadataIdentity(requireAssetTransactions().read(Function.identity()), resourceId);
+        }
+    }
+
+    public record ProjectMetadataObservation(ResourceIdentity identity, long projectRevision, String projectHash,
+                                             long persistenceGeneration) {
+        public ProjectMetadataObservation {
+            projectHash = Objects.requireNonNull(projectHash, "Project metadata hash is required");
+        }
+    }
+
+    public synchronized ProjectMetadataObservation readProjectMetadataObservation(String id) {
+        try (AssetPersistenceGate.MutationLease ignored = requirePersistenceReadOpen()) {
+            String resourceId = projectMetadataResourceId();
+            if (!isProjectMetadataId(id)) {
+                return null;
+            }
+            AssetTransactionCoordinator.Snapshot snapshot = requireAssetTransactions().read(Function.identity());
+            ResourceIdentity identity = projectMetadataIdentity(snapshot, resourceId);
+            return new ProjectMetadataObservation(identity, snapshot.project().revision(), snapshot.project().hash(),
+                persistenceGeneration);
         }
     }
 
@@ -4388,6 +4420,10 @@ public class FlowStorage {
         return coordinator.committedSequence();
     }
 
+    public boolean coordinatedNetworkScanAvailable() {
+        return !legacyRuntimeGate.allowsLegacyFallback();
+    }
+
     public synchronized void setTabRefreshIntervalTicks(int ticks) {
         try (AssetPersistenceGate.MutationLease ignored = requirePersistenceMutationOpen()) {
             this.tabRefreshIntervalTicks = Math.max(1, ticks);
@@ -4464,10 +4500,10 @@ public class FlowStorage {
             }
         }
         String cacheKey = assetIndexKey(coordinatedType, safeId);
-        FlowGraph cached = graphCache.get(cacheKey);
+        CachedGraph cached = graphCache.get(cacheKey);
         try {
-            if (cached != null && graphCacheIdentityMatches(cached, snapshot, coordinatedType, safeId, file, true)) {
-                return cached.copy();
+            if (cached != null && graphCacheIdentityMatches(cached.graph(), snapshot, coordinatedType, safeId, file)) {
+                return cached.graph().copy();
             }
             if (cached != null) {
                 graphCache.remove(cacheKey, cached);
@@ -4491,11 +4527,11 @@ public class FlowStorage {
                 graph = FlowSerializer.deserialize(StorageSafety.readUtf8(file));
                 applyResourceIdentity(graph, file);
             }
-            if (!graphCacheIdentityMatches(graph, snapshot, coordinatedType, safeId, file, true)) {
+            if (!graphCacheIdentityMatches(graph, snapshot, coordinatedType, safeId, file)) {
                 Log.warn("Skipped caching flow without a matching coordinator identity: " + safeId);
                 return graph.copy();
             }
-            graphCache.put(cacheKey, graph);
+            cacheGraph(graph, snapshot, coordinatedType, safeId, file);
             return graph.copy();
         } catch (IOException | RuntimeException exception) {
             Log.warn("Failed to load flow: " + safeId + " - " + exception.getMessage());
@@ -7103,6 +7139,7 @@ public class FlowStorage {
         changed |= ensureFolder(metadata, "Content/Items", "Content", 0);
         changed |= ensureFolder(metadata, "Content/Armor", "Content", 1);
         changed |= ensureFolder(metadata, "Content/Blocks", "Content", 2);
+        changed |= ensureFolder(metadata, "Content/Projectiles", "Content", 3);
         changed |= ensureFolder(metadata, "Content/Advancements", "Content", 3);
         changed |= ensureFolder(metadata, "Content/Dialogs", "Content", 4);
         changed |= ensureFolder(metadata, "GUIs", "", 2);
@@ -7827,19 +7864,43 @@ public class FlowStorage {
             if (state instanceof AssetTransactionCoordinator.Live live && live.revision() == revision
                 && Objects.equals(mutationId, snapshot.mutationValue(assetKey(type, id)).orElse(""))
                 && currentFile) {
-                graphCache.put(assetIndexKey(type, id), graph.copy());
+                cacheGraph(graph.copy(), snapshot, type, id, file);
             }
         }
     }
 
-    private boolean graphCacheIdentityMatches(FlowGraph cached, AssetTransactionCoordinator.Snapshot snapshot,
-                                               String type, String id, Path file) throws IOException {
-        return graphCacheIdentityMatches(cached, snapshot, type, id, file, false);
+    private void cacheGraph(FlowGraph graph, AssetTransactionCoordinator.Snapshot snapshot, String type, String id, Path file) {
+        AssetTransactionCoordinator.AssetKey key = assetKey(type, id);
+        AssetTransactionCoordinator.ExpectedState state = snapshot.state(key).orElse(AssetTransactionCoordinator.Missing.INSTANCE);
+        String mutationId = snapshot.mutationValue(key).orElse("");
+        GraphCacheStamp stamp = null;
+        if (state instanceof AssetTransactionCoordinator.Live live && type.equals(graph.getResourceType())
+            && id.equals(graph.getId()) && graph.getResourceRevision() == live.revision()
+            && mutationId.equals(graph.getResourceMutationId())) {
+            stamp = new GraphCacheStamp(requireAssetTransactions(), persistenceGeneration, type, id, live.revision(),
+                mutationId, live.hash(), file.toAbsolutePath().normalize());
+            if (!currentGraphCacheStamp(stamp, type, id)) {
+                return;
+            }
+        }
+        graphCache.put(assetIndexKey(type, id), new CachedGraph(graph, stamp));
+    }
+
+    private boolean currentGraphCacheStamp(GraphCacheStamp stamp, String type, String id) {
+        if (stamp == null || !type.equals(stamp.type()) || !id.equals(stamp.id())
+            || stamp.generation() != persistenceGeneration || stamp.coordinator() != requireAssetTransactions()) {
+            return false;
+        }
+        return stamp.coordinator().committedAsset(assetKey(type, id))
+            .filter(committed -> committed.state() instanceof AssetTransactionCoordinator.Live live
+                && live.revision() == stamp.revision() && live.hash().equals(stamp.hash())
+                && committed.mutationId().value().equals(stamp.mutationId())
+                && committed.path().toAbsolutePath().normalize().equals(stamp.path()))
+            .isPresent();
     }
 
     private boolean graphCacheIdentityMatches(FlowGraph cached, AssetTransactionCoordinator.Snapshot snapshot,
-                                               String type, String id, Path file, boolean payloadHashVerified)
-        throws IOException {
+                                               String type, String id, Path file) throws IOException {
         AssetTransactionCoordinator.ExpectedState state = snapshot.state(assetKey(type, id))
             .orElse(AssetTransactionCoordinator.Missing.INSTANCE);
         if (!(state instanceof AssetTransactionCoordinator.Live live)
@@ -7850,7 +7911,7 @@ public class FlowStorage {
             || !Objects.equals(cached.getResourceHash(), AssetFileFormat.readContentHash(file))) {
             return false;
         }
-        return payloadHashVerified || live.hash().equals(StorageSafety.sha256(Files.readAllBytes(file)));
+        return live.hash().equals(StorageSafety.sha256(Files.readAllBytes(file)));
     }
 
     private boolean cachedResourceIdentityMatches(String type, String id, CachedResourceIdentity cached) {

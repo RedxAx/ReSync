@@ -28,6 +28,31 @@ final class IdentityValidation {
         return segmentedIdentifier(value, field, false);
     }
 
+    static String pin(String value) {
+        Objects.requireNonNull(value, "Pin ID is required");
+        if (value.isEmpty() || value.length() > MAX_IDENTIFIER_LENGTH) {
+            throw new IllegalArgumentException("Pin ID must contain 1 to " + MAX_IDENTIFIER_LENGTH + " characters");
+        }
+        int segmentLength = 0;
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            boolean letter = character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z';
+            boolean digit = character >= '0' && character <= '9';
+            boolean separator = character == '.' || character == '-' || character == '_';
+            if (separator && segmentLength > 0) {
+                segmentLength = 0;
+            } else if ((letter || digit && index > 0) && ++segmentLength <= 32) {
+                continue;
+            } else {
+                throw new IllegalArgumentException("Invalid Pin ID: " + value);
+            }
+        }
+        if (segmentLength == 0) {
+            throw new IllegalArgumentException("Invalid Pin ID: " + value);
+        }
+        return value;
+    }
+
     static String resource(String value) {
         return identifier(value, "Resource ID", RESOURCE);
     }

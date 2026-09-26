@@ -264,6 +264,8 @@ public class FlowGraph {
     public static class EditorPassthrough {
         private String nodeId;
         private String inputPin;
+        private String inputPinId;
+        private String inputPinDisplayName;
 
         public EditorPassthrough() {
             this.nodeId = "";
@@ -289,6 +291,22 @@ public class FlowGraph {
 
         public void setInputPin(String inputPin) {
             this.inputPin = inputPin;
+        }
+
+        public String getInputPinId() {
+            return inputPinId;
+        }
+
+        public void setInputPinId(String inputPinId) {
+            this.inputPinId = inputPinId;
+        }
+
+        public String getInputPinDisplayName() {
+            return inputPinDisplayName;
+        }
+
+        public void setInputPinDisplayName(String inputPinDisplayName) {
+            this.inputPinDisplayName = inputPinDisplayName;
         }
     }
 

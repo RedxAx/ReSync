@@ -84,6 +84,34 @@ class GraphFoundationTest {
     }
 
     @Test
+    void templatePlaceholdersDeclareRealStringInputsOnlyWhilePresent() {
+        TypeExpr string = StringTemplatePins.STRING;
+        PinId text = PinId.of("text");
+        PinId extra = PinId.of("extraPin");
+        CatalogSnapshot catalog = catalog(1, List.of(
+            node("source", CatalogNodeDescriptor.Direction.OUTPUT, PinId.of("result"), string),
+            node("target", CatalogNodeDescriptor.Direction.INPUT, text, string)));
+        GraphNode source = new GraphNode(SOURCE_ID, SOURCE_DEFINITION, 1, Map.of());
+        GraphNode target = new GraphNode(TARGET_ID, TARGET_DEFINITION, 1,
+            Map.of(text, new PinValue(text, TypedValue.value(string, "Hello {extraPin}"))));
+        GraphConnection connection = new GraphConnection(CONNECTION_ID,
+            new GraphEndpoint(SOURCE_ID, PinId.of("result")), new GraphEndpoint(TARGET_ID, extra));
+        GraphDocument graph = new GraphDocument(resource(), 4, binding(catalog), List.of(source, target), List.of(connection));
+
+        assertTrue(new GraphValidator().validate(graph, catalog).valid());
+        CompiledExecutionStep compiled = new GraphCompiler().compile(graph, catalog).steps().stream()
+            .filter(step -> step.nodeId().equals(TARGET_ID)).findFirst().orElseThrow();
+        assertEquals(TypedValue.absent(string), compiled.inputBindings().get(extra));
+
+        GraphNode withoutPlaceholder = new GraphNode(TARGET_ID, TARGET_DEFINITION, 1,
+            Map.of(text, new PinValue(text, TypedValue.value(string, "Hello"))));
+        GraphDocument staleConnection = new GraphDocument(resource(), 4, binding(catalog),
+            List.of(source, withoutPlaceholder), List.of(connection));
+        assertTrue(new GraphValidator().validate(staleConnection, catalog).diagnostics().stream()
+            .anyMatch(diagnostic -> "GRAPH.ENDPOINT_PIN_MISSING".equals(diagnostic.code())));
+    }
+
+    @Test
     void compiledStepsCarryTheResolvedProviderAndBindingDescriptor() {
         GraphDocument base = graph(List.of(
             new GraphNode(SOURCE_ID, SOURCE_DEFINITION, 1, Map.of()),
@@ -252,11 +280,14 @@ class GraphFoundationTest {
     }
 
     private static CatalogSnapshot catalog(long generation) {
+        return catalog(generation, List.of(
+            node("source", CatalogNodeDescriptor.Direction.OUTPUT, PinId.of("result")),
+            node("target", CatalogNodeDescriptor.Direction.INPUT, PinId.of("input"))));
+    }
+
+    private static CatalogSnapshot catalog(long generation, List<CatalogNodeDescriptor> definitions) {
         CatalogVersion contract = new CatalogVersion(1, 0);
         CatalogContractRange range = new CatalogContractRange(contract, contract);
-        List<CatalogNodeDescriptor> definitions = List.of(
-            node("source", CatalogNodeDescriptor.Direction.OUTPUT, PinId.of("result")),
-            node("target", CatalogNodeDescriptor.Direction.INPUT, PinId.of("input")));
         List<RuntimeOperationDescriptor> requirements = definitions.stream().map(GraphFoundationTest::requirement).toList();
         CatalogContribution contribution = CatalogContribution.builder(OwnerId.of("builtin"), "1.0.0", range, provenance())
             .categories(List.of(category()))
@@ -457,10 +488,14 @@ class GraphFoundationTest {
     }
 
     private static CatalogNodeDescriptor node(String id, CatalogNodeDescriptor.Direction direction, PinId pinId) {
+        return node(id, direction, pinId, NUMBER);
+    }
+
+    private static CatalogNodeDescriptor node(String id, CatalogNodeDescriptor.Direction direction, PinId pinId, TypeExpr type) {
         ContractRef<CapabilityId> execute = ContractRef.of(new OwnerId("builtin"), CapabilityId.of("flow-execute"));
         CatalogNodeDescriptor.Branch failure = new CatalogNodeDescriptor.Branch("failed", "Failed", "Describes the failure outcome for this operation.", List.of(new CatalogNodeDescriptor.Case("failure", "Failure", "The operation completed with a structured failure.")));
         RuntimeSemantics semantics = pure(ContractRef.of(new OwnerId("resync.system"), CapabilityId.of("flow-authorize")), "failed");
-        CatalogNodeDescriptor.Pin pin = new CatalogNodeDescriptor.Pin(pinId, direction, NUMBER, direction == CatalogNodeDescriptor.Direction.INPUT ? "Input" : "Result", "A number supplied to or returned by the operation.", CatalogNodeDescriptor.Requirement.REQUIRED, null, ContractRef.of(new OwnerId("builtin"), CapabilityId.of("generic-editor")), null, null, null);
+        CatalogNodeDescriptor.Pin pin = new CatalogNodeDescriptor.Pin(pinId, direction, type, direction == CatalogNodeDescriptor.Direction.INPUT ? "Input" : "Result", "A value supplied to or returned by the operation.", CatalogNodeDescriptor.Requirement.REQUIRED, null, ContractRef.of(new OwnerId("builtin"), CapabilityId.of("generic-editor")), null, null, null);
         return CatalogNodeDescriptor.builder(NodeId.of(id))
             .domain("flow")
             .family("operation")

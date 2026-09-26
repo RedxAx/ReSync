@@ -133,7 +133,7 @@ public final class GraphCompiler {
         for (GraphNode node : graph.nodes().stream().sorted(Comparator.comparing(GraphNode::instanceId)).toList()) {
             CatalogOwned<CatalogNodeDescriptor> owned = catalog.definition(node.definition()).orElseThrow();
             CatalogNodeDescriptor definition = owned.descriptor();
-            Map<PinId, FunctionBoundaryPins.EffectivePin> pins = FunctionBoundaryPins.resolve(owned, functionSignature);
+            Map<PinId, FunctionBoundaryPins.EffectivePin> pins = FunctionBoundaryPins.resolve(owned, functionSignature, node);
             Map<PinId, TypedValue> inputs = inputBindings(node, pins);
             Map<PinId, List<GraphEndpoint>> outputs = new LinkedHashMap<>();
             pins.values().stream()
@@ -194,9 +194,9 @@ public final class GraphCompiler {
         GraphNode targetNode = graph.nodes().stream().filter(node -> node.instanceId().equals(connection.target().nodeId())).findFirst().orElseThrow();
         CatalogOwned<CatalogNodeDescriptor> sourceDefinition = catalog.definition(sourceNode.definition()).orElseThrow();
         CatalogOwned<CatalogNodeDescriptor> targetDefinition = catalog.definition(targetNode.definition()).orElseThrow();
-        FunctionBoundaryPins.EffectivePin source = FunctionBoundaryPins.resolve(sourceDefinition, functionSignature)
+        FunctionBoundaryPins.EffectivePin source = FunctionBoundaryPins.resolve(sourceDefinition, functionSignature, sourceNode)
             .get(connection.source().pinId());
-        FunctionBoundaryPins.EffectivePin target = FunctionBoundaryPins.resolve(targetDefinition, functionSignature)
+        FunctionBoundaryPins.EffectivePin target = FunctionBoundaryPins.resolve(targetDefinition, functionSignature, targetNode)
             .get(connection.target().pinId());
         if (source == null || target == null) {
             throw new IllegalStateException("Validated graph connection pin is unavailable");

@@ -216,6 +216,91 @@ class CompiledExecutionRunnerTest {
     }
 
     @Test
+    void includesIndependentDataSourcesInAnEventExecutionScope() throws Exception {
+        RuntimeOperationDescriptor eventOperation = operation("scoped-event", List.of(
+            new RuntimeOperationDescriptor.Pin(OUTPUT_A, RuntimeOperationDescriptor.Direction.OUTPUT, STRING)),
+            RuntimeSemantics.Cancellation.NONE);
+        RuntimeOperationDescriptor literalOperation = operation("scoped-literal", List.of(
+            new RuntimeOperationDescriptor.Pin(OUTPUT_B, RuntimeOperationDescriptor.Direction.OUTPUT, STRING)),
+            RuntimeSemantics.Cancellation.NONE);
+        RuntimeOperationDescriptor consumerOperation = operation("scoped-consumer", List.of(
+            new RuntimeOperationDescriptor.Pin(LEFT, RuntimeOperationDescriptor.Direction.INPUT, STRING),
+            new RuntimeOperationDescriptor.Pin(RIGHT, RuntimeOperationDescriptor.Direction.INPUT, STRING)),
+            RuntimeSemantics.Cancellation.NONE);
+        RuntimeOperationDescriptor unrelatedOperation = operation("scoped-unrelated", List.of(), RuntimeSemantics.Cancellation.NONE);
+        GraphEndpoint left = new GraphEndpoint(JOIN, LEFT);
+        GraphEndpoint right = new GraphEndpoint(JOIN, RIGHT);
+        GraphConnection eventConnection = new GraphConnection(ConnectionId.interactive(),
+            new GraphEndpoint(SOURCE_A, OUTPUT_A), left);
+        GraphConnection literalConnection = new GraphConnection(ConnectionId.interactive(),
+            new GraphEndpoint(SOURCE_B, OUTPUT_B), right);
+        CompiledExecutionPlan plan = plan(List.of(
+            step(SOURCE_A, eventOperation, Map.of(), outputBindings(OUTPUT_A, left)),
+            step(SOURCE_B, literalOperation, Map.of(), outputBindings(OUTPUT_B, right)),
+            step(JOIN, consumerOperation, Map.of(LEFT, TypedValue.absent(STRING), RIGHT, TypedValue.absent(STRING)), Map.of()),
+            step(DOWNSTREAM, unrelatedOperation, Map.of(), Map.of())),
+            List.of(eventConnection, literalConnection), List.of());
+        AtomicReference<Map<PinId, TypedValue>> received = new AtomicReference<>();
+        AtomicBoolean unrelatedInvoked = new AtomicBoolean();
+        CompiledExecutionRunner runner = new CompiledExecutionRunner(registry(
+            binding(eventOperation, invocation -> CompletableFuture.completedFuture(RuntimeResult.success(
+                Map.of(OUTPUT_A, TypedValue.value(STRING, "event")), null))),
+            binding(literalOperation, invocation -> CompletableFuture.completedFuture(RuntimeResult.success(
+                Map.of(OUTPUT_B, TypedValue.value(STRING, "literal")), null))),
+            binding(consumerOperation, invocation -> {
+                received.set(invocation.inputs());
+                return CompletableFuture.completedFuture(RuntimeResult.success());
+            }),
+            binding(unrelatedOperation, invocation -> {
+                unrelatedInvoked.set(true);
+                return CompletableFuture.completedFuture(RuntimeResult.success());
+            })), new RuntimeAuthority("test-authority"));
+
+        CompiledExecutionRunner.ExecutionTemplate prepared = runner.prepare(plan, SOURCE_A);
+        assertEquals(CompiledExecutionRunner.Status.SUCCESS, runner.execute(prepared, Map.of(),
+            new RuntimeCancellationToken(), null, CorrelationId.random(), System.currentTimeMillis() + 60_000L)
+            .toCompletableFuture().get(5, TimeUnit.SECONDS).status());
+        assertEquals(TypedValue.value(STRING, "event"), received.get().get(LEFT));
+        assertEquals(TypedValue.value(STRING, "literal"), received.get().get(RIGHT));
+        assertFalse(unrelatedInvoked.get());
+    }
+
+    @Test
+    void rendersConnectedStringTemplatePinWithoutPassingItToTheFixedRuntimeBinding() throws Exception {
+        PinId textPin = PinId.of("text");
+        PinId extraPin = PinId.of("extraPin");
+        RuntimeOperationDescriptor sourceOperation = operation("template-source", List.of(
+            new RuntimeOperationDescriptor.Pin(OUTPUT_A, RuntimeOperationDescriptor.Direction.OUTPUT, STRING)),
+            RuntimeSemantics.Cancellation.NONE);
+        RuntimeOperationDescriptor targetOperation = operation("template-target", List.of(
+            new RuntimeOperationDescriptor.Pin(textPin, RuntimeOperationDescriptor.Direction.INPUT, STRING)),
+            RuntimeSemantics.Cancellation.NONE);
+        GraphEndpoint target = new GraphEndpoint(DOWNSTREAM, extraPin);
+        GraphConnection connection = new GraphConnection(ConnectionId.interactive(),
+            new GraphEndpoint(SOURCE_A, OUTPUT_A), target);
+        CompiledExecutionPlan plan = plan(List.of(
+            step(SOURCE_A, sourceOperation, Map.of(), outputBindings(OUTPUT_A, target)),
+            step(DOWNSTREAM, targetOperation, Map.of(
+                textPin, TypedValue.value(STRING, "Color: {extraPin}, {{literal}}"),
+                extraPin, TypedValue.absent(STRING)), Map.of())), List.of(connection), List.of());
+        AtomicReference<Map<PinId, TypedValue>> received = new AtomicReference<>();
+        CompiledExecutionRunner runner = new CompiledExecutionRunner(registry(
+            binding(sourceOperation, invocation -> CompletableFuture.completedFuture(RuntimeResult.success(
+                Map.of(OUTPUT_A, TypedValue.value(STRING, "red")), null))),
+            binding(targetOperation, invocation -> {
+                received.set(invocation.inputs());
+                return CompletableFuture.completedFuture(RuntimeResult.success());
+            })), new RuntimeAuthority("test-authority"));
+        CompiledExecutionRunner.ExecutionTemplate resident = runner.prepare(plan, SOURCE_A);
+
+        assertEquals(CompiledExecutionRunner.Status.SUCCESS, runner.execute(resident, Map.of(),
+            new RuntimeCancellationToken(), null, CorrelationId.random(), System.currentTimeMillis() + 60_000L)
+            .toCompletableFuture().get(5, TimeUnit.SECONDS).status());
+        assertEquals(Map.of(textPin, TypedValue.value(STRING, "Color: red, {literal}")), received.get());
+        assertEquals(1L, runner.templatePreparationCount());
+    }
+
+    @Test
     void returnsFailureAndStopsBeforeDownstreamSteps() throws Exception {
         RuntimeOperationDescriptor failureOperation = operation("failure", List.of(
             new RuntimeOperationDescriptor.Pin(OUTPUT_A, RuntimeOperationDescriptor.Direction.OUTPUT, TEXT)),

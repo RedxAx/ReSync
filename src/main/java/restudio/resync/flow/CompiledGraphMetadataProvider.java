@@ -283,7 +283,7 @@ public final class CompiledGraphMetadataProvider {
                         "failure", value(failure.getMessage()))));
             }
             Map<PinId, FunctionBoundaryPins.EffectivePin> pinsById = FunctionBoundaryPins.resolve(owned,
-                functionSource == null ? null : functionSource.signature());
+                functionSource == null ? null : functionSource.signature(), node);
             for (FunctionBoundaryPins.EffectivePin pin : pinsById.values()) {
                 pins.put(new CompiledGraphMetadata.PinAddress(nodeKey, pin.id().canonicalText()), pin.id());
             }

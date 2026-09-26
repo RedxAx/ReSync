@@ -2,7 +2,7 @@ package restudio.resync.flow.identity;
 
 public record PinId(String value) implements LocalId, Comparable<PinId> {
     public PinId {
-        value = IdentityValidation.local(value, "Pin ID");
+        value = IdentityValidation.pin(value);
     }
 
     public static PinId of(String value) {

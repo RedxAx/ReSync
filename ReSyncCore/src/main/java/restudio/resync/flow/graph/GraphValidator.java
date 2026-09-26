@@ -102,10 +102,10 @@ public final class GraphValidator {
             CatalogNodeDescriptor definition = owned.descriptor();
             Map<PinId, FunctionBoundaryPins.EffectivePin> endpointPins;
             try {
-                endpointPins = FunctionBoundaryPins.resolve(owned, functionSignature);
+                endpointPins = FunctionBoundaryPins.resolve(owned, functionSignature, node);
             } catch (IllegalArgumentException failure) {
                 diagnostics.add(error("GRAPH.PIN_UNRESOLVED", node.instanceId(), null));
-                endpointPins = FunctionBoundaryPins.resolve(owned, null);
+                endpointPins = FunctionBoundaryPins.resolve(owned, null, node);
             }
             contexts.put(node.instanceId(), new NodeContext(node, definition, owned, endpointPins));
             validateNode(node, definition, owned, catalog, runtimeManifest, diagnostics);

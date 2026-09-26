@@ -31,8 +31,18 @@ public final class FunctionBoundaryPins {
 
     public static Map<PinId, EffectivePin> resolve(CatalogOwned<CatalogNodeDescriptor> owned,
                                                    FunctionSignature signature) {
+        return resolve(owned, signature, null);
+    }
+
+    public static Map<PinId, EffectivePin> resolve(CatalogOwned<CatalogNodeDescriptor> owned,
+                                                   FunctionSignature signature, GraphNode node) {
         LinkedHashMap<PinId, EffectivePin> pins = new LinkedHashMap<>();
         owned.descriptor().pins().forEach(pin -> pins.put(pin.id(), EffectivePin.from(pin)));
+        if (node != null) {
+            StringTemplatePins.derive(node, owned.descriptor()).forEach((id, type) ->
+                pins.putIfAbsent(id, new EffectivePin(id, CatalogNodeDescriptor.Direction.INPUT, type, null,
+                    CatalogNodeDescriptor.RepeatableIntent.disabled())));
+        }
         if (signature == null) {
             return Collections.unmodifiableMap(new LinkedHashMap<>(pins));
         }

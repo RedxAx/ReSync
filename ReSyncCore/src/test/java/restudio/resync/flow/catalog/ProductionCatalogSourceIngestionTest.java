@@ -54,8 +54,8 @@ class ProductionCatalogSourceIngestionTest {
     private static final CatalogContractRange CONTRACT_RANGE = new CatalogContractRange(CONTRACT, CONTRACT);
     private static final String BUILD_ID = "production-catalog-source-ingestion-test";
     private static final int EXPECTED_FILES = 80;
-    private static final int EXPECTED_DEFINITIONS = 1257;
-    private static final int EXPECTED_PINS = 6909;
+    private static final int EXPECTED_DEFINITIONS = 1263;
+    private static final int EXPECTED_PINS = 6977;
     private static final int EXPECTED_MIGRATED_DEFINITIONS = 972;
     private static final int EXPECTED_MIGRATIONS = 973;
     private static final int EXPECTED_TRIGGERS = 104;
@@ -64,6 +64,7 @@ class ProductionCatalogSourceIngestionTest {
     private static final Map<String, String> OPTION_SOURCE_TYPES = Map.ofEntries(
         Map.entry("server-custom-content-asset", "string"),
         Map.entry("server-custom-content-provider", "string"),
+        Map.entry("server-custom-content-recipe-item", "string"),
         Map.entry("server-luckperms-group", "permission_group"),
         Map.entry("server-luckperms-permission", "permission"),
         Map.entry("server-luckperms-track", "permission_track"),
@@ -93,6 +94,7 @@ class ProductionCatalogSourceIngestionTest {
         Map.entry("server-minecraft-sound", "sound"),
         Map.entry("server-resync-advancement-tree", "advancement_tree_id"),
         Map.entry("server-resync-chat", "chat_id"),
+        Map.entry("server-resync-component-builder", "component_builder_id"),
         Map.entry("server-resync-command", "command_id"),
         Map.entry("server-resync-custom-content", "custom_content_id"),
         Map.entry("server-resync-dialog", "dialog_id"),

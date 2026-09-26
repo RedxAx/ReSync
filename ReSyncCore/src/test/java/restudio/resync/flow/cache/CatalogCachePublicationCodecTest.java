@@ -1,9 +1,12 @@
 package restudio.resync.flow.cache;
 
 import org.junit.jupiter.api.Test;
+import restudio.resync.contract.cache.CatalogProjectionVersion;
 import restudio.resync.contract.canonical.JsonValue;
 import restudio.resync.contract.identity.IdentityCodec;
+import restudio.resync.flow.catalog.CatalogVersion;
 import restudio.resync.flow.identity.CapabilityId;
+import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.NodeId;
@@ -52,6 +55,30 @@ class CatalogCachePublicationCodecTest {
 
         assertEquals(publication, validated.publication());
         assertArrayEquals(expected, validated.canonicalBytes());
+        assertThrows(IllegalArgumentException.class, () -> codec.decodeValidatedPublication(input));
+    }
+
+    @Test
+    void validatedPublicationRetainsExactAuthoringSubtreeBytes() {
+        CatalogCachePublicationCodec codec = new CatalogCachePublicationCodec();
+        ContentHash checksum = new ContentHash("0".repeat(64));
+        CatalogBinding binding = new CatalogBinding(1, checksum, new ContentHash("1".repeat(64)));
+        CatalogCacheKey key = new CatalogCacheKey(SERVER, 1, checksum, CatalogProjectionVersion.current(),
+            binding.bindingManifestHash());
+        CatalogAuthoringPublication authoring = new CatalogAuthoringPublication(binding, new CatalogVersion(1, 0),
+            CatalogProjectionVersion.current(), List.of());
+        CatalogCachePublication publication = new CatalogCachePublication(CatalogCachePublication.Kind.FULL, key,
+            binding, 1, List.of(), authoring, Map.of());
+        byte[] input = codec.encodeBytes(publication);
+        byte[] expected = new CatalogAuthoringPublicationCodec().encodeBytes(authoring);
+
+        CatalogCachePublicationCodec.ValidatedPublication validated = codec.decodeValidatedPublication(input);
+        byte[] exposed = validated.authoringCanonicalBytes();
+        exposed[0] = '[';
+        input[0] = '[';
+
+        assertEquals(publication, validated.publication());
+        assertArrayEquals(expected, validated.authoringCanonicalBytes());
         assertThrows(IllegalArgumentException.class, () -> codec.decodeValidatedPublication(input));
     }
 

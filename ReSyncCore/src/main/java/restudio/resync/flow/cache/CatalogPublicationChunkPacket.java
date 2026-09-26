@@ -136,6 +136,14 @@ public final class CatalogPublicationChunkPacket {
         private int nextChunkIndex;
 
         public synchronized Optional<byte[]> accept(long scope, Chunk chunk) {
+            return accept(scope, chunk, true);
+        }
+
+        public synchronized Optional<byte[]> acceptUnverified(long scope, Chunk chunk) {
+            return accept(scope, chunk, false);
+        }
+
+        private Optional<byte[]> accept(long scope, Chunk chunk, boolean verifyDigest) {
             try {
                 Objects.requireNonNull(chunk, "Catalog publication chunk is required");
                 if (this.scope == null || this.scope.longValue() != scope) {
@@ -183,7 +191,7 @@ public final class CatalogPublicationChunkPacket {
                     System.arraycopy(current, 0, completed, offset, current.length);
                     offset += current.length;
                 }
-                if (!CanonicalDigests.equal(digest, sha256(completed))) {
+                if (verifyDigest && !CanonicalDigests.equal(digest, sha256(completed))) {
                     throw new IllegalArgumentException("Catalog publication digest does not match");
                 }
                 clear();

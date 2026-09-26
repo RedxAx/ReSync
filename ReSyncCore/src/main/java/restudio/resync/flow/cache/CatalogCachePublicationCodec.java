@@ -181,16 +181,26 @@ public final class CatalogCachePublicationCodec implements CanonicalCodec<Catalo
 
     public ValidatedPublication decodeValidatedPublication(byte[] input) {
         byte[] stableInput = Objects.requireNonNull(input, "Canonical publication bytes are required").clone();
-        return new ValidatedPublication(decodeBytes(stableInput), stableInput);
+        CanonicalCodec.ValidatedJson validated = CanonicalCodec.decodeValidated(stableInput, CanonicalLimits.catalog());
+        CatalogCachePublication publication = decode(validated);
+        JsonValue authoring = ((JsonValue.JsonObject) validated.value()).value("authoringPublication");
+        return new ValidatedPublication(publication, stableInput,
+            authoring == null ? null : validated.canonicalBytes(authoring));
     }
 
     public static final class ValidatedPublication {
         private final CatalogCachePublication publication;
         private final byte[] canonicalBytes;
+        private final byte[] authoringCanonicalBytes;
 
-        private ValidatedPublication(CatalogCachePublication publication, byte[] canonicalBytes) {
+        private ValidatedPublication(CatalogCachePublication publication, byte[] canonicalBytes,
+                                     byte[] authoringCanonicalBytes) {
             this.publication = Objects.requireNonNull(publication, "Catalog publication is required");
             this.canonicalBytes = Objects.requireNonNull(canonicalBytes, "Canonical publication bytes are required").clone();
+            if ((publication.authoringPublication() == null) != (authoringCanonicalBytes == null)) {
+                throw new IllegalArgumentException("Canonical authoring bytes do not match the publication");
+            }
+            this.authoringCanonicalBytes = authoringCanonicalBytes == null ? null : authoringCanonicalBytes.clone();
         }
 
         public CatalogCachePublication publication() {
@@ -199,6 +209,10 @@ public final class CatalogCachePublicationCodec implements CanonicalCodec<Catalo
 
         public byte[] canonicalBytes() {
             return canonicalBytes.clone();
+        }
+
+        public byte[] authoringCanonicalBytes() {
+            return authoringCanonicalBytes == null ? null : authoringCanonicalBytes.clone();
         }
     }
 

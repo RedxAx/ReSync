@@ -85,6 +85,28 @@ class CatalogPublicationChunkPacketTest {
     }
 
     @Test
+    void browserAssemblyDefersDigestVerificationWithoutWeakeningTheDefaultPath() {
+        byte[] publication = new byte[4097];
+        Arrays.fill(publication, (byte) 7);
+        List<CatalogPublicationChunkPacket.Chunk> chunks = CatalogPublicationChunkPacket.split(publication, 1000);
+        CatalogPublicationChunkPacket.Chunk last = chunks.getLast();
+        byte[] changed = last.payload();
+        changed[0] = 8;
+        CatalogPublicationChunkPacket.Chunk tampered = new CatalogPublicationChunkPacket.Chunk(last.totalLength(),
+            last.chunkIndex(), last.chunkCount(), last.digest(), changed);
+        CatalogPublicationChunkPacket.Reassembler strict = new CatalogPublicationChunkPacket.Reassembler();
+        CatalogPublicationChunkPacket.Reassembler deferred = new CatalogPublicationChunkPacket.Reassembler();
+        for (int index = 0; index < chunks.size() - 1; index++) {
+            assertEquals(Optional.empty(), strict.accept(1, chunks.get(index)));
+            assertEquals(Optional.empty(), deferred.acceptUnverified(1, chunks.get(index)));
+        }
+        assertThrows(IllegalArgumentException.class, () -> strict.accept(1, tampered));
+        byte[] assembled = deferred.acceptUnverified(1, tampered).orElseThrow();
+        assertFalse(Arrays.equals(last.digest(), CatalogPublicationChunkPacket.sha256(assembled)));
+        assertFalse(deferred.hasActiveTransfer());
+    }
+
+    @Test
     void rejectsNonZeroStartAndOutOfOrderChunk() {
         byte[] publication = new byte[CatalogPublicationChunkPacket.MAX_CHUNK_BYTES * 2 + 1];
         List<CatalogPublicationChunkPacket.Chunk> chunks = CatalogPublicationChunkPacket.split(publication);

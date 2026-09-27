@@ -110,6 +110,11 @@ gradle-app.setting
 .gradletasknamecache
 
 **/build/
+/bin/
+/ReSyncCore/bin/
+/ReSyncUpgrade/build-deploy-*/
+/ReSyncUpgradeSqlite/build-deploy-*/
+/flow-variables.json
 
 # Common working directory
 run/

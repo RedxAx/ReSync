@@ -11,9 +11,13 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
+import java.lang.reflect.Array;
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -33,7 +37,10 @@ public class ConversionHandler implements NodeHandler {
 
         operations.put("to_string", (ctx, node) -> {
             Object value = ctx.getInputValue(node, "value", Object.class, null);
-            String string = value != null ? value.toString() : "";
+            String string = value instanceof BigDecimal decimal ? decimal.toPlainString()
+                : value instanceof Double number && Double.isFinite(number) ? new BigDecimal(number.toString()).toPlainString()
+                : value instanceof Float number && Float.isFinite(number) ? new BigDecimal(number.toString()).toPlainString()
+                : value != null ? value.toString() : "";
             ctx.setOutput(node, "string", string);
         });
 
@@ -58,7 +65,7 @@ public class ConversionHandler implements NodeHandler {
             if (value instanceof Boolean) {
                 bool = (Boolean) value;
             } else if (value instanceof String) {
-                String str = ((String) value).toLowerCase();
+                String str = ((String) value).trim().toLowerCase(Locale.ROOT);
                 bool = str.equals("true") || str.equals("yes") || str.equals("1");
             } else if (value instanceof Number) {
                 bool = ((Number) value).doubleValue() != 0;
@@ -71,6 +78,8 @@ public class ConversionHandler implements NodeHandler {
             Player player = null;
             if (uuidOrName instanceof Player) {
                 player = (Player) uuidOrName;
+            } else if (uuidOrName instanceof UUID uuid) {
+                player = Bukkit.getPlayer(uuid);
             } else if (uuidOrName instanceof String) {
                 String str = (String) uuidOrName;
                 try {
@@ -105,7 +114,7 @@ public class ConversionHandler implements NodeHandler {
             Integer amount = ctx.getInputValue(node, "amount", Integer.class, 1);
             ItemStack item;
             try {
-                Material mat = Material.valueOf(material.toUpperCase());
+                Material mat = Material.valueOf(material.toUpperCase(Locale.ROOT));
                 item = new ItemStack(mat, amount);
             } catch (IllegalArgumentException e) {
                 item = new ItemStack(Material.STONE, amount);
@@ -116,13 +125,15 @@ public class ConversionHandler implements NodeHandler {
         operations.put("to_list", (ctx, node) -> {
             Object valueOrSeparator = ctx.getInputValue(node, "value_or_separator", Object.class, null);
             List<Object> list = new ArrayList<>();
-            if (valueOrSeparator instanceof List) {
-                list = (List<Object>) valueOrSeparator;
+            if (valueOrSeparator instanceof Collection<?> values) {
+                list.addAll(values);
             } else if (valueOrSeparator instanceof String) {
                 String str = (String) valueOrSeparator;
-                list = Arrays.asList((Object[]) str.split(","));
-            } else if (valueOrSeparator instanceof Object[]) {
-                list = Arrays.asList((Object[]) valueOrSeparator);
+                list.addAll(Arrays.asList(str.split(",")));
+            } else if (valueOrSeparator != null && valueOrSeparator.getClass().isArray()) {
+                for (int i = 0; i < Array.getLength(valueOrSeparator); i++) {
+                    list.add(Array.get(valueOrSeparator, i));
+                }
             } else if (valueOrSeparator != null) {
                 list.add(valueOrSeparator);
             }

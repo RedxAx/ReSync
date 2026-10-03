@@ -11,6 +11,9 @@ import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.FlowGraph;
+import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.protocol.ResourceActivationState;
+import restudio.resync.flow.runtime.RuntimeExecutionContext;
 import restudio.resync.Log;
 import restudio.resync.server.TemporaryLifecycleDiagnostics;
 import restudio.resync.flow.triggers.TriggerBinding;
@@ -33,6 +36,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class GlobalTriggers implements Listener {
     private final JavaPlugin plugin;
@@ -41,6 +45,7 @@ public class GlobalTriggers implements Listener {
     private final TriggerRegistry triggerRegistry;
     private final TriggerDispatcher triggerDispatcher;
     private final ReTextService text;
+    private final Consumer<Runnable> primaryRefresh;
     private SystemEventListener systemEventListener;
     private volatile boolean runtimeBindingsActive;
     private volatile Map<String, CommandTrigger> commandTriggers = Map.of();
@@ -61,8 +66,18 @@ public class GlobalTriggers implements Listener {
         private final String usage;
         private final Map<String, Object> metadata;
         private final FlowGraph graph;
+        private final CoreGraphStorageBoundary.Decoded source;
+
+        private CommandTrigger(TypedCommandGraphAdapter.CommandBinding binding, CoreGraphStorageBoundary.Decoded source) {
+            this(binding, null, Objects.requireNonNull(source, "Committed Command Source Is Required"));
+        }
 
         private CommandTrigger(TypedCommandGraphAdapter.CommandBinding binding, FlowGraph graph) {
+            this(binding, Objects.requireNonNull(graph, "Legacy Command Fixture Is Required"), null);
+        }
+
+        private CommandTrigger(TypedCommandGraphAdapter.CommandBinding binding, FlowGraph graph,
+                               CoreGraphStorageBoundary.Decoded source) {
             this.bindingId = binding.bindingId();
             this.flowId = binding.graphId();
             this.startNode = binding.nodeId();
@@ -77,7 +92,28 @@ public class GlobalTriggers implements Listener {
             this.description = binding.description();
             this.usage = binding.usage();
             this.metadata = binding.metadata();
-            this.graph = Objects.requireNonNull(graph, "Command Graph Snapshot Is Required");
+            this.graph = graph;
+            this.source = source;
+        }
+
+        private long revision() {
+            return source == null ? graph.getResourceRevision() : source.envelope().assetRevision();
+        }
+
+        private String checksum() {
+            return source == null ? graph.getResourceHash() : source.envelope().assetHash().canonicalText();
+        }
+
+        private boolean active() {
+            return source == null ? graph.isEnabled() : source.envelope().assetActivationState() == ResourceActivationState.ACTIVE;
+        }
+
+        private void prepare(CompiledTriggerExecution execution) {
+            if (source == null) {
+                execution.prepare(graph);
+            } else {
+                execution.prepareSource(source);
+            }
         }
 
         private boolean matchesLabel(String label) {
@@ -112,8 +148,8 @@ public class GlobalTriggers implements Listener {
 
         private boolean matches(CommandTrigger expected, Map<String, Command> knownCommands, String pluginPrefix) {
             if (!trigger.bindingId.equals(expected.bindingId)
-                || trigger.graph.getResourceRevision() != expected.graph.getResourceRevision()
-                || !Objects.equals(trigger.graph.getResourceHash(), expected.graph.getResourceHash())
+                || trigger.revision() != expected.revision()
+                || !Objects.equals(trigger.checksum(), expected.checksum())
                 || !trigger.command.equals(expected.command)
                 || !trigger.aliases.equals(expected.aliases)
                 || !trigger.subcommands.equals(expected.subcommands)
@@ -178,11 +214,20 @@ public class GlobalTriggers implements Listener {
 
     public GlobalTriggers(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry, ReTextService text,
                           boolean activateBindings) {
+        this(storage, executor, triggerRegistry, text, activateBindings, action -> {
+            if (Bukkit.isPrimaryThread()) action.run();
+            else executor.runOnMain(triggerRegistry.getPlugin(), action).join();
+        });
+    }
+
+    public GlobalTriggers(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry, ReTextService text,
+                          boolean activateBindings, Consumer<Runnable> primaryRefresh) {
         this.plugin = triggerRegistry.getPlugin();
         this.storage = storage;
         this.executor = executor;
         this.triggerRegistry = triggerRegistry;
         this.text = text;
+        this.primaryRefresh = Objects.requireNonNull(primaryRefresh, "Primary refresh is required");
         this.triggerDispatcher = new TriggerDispatcher(storage, executor, triggerRegistry.getPlugin());
         this.triggerDispatcher.registerFromContainer(new TriggerDefinitions());
         if (activateBindings) {
@@ -216,7 +261,7 @@ public class GlobalTriggers implements Listener {
     public void setCompiledExecution(CompiledTriggerExecution compiledExecution) {
         triggerDispatcher.setCompiledExecution(compiledExecution);
         if (compiledExecution != null) {
-            commandTriggers.values().stream().map(trigger -> trigger.graph).distinct().forEach(compiledExecution::prepare);
+            commandTriggers.values().stream().distinct().forEach(trigger -> trigger.prepare(compiledExecution));
             if (systemEventListener != null) {
                 systemEventListener.setCompiledExecution(compiledExecution);
             }
@@ -240,22 +285,59 @@ public class GlobalTriggers implements Listener {
     }
 
     public void registerTrigger(String eventType, String flowId) {
-        FlowGraph graph = storage.getGraph("flow", flowId);
-        if (graph == null || !graph.isEnabled()) {
+        if (!storage.hasCoreGraphAuthority()) {
+            FlowGraph graph = storage.getGraph("flow", flowId);
+            if (graph == null || !graph.isEnabled()) {
+                Log.warn("[ReSync] Failed to load flow for trigger: " + flowId);
+                return;
+            }
+            String start = findStartNodeForEvent(graph, eventType);
+            if (start == null && !eventType.contains("/")) {
+                start = findStartNode(graph);
+            }
+            if (start != null) {
+                triggerDispatcher.registerBinding(eventType.toLowerCase(Locale.ROOT), flowId, start);
+            }
+            return;
+        }
+        CompiledTriggerExecution execution = triggerDispatcher.getCompiledExecution();
+        CoreGraphStorageBoundary.Decoded source = execution == null ? storage.getCoreGraph("flow", flowId).orElse(null)
+            : execution.source("flow", flowId).orElse(null);
+        if (source == null || source.graphDocument() == null || source.envelope().assetActivationState() != ResourceActivationState.ACTIVE) {
             Log.warn("[ReSync] Failed to load flow for trigger: " + flowId);
             return;
         }
-
-        String startNode = findStartNodeForEvent(graph, eventType);
+        String startNode = findTypedStartNodeForEvent(source.graphDocument(), eventType);
         if (startNode == null && !eventType.contains("/")) {
-            startNode = findStartNode(graph);
+            startNode = executor.findStartNode(source.graphDocument());
         }
         if (startNode == null) {
             Log.warn("[ReSync] No event node found for trigger: " + eventType + " in flow: " + flowId);
             return;
         }
+        triggerDispatcher.registerBinding(eventType.toLowerCase(Locale.ROOT), flowId, startNode);
+    }
 
-        triggerDispatcher.registerBinding(eventType.toLowerCase(), flowId, startNode);
+    private String findTypedStartNodeForEvent(GraphDocument graph, String eventType) {
+        if (eventType != null && eventType.contains("/")) {
+            if (!triggerDispatcher.hasEventType(eventType)) {
+                return null;
+            }
+            return graph.nodes().stream().filter(node -> eventType.equals(node.definition().canonicalText())
+                || eventType.equals(executor.eventBindingContext(node.definition().canonicalText())))
+                .map(node -> node.instanceId().canonicalText()).findFirst().orElse(null);
+        }
+        String requested = normalizeEventKey(eventType);
+        String canonical = triggerDispatcher.resolveEventType(requested);
+        for (var node : graph.nodes()) {
+            String normalized = normalizeEventKey(node.definition().id().value());
+            if (normalized != null && (requested != null && requested.equals(normalized)
+                || canonical != null && (canonical.equals(normalized)
+                    || canonical.equals(triggerDispatcher.resolveEventType(normalized))))) {
+                return node.instanceId().canonicalText();
+            }
+        }
+        return null;
     }
 
     private String normalizeCommandLabel(String label) {
@@ -476,17 +558,16 @@ public class GlobalTriggers implements Listener {
         String failureCode = "TRIGGER.GRAPH_UNAVAILABLE";
         String failureReason = "graph-resolution-failed";
         try {
-            FlowGraph graph = trigger.graph;
-            if (graph == null || !graph.isEnabled()) {
+            if (!trigger.active()) {
                 TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, ingressIdentity, "rejected",
-                    "TRIGGER.GRAPH_UNAVAILABLE", graph == null ? "graph-unavailable" : "graph-disabled");
+                    "TRIGGER.GRAPH_UNAVAILABLE", "graph-disabled");
                 CompiledTriggerExecution.warnInvocation("command|" + trigger.flowId + "|TRIGGER.GRAPH_UNAVAILABLE",
                     "Command trigger invocation rejected correlationId=" + invocationId.canonicalText()
                         + " diagnosticCode=TRIGGER.GRAPH_UNAVAILABLE");
                 return false;
             }
             Map<String, Object> bindingIdentity = TemporaryLifecycleDiagnostics.with(ingressIdentity,
-                "revision", graph.getResourceRevision(), "graphHash", graph.getResourceHash(), "outcome", "selected");
+                "revision", trigger.revision(), "graphHash", trigger.checksum(), "outcome", "selected");
             terminalIdentity = bindingIdentity;
             TemporaryLifecycleDiagnostics.event("trigger_binding_selected", started, bindingIdentity);
             failureCode = "TRIGGER.CONTEXT_REJECTED";
@@ -506,7 +587,10 @@ public class GlobalTriggers implements Listener {
             }
             failureCode = "TRIGGER.EXECUTOR_REJECTED";
             failureReason = "synchronous-rejection";
-            CompletableFuture<Void> future = execution.execute(graph, trigger.startNode, player, null, eventVars, null, invocationId);
+            CompletableFuture<Void> future = trigger.source == null
+                ? execution.execute(trigger.graph, trigger.startNode, player, null, eventVars, null, invocationId)
+                : execution.executeSource(trigger.source, trigger.startNode, player, null, eventVars, null, invocationId,
+                    RuntimeExecutionContext.NO_DEADLINE);
             execution.observe(future, invocationId, "command:" + trigger.flowId);
         } catch (RuntimeException failure) {
             TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, terminalIdentity, "failed",
@@ -691,26 +775,20 @@ public class GlobalTriggers implements Listener {
             return;
         }
         long started = TemporaryLifecycleDiagnostics.start();
-        if (!Bukkit.isPrimaryThread()) {
-            try {
-                Bukkit.getScheduler().callSyncMethod(plugin, () -> {
-                    refreshBindingsNow();
-                    return null;
-                }).get(10, TimeUnit.SECONDS);
-                TemporaryLifecycleDiagnostics.event("command_refresh_wait", started,
-                    TemporaryLifecycleDiagnostics.with(Map.of("operation", "refreshBindings", "outcome", "complete",
-                        "queueWaitMs", elapsedMillis(started))));
-            } catch (Exception exception) {
-                TemporaryLifecycleDiagnostics.terminal("command_refresh_wait", started, Map.of("operation", "refreshBindings"),
-                    "failed", "COMMAND_REFRESH.WAIT_FAILED", exception.getClass().getSimpleName());
-                throw new IllegalStateException("Could not refresh flow commands on the server thread", exception);
-            }
-            return;
+        boolean queued = !Bukkit.isPrimaryThread();
+        try {
+            primaryRefresh.accept(() -> {
+                if (runtimeBindingsActive) refreshBindingsNow();
+            });
+        } catch (RuntimeException exception) {
+            if (!runtimeBindingsActive) return;
+            TemporaryLifecycleDiagnostics.terminal("command_refresh_wait", started, Map.of("operation", "refreshBindings"),
+                "failed", "COMMAND_REFRESH.WAIT_FAILED", exception.getClass().getSimpleName());
+            throw new IllegalStateException("Could not refresh flow commands on the server thread", exception);
         }
-        refreshBindingsNow();
         TemporaryLifecycleDiagnostics.event("command_refresh_wait", started,
             TemporaryLifecycleDiagnostics.with(Map.of("operation", "refreshBindings", "outcome", "complete",
-                "queueWaitMs", 0L)));
+                "queueWaitMs", queued ? elapsedMillis(started) : 0L)));
     }
 
     private synchronized void refreshBindingsNow() {
@@ -722,22 +800,39 @@ public class GlobalTriggers implements Listener {
         commandSnapshot.rejections().forEach(rejection -> Log.warn("Rejected typed command graph " + rejection.graphId() + ": " + rejection.detail()));
         Map<String, CommandTrigger> nextCommands = new LinkedHashMap<>();
         for (TypedCommandGraphAdapter.CommandBinding binding : commandSnapshot.activeBindings()) {
-            FlowGraph graph = storage.getCommandGraph(binding.graphId());
-            if (graph == null) {
-                Log.warn("Rejected typed command graph " + binding.graphId() + ": command graph snapshot is unavailable");
-                continue;
-            }
             CompiledTriggerExecution execution = triggerDispatcher.getCompiledExecution();
+            CommandTrigger trigger;
+            if (storage.hasCoreGraphAuthority()) {
+                CoreGraphStorageBoundary.Decoded source = execution == null
+                    ? storage.getCoreGraph("command", binding.graphId()).orElse(null)
+                    : execution.source("command", binding.graphId()).orElse(null);
+                if (source == null) {
+                    Log.warn("Rejected typed command graph " + binding.graphId() + ": committed command source is unavailable");
+                    continue;
+                }
+                boolean enabled = source.envelope().assetActivationState() == ResourceActivationState.ACTIVE;
+                if (!binding.equals(TypedCommandGraphAdapter.read(source.graphDocument(), enabled))) {
+                    Log.warn("Rejected typed command graph " + binding.graphId() + ": command metadata changed during refresh");
+                    continue;
+                }
+                trigger = new CommandTrigger(binding, source);
+            } else {
+                FlowGraph graph = storage.getCommandGraph(binding.graphId());
+                if (graph == null) {
+                    Log.warn("Rejected typed command graph " + binding.graphId() + ": legacy command fixture is unavailable");
+                    continue;
+                }
+                trigger = new CommandTrigger(binding, graph);
+            }
             if (execution != null) {
                 try {
-                    execution.prepare(graph);
+                    trigger.prepare(execution);
                 } catch (RuntimeException exception) {
                     Log.warn("Rejected typed command graph " + binding.graphId() + ": " + exception.getMessage(), exception);
                     execution.retire("command", binding.graphId());
                     continue;
                 }
             }
-            CommandTrigger trigger = new CommandTrigger(binding, graph);
             for (String label : binding.labels()) {
                 nextCommands.put(label + "\u0000" + binding.bindingId(), trigger);
             }

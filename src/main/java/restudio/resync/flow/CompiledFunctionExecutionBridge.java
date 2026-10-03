@@ -32,7 +32,9 @@ import restudio.resync.flow.runtime.CompiledRuntimeContext;
 import restudio.resync.flow.runtime.RuntimeAuthority;
 import restudio.resync.flow.runtime.RuntimeExecutionContext;
 import restudio.resync.flow.runtime.RuntimePrincipal;
+import restudio.resync.flow.runtime.RuntimeCancellationToken;
 import restudio.resync.flow.function.FunctionCancellation;
+import restudio.resync.flow.type.TypedValue;
 
 import java.util.List;
 import java.util.HashMap;
@@ -44,12 +46,27 @@ import java.util.Optional;
 import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 public final class CompiledFunctionExecutionBridge {
+    private static final String SOURCE_CHECKSUM = "function.sourceChecksum";
     private final TypedFunctionCompiler compiler;
     private final CompiledFunctionRunner runner;
     private final TypedFunctionSourceProvider sourceProvider;
     private final TypedFunctionCapabilityProvider capabilityProvider;
+    private final TypedFunctionResolver resolver;
+    private final GraphFunctions graphFunctions;
+
+    public CompiledFunctionExecutionBridge(GraphFunctions graphFunctions) {
+        this.compiler = null;
+        this.runner = null;
+        this.sourceProvider = null;
+        this.capabilityProvider = null;
+        this.resolver = null;
+        this.graphFunctions = Objects.requireNonNull(graphFunctions, "Compiled Graph Function Capability Is Required");
+    }
 
     public CompiledFunctionExecutionBridge(
         TypedFunctionSourceProvider sourceProvider,
@@ -68,6 +85,9 @@ public final class CompiledFunctionExecutionBridge {
         this.runner = runner;
         this.sourceProvider = sourceProvider;
         this.capabilityProvider = capabilityProvider;
+        this.resolver = compiler == null || sourceProvider == null || capabilityProvider == null ? null
+            : new TypedFunctionResolver(compiler, sourceProvider, capabilityProvider);
+        this.graphFunctions = null;
     }
 
     public TypedFunctionResolver.Resolution resolve(CompiledFunctionExecutionRequest request) {
@@ -146,7 +166,7 @@ public final class CompiledFunctionExecutionBridge {
         }
         ContentHash fingerprint;
         try {
-            fingerprint = capabilitySet.fingerprint();
+            fingerprint = resolver == null ? capabilitySet.fingerprint() : resolver.capabilityFingerprint(capabilitySet);
         } catch (RuntimeException failure) {
             return TypedFunctionResolver.Resolution.rejected(diagnostic(request, "FUNCTION.FINGERPRINT_MISSING",
                 "binding-validation", "The typed Function capability fingerprint is unavailable.", Map.of(
@@ -170,17 +190,11 @@ public final class CompiledFunctionExecutionBridge {
             return TypedFunctionResolver.Resolution.rejected(diagnostic(request, "FUNCTION.RUNNER_MISSING",
                 "function-execution", "The typed Function runner is unavailable.", Map.of()));
         }
-        TypedFunctionResolver resolver;
         try {
-            resolver = new TypedFunctionResolver(compiler,
-                List.of(new TypedFunctionResolver.Registration(sourceDocument, capabilitySet)));
-        } catch (RuntimeException failure) {
-            return TypedFunctionResolver.Resolution.rejected(diagnostic(request, "FUNCTION.RESOLVER_FAILURE",
-                "function-resolution", "The typed Function resolver could not be prepared.", Map.of(
-                    "exceptionType", failure.getClass().getName())));
-        }
-        try {
-            return resolver.resolveResult(execution.function(), execution.revision());
+            Object checksum = execution.attributes().get(SOURCE_CHECKSUM);
+            ContentHash expectedSource = checksum == null ? null : ContentHash.of((String) checksum);
+            return resolver.resolveResult(sourceDocument, capabilitySet, expectedSource,
+                request.catalogBinding(), request.capabilityFingerprint());
         } catch (RuntimeException failure) {
             return TypedFunctionResolver.Resolution.rejected(diagnostic(request, "FUNCTION.RESOLVER_FAILURE",
                 "function-resolution", "The typed Function resolver failed.", Map.of(
@@ -200,8 +214,114 @@ public final class CompiledFunctionExecutionBridge {
                 ? Optional.of(function) : Optional.empty(), runner).execute(request.execution());
     }
 
+    public CompletionStage<FunctionResult> executeAsync(CompiledFunctionExecutionRequest request,
+                                                       RuntimeCancellationToken parentCancellation) {
+        if (graphFunctions != null) {
+            return graphFunctions.execute(request, parentCancellation);
+        }
+        try {
+            if (parentCancellation != null) {
+                parentCancellation.throwIfCancelled();
+            }
+            return CompletableFuture.completedFuture(execute(request));
+        } catch (RuntimeException | Error failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
     public boolean hasTypedFunctionProviders() {
-        return sourceProvider != null && capabilityProvider != null;
+        return graphFunctions != null || sourceProvider != null && capabilityProvider != null;
+    }
+
+    public CompiledFunctionExecutionRequest bindSource(CompiledFunctionExecutionRequest request, FunctionSourceDocument source) {
+        Objects.requireNonNull(request, "Function Request Is Required");
+        Objects.requireNonNull(source, "Authoritative Function Source Is Required");
+        if (!source.signature().equals(request.execution().signature()) || resolver == null && graphFunctions == null) {
+            throw new IllegalArgumentException("The Authoritative Function Signature Or Provider Does Not Match The Request");
+        }
+        FunctionExecutionRequest execution = request.execution().withAttribute(SOURCE_CHECKSUM,
+            (resolver == null ? source.checksum() : resolver.sourceChecksum(source)).canonicalText());
+        return new CompiledFunctionExecutionRequest(execution, request.catalogBinding(), request.capabilityFingerprint(),
+            request.authority(), request.principal(), request.runtimeContext(), request.sessionReference(), request.requestedDeadlineMillis(),
+            request.creatorPrincipal(), request.creatorSessionReference());
+    }
+
+    public CompiledFunctionExecutionRequest requestForSource(
+        FunctionSourceDocument expected,
+        Player player,
+        Event event,
+        Map<String, Object> inputs,
+        Map<String, Object> eventVariables,
+        ServerId serverId,
+        RuntimeAuthority authority,
+        RuntimePrincipal principal,
+        CorrelationId invocationId,
+        CompiledRuntimeContext runtimeContext,
+        long requestedDeadlineMillis,
+        String creatorPrincipal,
+        String creatorSessionReference
+    ) {
+        Objects.requireNonNull(expected, "Authoritative Function Source Is Required");
+        Objects.requireNonNull(serverId, "Function Server Identity Is Required");
+        FunctionSignature signature = expected.signature();
+        if (!serverId.equals(signature.function().serverId()) || signature.revision().value() < 1) {
+            throw new IllegalArgumentException("Function Source Must Have The Requested Server And A Positive Revision");
+        }
+        Optional<FunctionAdmission> admitted = graphFunctions == null ? Optional.empty()
+            : graphFunctions.resolve(signature.function(), signature.revision());
+        Optional<FunctionSourceDocument> resolved = graphFunctions == null
+            ? sourceProvider == null ? Optional.empty() : sourceProvider.resolve(signature.function(), signature.revision())
+            : admitted == null ? Optional.empty() : admitted.map(FunctionAdmission::source);
+        if (resolved == null || resolved.isEmpty()) {
+            throw new IllegalStateException("The typed Function source is unavailable");
+        }
+        FunctionSourceDocument source = resolved.get();
+        ContentHash checksum = graphFunctions != null ? admitted.orElseThrow().sourceChecksum()
+            : resolver == null ? source.checksum() : resolver.sourceChecksum(source);
+        ContentHash expectedChecksum = resolver == null ? expected.checksum() : resolver.sourceChecksum(expected);
+        if (!signature.equals(source.signature()) || !expected.graph().catalogBinding().equals(source.graph().catalogBinding())
+            || !expectedChecksum.equals(checksum)) {
+            throw new IllegalArgumentException("The Requested Function Source Signature, Checksum Or Catalog Binding Is Not Current");
+        }
+        Optional<TypedFunctionCapabilitySet> capabilities = graphFunctions == null && capabilityProvider != null
+            ? capabilityProvider.resolve(source) : Optional.empty();
+        if (graphFunctions == null && (capabilities == null || capabilities.isEmpty())) {
+            throw new IllegalStateException("The typed Function capability set is unavailable");
+        }
+        ContentHash fingerprint = graphFunctions != null ? admitted.orElseThrow().capabilityFingerprint()
+            : resolver == null ? capabilities.orElseThrow().fingerprint() : resolver.capabilityFingerprint(capabilities.orElseThrow());
+        return request(source, sourceInputs(signature, inputs).require(signature), checksum, fingerprint, player, event, eventVariables,
+            serverId, authority, principal, invocationId, runtimeContext, requestedDeadlineMillis, creatorPrincipal, creatorSessionReference);
+    }
+
+    private static FunctionInputMap sourceInputs(FunctionSignature signature, Map<String, Object> inputs) {
+        Map<FunctionParameterId, FunctionParameterContract> parameters = new LinkedHashMap<>();
+        Map<String, FunctionParameterId> names = new LinkedHashMap<>();
+        signature.inputs().forEach(parameter -> {
+            parameters.put(parameter.id(), parameter);
+            Object declaredName = parameter.unknown().get("name");
+            if (declaredName instanceof String name && !name.isBlank() && names.putIfAbsent(name, parameter.id()) != null) {
+                throw new IllegalArgumentException("Function Input Display Name Is Ambiguous: " + name);
+            }
+        });
+        Map<FunctionParameterId, TypedValue> values = new LinkedHashMap<>();
+        if (inputs != null) {
+            inputs.forEach((key, raw) -> {
+                if (key == null || key.isBlank()) {
+                    throw new IllegalArgumentException("Function Input Identity Is Required");
+                }
+                FunctionParameterId id = parameterId(key);
+                if (id == null) {
+                    id = names.get(key);
+                }
+                FunctionParameterContract parameter = parameters.get(id);
+                if (parameter == null || values.containsKey(id)) {
+                    throw new IllegalArgumentException("Function Input Is Undeclared Or Supplied More Than Once: " + key);
+                }
+                values.put(id, CompiledRuntimeValueCodec.encode(signature.function().serverId(), parameter.type(), raw));
+            });
+        }
+        return new FunctionInputMap(values);
     }
 
     public CompiledFunctionExecutionRequest requestForLegacyGraph(
@@ -261,13 +381,16 @@ public final class CompiledFunctionExecutionBridge {
         FunctionLocator locator = new FunctionLocator(serverId,
             ContractRef.of(new OwnerId("restudio.resync"), ResourceTypeId.of("function")), graph.getId());
         FunctionRevision revision = FunctionRevision.of(graph.getResourceRevision());
-        Optional<FunctionSourceDocument> source = sourceProvider == null ? Optional.empty() : sourceProvider.resolve(locator, revision);
+        Optional<FunctionAdmission> graphAdmission = graphFunctions == null ? Optional.empty() : graphFunctions.resolve(locator, revision);
+        Optional<FunctionSourceDocument> source = graphFunctions == null
+            ? sourceProvider == null ? Optional.empty() : sourceProvider.resolve(locator, revision)
+            : graphAdmission.map(FunctionAdmission::source);
         if (source == null || source.isEmpty()) {
             throw new IllegalStateException("The typed Function source is unavailable");
         }
         Optional<TypedFunctionCapabilitySet> capabilities = capabilityProvider == null
             ? Optional.empty() : capabilityProvider.resolve(source.get());
-        if (capabilities == null || capabilities.isEmpty()) {
+        if (graphFunctions == null && (capabilities == null || capabilities.isEmpty())) {
             throw new IllegalStateException("The typed Function capability set is unavailable");
         }
         FunctionSourceDocument sourceDocument = source.get();
@@ -279,16 +402,30 @@ public final class CompiledFunctionExecutionBridge {
         requireExactParameterIds(graphInputs, signature.inputs(), "input");
         requireExactParameterIds(graphOutputs, signature.outputs(), "output");
         Map<FunctionParameterId, Object> supplied = boundaryInputs(graphInputs, inputs);
-        Map<FunctionParameterId, restudio.resync.flow.type.TypedValue> values = new LinkedHashMap<>();
+        Map<FunctionParameterId, TypedValue> values = new LinkedHashMap<>();
         for (FunctionParameterContract parameter : signature.inputs()) {
             if (!supplied.containsKey(parameter.id())) {
                 continue;
             }
             Object raw = supplied.get(parameter.id());
-            values.put(parameter.id(), raw instanceof restudio.resync.flow.type.TypedValue typed
-                ? typed : restudio.resync.flow.type.TypedValue.value(parameter.type(), raw));
+            values.put(parameter.id(), raw instanceof TypedValue typed ? typed : raw == null
+                ? TypedValue.nullValue(parameter.type()) : TypedValue.value(parameter.type(), raw));
         }
+        ContentHash checksum = graphFunctions != null ? graphAdmission.orElseThrow().sourceChecksum()
+            : resolver == null ? sourceDocument.checksum() : resolver.sourceChecksum(sourceDocument);
+        ContentHash fingerprint = graphFunctions != null ? graphAdmission.orElseThrow().capabilityFingerprint()
+            : resolver == null ? capabilities.get().fingerprint() : resolver.capabilityFingerprint(capabilities.get());
+        return request(sourceDocument, new FunctionInputMap(values), checksum, fingerprint, player, event, eventVariables,
+            serverId, authority, principal, invocationId, runtimeContext, requestedDeadlineMillis, creatorPrincipal, creatorSessionReference);
+    }
+
+    private static CompiledFunctionExecutionRequest request(FunctionSourceDocument source, FunctionInputMap inputs,
+        ContentHash checksum, ContentHash fingerprint, Player player, Event event, Map<String, Object> eventVariables,
+        ServerId serverId, RuntimeAuthority authority, RuntimePrincipal principal, CorrelationId invocationId,
+        CompiledRuntimeContext runtimeContext, long requestedDeadlineMillis, String creatorPrincipal, String creatorSessionReference) {
+        Objects.requireNonNull(invocationId, "Function Invocation ID Is Required");
         Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put(SOURCE_CHECKSUM, checksum.canonicalText());
         if (eventVariables != null && !eventVariables.isEmpty()) {
             CompiledRuntimeContextAdapter.Result adapted = CompiledRuntimeContextAdapter.adapt(
                 serverId, player, event, eventVariables);
@@ -304,13 +441,37 @@ public final class CompiledFunctionExecutionBridge {
         FunctionCancellation cancellation = requestedDeadlineMillis == RuntimeExecutionContext.NO_DEADLINE
             ? FunctionCancellation.none()
             : new FunctionCancellation(FunctionCancellation.State.NONE, null, requestedDeadlineMillis);
-        FunctionExecutionRequest execution = new FunctionExecutionRequest(sourceDocument.signature(), invocationId.value(),
-            new FunctionInputMap(values), cancellation, attributes);
+        FunctionExecutionRequest execution = new FunctionExecutionRequest(source.signature(), invocationId.value(),
+            inputs, cancellation, attributes);
         String sessionReference = eventVariables != null && eventVariables.get("runtime.sessionId") instanceof String value
             ? value : null;
-        return new CompiledFunctionExecutionRequest(execution, sourceDocument.graph().catalogBinding(), capabilities.get().fingerprint(),
+        return new CompiledFunctionExecutionRequest(execution, source.graph().catalogBinding(), fingerprint,
             authority, principal, runtimeContext, sessionReference, requestedDeadlineMillis, creatorPrincipal,
             creatorSessionReference);
+    }
+
+    public Map<String, Object> outputsForSource(FunctionSourceDocument source, FunctionResult result) {
+        Objects.requireNonNull(source, "Function Source Is Required");
+        Objects.requireNonNull(result, "Function Result Is Required");
+        FunctionSignature signature = source.signature();
+        if (!signature.equals(result.signature())) {
+            throw new IllegalArgumentException("Function Result Signature Does Not Match The Admitted Source");
+        }
+        result.outputs().require(signature);
+        Map<FunctionParameterId, FunctionParameterContract> parameters = new LinkedHashMap<>();
+        signature.outputs().forEach(parameter -> parameters.put(parameter.id(), parameter));
+        Map<String, Object> outputs = new LinkedHashMap<>();
+        Set<String> names = new HashSet<>();
+        result.outputs().values().forEach((id, value) -> {
+            FunctionParameterContract parameter = parameters.get(id);
+            String key = parameter.unknown().get("name") instanceof String name && !name.isBlank()
+                ? name : id.canonicalText();
+            if (!names.add(key)) {
+                throw new IllegalArgumentException("Function Output Display Name Is Ambiguous: " + key);
+            }
+            outputs.put(key, value.state() == TypedValue.State.LOCATOR ? value.locator() : value.value());
+        });
+        return Collections.unmodifiableMap(outputs);
     }
 
     public Map<String, Object> outputsForLegacyGraph(FlowGraph graph, FunctionResult result) {
@@ -331,9 +492,23 @@ public final class CompiledFunctionExecutionBridge {
             if (!names.add(key)) {
                 throw new IllegalArgumentException("Function output display name is ambiguous: " + key);
             }
-            outputs.put(key, value.value());
+            outputs.put(key, value.state() == TypedValue.State.LOCATOR ? value.locator() : value.value());
         });
-        return Map.copyOf(outputs);
+        return Collections.unmodifiableMap(outputs);
+    }
+
+    public interface GraphFunctions {
+        Optional<FunctionAdmission> resolve(FunctionLocator function, FunctionRevision revision);
+
+        CompletionStage<FunctionResult> execute(CompiledFunctionExecutionRequest request, RuntimeCancellationToken parentCancellation);
+    }
+
+    public record FunctionAdmission(FunctionSourceDocument source, ContentHash sourceChecksum, ContentHash capabilityFingerprint) {
+        public FunctionAdmission {
+            Objects.requireNonNull(source, "Admitted Function Source Is Required");
+            Objects.requireNonNull(sourceChecksum, "Admitted Function Checksum Is Required");
+            Objects.requireNonNull(capabilityFingerprint, "Admitted Function Capability Fingerprint Is Required");
+        }
     }
 
     private static Map<FunctionParameterId, FlowGraph.FunctionParameter> parameterMap(
@@ -408,7 +583,7 @@ public final class CompiledFunctionExecutionBridge {
             }
             result.put(id, value);
         });
-        return Map.copyOf(result);
+        return Collections.unmodifiableMap(new LinkedHashMap<>(result));
     }
 
     private static FunctionParameterId parameterId(String value) {

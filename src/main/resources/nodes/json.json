@@ -30,7 +30,7 @@
     },
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts parsing when execution reaches this node."},
-      {"id": "json_string", "displayName": "JSON String", "name": "json_string", "pinType": "DATA", "dataType": "string", "defaultValue": "{}", "constraints": {"max": 65536}, "description": "Canonical JSON text to parse. Missing or null input uses {}. Text may contain at most 65536 characters; malformed JSON, duplicate keys, non-finite numbers, or nesting deeper than 64 fail."}
+      {"id": "json_string", "displayName": "JSON String", "name": "json_string", "pinType": "DATA", "dataType": "string", "defaultValue": "{}", "constraints": {"max": 65536}, "description": "Canonical JSON text to parse. Missing or null input uses {}. Text may contain at most 65536 characters. Malformed JSON, duplicate keys, non-finite numbers, or nesting deeper than 64 fail."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the JSON value is parsed successfully."},
@@ -40,7 +40,7 @@
   {
     "id": "json_to_string",
     "displayName": "JSON To String",
-    "description": "Serialize a CanonicalJson-supported value to canonical JSON text. Character, UUID, Set, Iterable, and array shapes are coerced to JSON; cycles, non-finite numbers, values outside the canonical JSON contract, or output beyond 65536 characters fail before return.",
+    "description": "Serialize a CanonicalJson-supported value to canonical JSON text. Character, UUID, Set, Iterable, and array shapes are coerced to JSON. Cycles, non-finite numbers, values outside the canonical JSON contract, or output beyond 65536 characters fail before return.",
     "domain": "core",
     "family": "json",
     "lifecycle": "active",
@@ -68,7 +68,7 @@
     },
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts JSON serialization when execution reaches this node."},
-      {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "any", "description": "Value to serialize through CanonicalJson. Character, UUID, Set, Iterable, and array shapes are accepted; cycles, non-finite numbers, values outside the canonical JSON contract, and text over 65536 characters fail."}
+      {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "any", "description": "Value to serialize through CanonicalJson. Character, UUID, Set, Iterable, and array shapes are accepted. Cycles, non-finite numbers, values outside the canonical JSON contract, and text over 65536 characters fail."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after canonical JSON text is produced."},
@@ -78,7 +78,7 @@
   {
     "id": "json_get",
     "displayName": "Get JSON Value",
-    "description": "Read a value from a JSON object using a simple dotted, object-only path. Missing keys return null; blank paths, non-object roots, traversal through non-objects, and unsupported path values fail before output.",
+    "description": "Read a value from a JSON object using a simple dotted, object-only path. Missing keys return null. Inputs with blank paths, non-object roots, traversal through non-objects, and unsupported path values fail before output.",
     "domain": "core",
     "family": "json",
     "lifecycle": "active",
@@ -108,7 +108,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the JSON lookup when execution reaches this node."},
       {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "map<any,any>", "description": "JSON object to inspect. A non-object root fails before output, and arrays or scalar values cannot be traversed as objects."},
-      {"id": "path", "displayName": "Path", "name": "path", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Simple dotted object-only path such as player.score. Blank paths and traversal through a non-object fail before output; a missing key returns null."}
+      {"id": "path", "displayName": "Path", "name": "path", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Simple dotted object-only path such as player.score. Blank paths and traversal through a non-object fail before output. A missing key returns null."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the lookup completes, including when the value is missing."},
@@ -118,7 +118,7 @@
   {
     "id": "json_has",
     "displayName": "JSON Has Key",
-    "description": "Check whether a JSON object contains a value at a simple dotted, object-only path. Missing keys return false; blank paths, non-object roots, traversal through non-objects, and unsupported path values fail before output.",
+    "description": "Check whether a JSON object contains a value at a simple dotted, object-only path. Missing keys return false. Inputs with blank paths, non-object roots, traversal through non-objects, and unsupported path values fail before output.",
     "domain": "core",
     "family": "json",
     "lifecycle": "active",
@@ -148,7 +148,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the JSON key check when execution reaches this node."},
       {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "map<any,any>", "description": "JSON object to inspect. A non-object root fails before output, and arrays or scalar values cannot be traversed as objects."},
-      {"id": "path", "displayName": "Path", "name": "path", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Simple dotted object-only path such as player.score. Blank paths and traversal through a non-object fail before output; a missing key returns false."}
+      {"id": "path", "displayName": "Path", "name": "path", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Simple dotted object-only path such as player.score. Blank paths and traversal through a non-object fail before output. A missing key returns false."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the key check completes."},
@@ -158,7 +158,7 @@
   {
     "id": "json_keys",
     "displayName": "Get JSON Keys",
-    "description": "Return the keys of a JSON object in canonical code-point-sorted order. The result is a fresh list; missing, null, array, and scalar inputs return an empty list.",
+    "description": "Return the keys of a JSON object in canonical code-point-sorted order. The result is a fresh list. Missing, null, array, and scalar inputs return an empty list.",
     "domain": "core",
     "family": "json",
     "lifecycle": "active",
@@ -196,7 +196,7 @@
   {
     "id": "json_merge",
     "displayName": "Merge JSON",
-    "description": "Merge two JSON objects by top-level keys into a fresh map with recursively detached canonical copies. Values from the second object replace duplicate keys; nested objects and lists are detached recursively, and non-object inputs are ignored.",
+    "description": "Merge two JSON objects by top-level keys into a fresh map with recursively detached canonical copies. Values from the second object replace duplicate keys. Nested objects and lists are detached recursively, and non-object inputs are ignored.",
     "domain": "core",
     "family": "json",
     "lifecycle": "active",
@@ -226,7 +226,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the JSON merge when execution reaches this node."},
       {"id": "object1", "displayName": "Object 1", "name": "object1", "pinType": "DATA", "dataType": "map<any,any>", "description": "First JSON object to copy recursively into the fresh detached result. Non-object input is ignored."},
-      {"id": "object2", "displayName": "Object 2", "name": "object2", "pinType": "DATA", "dataType": "map<any,any>", "description": "Second JSON object to copy recursively after Object 1. Its values replace duplicate keys; non-object input is ignored."}
+      {"id": "object2", "displayName": "Object 2", "name": "object2", "pinType": "DATA", "dataType": "map<any,any>", "description": "Second JSON object to copy recursively after Object 1. Its values replace duplicate keys. Non-object input is ignored."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the shallow merge completes."},
@@ -272,7 +272,7 @@
   {
     "id": "json_set_array",
     "displayName": "Create JSON Array",
-    "description": "Create a fresh JSON array list from the supplied values. The list is recursively detached through the canonical JSON form; cycles, non-finite numbers, values outside the canonical JSON contract, or values that cannot be validated as JSON fail.",
+    "description": "Create a fresh JSON array list from the supplied values. The list is recursively detached through the canonical JSON form. Cycles, non-finite numbers, values outside the canonical JSON contract, or values that cannot be validated as JSON fail.",
     "domain": "core",
     "family": "json",
     "lifecycle": "active",

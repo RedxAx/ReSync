@@ -377,7 +377,7 @@ public final class RuntimeBindingRegistry {
         RuntimeLeaseInput immutableInput = new RuntimeLeaseInput.Default(requirements, planFingerprint, authority,
             input.principal(), input.catalogGeneration(), input.catalogHash(), input.mutationId(),
             input.invocationId() == null ? CorrelationId.random() : input.invocationId(),
-            input.requestedDeadlineMillis());
+            input.requestedDeadlineMillis()).withFunctionBindings(input.functionBindings()).withScope(input.scope());
         LeasePreparation preparation;
         synchronized (lifecycleMonitor) {
             requireExpectedSnapshotLocked(expectedSnapshot, requirements.getFirst().binding());

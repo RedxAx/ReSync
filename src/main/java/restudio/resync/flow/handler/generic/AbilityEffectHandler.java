@@ -9,6 +9,7 @@ import org.bukkit.World;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.BlockState;
 import org.bukkit.Material;
 import org.bukkit.entity.Animals;
 import org.bukkit.entity.AbstractArrow;
@@ -30,6 +31,8 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
@@ -58,6 +61,7 @@ import restudio.resync.flow.automation.TimerDefinition;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
+import restudio.resync.world.WorldExternalPersistenceCapability;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -68,10 +72,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class AbilityEffectHandler implements NodeHandler, Listener {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
@@ -80,6 +87,10 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     private final Map<UUID, ItemStack> disarmedItems = new ConcurrentHashMap<>();
     private final Map<String, CooldownEntry> cooldowns = new ConcurrentHashMap<>();
     private final AutomationTaskService automationTasks;
+    private final Supplier<WorldExternalPersistenceCapability> worldPersistence;
+    private final Map<BlockPosition, TemporaryBlock> temporaryBlocks = new HashMap<>();
+    private long temporaryGeneration;
+    private boolean temporaryBlocksStopped;
     private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
 
     public AbilityEffectHandler() {
@@ -87,9 +98,14 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     }
 
     public AbilityEffectHandler(AutomationTaskService automationTasks) {
+        this(automationTasks, AbilityEffectHandler::worldPersistence);
+    }
+
+    public AbilityEffectHandler(AutomationTaskService automationTasks, Supplier<WorldExternalPersistenceCapability> worldPersistence) {
         this.automationTasks = automationTasks;
+        this.worldPersistence = Objects.requireNonNull(worldPersistence, "World persistence supplier is required");
         ReSync plugin = ReSync.getInstance();
-        if (plugin != null) Bukkit.getPluginManager().registerEvents(this, plugin);
+        if (plugin != null && plugin.isEnabled()) Bukkit.getPluginManager().registerEvents(this, plugin);
         operations.put("strike_lightning", (ctx, node) -> {
             Location location = requireLocation(ctx, node);
             location.getWorld().strikeLightning(location);
@@ -498,20 +514,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             }
             ctx.triggerOutput("flow");
         });
-        operations.put("temporary_block", (ctx, node) -> {
-            Location location = requireLocation(ctx, node);
-            int duration = requireDuration(integer(ctx, node, "duration_ticks", 60));
-            String materialName = string(ctx, node, "material", "ICE");
-            Block block = location.getBlock();
-            Material previousType = block.getType();
-            Material material = parseMaterial(materialName, Material.ICE);
-            if (material == null) throw new IllegalArgumentException("Temporary block material cannot be a wildcard");
-            block.setType(material, false);
-            ctx.runLater(() -> {
-                if (block.getType() == material) block.setType(previousType, false);
-            }, duration);
-            ctx.triggerOutput("flow");
-        });
+        operations.put("temporary_block", this::temporaryBlock);
         operations.put("find_blocks", (ctx, node) -> {
             Location center = requireLocation(ctx, node);
             int radius = requireBlockRadius(integer(ctx, node, "radius", 5));
@@ -898,6 +901,10 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
 
     @Override
     public void shutdown() {
+        if (!temporaryBlocks.isEmpty()) requireTemporaryBlockThread();
+        temporaryBlocksStopped = true;
+        RuntimeException restorationFailure = restoreTemporaryBlocks(List.copyOf(temporaryBlocks.values()));
+        if (restorationFailure != null) throw restorationFailure;
         HandlerList.unregisterAll(this);
         for (UUID playerId : List.copyOf(disarmedItems.keySet())) {
             Player player = Bukkit.getPlayer(playerId);
@@ -916,6 +923,188 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             op.accept(ctx, node);
         } else {
             throw new IllegalArgumentException("Unknown ability effect operation: " + operation);
+        }
+    }
+
+    private static WorldExternalPersistenceCapability worldPersistence() {
+        ReSync plugin = ReSync.getInstance();
+        if (plugin == null || plugin.getReSyncServer() == null) throw new IllegalStateException("World persistence ownership is unavailable");
+        return plugin.getReSyncServer().getModuleContext().getRequiredService(WorldExternalPersistenceCapability.class);
+    }
+
+    private void temporaryBlock(FlowContext context, FlowNode node) {
+        requireTemporaryBlockThread();
+        if (temporaryBlocksStopped) throw new IllegalStateException("Temporary block handler is shut down");
+        Location location = requireLocation(context, node);
+        int duration = requireDuration(integer(context, node, "duration_ticks", 60));
+        Material material = parseMaterial(string(context, node, "material", "ICE"), Material.ICE);
+        if (material == null || !material.isBlock()) throw new IllegalArgumentException("Temporary block material must be a block");
+        WorldExternalPersistenceCapability capability = worldPersistence.get();
+        if (capability == null) throw new IllegalStateException("World persistence ownership is unavailable");
+        World world = location.getWorld();
+        if (Bukkit.getWorld(world.getUID()) != world) throw new IllegalStateException("Temporary block world is not loaded");
+        WorldExternalPersistenceCapability.MutationLease lease = capability.acquireNormalMutation("flow-temporary-block", world.getName());
+        TemporaryBlock placement = null;
+        try {
+            Block block = location.getBlock();
+            BlockPosition position = new BlockPosition(world.getUID(), block.getX(), block.getY(), block.getZ());
+            TemporaryBlock previous = temporaryBlocks.get(position);
+            BlockState before = block.getState(true);
+            BlockState original = previous != null && previous.matches(block) ? previous.original : before;
+            long generation = Math.incrementExact(temporaryGeneration);
+            CompletableFuture<Void> recovery = new CompletableFuture<>();
+            placement = new TemporaryBlock(position, generation, original, context, lease, recovery);
+            TemporaryBlock owned = placement;
+            try {
+                context.trackOperation(recovery);
+                temporaryBlocks.put(position, placement);
+                temporaryGeneration = generation;
+                block.setType(material, false);
+                owned.committedData = block.getBlockData().getAsString();
+                owned.timer = context.runLater(() -> {
+                    owned.timerRunning = true;
+                    try {
+                        restoreTemporaryBlock(owned);
+                    } finally {
+                        owned.timerRunning = false;
+                    }
+                }, duration);
+                owned.timer.whenComplete((ignored, failure) -> {
+                    if (failure != null) requestTemporaryBlockRestoration(owned);
+                });
+            } catch (Throwable failure) {
+                rollbackTemporaryBlock(owned, previous, before, failure);
+                throw failure;
+            }
+            if (previous != null) finishTemporaryBlock(previous, false);
+            context.triggerOutput("flow");
+        } catch (Throwable failure) {
+            if (placement == null) lease.close();
+            throw failure;
+        }
+    }
+
+    private void rollbackTemporaryBlock(TemporaryBlock placement, TemporaryBlock previous, BlockState before, Throwable failure) {
+        try {
+            if (!before.update(true, false)) throw new IllegalStateException("Temporary block placement rollback was rejected");
+            if (previous == null) temporaryBlocks.remove(placement.position, placement);
+            else temporaryBlocks.replace(placement.position, placement, previous);
+            placement.lease.close();
+            placement.recovery.completeExceptionally(failure);
+        } catch (Throwable rollbackFailure) {
+            if (failure != rollbackFailure) failure.addSuppressed(rollbackFailure);
+        }
+    }
+
+    private void requestTemporaryBlockRestoration(TemporaryBlock placement) {
+        if (placement.recovery.isDone()) return;
+        try {
+            if (Bukkit.isPrimaryThread()) {
+                restoreTemporaryBlock(placement);
+            } else {
+                placement.context.runSync(() -> restoreTemporaryBlock(placement)).whenComplete((ignored, failure) -> {
+                    if (failure != null) placement.failure = failure;
+                });
+            }
+        } catch (Throwable failure) {
+            placement.failure = failure;
+        }
+    }
+
+    private void restoreTemporaryBlock(TemporaryBlock placement) {
+        requireTemporaryBlockThread();
+        if (placement.recovery.isDone()) return;
+        TemporaryBlock current = temporaryBlocks.get(placement.position);
+        if (current == null || current.generation != placement.generation) {
+            finishTemporaryBlock(placement);
+            return;
+        }
+        World world = Bukkit.getWorld(placement.position.world());
+        if (world == null || world != placement.original.getWorld()) throw new IllegalStateException("Temporary block world ownership is unavailable");
+        Block block = world.getBlockAt(placement.position.x(), placement.position.y(), placement.position.z());
+        if (placement.matches(block) && !placement.original.update(true, false)) throw new IllegalStateException("Temporary block restoration was rejected");
+        temporaryBlocks.remove(placement.position, placement);
+        finishTemporaryBlock(placement);
+    }
+
+    private void finishTemporaryBlock(TemporaryBlock placement) {
+        finishTemporaryBlock(placement, !placement.timerRunning);
+    }
+
+    private void finishTemporaryBlock(TemporaryBlock placement, boolean cancelTimer) {
+        placement.lease.close();
+        placement.recovery.complete(null);
+        CompletableFuture<Void> timer = placement.timer;
+        if (cancelTimer && timer != null && !timer.isDone()) {
+            String taskId = placement.context.getAsyncOperations().entrySet().stream()
+                .filter(entry -> entry.getValue() == timer).map(Map.Entry::getKey).findFirst().orElse(null);
+            if (taskId == null || !placement.context.cancelScheduledTask(taskId)) timer.cancel(false);
+        }
+    }
+
+    private RuntimeException restoreTemporaryBlocks(Collection<TemporaryBlock> placements) {
+        RuntimeException failure = null;
+        for (TemporaryBlock placement : placements) {
+            try {
+                restoreTemporaryBlock(placement);
+            } catch (Throwable restoreFailure) {
+                if (placement.failure != null && placement.failure != restoreFailure) restoreFailure.addSuppressed(placement.failure);
+                if (failure == null) failure = new IllegalStateException("Temporary blocks could not be restored");
+                failure.addSuppressed(restoreFailure);
+            }
+        }
+        return failure;
+    }
+
+    @EventHandler
+    public void onChunkUnload(ChunkUnloadEvent event) {
+        RuntimeException failure = restoreTemporaryBlocks(temporaryBlocks.values().stream()
+            .filter(placement -> placement.position.world().equals(event.getWorld().getUID())
+                && (placement.position.x() >> 4) == event.getChunk().getX() && (placement.position.z() >> 4) == event.getChunk().getZ()).toList());
+        if (failure != null) throw failure;
+    }
+
+    @EventHandler
+    public void onWorldUnload(WorldUnloadEvent event) {
+        RuntimeException failure = restoreTemporaryBlocks(temporaryBlocks.values().stream()
+            .filter(placement -> placement.position.world().equals(event.getWorld().getUID())).toList());
+        if (failure != null) {
+            event.setCancelled(true);
+            throw failure;
+        }
+    }
+
+    private static void requireTemporaryBlockThread() {
+        if (!Bukkit.isPrimaryThread()) throw new IllegalStateException("Temporary blocks require the server thread");
+    }
+
+    private record BlockPosition(UUID world, int x, int y, int z) {
+    }
+
+    private static final class TemporaryBlock {
+        private final BlockPosition position;
+        private final long generation;
+        private final BlockState original;
+        private final FlowContext context;
+        private final WorldExternalPersistenceCapability.MutationLease lease;
+        private final CompletableFuture<Void> recovery;
+        private String committedData;
+        private CompletableFuture<Void> timer;
+        private boolean timerRunning;
+        private volatile Throwable failure;
+
+        private TemporaryBlock(BlockPosition position, long generation, BlockState original, FlowContext context,
+                               WorldExternalPersistenceCapability.MutationLease lease, CompletableFuture<Void> recovery) {
+            this.position = position;
+            this.generation = generation;
+            this.original = original;
+            this.context = context;
+            this.lease = lease;
+            this.recovery = recovery;
+        }
+
+        private boolean matches(Block block) {
+            return committedData != null && committedData.equals(block.getBlockData().getAsString());
         }
     }
 
@@ -1159,6 +1348,9 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         });
         inputs.put("location", center);
         FlowNode queryNode = new FlowNode("ability.entity_query", node.getX(), node.getY(), inputs);
+        if ("sphere".equals(shape)) {
+            return limitEntities(ctx, queryNode, sortEntities(ctx, queryNode, entitiesAround(ctx, queryNode, true)));
+        }
         return queryEntities(ctx, queryNode);
     }
 
@@ -1584,6 +1776,10 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     }
 
     private List<Entity> entitiesAround(FlowContext ctx, FlowNode node) {
+        return entitiesAround(ctx, node, false);
+    }
+
+    private List<Entity> entitiesAround(FlowContext ctx, FlowNode node, boolean spherical) {
         Location location = requireAreaCenter(ctx, node);
         double radius = number(ctx, node, "radius", 8.0);
         requireRadius(radius);
@@ -1591,7 +1787,8 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         boolean excludeCaster = bool(ctx, node, "exclude_caster", true);
         List<Entity> entities = new ArrayList<>();
         for (Entity entity : location.getWorld().getNearbyEntities(location, radius, radius, radius)) {
-            if (acceptsTarget(entity, targetFilter) && (!excludeCaster || entity != ctx.getPlayer())) {
+            if (acceptsTarget(entity, targetFilter) && (!excludeCaster || entity != ctx.getPlayer())
+                && (!spherical || entity.getLocation().distanceSquared(location) <= radius * radius)) {
                 entities.add(entity);
             }
         }

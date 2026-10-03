@@ -198,7 +198,7 @@
   {
     "id": "file_delete",
     "displayName": "Delete File",
-    "description": "Preview or delete a managed file inside the ReSync Flow-files area. Preview reports the target without changing it; an actual delete requires the trusted flow policy and reports a stable Result.",
+    "description": "Preview or delete a managed file inside the ReSync Flow-files area. Preview reports the target without changing it. An actual delete requires the trusted flow policy and reports a stable Result.",
     "domain": "core",
     "family": "file",
     "lifecycle": "active",
@@ -491,7 +491,7 @@
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the directory exists after the operation."},
       {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when path policy, storage availability, or creation fails."},
-      {"id": "created", "displayName": "Created", "name": "created", "direction": "output", "dataType": "boolean", "description": "True when a new directory was created; false when it already existed."},
+      {"id": "created", "displayName": "Created", "name": "created", "direction": "output", "dataType": "boolean", "description": "Returns true when a new directory is created. Returns false when it already exists."},
       {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<boolean>", "description": "Reports the directory operation and stable failure information."},
       {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True when the directory exists after the operation."},
       {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why creation failed, or an empty string after success."},

@@ -2,7 +2,7 @@
   {
     "id": "entity_mount",
     "displayName": "Entity Mount",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Teleports an entity to another entity and makes it a passenger. Self-mounting and rejected teleports or mounts fail the operation.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -37,7 +37,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_mount_entity",
@@ -45,7 +45,7 @@
         "name": "mount_entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Value provided to the entity operation."
+        "description": "Valid entity that will carry Entity as a passenger."
       }
     ],
     "outputs": [
@@ -89,7 +89,7 @@
   {
     "id": "entity_dismount",
     "displayName": "Entity Dismount",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Makes an entity leave its current vehicle. Fails if it is not mounted or the dismount is rejected.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -124,7 +124,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       }
     ],
     "outputs": [
@@ -163,7 +163,7 @@
   {
     "id": "entity_ai_disable",
     "displayName": "Entity AI Disable",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Disables a mob's normal AI, including autonomous movement and targeting. Requires a mob that supports AI.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -198,7 +198,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       }
     ],
     "outputs": [
@@ -237,7 +237,7 @@
   {
     "id": "entity_ai_enable",
     "displayName": "Entity AI Enable",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Restores a mob's normal AI. Requires a mob that supports AI.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -272,7 +272,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       }
     ],
     "outputs": [
@@ -311,7 +311,7 @@
   {
     "id": "entity_set_no_damage",
     "displayName": "Entity Set No Damage",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Sets whether an entity is invulnerable. No Damage true enables invulnerability. False restores normal damage handling.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -346,7 +346,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_no_damage",
@@ -354,7 +354,7 @@
         "name": "no_damage",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Value provided to the entity operation."
+        "description": "True enables invulnerability. False restores normal damage handling."
       }
     ],
     "outputs": [
@@ -398,7 +398,7 @@
   {
     "id": "entity_set_silent",
     "displayName": "Entity Set Silent",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Enables or disables the sounds an entity normally makes.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -433,7 +433,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_silent",
@@ -441,7 +441,7 @@
         "name": "silent",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Value provided to the entity operation."
+        "description": "True suppresses normal entity sounds. False allows them."
       }
     ],
     "outputs": [
@@ -485,7 +485,7 @@
   {
     "id": "entity_add_potion",
     "displayName": "Entity Add Potion",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Applies a named potion effect to a living entity for 1 through 72000 server ticks. Amplifier 0 is level I, 1 is level II, and so on.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -520,7 +520,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_effect_type",
@@ -528,7 +528,7 @@
         "name": "effect_type",
         "pinType": "DATA",
         "dataType": "potion_effect",
-        "description": "Value provided to the entity operation.",
+        "description": "Potion effect name from the server catalog, such as SPEED.",
         "optionsSource": "server:minecraft:potion_effect"
       },
       {
@@ -537,7 +537,7 @@
         "name": "duration",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Value provided to the entity operation.",
+        "description": "Effect duration from 1 through 72000 server ticks. Defaults to 200 ticks, about 10 seconds at 20 ticks per second.",
         "defaultValue": 200
       },
       {
@@ -546,7 +546,7 @@
         "name": "amplifier",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Value provided to the entity operation.",
+        "description": "Effect strength from 0 through 255. Zero means level I and is the default.",
         "defaultValue": 0
       }
     ],
@@ -601,7 +601,7 @@
   {
     "id": "entity_clear_potions",
     "displayName": "Entity Clear Potions",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Removes every active potion effect from a living entity.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -636,7 +636,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       }
     ],
     "outputs": [
@@ -675,7 +675,7 @@
   {
     "id": "entity_leash",
     "displayName": "Entity Leash",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Leashes a living entity to the selected holder. Fails if the entity cannot be leashed to that holder.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -710,7 +710,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_holder_entity",
@@ -718,7 +718,7 @@
         "name": "holder_entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Value provided to the entity operation."
+        "description": "Valid entity that will hold the leash."
       }
     ],
     "outputs": [
@@ -762,7 +762,7 @@
   {
     "id": "entity_unleash",
     "displayName": "Entity Unleash",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Removes the leash from a living entity. Fails when it is not leashed or the removal is rejected.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -797,7 +797,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       }
     ],
     "outputs": [
@@ -836,7 +836,7 @@
   {
     "id": "entity_set_custom_name",
     "displayName": "Entity Set Custom Name",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Sets a non-empty custom name on an entity and makes that name visible.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -871,7 +871,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_name",
@@ -879,7 +879,7 @@
         "name": "name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Value provided to the entity operation."
+        "description": "Non-empty custom name to display above the entity."
       }
     ],
     "outputs": [
@@ -923,7 +923,7 @@
   {
     "id": "entity_get_passengers",
     "displayName": "Entity Get Passengers",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Returns the entities currently riding this entity, without changing their mounts.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -950,7 +950,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       }
     ],
     "outputs": [
@@ -960,7 +960,7 @@
         "name": "passengers_list",
         "pinType": "DATA",
         "dataType": "list<entity>",
-        "description": "Value returned by the entity operation."
+        "description": "Entities currently riding the selected entity."
       }
     ],
     "migrationMapping": {
@@ -984,7 +984,7 @@
   {
     "id": "entity_get_vehicle",
     "displayName": "Entity Get Vehicle",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Returns the entity this entity is riding. Returns no value when it is not mounted.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1011,7 +1011,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       }
     ],
     "outputs": [
@@ -1021,7 +1021,7 @@
         "name": "vehicle",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Value returned by the entity operation."
+        "description": "Current mount, or no value when the entity has no vehicle."
       }
     ],
     "migrationMapping": {
@@ -1045,7 +1045,7 @@
   {
     "id": "entity_set_fire_ticks",
     "displayName": "Entity Set Fire Ticks",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Sets an entity's remaining burning time from 0 through 72000 server ticks. Zero extinguishes it.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1080,7 +1080,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_ticks",
@@ -1088,7 +1088,7 @@
         "name": "ticks",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Value provided to the entity operation."
+        "description": "Remaining burning time from 0 through 72000 server ticks. Zero extinguishes the entity."
       }
     ],
     "outputs": [
@@ -1132,7 +1132,7 @@
   {
     "id": "entity_set_frozen",
     "displayName": "Entity Set Frozen",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Sets an entity's freezing progress in server ticks, from zero through its maximum freeze threshold.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1167,7 +1167,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_ticks",
@@ -1175,7 +1175,7 @@
         "name": "ticks",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Value provided to the entity operation."
+        "description": "Freezing progress from 0 through the entity's maximum freeze threshold, in server ticks."
       }
     ],
     "outputs": [
@@ -1219,7 +1219,7 @@
   {
     "id": "entity_add_tag",
     "displayName": "Entity Add Tag",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Adds one non-empty scoreboard tag to an entity. Fails if the tag cannot be added, including when already present.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1254,7 +1254,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_tag",
@@ -1262,7 +1262,7 @@
         "name": "tag",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Value provided to the entity operation."
+        "description": "Exact, non-empty scoreboard tag text."
       }
     ],
     "outputs": [
@@ -1306,7 +1306,7 @@
   {
     "id": "entity_remove_tag",
     "displayName": "Entity Remove Tag",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Removes one scoreboard tag from an entity. Fails if the tag is absent or cannot be removed.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1341,7 +1341,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_tag",
@@ -1349,7 +1349,7 @@
         "name": "tag",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Value provided to the entity operation."
+        "description": "Exact, non-empty scoreboard tag text."
       }
     ],
     "outputs": [
@@ -1393,7 +1393,7 @@
   {
     "id": "entity_clear_tags",
     "displayName": "Entity Clear Tags",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Removes every scoreboard tag from an entity.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1428,7 +1428,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       }
     ],
     "outputs": [
@@ -1467,7 +1467,7 @@
   {
     "id": "entity_has_tag",
     "displayName": "Entity Has Tag",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Checks whether an entity has one exact scoreboard tag.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1494,7 +1494,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_tag",
@@ -1502,7 +1502,7 @@
         "name": "tag",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Value provided to the entity operation."
+        "description": "Exact, non-empty scoreboard tag text."
       }
     ],
     "outputs": [
@@ -1512,7 +1512,7 @@
         "name": "has_tag",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Value returned by the entity operation."
+        "description": "True if the exact tag is present."
       }
     ],
     "migrationMapping": {
@@ -1541,7 +1541,7 @@
   {
     "id": "entity_has_any_tag",
     "displayName": "Entity Has Any Tag",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Returns true when an entity has at least one tag from a non-empty list of scoreboard tags.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1568,7 +1568,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_tags",
@@ -1576,7 +1576,7 @@
         "name": "tags",
         "pinType": "DATA",
         "dataType": "list<string>",
-        "description": "Value provided to the entity operation."
+        "description": "Non-empty list of non-empty scoreboard tag strings to check."
       }
     ],
     "outputs": [
@@ -1586,7 +1586,7 @@
         "name": "has_any",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Value returned by the entity operation."
+        "description": "True if at least one requested tag is present."
       }
     ],
     "migrationMapping": {
@@ -1615,7 +1615,7 @@
   {
     "id": "entity_has_all_tags",
     "displayName": "Entity Has All Tags",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Returns true when an entity has every tag in a non-empty list of scoreboard tags.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1642,7 +1642,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       },
       {
         "id": "input_tags",
@@ -1650,7 +1650,7 @@
         "name": "tags",
         "pinType": "DATA",
         "dataType": "list<string>",
-        "description": "Value provided to the entity operation."
+        "description": "Non-empty list of non-empty scoreboard tag strings to check."
       }
     ],
     "outputs": [
@@ -1660,7 +1660,7 @@
         "name": "has_all",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Value returned by the entity operation."
+        "description": "True if every requested tag is present."
       }
     ],
     "migrationMapping": {
@@ -1689,7 +1689,7 @@
   {
     "id": "entity_get_tags",
     "displayName": "Entity Get Tags",
-    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "description": "Returns this entity's scoreboard tags as text values. Changing the returned list does not change the entity's tags.",
     "domain": "entity",
     "family": "entity",
     "lifecycle": "active",
@@ -1716,7 +1716,7 @@
         "name": "entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Entity to use for this operation."
+        "description": "Valid entity to inspect or change. Living-entity and mob actions require the corresponding entity kind."
       }
     ],
     "outputs": [
@@ -1726,7 +1726,7 @@
         "name": "tags",
         "pinType": "DATA",
         "dataType": "list<string>",
-        "description": "Value returned by the entity operation."
+        "description": "Copy of the entity's scoreboard tags."
       }
     ],
     "migrationMapping": {

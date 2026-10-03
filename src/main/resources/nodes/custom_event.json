@@ -2,7 +2,7 @@
   {
     "id": "custom.event.emit",
     "displayName": "Custom Event Emit",
-    "description": "Emit a named custom event with a map of payload values.",
+    "description": "Emits an Event ID and payload to its active listeners and stores that payload for Get Data. Matching listeners handle the event before Emit continues. Listener failures are reported after the other listeners have been notified.",
     "domain": "custom_event",
     "family": "custom",
     "lifecycle": "active",
@@ -31,7 +31,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Provides the flow used by this custom event operation.",
+        "description": "Starts this custom event operation when execution reaches the node.",
         "direction": "input"
       },
       {
@@ -40,7 +40,7 @@
         "name": "event_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the event id used by this custom event operation.",
+        "description": "Exact custom event ID used by Emit, Listen, Clear, and Get Data. IDs are case sensitive and must not be blank.",
         "direction": "input"
       },
       {
@@ -49,7 +49,7 @@
         "name": "data_payload",
         "pinType": "DATA",
         "dataType": "map<any,any>",
-        "description": "Provides the data payload used by this custom event operation.",
+        "description": "Event values as a map. Keys become text and null keys are skipped. Each matching listener receives the values, and Get Data returns the last emitted map.",
         "direction": "input"
       }
     ],
@@ -60,7 +60,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution after this custom event operation.",
+        "description": "Continues after matching listeners have handled the emitted payload. A listener failure fails this operation after the other listeners are notified.",
         "direction": "output"
       }
     ],
@@ -95,7 +95,7 @@
   {
     "id": "custom.event.listen",
     "displayName": "Custom Event Listen",
-    "description": "Listen for a named custom event for a bounded number of ticks.",
+    "description": "Waits for one named custom event. Positive Timeout Ticks limit the wait. Zero or negative values wait without a tick deadline. A match continues Flow once. Timeout, clear, or cancellation ends the wait without firing Flow.",
     "domain": "custom_event",
     "family": "custom",
     "lifecycle": "active",
@@ -124,7 +124,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Provides the flow used by this custom event operation.",
+        "description": "Starts this custom event operation when execution reaches the node.",
         "direction": "input"
       },
       {
@@ -133,7 +133,7 @@
         "name": "event_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the event id used by this custom event operation.",
+        "description": "Exact custom event ID used by Emit, Listen, Clear, and Get Data. IDs are case sensitive and must not be blank.",
         "direction": "input"
       },
       {
@@ -142,7 +142,7 @@
         "name": "timeout_ticks",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the timeout ticks used by this custom event operation.",
+        "description": "Maximum server ticks to wait for one event. Positive values set a deadline. Zero or negative values wait until an event arrives, listeners are cleared, or this flow is cancelled. Omitted values use 0.",
         "direction": "input"
       }
     ],
@@ -153,7 +153,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution after this custom event operation.",
+        "description": "Continues once when a matching event arrives. Registration, timeout, clear, and cancellation do not fire this output.",
         "direction": "output"
       },
       {
@@ -162,7 +162,7 @@
         "name": "listening",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the listening value produced by this event.",
+        "description": "True when event wait registration was accepted. Remains true after the wait ends. False when no event ID is supplied.",
         "direction": "output"
       }
     ],
@@ -202,7 +202,7 @@
   {
     "id": "event.custom_event_define",
     "displayName": "Custom Event Define",
-    "description": "Declare a named custom event for use by other flows.",
+    "description": "Keeps older flows that include an event definition step working. Continues immediately. Emit and Listen can use the Event ID directly.",
     "domain": "custom_event",
     "family": "custom",
     "lifecycle": "active",
@@ -231,7 +231,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Provides the flow used by this custom event operation.",
+        "description": "Starts this custom event operation when execution reaches the node.",
         "direction": "input"
       },
       {
@@ -240,7 +240,7 @@
         "name": "event_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the event id used by this custom event operation.",
+        "description": "Event ID used by related Emit and Listen nodes. This legacy setup step continues immediately.",
         "direction": "input"
       }
     ],
@@ -251,7 +251,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution after this custom event operation.",
+        "description": "Continues immediately after the legacy event setup step.",
         "direction": "output"
       }
     ],
@@ -281,7 +281,7 @@
   {
     "id": "event.custom_event_remove_listener",
     "displayName": "Custom Event Remove Listener",
-    "description": "Remove listeners registered for a named custom event.",
+    "description": "Stops every listener for this Event ID and removes its last payload. Prevents future callbacks. A callback already running finishes before its listening flow stops.",
     "domain": "custom_event",
     "family": "custom",
     "lifecycle": "active",
@@ -310,7 +310,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Provides the flow used by this custom event operation.",
+        "description": "Starts this custom event operation when execution reaches the node.",
         "direction": "input"
       },
       {
@@ -319,7 +319,7 @@
         "name": "event_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the event id used by this custom event operation.",
+        "description": "Exact custom event ID used by Emit, Listen, Clear, and Get Data. IDs are case sensitive and must not be blank.",
         "direction": "input"
       }
     ],
@@ -330,7 +330,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution after this custom event operation.",
+        "description": "Continues after listeners are removed and the last payload is cleared. Event callbacks already running finish separately.",
         "direction": "output"
       }
     ],
@@ -360,7 +360,7 @@
   {
     "id": "custom.event.clear",
     "displayName": "Clear Custom Event Listeners",
-    "description": "Clear all listeners registered for a named custom event.",
+    "description": "Stops every listener for this Event ID and removes its last payload. Prevents future callbacks. A callback already running finishes before its listening flow stops.",
     "domain": "custom_event",
     "family": "custom",
     "lifecycle": "active",
@@ -389,7 +389,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Provides the flow used by this custom event operation.",
+        "description": "Starts this custom event operation when execution reaches the node.",
         "direction": "input"
       },
       {
@@ -398,7 +398,7 @@
         "name": "event_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the event id used by this custom event operation.",
+        "description": "Exact custom event ID used by Emit, Listen, Clear, and Get Data. IDs are case sensitive and must not be blank.",
         "direction": "input"
       }
     ],
@@ -409,7 +409,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution after this custom event operation.",
+        "description": "Continues after listeners are removed and the last payload is cleared. Event callbacks already running finish separately.",
         "direction": "output"
       }
     ],
@@ -439,7 +439,7 @@
   {
     "id": "custom.event.get.data",
     "displayName": "Get Custom Event Data",
-    "description": "Read the last payload recorded for a named custom event.",
+    "description": "Reads the most recently emitted payload for this Event ID. Returns an empty map before the first emit or after listeners for the event are cleared.",
     "domain": "custom_event",
     "family": "custom",
     "lifecycle": "active",
@@ -468,7 +468,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Provides the flow used by this custom event operation.",
+        "description": "Starts this custom event operation when execution reaches the node.",
         "direction": "input"
       },
       {
@@ -477,7 +477,7 @@
         "name": "event_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the event id used by this custom event operation.",
+        "description": "Exact custom event ID used by Emit, Listen, Clear, and Get Data. IDs are case sensitive and must not be blank.",
         "direction": "input"
       }
     ],
@@ -488,7 +488,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution after this custom event operation.",
+        "description": "Continues after the last emitted payload has been read.",
         "direction": "output"
       },
       {
@@ -497,7 +497,7 @@
         "name": "data",
         "pinType": "DATA",
         "dataType": "map<any,any>",
-        "description": "Provides the data value produced by this event.",
+        "description": "Last payload emitted for this Event ID as a map. Empty before the first emit or after listeners are cleared.",
         "direction": "output"
       }
     ],

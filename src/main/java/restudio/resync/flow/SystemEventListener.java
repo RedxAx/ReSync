@@ -3,13 +3,15 @@ package restudio.resync.flow;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.server.*;
 import org.bukkit.event.world.*;
 import org.bukkit.plugin.Plugin;
 import restudio.flow.data.FlowGraph;
 import restudio.resync.flow.identity.CorrelationId;
+import restudio.resync.flow.graph.GraphNode;
+import restudio.resync.flow.protocol.ResourceActivationState;
+import restudio.resync.flow.runtime.RuntimeExecutionContext;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
@@ -40,8 +42,41 @@ public class SystemEventListener implements Listener {
     private final Map<String, String> chunkUnloadTriggers = new ConcurrentHashMap<>();
     private final Map<String, String> serverTickTriggers = new ConcurrentHashMap<>();
     private final Map<String, String> serverSaveTriggers = new ConcurrentHashMap<>();
-    private final Map<String, FlowGraph> graphSnapshots = new ConcurrentHashMap<>();
+    private final Map<String, GraphSnapshot> graphSnapshots = new ConcurrentHashMap<>();
     
+    private record GraphSnapshot(CoreGraphStorageBoundary.Decoded source, FlowGraph graph) {
+        private boolean enabled() {
+            return source != null ? source.envelope().assetActivationState() == ResourceActivationState.ACTIVE : graph.isEnabled();
+        }
+
+        private long revision() {
+            return source != null ? source.envelope().assetRevision() : graph.getResourceRevision();
+        }
+
+        private String hash() {
+            return source != null ? source.envelope().assetHash().canonicalText() : graph.getResourceHash();
+        }
+    }
+
+    private GraphSnapshot graphSnapshot(String flowId) {
+        if (storage.hasCoreGraphAuthority()) {
+            CompiledTriggerExecution execution = compiledExecution;
+            CoreGraphStorageBoundary.Decoded source = execution == null
+                ? storage.getCoreGraph("flow", flowId).orElse(null) : execution.source("flow", flowId).orElse(null);
+            return source == null ? null : new GraphSnapshot(source, null);
+        }
+        FlowGraph graph = storage.getGraph("flow", flowId);
+        return graph == null ? null : new GraphSnapshot(null, graph);
+    }
+
+    private void prepare(GraphSnapshot snapshot, CompiledTriggerExecution execution) {
+        if (snapshot.source() != null) {
+            execution.prepareSource(snapshot.source());
+        } else {
+            execution.prepare(snapshot.graph());
+        }
+    }
+
     public SystemEventListener(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry) {
         this.storage = storage;
         this.executor = executor;
@@ -54,9 +89,9 @@ public class SystemEventListener implements Listener {
             warnRegistration(flowId, eventType, "TRIGGER.GRAPH_UNAVAILABLE", "graph-id-unavailable");
             return;
         }
-        FlowGraph graph;
+        GraphSnapshot graph;
         try {
-            graph = storage.getGraph("flow", flowId);
+            graph = graphSnapshot(flowId);
         } catch (RuntimeException failure) {
             rejectFlow(flowId, eventType, failure);
             return;
@@ -79,7 +114,7 @@ public class SystemEventListener implements Listener {
         CompiledTriggerExecution execution = compiledExecution;
         if (execution != null) {
             try {
-                execution.prepare(graph);
+                prepare(graph, execution);
             } catch (RuntimeException failure) {
                 rejectFlow(flowId, eventType, failure);
                 return;
@@ -151,10 +186,12 @@ public class SystemEventListener implements Listener {
             return;
         }
         
-        for (TriggerBinding binding : triggerRegistry.getBindings(TriggerType.EVENT)) {
-            String context = binding.getContext();
-            if (isSystemEvent(context)) {
-                registerTrigger(context, binding.getFlowId());
+        for (TriggerType type : List.of(TriggerType.EVENT, TriggerType.SYSTEM)) {
+            for (TriggerBinding binding : triggerRegistry.getBindings(type)) {
+                String context = binding.getContext();
+                if (isSystemEvent(context)) {
+                    registerTrigger(context, binding.getFlowId());
+                }
             }
         }
     }
@@ -162,9 +199,9 @@ public class SystemEventListener implements Listener {
     public void setCompiledExecution(CompiledTriggerExecution compiledExecution) {
         this.compiledExecution = compiledExecution;
         if (compiledExecution != null) {
-            for (Map.Entry<String, FlowGraph> entry : Map.copyOf(graphSnapshots).entrySet()) {
+            for (Map.Entry<String, GraphSnapshot> entry : Map.copyOf(graphSnapshots).entrySet()) {
                 try {
-                    compiledExecution.prepare(entry.getValue());
+                    prepare(entry.getValue(), compiledExecution);
                 } catch (RuntimeException failure) {
                     rejectFlow(entry.getKey(), "system-event", failure);
                 }
@@ -228,15 +265,15 @@ public class SystemEventListener implements Listener {
         String failureCode = "TRIGGER.GRAPH_UNAVAILABLE";
         String failureReason = "graph-resolution-failed";
         try {
-            FlowGraph graph = suppliedGraph != null ? suppliedGraph : graphSnapshots.get(flowId);
-            if (graph == null || !graph.isEnabled()) {
+            GraphSnapshot snapshot = suppliedGraph != null ? new GraphSnapshot(null, suppliedGraph) : graphSnapshots.get(flowId);
+            if (snapshot == null || !snapshot.enabled()) {
                 TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, ingress, "rejected",
-                    "TRIGGER.GRAPH_UNAVAILABLE", graph == null ? "graph-unavailable" : "graph-disabled");
+                    "TRIGGER.GRAPH_UNAVAILABLE", snapshot == null ? "graph-unavailable" : "graph-disabled");
                 warn(flowId, invocationId, "TRIGGER.GRAPH_UNAVAILABLE", "rejected");
                 return failed("CORE_EXECUTION_UNAVAILABLE", "The system trigger graph is unavailable", startNodeId);
             }
-            Map<String, Object> binding = TemporaryLifecycleDiagnostics.with(ingress, "revision", graph.getResourceRevision(),
-                "graphHash", graph.getResourceHash(), "outcome", "selected");
+            Map<String, Object> binding = TemporaryLifecycleDiagnostics.with(ingress, "revision", snapshot.revision(),
+                "graphHash", snapshot.hash(), "outcome", "selected");
             terminalIdentity = binding;
             TemporaryLifecycleDiagnostics.event("trigger_binding_selected", started, binding);
             CompiledTriggerExecution execution = compiledExecution;
@@ -248,7 +285,14 @@ public class SystemEventListener implements Listener {
             }
             failureCode = "TRIGGER.EXECUTOR_REJECTED";
             failureReason = "synchronous-rejection";
-            CompletableFuture<Void> future = execution.execute(graph, startNodeId, null, event, eventVars, null, invocationId);
+            CompletableFuture<Void> future;
+            if (snapshot.source() != null) {
+                future = execution.executeSource(snapshot.source(), startNodeId, null, event, eventVars, null, invocationId,
+                    RuntimeExecutionContext.NO_DEADLINE);
+            } else {
+                FlowGraph graph = snapshot.graph();
+                future = execution.execute(graph, startNodeId, null, event, eventVars, null, invocationId);
+            }
             execution.observe(future, invocationId, "system-event:" + eventType + ":" + flowId);
             return future;
         } catch (RuntimeException failure) {
@@ -267,9 +311,9 @@ public class SystemEventListener implements Listener {
         if (flowId == null || flowId.isBlank()) {
             return;
         }
-        FlowGraph graph;
+        GraphSnapshot graph;
         try {
-            graph = storage.getGraph("flow", flowId);
+            graph = graphSnapshot(flowId);
         } catch (RuntimeException failure) {
             rejectFlow(flowId, "system-event", failure);
             return;
@@ -284,13 +328,33 @@ public class SystemEventListener implements Listener {
             CompiledTriggerExecution execution = compiledExecution;
             if (execution != null) {
                 try {
-                    execution.prepare(graph);
+                    prepare(graph, execution);
                 } catch (RuntimeException failure) {
                     rejectFlow(flowId, "system-event", failure);
                     return;
                 }
             }
-            graphSnapshots.put(flowId, graph);
+            boolean retained = false;
+            for (Map.Entry<String, Map<String, String>> entry : eventBindings().entrySet()) {
+                Map<String, String> bindings = entry.getValue();
+                if (bindings.containsKey(flowId)) {
+                    String start = findStartNodeForEvent(graph, entry.getKey());
+                    if (start == null) {
+                        start = findStartNode(graph);
+                    }
+                    if (start == null) {
+                        bindings.remove(flowId);
+                    } else {
+                        bindings.put(flowId, start);
+                        retained = true;
+                    }
+                }
+            }
+            if (retained) {
+                graphSnapshots.put(flowId, graph);
+            } else {
+                removeFlowBindings(flowId);
+            }
         } else if (triggerRegistry != null) {
             for (TriggerType type : List.of(TriggerType.EVENT, TriggerType.SYSTEM)) {
                 for (TriggerBinding binding : triggerRegistry.getBindings(type)) {
@@ -444,6 +508,38 @@ public class SystemEventListener implements Listener {
         }
     }
     
+    private Map<String, Map<String, String>> eventBindings() {
+        return Map.of("server_start", serverStartTriggers, "server_stop", serverStopTriggers,
+            "plugin_enable", pluginEnableTriggers, "plugin_disable", pluginDisableTriggers,
+            "world_load", worldLoadTriggers, "world_unload", worldUnloadTriggers,
+            "chunk_load", chunkLoadTriggers, "chunk_unload", chunkUnloadTriggers,
+            "server_tick", serverTickTriggers, "server_save", serverSaveTriggers);
+    }
+
+    private String findStartNodeForEvent(GraphSnapshot graph, String eventType) {
+        if (graph.source() == null) {
+            return findStartNodeForEvent(graph.graph(), eventType);
+        }
+        String expected = normalizeEventKey(eventType);
+        for (GraphNode node : graph.source().graphDocument().nodes()) {
+            String type = node.definition().canonicalText();
+            String context = executor == null ? null : executor.eventBindingContext(type);
+            if (expected.equals(normalizeEventKey(node.definition().id().value()))
+                || expected.equals(normalizeEventKey(context))) {
+                return node.instanceId().canonicalText();
+            }
+        }
+        return null;
+    }
+
+    private String findStartNode(GraphSnapshot graph) {
+        if (graph.source() == null) {
+            return findStartNode(graph.graph());
+        }
+        CompiledTriggerExecution execution = compiledExecution;
+        return execution == null ? executor.findStartNode(graph.source().graphDocument()) : execution.findStartNode(graph.source());
+    }
+
     private String findStartNodeForEvent(FlowGraph graph, String eventType) {
         String expected = normalizeEventKey(eventType);
         for (var entry : graph.getNodes().entrySet()) {

@@ -86,7 +86,7 @@ public final class RuntimeRegistrySnapshot {
     ) {
         List<RuntimeBindingDescriptor> descriptors = bindings.values().stream().map(RuntimeBinding::descriptor).toList();
         Map<RuntimeBindingKey, ContentHash> fingerprints = new LinkedHashMap<>();
-        descriptors.forEach(descriptor -> fingerprints.put(descriptor.key(), descriptor.executionFingerprint()));
+        bindings.values().forEach(binding -> fingerprints.put(binding.descriptor().key(), binding.executionFingerprint()));
         return RuntimeBindingManifest.create(providers.values(), descriptors, fingerprints, diagnostics);
     }
 

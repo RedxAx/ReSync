@@ -25,6 +25,15 @@ import restudio.resync.flow.handler.generic.MiscHandler;
 import restudio.resync.flow.handler.event.FlowEventRegistry;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.graph.FunctionBinding;
+import restudio.resync.flow.graph.FunctionParameter;
+import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.function.FunctionSignature;
+import restudio.resync.flow.function.FunctionLocator;
+import restudio.resync.flow.function.FunctionRevision;
+import restudio.resync.qa.QaExecutionAdapter;
+import restudio.resync.runtime.RuntimeFlowDispatcher;
+
 import restudio.resync.flow.graph.GraphConnection;
 import restudio.resync.flow.graph.GraphEndpoint;
 import restudio.resync.flow.graph.GraphNode;
@@ -93,6 +102,7 @@ class CompiledTriggerExecutionTest {
 
     @AfterEach
     void closePersistence() throws Exception {
+        MockBukkit.unmock();
         TemporaryLifecycleDiagnostics.close();
         for (ServerCompiledPlanRepository repository : planRepositories) {
             repository.close();
@@ -148,7 +158,11 @@ class CompiledTriggerExecutionTest {
 
     @Test
     void rejectedInvocationDiagnosticCarriesLiveCorrelationAndTypedAuthorityContext() throws Exception {
-        Fixture fixture = fixture((executor, invocation) -> CompletableFuture.completedFuture(RuntimeResult.success()));
+        AtomicInteger calls = new AtomicInteger();
+        Fixture fixture = fixture((executor, invocation) -> {
+            calls.incrementAndGet();
+            return CompletableFuture.completedFuture(RuntimeResult.success());
+        });
         CorrelationId invocationId = CorrelationId.deterministic("compiled-trigger-live-correlation");
         FlowGraph stale = fixture.graph().copy();
         stale.setResourceRevision(stale.getResourceRevision() + 1);
@@ -163,6 +177,10 @@ class CompiledTriggerExecutionTest {
             assertEquals(invocationId.value(), diagnostic.correlationId());
             assertEquals(ServerId.deterministic("event-test"), diagnostic.serverId());
             assertEquals("event-test", diagnostic.resource().id());
+            assertEquals(2L, diagnostic.evidence().get("requestedRevision"));
+            assertEquals(1L, diagnostic.evidence().get("currentSourceRevision"));
+            assertEquals(0, calls.get());
+            assertEquals(0, fixture.plans().activeLeaseCount());
             assertEquals("flow", diagnostic.resource().resourceType().value());
             assertEquals(1L, diagnostic.catalogGeneration());
             assertEquals("event.block.break", diagnostic.nodeId().canonicalText());
@@ -404,6 +422,66 @@ class CompiledTriggerExecutionTest {
             listener.tick();
             assertEquals(3, calls.get());
         } finally {
+            fixture.executor().shutdown();
+        }
+    }
+
+    @Test
+    void systemTicksRetainStaticFunctionBindingsAndPhysicalWorkAcrossSourceRefresh() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        AtomicReference<RuntimeInvocation> captured = new AtomicReference<>();
+        CompletableFuture<RuntimeResult> work = new CompletableFuture<>();
+        Fixture fixture = fixture((executor, invocation) -> {
+            captured.set(invocation);
+            return calls.getAndIncrement() == 0 ? work : CompletableFuture.completedFuture(RuntimeResult.success());
+        }, "flow", "event.server.tick", true);
+        GraphDocument original = fixture.storage().getCoreGraph("flow", fixture.graph().getId()).orElseThrow().graphDocument();
+        ServerResourceLocator childId = new ServerResourceLocator(original.resource().serverId(),
+            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("function")), "pinned-child");
+        GraphDocument childGraph = new GraphDocument(childId, 1, original.catalogBinding(), original.nodes(), original.connections());
+        FunctionSourceDocument child = new FunctionSourceDocument(new FunctionSignature(FunctionLocator.of(childId),
+            FunctionRevision.of(1), List.of(), List.of()), childGraph);
+        fixture.storage().saveCoreGraph(child, ResourceActivationState.ACTIVE, UUID.randomUUID(), 0);
+        FunctionBinding dependency = new FunctionBinding(childId, 1, List.of(), List.of());
+        GraphDocument graph = new GraphDocument(original.schemaVersion(), original.resource(), 2, original.catalogBinding(),
+            original.requiredCapabilities(), original.nodes(), original.connections(), original.passthroughs(), original.variables(),
+            List.of(dependency), original.unknown());
+        fixture.storage().saveCoreGraph(graph, ResourceActivationState.ACTIVE, UUID.randomUUID(), 1);
+        fixture.plans().initialize();
+        bindResidentAuthority(fixture.executor(), fixture.plans());
+        TriggerRegistry registry = new TriggerRegistry(temporary.resolve("typed-system-ticks.json").toFile());
+        registry.setBindings(List.of(new TriggerBinding("typed-tick", graph.resource().id(), TriggerType.SYSTEM, "server_tick")));
+        SystemEventListener listener = new SystemEventListener(fixture.storage(), fixture.executor(), registry);
+        try {
+            listener.setCompiledExecution(fixture.execution());
+            assertThrows(IllegalStateException.class, () -> fixture.storage().getGraph("flow", graph.resource().id()));
+            listener.tick();
+            assertEquals(1, calls.get(), fixture.diagnostics()::toString);
+            assertEquals(1, ((Number) captured.get().runtimeContext().variables().get("event.tick_number").value()).intValue());
+            assertEquals(childId, captured.get().functionBindings().getFirst().function());
+            assertEquals(1L, captured.get().functionBindings().getFirst().revision());
+            assertEquals(1, fixture.plans().activeLeaseCount());
+            assertFalse(work.isDone());
+            work.complete(RuntimeResult.success());
+            assertEquals(0, fixture.plans().activeLeaseCount());
+
+            GraphNode nextStart = new GraphNode(NodeInstanceId.deterministic("refreshed-system-tick"),
+                original.nodes().getFirst().definition(), 1, Map.of());
+            GraphDocument updated = new GraphDocument(graph.schemaVersion(), graph.resource(), 3, graph.catalogBinding(),
+                graph.requiredCapabilities(), List.of(nextStart), graph.connections(), graph.passthroughs(), graph.variables(),
+                graph.functions(), graph.unknown());
+            fixture.storage().saveCoreGraph(updated, ResourceActivationState.ACTIVE, UUID.randomUUID(), 2);
+            fixture.plans().initialize();
+            listener.tick();
+            assertEquals(1, calls.get(), "The Cached Earlier Source Must Be Rejected Until Its Binding Refreshes");
+            listener.refreshGraph(graph.resource().id());
+            listener.tick();
+            assertEquals(2, calls.get(), fixture.diagnostics()::toString);
+            assertEquals(3, ((Number) captured.get().runtimeContext().variables().get("event.tick_number").value()).intValue());
+            assertStaticBindingContract(updated, fixture.plans().residentExecution(updated.resource(), 3).orElseThrow().graph());
+            assertEquals(0, fixture.plans().activeLeaseCount());
+        } finally {
+            work.complete(RuntimeResult.success());
             fixture.executor().shutdown();
         }
     }
@@ -661,12 +739,143 @@ class CompiledTriggerExecutionTest {
         }
     }
 
+    @Test
+    void staticFunctionBindingsRemainExecutableThroughNativeEventsQaAndRuntimeDispatch() throws Exception {
+        var server = MockBukkit.mock();
+        var plugin = MockBukkit.createMockPlugin();
+        CompletableFuture<RuntimeResult> eventWork = new CompletableFuture<>();
+        CompletableFuture<RuntimeResult> qaWork = new CompletableFuture<>();
+        AtomicInteger calls = new AtomicInteger();
+        AtomicReference<CompiledRuntimeContext> captured = new AtomicReference<>();
+        Fixture fixture = fixture((executor, invocation) -> {
+            captured.set(invocation.runtimeContext());
+            return switch (calls.getAndIncrement()) {
+                case 0 -> eventWork;
+                case 1 -> qaWork;
+                default -> CompletableFuture.completedFuture(RuntimeResult.success());
+            };
+        }, "flow", "event.block.break", true);
+        GlobalTriggers bindings = new GlobalTriggers(fixture.storage(), fixture.executor(), new TriggerRegistry(plugin), null);
+        try {
+            GraphDocument original = fixture.storage().getCoreGraph("flow", fixture.graph().getId()).orElseThrow().graphDocument();
+            ServerResourceLocator childId = new ServerResourceLocator(original.resource().serverId(),
+                ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("function")), "pinned-child");
+            GraphDocument childGraph = new GraphDocument(childId, 1, original.catalogBinding(), original.nodes(), original.connections());
+            FunctionSourceDocument child = new FunctionSourceDocument(new FunctionSignature(FunctionLocator.of(childId),
+                FunctionRevision.of(1), List.of(), List.of()), childGraph);
+            fixture.storage().saveCoreGraph(child, ResourceActivationState.ACTIVE, UUID.randomUUID(), 0);
+            FunctionBinding binding = new FunctionBinding(childId, 1, List.of(), List.of());
+            GraphDocument graph = new GraphDocument(original.schemaVersion(), original.resource(), 2, original.catalogBinding(),
+                original.requiredCapabilities(), original.nodes(), original.connections(), original.passthroughs(), original.variables(),
+                List.of(binding), original.unknown());
+            var committed = fixture.storage().saveCoreGraph(graph, ResourceActivationState.ACTIVE, UUID.randomUUID(), 1);
+            fixture.plans().initialize();
+            bindResidentAuthority(fixture.executor(), fixture.plans());
+            fixture.execution().prepareSource(committed);
+            assertThrows(IllegalStateException.class, () -> fixture.storage().getGraph("flow", graph.resource().id()));
+            assertStaticBindingContract(graph, fixture.plans().residentExecution(graph.resource(), 2).orElseThrow().graph());
+            bindings.setCompiledExecution(fixture.execution());
+            NodeDefinition definition = new NodeDefinition.Builder("event.block.break", "Block Break", NodeDefinition.NodeCategory.EVENT)
+                .owner("restudio.resync").trigger(true).eventType(BlockBreakEvent.class.getName()).build();
+            new FlowEventRegistry(bindings.getTriggerDispatcher()).registerFromJson(List.of(definition));
+            bindings.registerTrigger("restudio.resync/event.block.break", graph.resource().id());
+            var world = server.addSimpleWorld("static-binding-event");
+            Player player = server.addPlayer();
+            BlockBreakEvent event = new BlockBreakEvent(world.getBlockAt(0, 64, 0), player);
+            var observed = bindings.getTriggerDispatcher().observeEvent(event);
+            server.getPluginManager().callEvent(event);
+            observed.close();
+            server.getScheduler().performOneTick();
+            assertEquals(1, calls.get(), fixture.diagnostics()::toString);
+            assertEquals(BlockBreakEvent.class.getName(), captured.get().event().type());
+            assertFalse(observed.completion().toCompletableFuture().isDone());
+            eventWork.complete(RuntimeResult.success());
+            assertEquals(true, observed.completion().toCompletableFuture().join().get("physicalComplete"));
+            assertEquals(1, ((List<?>) observed.completion().toCompletableFuture().join().get("invocations")).size());
+
+            var actor = server.getConsoleSender();
+            actor.addAttachment(plugin, "resync.qa", true);
+            RuntimeAuthority authority = fixture.authority();
+            QaExecutionAdapter qa = new QaExecutionAdapter(plugin, graph.resource().serverId(), fixture.storage(), fixture.executor(),
+                fixture.execution(), fixture.bridge(), new CompiledFunctionExecutionBridge(null, null), authority,
+                new RuntimePrincipalAuthority(authority), bindings.getTriggerDispatcher());
+            Map<String, Object> input = Map.of("resourceType", "flow", "resourceId", graph.resource().id(), "revision", 2,
+                "checksum", committed.envelope().assetHash().canonicalText(), "startNodeId", fixture.start(),
+                "variables", Map.of("qa.scope", "caller"));
+            var qaResult = qa.invoke(actor, "flow.run", input).toCompletableFuture();
+            assertEquals(2, calls.get(), fixture.diagnostics()::toString);
+            assertFalse(qaResult.isDone());
+            assertEquals("caller", captured.get().variables().get("qa.scope").value());
+            qaWork.complete(RuntimeResult.success());
+            assertEquals(true, qaResult.join().get("physicalComplete"));
+            assertEquals(2L, ((Map<?, ?>) qaResult.join().get("resource")).get("revision"));
+            Map<String, Object> stale = new LinkedHashMap<>(input);
+            stale.put("revision", 1);
+            assertThrows(Exception.class, () -> qa.invoke(actor, "flow.run", stale).toCompletableFuture().join());
+            var discovery = qa.invoke(actor, "execution.discover", Map.of()).toCompletableFuture().join();
+            assertTrue(((List<?>) discovery.get("resources")).stream().map(value -> (Map<?, ?>) value)
+                .anyMatch(value -> graph.resource().id().equals(value.get("resourceId")) && "flow".equals(value.get("resourceType"))));
+
+            RuntimeFlowDispatcher runtime = new RuntimeFlowDispatcher(fixture.storage(), fixture.executor());
+            runtime.setCompiledExecution(fixture.execution());
+            runtime.dispatchAsync(graph.resource().id(), player, null, Map.of()).join();
+            assertEquals(3, calls.get(), fixture.diagnostics()::toString);
+            assertStaticBindingContract(graph, fixture.execution().source("flow", graph.resource().id()).orElseThrow().graphDocument());
+            ServerResourceLocator commandId = new ServerResourceLocator(graph.resource().serverId(),
+                ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("command")), "static-command");
+            GraphNode commandStart = new GraphNode(original.nodes().getFirst().instanceId(),
+                ContractRef.of(OwnerId.of("restudio.resync"), NodeId.of("event.command")), 1, Map.of());
+            GraphDocument command = new GraphDocument(graph.schemaVersion(), commandId, 1, graph.catalogBinding(), Set.of(),
+                List.of(commandStart), List.of(), List.of(binding), graph.unknown());
+            command = new CommandGraphMetadata("qa-static-command", false, List.of()).apply(command);
+            fixture.storage().saveCoreGraph(command, ResourceActivationState.ACTIVE, UUID.randomUUID(), 0);
+            fixture.plans().initialize();
+            bindings.refreshBindings();
+            assertThrows(IllegalStateException.class, () -> fixture.storage().getCommandGraph(commandId.id()));
+            assertTrue(server.getCommandMap().getCommand("qa-static-command") != null);
+            assertTrue(server.dispatchCommand(actor, "qa-static-command argument"));
+            assertEquals(4, calls.get(), fixture.diagnostics()::toString);
+            assertEquals("qa-static-command", captured.get().variables().get("event.bound_command").value());
+            assertEquals("argument", captured.get().variables().get("event.args").value());
+            assertStaticBindingContract(command, fixture.execution().source("command", commandId.id()).orElseThrow().graphDocument());
+            assertEquals(0, fixture.plans().activeLeaseCount());
+        } finally {
+            eventWork.complete(RuntimeResult.success());
+            qaWork.complete(RuntimeResult.success());
+            bindings.shutdownRuntimeCommands();
+            bindings.getTriggerDispatcher().shutdown();
+            fixture.executor().shutdown();
+            MockBukkit.unmock();
+        }
+    }
+
+    private void assertStaticBindingContract(GraphDocument expected, GraphDocument actual) {
+        assertEquals(expected.checksum(), actual.checksum());
+        FunctionBinding expectedBinding = expected.functions().getFirst();
+        FunctionBinding actualBinding = actual.functions().getFirst();
+        assertEquals(expectedBinding.function(), actualBinding.function());
+        assertEquals(expectedBinding.revision(), actualBinding.revision());
+        assertEquals(parameterContract(expectedBinding.inputs()), parameterContract(actualBinding.inputs()));
+        assertEquals(parameterContract(expectedBinding.outputs()), parameterContract(actualBinding.outputs()));
+    }
+
+    private List<List<Object>> parameterContract(List<FunctionParameter> parameters) {
+        return parameters.stream().map(parameter -> Arrays.<Object>asList(parameter.parameterId(), parameter.name(),
+            parameter.type().canonicalJson(), parameter.description(),
+            parameter.defaultValue() == null ? null : parameter.defaultValue().canonicalJson())).toList();
+    }
+
     private Fixture fixture(BiFunction<FlowExecutor, RuntimeInvocation, CompletableFuture<RuntimeResult>> handler) throws Exception {
         return fixture(handler, "flow", "event.block.break");
     }
 
     private Fixture fixture(BiFunction<FlowExecutor, RuntimeInvocation, CompletableFuture<RuntimeResult>> handler,
                             String resourceType, String nodeId) throws Exception {
+        return fixture(handler, resourceType, nodeId, false);
+    }
+
+    private Fixture fixture(BiFunction<FlowExecutor, RuntimeInvocation, CompletableFuture<RuntimeResult>> handler,
+                            String resourceType, String nodeId, boolean advertisedChild) throws Exception {
         OwnerId owner = OwnerId.of("restudio.resync");
         ContractRef<CapabilityId> capability = ContractRef.of(owner, CapabilityId.of("event-test"));
         ContractRef<OperationId> operationId = ContractRef.of(owner, OperationId.of("event-test"));
@@ -690,8 +899,18 @@ class CompiledTriggerExecutionTest {
             task -> { throw new AssertionError("No asynchronous work was requested"); }, () -> true);
         RuntimeBindingRegistry registry = new RuntimeBindingRegistry(security, RuntimeAuditBoundary.unavailable(), boundary,
             RuntimeReceiptStore.inMemory(false));
-        registry.activate(new RuntimeProviderDescriptor(providerId, "1.0.0", 0, 0, RuntimeSemantics.UnloadPolicy.DRAIN),
-            List.of(RuntimeBinding.available(operation, providerId, "1.0.0", invocation -> handler.apply(executor, invocation))));
+        TypeExpr executionType = TypeExpr.named(TypeReference.of("builtin", "execution"));
+        ContractRef<OperationId> functionOperation = ContractRef.of(owner, OperationId.of("custom_function_call"));
+        RuntimeOperationDescriptor functionCall = new RuntimeOperationDescriptor(capability, functionOperation, List.of(
+            new RuntimeOperationDescriptor.Pin(PinId.of("flow"), RuntimeOperationDescriptor.Direction.INPUT, executionType),
+            new RuntimeOperationDescriptor.Pin(PinId.of("output_flow"), RuntimeOperationDescriptor.Direction.OUTPUT, executionType)), semantics);
+        List<RuntimeBinding> runtimeBindings = new ArrayList<>();
+        runtimeBindings.add(RuntimeBinding.available(operation, providerId, "1.0.0", invocation -> handler.apply(executor, invocation)));
+        if (advertisedChild) {
+            runtimeBindings.add(RuntimeBinding.available(functionCall, providerId, "1.0.0", invocation ->
+                CompletableFuture.completedFuture(RuntimeResult.success())));
+        }
+        registry.activate(new RuntimeProviderDescriptor(providerId, "1.0.0", 0, 0, RuntimeSemantics.UnloadPolicy.DRAIN), runtimeBindings);
         CatalogVersion version = new CatalogVersion(1, 0);
         CatalogNodeDescriptor definition = CatalogNodeDescriptor.builder(nodeId)
             .domain("event").family("block").displayName("Block Break").description("Runs a block break event handler.")
@@ -700,11 +919,33 @@ class CompiledTriggerExecutionTest {
                 List.of(new CatalogNodeDescriptor.Case("failure", "Failure", "The handler returned a failure.")))))
             .handler(new CatalogNodeDescriptor.Handler(capability, operationId)).semantics(semantics)
             .requiredCapabilities(Set.of(capability)).metadata(Map.of("sourceNodeId", nodeId, "handlerConfig", Map.of())).build();
+        List<CatalogNodeDescriptor> definitions = new ArrayList<>(List.of(definition));
+        List<RuntimeOperationDescriptor> requirements = new ArrayList<>(List.of(operation));
+        if (advertisedChild) {
+            definitions.add(CatalogNodeDescriptor.builder("custom-function.pinned-child").domain("call").family("function")
+                .displayName("Pinned Child").description("Runs the pinned child Function.").category(capability)
+                .pins(List.of(new CatalogNodeDescriptor.Pin("flow", CatalogNodeDescriptor.Direction.INPUT, executionType,
+                        "Flow", "Starts the child.", CatalogNodeDescriptor.Requirement.REQUIRED, capability),
+                    new CatalogNodeDescriptor.Pin("output_flow", CatalogNodeDescriptor.Direction.OUTPUT, executionType,
+                        "Flow", "Continues after the child.", CatalogNodeDescriptor.Requirement.REQUIRED, capability)))
+                .branches(List.of(new CatalogNodeDescriptor.Branch("failed", "Failed", "The child failed.",
+                    List.of(new CatalogNodeDescriptor.Case("failure", "Failure", "The child returned a failure.")))))
+                .handler(new CatalogNodeDescriptor.Handler(capability, functionOperation)).semantics(semantics)
+                .requiredCapabilities(Set.of(capability)).metadata(Map.of("customFunctionIdentity",
+                    Map.of("owner", owner.value(), "namespace", "local", "id", "pinned-child"))).build());
+            requirements.add(functionCall);
+            definitions.add(CatalogNodeDescriptor.builder("event.command").domain("event").family("command")
+                .displayName("Command").description("Runs the installed command.").category(capability)
+                .branches(List.of(new CatalogNodeDescriptor.Branch("failed", "Failed", "The command failed.",
+                    List.of(new CatalogNodeDescriptor.Case("failure", "Failure", "The command returned a failure.")))))
+                .handler(new CatalogNodeDescriptor.Handler(capability, operationId)).semantics(semantics)
+                .requiredCapabilities(Set.of(capability)).metadata(Map.of("sourceNodeId", "event.command", "handlerConfig", Map.of())).build());
+        }
         CatalogContribution contribution = CatalogContribution.builder(owner, "1.0.0", new CatalogContractRange(version, version),
                 CatalogProvenance.fromText(CatalogProvenance.SourceKind.BUNDLED, "classpath:/event-test.json", "1.0.0", "test", "event-test"))
             .categories(List.of(new CatalogCategoryDescriptor(CapabilityId.of("event-test"), "Events", "Event handler tests.", 1)))
             .capabilities(List.of(new CatalogCapabilityDescriptor(CapabilityId.of("event-test"), 1, false, InspectorFallback.GENERIC)))
-            .definitions(List.of(definition)).runtimeRequirements(List.of(operation)).build();
+            .definitions(definitions).runtimeRequirements(requirements).build();
         CatalogCompilationResult compiled = new CatalogCompiler(version, CatalogBindingProof.live(registry)).compile(List.of(contribution), 1);
         assertTrue(compiled.accepted(), compiled.diagnostics()::toString);
         CatalogSnapshot catalog = compiled.snapshot().orElseThrow();
@@ -721,8 +962,9 @@ class CompiledTriggerExecutionTest {
         FlowStorageCoreGraphResourceAuthority resources = new FlowStorageCoreGraphResourceAuthority(storage, server, validator);
         ServerCompiledPlanRepository plans = new ServerCompiledPlanRepository(resources, () -> activation);
         planRepositories.add(plans);
+        RuntimeAuthority authority = RuntimeAuthority.anonymous();
         CompiledCoreFlowExecutionBridge bridge = new CompiledCoreFlowExecutionBridge(() -> activation, registry,
-            RuntimeAuthority.anonymous(), null, plans);
+            authority, null, plans);
         NodeInstanceId start = NodeInstanceId.deterministic("event-test-start");
         GraphDocument document = new GraphDocument(new ServerResourceLocator(server,
             ContractRef.of(owner, ResourceTypeId.of(resourceType)), "event-test"), 1,
@@ -745,7 +987,7 @@ class CompiledTriggerExecutionTest {
         }, null, plans);
         execution.bindCoreStorage(storage, server);
         execution.prepare(graph);
-        return new Fixture(executor, execution, graph, start.canonicalText(), storage, diagnostics, plans, bridge);
+        return new Fixture(executor, execution, graph, start.canonicalText(), storage, diagnostics, plans, bridge, authority);
     }
 
     private Fixture connectedCommandFixture(AtomicReference<String> broadcast) throws Exception {
@@ -861,8 +1103,9 @@ class CompiledTriggerExecutionTest {
         FlowStorageCoreGraphResourceAuthority resources = new FlowStorageCoreGraphResourceAuthority(storage, server, validator);
         ServerCompiledPlanRepository plans = new ServerCompiledPlanRepository(resources, () -> activation);
         planRepositories.add(plans);
+        RuntimeAuthority authority = RuntimeAuthority.anonymous();
         CompiledCoreFlowExecutionBridge bridge = new CompiledCoreFlowExecutionBridge(() -> activation, registry,
-            RuntimeAuthority.anonymous(), null, plans);
+            authority, null, plans);
         NodeInstanceId start = NodeInstanceId.deterministic("connected-command-start");
         NodeInstanceId target = NodeInstanceId.deterministic("connected-command-broadcast");
         GraphDocument document = new GraphDocument(new ServerResourceLocator(server,
@@ -890,7 +1133,7 @@ class CompiledTriggerExecutionTest {
         }, null, plans);
         execution.bindCoreStorage(storage, server);
         execution.prepare(graph);
-        return new Fixture(executor, execution, graph, start.canonicalText(), storage, diagnostics, plans, bridge);
+        return new Fixture(executor, execution, graph, start.canonicalText(), storage, diagnostics, plans, bridge, authority);
     }
 
     private static void bindResidentAuthority(FlowExecutor executor, ServerCompiledPlanRepository plans) {
@@ -1011,7 +1254,7 @@ class CompiledTriggerExecutionTest {
 
     private record Fixture(FlowExecutor executor, CompiledTriggerExecution execution, FlowGraph graph, String start,
                            FlowStorage storage, List<Diagnostic> diagnostics, ServerCompiledPlanRepository plans,
-                           CompiledCoreFlowExecutionBridge bridge) {}
+                           CompiledCoreFlowExecutionBridge bridge, RuntimeAuthority authority) {}
 
     @Test
     void registeredTypedCommandPreservesZeroMultipleAndNamespacedAliasArgumentsForBothSenders() throws Exception {

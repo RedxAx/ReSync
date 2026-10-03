@@ -52,6 +52,8 @@ public final class NodeDefinitionBuildValidator {
         validateDefinitions(definitions, dataTypes, handlerIds, handlerOperations, errors);
         validateRuntimeRequirementKeys(definitions, errors);
         validateOptionSourceTypes(definitions, errors);
+        validatePinContracts(definitions, errors);
+        validateDescriptions(definitions, errors);
 
         System.out.println("definitions=" + definitions.size()
             + " handlers=" + handlerIds.size()
@@ -157,6 +159,8 @@ public final class NodeDefinitionBuildValidator {
                             for (JsonElement element : root.getAsJsonArray()) {
                                 if (element.isJsonObject()) {
                                     definitions.add(element.getAsJsonObject());
+                                } else {
+                                    errors.add(path + " contains a non-object node definition");
                                 }
                             }
                         } else if (root.isJsonObject()) {
@@ -351,6 +355,120 @@ public final class NodeDefinitionBuildValidator {
     private record OptionSourceType(String nodeId, String pinId, String type) {
         private String location() {
             return nodeId + "." + pinId;
+        }
+    }
+
+    static void validateDescriptions(List<JsonObject> definitions, List<String> errors) {
+        for (JsonObject definition : definitions) {
+            String id = string(definition, "id");
+            validateDescription(id, string(definition, "description"), 24, 280, errors);
+            for (String field : List.of("inputs", "outputs")) {
+                if (!definition.has(field) || !definition.get(field).isJsonArray()) {
+                    continue;
+                }
+                for (JsonElement element : definition.getAsJsonArray(field)) {
+                    if (element.isJsonObject()) {
+                        JsonObject pin = element.getAsJsonObject();
+                        validateDescription(id + "." + string(pin, "id"), string(pin, "description"), 16, 240, errors);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void validateDescription(String location, String description, int minimum, int maximum,
+                                            List<String> errors) {
+        String text = description == null ? "" : description.trim();
+        if (text.length() < minimum || text.length() > maximum) {
+            errors.add(location + " description must contain " + minimum + " through " + maximum + " characters");
+        }
+    }
+
+    static void validatePinContracts(List<JsonObject> definitions, List<String> errors) {
+        Set<String> nodeIds = new HashSet<>();
+        for (JsonObject definition : definitions) {
+            String id = string(definition, "id");
+            if (id != null && !id.isBlank()) {
+                nodeIds.add(id);
+            }
+        }
+        for (JsonObject definition : definitions) {
+            String id = string(definition, "id");
+            String canonicalId = string(definition, "canonicalId");
+            if (canonicalId != null && !canonicalId.isBlank() && !nodeIds.contains(canonicalId)) {
+                errors.add(id + " references unknown canonicalId " + canonicalId);
+            }
+            validatePinContracts(id, definition, "inputs", "input", errors);
+            validatePinContracts(id, definition, "outputs", "output", errors);
+        }
+    }
+
+    private static void validatePinContracts(String nodeId, JsonObject definition, String field,
+                                            String direction, List<String> errors) {
+        if (!definition.has(field)) {
+            return;
+        }
+        if (!definition.get(field).isJsonArray()) {
+            errors.add(nodeId + " has non-array " + field);
+            return;
+        }
+        Set<String> ids = new HashSet<>();
+        Map<String, String> addresses = new HashMap<>();
+        for (JsonElement element : definition.getAsJsonArray(field)) {
+            if (!element.isJsonObject()) {
+                continue;
+            }
+            JsonObject pin = element.getAsJsonObject();
+            String pinId = string(pin, "id");
+            if (pinId == null || pinId.isBlank()) {
+                errors.add(nodeId + " has a pin without id in " + field);
+                continue;
+            }
+            if (!ids.add(pinId)) {
+                errors.add(nodeId + " has duplicate " + direction + " pin id " + pinId);
+            }
+            String name = string(pin, "name");
+            addPinAddress(nodeId, direction, pinId, pinId, addresses, errors);
+            if (name != null && !name.isBlank()) {
+                addPinAddress(nodeId, direction, name, pinId, addresses, errors);
+            }
+            String authoredDirection = string(pin, "direction");
+            if (authoredDirection != null && !direction.equalsIgnoreCase(authoredDirection)) {
+                errors.add(nodeId + "." + pinId + " declares " + authoredDirection + " direction in " + field);
+            }
+            String pinType = string(pin, "pinType");
+            if (pinType == null) {
+                pinType = string(pin, "type");
+            }
+            if ("FLOW".equalsIgnoreCase(pinType) && !"execution".equals(string(pin, "dataType"))) {
+                errors.add(nodeId + "." + pinId + " is a flow pin without execution dataType");
+            }
+        }
+        String mappingField = direction + "Mappings";
+        if (!definition.has(mappingField)) {
+            return;
+        }
+        if (!definition.get(mappingField).isJsonArray()) {
+            errors.add(nodeId + " has non-array " + mappingField);
+            return;
+        }
+        for (JsonElement element : definition.getAsJsonArray(mappingField)) {
+            if (!element.isJsonObject()) {
+                errors.add(nodeId + " has non-object " + mappingField + " entry");
+                continue;
+            }
+            String target = string(element.getAsJsonObject(), "target");
+            if (target == null || !addresses.containsKey(target)) {
+                errors.add(nodeId + " maps to unknown " + direction + " pin " + target);
+            }
+        }
+    }
+
+    private static void addPinAddress(String nodeId, String direction, String address, String pinId,
+                                     Map<String, String> addresses, List<String> errors) {
+        String previous = addresses.putIfAbsent(address, pinId);
+        if (previous != null && !previous.equals(pinId)) {
+            errors.add(nodeId + " has ambiguous " + direction + " pin address " + address + " for " + previous + " and " + pinId);
         }
     }
 

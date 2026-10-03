@@ -1974,7 +1974,7 @@
         "name": "inherits",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the inherits value used by this operation."
+        "description": "True if the selected group inherits the requested parent group."
       }
     ],
     "migrationMapping": {

@@ -3,10 +3,12 @@ package restudio.resync.flow.runtime;
 import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.type.TypedValue;
+import restudio.resync.flow.graph.FunctionBinding;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 
 public record RuntimeInvocation(
@@ -16,13 +18,21 @@ public record RuntimeInvocation(
     RuntimeCancellationToken cancellationToken,
     RuntimeExecutionContext executionContext,
     CompiledRuntimeContext runtimeContext,
-    CorrelationId invocationId
+    CorrelationId invocationId,
+    List<FunctionBinding> functionBindings,
+    RuntimeScope scope
 ) {
+    public RuntimeInvocation(RuntimeBindingKey binding, Map<PinId, TypedValue> inputs, String idempotencyKey,
+            RuntimeCancellationToken cancellationToken, RuntimeExecutionContext executionContext,
+            CompiledRuntimeContext runtimeContext, CorrelationId invocationId) {
+        this(binding, inputs, idempotencyKey, cancellationToken, executionContext, runtimeContext, invocationId, List.of(), null);
+    }
     public RuntimeInvocation {
         binding = Objects.requireNonNull(binding, "Binding Is Required");
         inputs = immutableInputs(inputs);
         idempotencyKey = Objects.requireNonNull(idempotencyKey, "Idempotency Key Is Required").trim();
         cancellationToken = Objects.requireNonNull(cancellationToken, "Cancellation Token Is Required");
+        functionBindings = List.copyOf(Objects.requireNonNull(functionBindings, "Invocation Function Bindings Are Required"));
         if (idempotencyKey.isEmpty()) {
             throw new IllegalArgumentException("Idempotency Key Is Required");
         }
@@ -57,20 +67,30 @@ public record RuntimeInvocation(
     }
 
     public RuntimeInvocation withCancellationToken(RuntimeCancellationToken token) {
-        return new RuntimeInvocation(binding, inputs, idempotencyKey, token, executionContext, runtimeContext, invocationId);
+        return new RuntimeInvocation(binding, inputs, idempotencyKey, token, executionContext, runtimeContext, invocationId, functionBindings, scope);
     }
 
     public RuntimeInvocation withExecutionContext(RuntimeExecutionContext context) {
-        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, context, runtimeContext, invocationId);
+        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, context, runtimeContext, invocationId, functionBindings, scope);
     }
 
     public RuntimeInvocation withRuntimeContext(CompiledRuntimeContext context) {
-        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, context, invocationId);
+        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, context, invocationId, functionBindings, scope);
     }
 
     public RuntimeInvocation withInvocationId(CorrelationId rootInvocationId) {
         return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, runtimeContext,
-            Objects.requireNonNull(rootInvocationId, "Invocation ID Is Required"));
+            Objects.requireNonNull(rootInvocationId, "Invocation ID Is Required"), functionBindings, scope);
+    }
+
+    public RuntimeInvocation withFunctionBindings(List<FunctionBinding> functions) {
+        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, runtimeContext,
+            invocationId, functions, scope);
+    }
+
+    public RuntimeInvocation withScope(RuntimeScope runtimeScope) {
+        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, runtimeContext,
+            invocationId, functionBindings, runtimeScope);
     }
 
     public long deadlineMillis() {

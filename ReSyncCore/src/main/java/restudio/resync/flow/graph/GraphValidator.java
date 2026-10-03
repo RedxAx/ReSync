@@ -1,6 +1,7 @@
 package restudio.resync.flow.graph;
 
 import restudio.resync.flow.catalog.CatalogNodeDescriptor;
+import restudio.resync.flow.catalog.CatalogFunctionShape;
 import restudio.resync.flow.catalog.CatalogOwned;
 import restudio.resync.flow.catalog.CatalogSnapshot;
 import restudio.resync.flow.diagnostic.Diagnostic;
@@ -25,6 +26,7 @@ import restudio.resync.flow.inspector.InspectorCondition;
 import restudio.resync.flow.inspector.InspectorDescriptor;
 import restudio.resync.flow.inspector.InspectorField;
 import restudio.resync.flow.inspector.InspectorFunctionParameter;
+import restudio.resync.flow.inspector.InspectorFunctionSignature;
 import restudio.resync.flow.inspector.InspectorRow;
 import restudio.resync.flow.inspector.InspectorSection;
 import restudio.resync.flow.runtime.RuntimeBindingDescriptor;
@@ -108,7 +110,7 @@ public final class GraphValidator {
                 endpointPins = FunctionBoundaryPins.resolve(owned, null, node);
             }
             contexts.put(node.instanceId(), new NodeContext(node, definition, owned, endpointPins));
-            validateNode(node, definition, owned, catalog, runtimeManifest, diagnostics);
+            validateNode(node, definition, owned, catalog, runtimeManifest, endpointPins, diagnostics);
         }
 
         ConversionGraph conversionGraph = conversionGraph(catalog);
@@ -168,7 +170,8 @@ public final class GraphValidator {
     }
 
     private static void validateNode(GraphNode node, CatalogNodeDescriptor definition, CatalogOwned<CatalogNodeDescriptor> owned,
-                                     CatalogSnapshot catalog, RuntimeBindingManifest runtimeManifest, List<Diagnostic> diagnostics) {
+                                     CatalogSnapshot catalog, RuntimeBindingManifest runtimeManifest,
+                                     Map<PinId, FunctionBoundaryPins.EffectivePin> endpointPins, List<Diagnostic> diagnostics) {
         if (definition.lifecycle() != CatalogNodeDescriptor.Lifecycle.ACTIVE) {
             diagnostics.add(error("GRAPH.DEFINITION_UNAVAILABLE", node.instanceId(), null));
         }
@@ -181,7 +184,19 @@ public final class GraphValidator {
                 diagnostics.add(error("GRAPH.PIN_UNRESOLVED", node.instanceId(), pin.id()));
             }
         }
-        validatePinValues(node.instanceId(), node.values(), pins, true, diagnostics);
+        node.values().forEach((pinId, value) -> {
+            FunctionBoundaryPins.EffectivePin pin = endpointPins.get(pinId);
+            if (pin == null) {
+                diagnostics.add(error("GRAPH.PIN_UNDECLARED", node.instanceId(), pinId));
+            } else {
+                if (pin.direction() != CatalogNodeDescriptor.Direction.INPUT) {
+                    diagnostics.add(error("GRAPH.OUTPUT_VALUE", node.instanceId(), pinId));
+                }
+                if (!pin.type().equals(value.value().type())) {
+                    diagnostics.add(error("GRAPH.PIN_VALUE_TYPE", node.instanceId(), pinId));
+                }
+            }
+        });
         validateInspector(node, definition, owned, catalog, diagnostics);
         validateNodeConditions(node, definition, owned, catalog, pins, diagnostics);
         validateMode(node, definition, diagnostics);
@@ -720,6 +735,13 @@ public final class GraphValidator {
             }
             if (!function.function().serverId().equals(graph.resource().serverId())) {
                 diagnostics.add(error("GRAPH.DEFINITION_MISSING", null, null));
+                continue;
+            }
+            List<CatalogOwned<CatalogNodeDescriptor>> advertised = catalog.definitions().stream()
+                .filter(owned -> advertises(owned, function)).toList();
+            if (!advertised.isEmpty()) {
+                validateAdvertisedFunction(function, advertised, diagnostics);
+                continue;
             }
             SignatureRef signature = findSignature(function, signatures);
             if (signature == null) {
@@ -754,12 +776,52 @@ public final class GraphValidator {
             }
             Object expectedRevision = function.unknown().get("catalogRevision");
             if (expectedRevision instanceof Number number && number.longValue() != function.revision()) {
-                diagnostics.add(error("GRAPH.CATALOG_INVALIDATED", null, null));
+                diagnostics.add(error("GRAPH.PIN_UNRESOLVED", null, null));
             }
             Object expectedSignature = function.unknown().get("signatureId");
             if (expectedSignature != null && !signature.signature().id().value().equals(String.valueOf(expectedSignature))) {
                 diagnostics.add(error("GRAPH.PIN_UNRESOLVED", null, null));
             }
+        }
+    }
+
+    private static boolean advertises(CatalogOwned<CatalogNodeDescriptor> owned, FunctionBinding function) {
+        Object identity = owned.descriptor().metadata().get("customFunctionIdentity");
+        return owned.key().owner().equals(function.function().owner())
+            && identity instanceof Map<?, ?> values && function.function().id().equals(values.get("id"));
+    }
+
+    private static void validateAdvertisedFunction(FunctionBinding function,
+                                                    List<CatalogOwned<CatalogNodeDescriptor>> advertised,
+                                                    List<Diagnostic> diagnostics) {
+        if (advertised.size() != 1 || !"function".equals(function.function().resourceType().value())) {
+            diagnostics.add(error("GRAPH.DEFINITION_MISSING", null, null));
+            return;
+        }
+        CatalogOwned<CatalogNodeDescriptor> owned = advertised.getFirst();
+        CatalogNodeDescriptor definition = owned.descriptor();
+        CatalogFunctionShape shape = CatalogFunctionShape.from(owned.key().owner(), definition).orElse(null);
+        if (shape == null || definition.lifecycle() != CatalogNodeDescriptor.Lifecycle.ACTIVE
+            || !owned.key().owner().equals(definition.handler().capability().owner())
+            || !owned.key().owner().equals(definition.handler().operation().owner())) {
+            diagnostics.add(error("GRAPH.DEFINITION_MISSING", null, null));
+            return;
+        }
+        Map<PinId, TypeExpr> actual = new LinkedHashMap<>();
+        function.inputs().forEach(parameter -> actual.put(PinId.of("function-input-" + parameter.parameterId().canonicalText()), parameter.type()));
+        function.outputs().forEach(parameter -> actual.put(PinId.of("function-output-" + parameter.parameterId().canonicalText()), parameter.type()));
+        Map<PinId, TypeExpr> expected = new LinkedHashMap<>();
+        shape.parameters().forEach((id, pin) -> expected.put(id, pin.type()));
+        if (!actual.equals(expected)) {
+            diagnostics.add(error("GRAPH.PIN_TYPE_MISMATCH", null, null));
+        }
+        Object expectedRevision = function.unknown().get("catalogRevision");
+        if (expectedRevision instanceof Number number && number.longValue() != function.revision()) {
+            diagnostics.add(error("GRAPH.PIN_UNRESOLVED", null, null));
+        }
+        Object expectedSignature = function.unknown().get("signatureId");
+        if (expectedSignature != null && !function.function().id().equals(String.valueOf(expectedSignature))) {
+            diagnostics.add(error("GRAPH.PIN_UNRESOLVED", null, null));
         }
     }
 
@@ -829,6 +891,6 @@ public final class GraphValidator {
                                Map<PinId, FunctionBoundaryPins.EffectivePin> endpointPins) {
     }
 
-    private record SignatureRef(CatalogOwned<InspectorDescriptor> owned, restudio.resync.flow.inspector.InspectorFunctionSignature signature) {
+    private record SignatureRef(CatalogOwned<InspectorDescriptor> owned, InspectorFunctionSignature signature) {
     }
 }

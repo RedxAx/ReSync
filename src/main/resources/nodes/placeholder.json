@@ -61,7 +61,7 @@
         "name": "text",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the text value used by this operation."
+        "description": "Text containing placeholders to expand or remove according to this node's operation."
       }
     ],
     "outputs": [
@@ -255,7 +255,7 @@
         "name": "text",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the text value used by this operation."
+        "description": "Text containing placeholders to expand or remove according to this node's operation."
       }
     ],
     "outputs": [
@@ -436,7 +436,7 @@
         "name": "text",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the text value used by this operation."
+        "description": "Text containing placeholders to expand or remove according to this node's operation."
       }
     ],
     "outputs": [
@@ -607,7 +607,7 @@
         "name": "text",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the text value used by this operation."
+        "description": "Text containing placeholders to expand or remove according to this node's operation."
       }
     ],
     "outputs": [

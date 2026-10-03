@@ -47,7 +47,7 @@ class ManagedFlowFileUnavailableCatalogTest {
         List<NodeDefinition> fileDefinitions;
         try (var input = Files.newInputStream(fileDefinitionSource)) {
             fileDefinitions = loader.parse(input, fileDefinitionSource.toString()).stream()
-                .filter(definition -> definition.getId().startsWith("file."))
+                .filter(definition -> "FileHandler".equals(definition.getHandler()))
                 .toList();
         }
         loader.setValidator(new NodeDefinitionValidator(handlers, true));
@@ -60,8 +60,10 @@ class ManagedFlowFileUnavailableCatalogTest {
             diagnostic -> diagnostic.severity() == NodeDefinitionDiagnostic.Severity.ERROR));
 
         TestFlowContext fileContext = new TestFlowContext(Map.of());
-        FlowNode fileNode = new FlowNode("file.exists", 0, 0, Map.of());
-        fileNode.setHandlerConfig(Map.of("operation", "file_exists"));
+        NodeDefinition existsDefinition = fileDefinitions.stream()
+            .filter(definition -> "file_exists".equals(definition.getId())).findFirst().orElseThrow();
+        FlowNode fileNode = new FlowNode(existsDefinition.getId(), 0, 0, Map.of());
+        fileNode.setHandlerConfig(existsDefinition.getHandlerConfig());
         handlers.getHandler("FileHandler").execute(fileContext, fileNode);
 
         FlowOperationResult<?> result = (FlowOperationResult<?>) fileContext.outputs.get("result");

@@ -88,6 +88,45 @@ class CatalogCompilerTest {
     Path startupIndex;
 
     @Test
+    void startupIndexInvalidatesGeneratedOptionContractsWithoutChangingAuthoredSources() {
+        OwnerId owner = OwnerId.of("resync.options");
+        NodeId id = NodeId.of("option-node");
+        CatalogVersion contract = new CatalogVersion(1, 3);
+        CatalogContribution first = indexedOptions(owner, id, OptionQuerySchemaV1.empty(), "flow-execute");
+        CatalogCompiler compiler = compilerFor(contract, first);
+        CatalogSnapshot original = compiler.compile(List.of(first), 4, startupIndex).snapshot().orElseThrow();
+        OptionQuerySchemaV1 contextual = new OptionQuerySchemaV1(null,
+            Map.of("$nodeType", new OptionQuerySchemaV1.Field(STRING, false)), Map.of());
+        CatalogContribution changed = indexedOptions(owner, id, contextual, "flow-execute");
+        CatalogSnapshot updated = compiler.compile(List.of(changed), 4, startupIndex).snapshot().orElseThrow();
+
+        assertEquals(first.provenance(), changed.provenance());
+        assertNotEquals(original.contentChecksum(), updated.contentChecksum());
+        assertTrue(updated.canonicalContent().contains("$nodeType"));
+        CatalogSnapshot restarted = compilerFor(contract, changed).compile(List.of(changed), 4, startupIndex)
+            .snapshot().orElseThrow();
+        assertEquals(updated.contentChecksum(), restarted.contentChecksum());
+        assertEquals(updated.canonicalContent(), restarted.canonicalContent());
+        assertEquals(contextual, restarted.optionSource(ref(owner, InspectorFieldId.of("blocks")))
+            .orElseThrow().descriptor().querySchema());
+        CatalogContribution unavailable = indexedOptions(owner, id, contextual, "missing-options");
+        assertFalse(compiler.compile(List.of(unavailable), 4, startupIndex).accepted());
+        assertEquals(original.contentChecksum(), compiler.compile(List.of(first), 4, startupIndex)
+            .snapshot().orElseThrow().contentChecksum());
+    }
+
+    private static CatalogContribution indexedOptions(OwnerId owner, NodeId id, OptionQuerySchemaV1 schema, String capability) {
+        CatalogContribution base = contribution(owner, id);
+        CatalogVersion contract = new CatalogVersion(1, 3);
+        return CatalogContribution.builder(owner, base.version(), new CatalogContractRange(CONTRACT, contract), base.provenance())
+            .categories(base.categories()).capabilities(base.capabilities()).definitions(base.definitions())
+            .runtimeRequirements(base.runtimeRequirements())
+            .optionSources(List.of(new InspectorOptionSource(InspectorFieldId.of("blocks"), "Blocks", "Provides block choices.",
+                STRING, schema, ref(owner, CapabilityId.of(capability)), 100)))
+            .build();
+    }
+
+    @Test
     void startupIndexRestoresCompiledSnapshotWithoutChangingChecksum() {
         CatalogContribution first = contribution(OwnerId.of("resync.alpha"), NodeId.of("alpha-node"));
         CatalogContribution second = contribution(OwnerId.of("resync.beta"), NodeId.of("beta-node"));
@@ -359,7 +398,7 @@ class CatalogCompilerTest {
 
         RuntimeBindingRegistry liveRegistry = new RuntimeBindingRegistry();
         RuntimeBinding live = RuntimeBinding.available(requirement, provider, "1.0.0",
-            invocation -> CompletableFuture.completedFuture(restudio.resync.flow.runtime.RuntimeResult.success()));
+            invocation -> CompletableFuture.completedFuture(RuntimeResult.success()));
         liveRegistry.activate(descriptor, List.of(live));
         assertTrue(CatalogBindingProof.live(liveRegistry).proves(requirement));
     }

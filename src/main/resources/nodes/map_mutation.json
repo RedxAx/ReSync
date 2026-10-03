@@ -2,7 +2,7 @@
   {
     "id": "core.map.create",
     "displayName": "Create",
-    "description": "Create an empty ordered string-keyed map.",
+    "description": "Creates an empty map with text keys. Map Set adds entries. Entries keep their insertion order.",
     "domain": "core",
     "family": "map",
     "lifecycle": "active",
@@ -62,7 +62,7 @@
   {
     "id": "core.map.remove",
     "displayName": "Map Remove",
-    "description": "Return a copy of a map without one key.",
+    "description": "Returns a copy of the map without the given text key. If the key is absent, the copy has the same entries. The input map is preserved.",
     "domain": "core",
     "family": "map",
     "lifecycle": "active",
@@ -98,7 +98,7 @@
   {
     "id": "core.map.clear",
     "displayName": "Map Clear",
-    "description": "Return an empty copy of a map.",
+    "description": "Returns an empty copy of a map. The input map and its entries are preserved.",
     "domain": "core",
     "family": "map",
     "lifecycle": "active",

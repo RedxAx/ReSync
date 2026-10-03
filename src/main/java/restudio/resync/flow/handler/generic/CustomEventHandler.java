@@ -44,12 +44,13 @@ public class CustomEventHandler implements NodeHandler {
         });
 
         operations.put("custom_event_listen", (ctx, node) -> {
-            String nodeId = findNodeId(ctx, node);
+            ctx.haltContinuation();
+            String nodeId = ctx.resolveNodeId(node);
             String eventId = ctx.getInputValue(node, "event_id", String.class, "");
             Integer timeoutTicks = ctx.getInputValue(node, "timeout_ticks", Integer.class, 0);
 
-            if (eventId != null && !eventId.isEmpty()) {
-                CustomEventManager.Listener listener = new CustomEventManager.Listener(ctx, nodeId, timeoutTicks);
+            if (eventId != null && !eventId.isBlank() && nodeId != null) {
+                CustomEventManager.Listener listener = new CustomEventManager.Listener(ctx, nodeId, timeoutTicks, "flow", true);
                 CustomEventManager.getInstance().listen(eventId, listener);
                 ctx.setOutput(node, "listening", true);
             } else {
@@ -96,15 +97,8 @@ public class CustomEventHandler implements NodeHandler {
             throw new IllegalArgumentException("Unknown custom event operation: " + operation);
         }
         op.accept(ctx, node);
-        ctx.triggerOutput("flow");
-    }
-
-    private static String findNodeId(FlowContext ctx, FlowNode node) {
-        for (var entry : ctx.getRuntime().getGraph().getNodes().entrySet()) {
-            if (entry.getValue() == node) {
-                return entry.getKey();
-            }
+        if (!"custom_event_listen".equals(operation)) {
+            ctx.triggerOutput("flow");
         }
-        return null;
     }
 }

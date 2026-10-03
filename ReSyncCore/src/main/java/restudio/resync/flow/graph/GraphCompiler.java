@@ -160,7 +160,9 @@ public final class GraphCompiler {
         List<StructuralRoute> structuralRoutes = structuralRoutes(graph);
         List<ProviderLease> providerLeases = providerLeases(planId, steps, conversionRoutes, catalog);
         CompiledExecutionPlan plan = new CompiledExecutionPlan(planId, graph.resource(), graph.revision(), catalogBinding, graphHash,
-            steps, graph.connections(), conversionRoutes, structuralRoutes, graph.functions(), providerLeases, graph.unknown());
+            steps, graph.connections(), conversionRoutes, structuralRoutes, graph.functions(), providerLeases, graph.unknown(), functionSignature,
+            graph.variables().stream().collect(Collectors.toUnmodifiableMap(GraphVariable::name,
+                variable -> variable.value() == null ? TypedValue.absent(variable.type()) : variable.value())));
         return new GraphCompilationResult(plan, validation);
     }
 

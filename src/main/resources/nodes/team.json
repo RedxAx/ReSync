@@ -177,7 +177,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts adding the player to the team."},
       {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID that receives the player."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player to add; uses the current Flow player when omitted."}
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player to add. The current Flow player is used when omitted."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the player is added."}
@@ -216,7 +216,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts removing the player from the team."},
       {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to update."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player to remove; uses the current Flow player when omitted."}
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player to remove. The current Flow player is used when omitted."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the player is removed."}
@@ -389,7 +389,7 @@
       ]
     },
     "inputs": [
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose team should be found; the current Flow player is used when omitted."}
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose team should be found. The current Flow player is used when omitted."}
     ],
     "outputs": [
       {"id": "team_id", "displayName": "Team ID", "name": "team_id", "pinType": "DATA", "direction": "output", "dataType": "string", "optional": true, "description": "Returns the matching team ID, or an empty value when the player is not assigned."}
@@ -474,7 +474,7 @@
     },
     "inputs": [
       {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to inspect."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player to check; uses the current Flow player when omitted."}
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player to check. The current Flow player is used when omitted."}
     ],
     "outputs": [
       {"id": "has", "displayName": "Has Player", "name": "has", "pinType": "DATA", "direction": "output", "dataType": "boolean", "description": "Reports whether the player is assigned to the selected team."}

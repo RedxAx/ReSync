@@ -2,7 +2,7 @@
   {
     "id": "event.bed.enter",
     "displayName": "Event Bed Enter",
-    "description": "Runs when the event bed enter event occurs.",
+    "description": "Starts a Flow when a player attempts to enter a bed.",
     "domain": "event",
     "family": "bed",
     "lifecycle": "active",
@@ -18,7 +18,7 @@
       "bed"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event bed enter event occurs."
+      "Connect Flow to the actions that should run when a player attempts to enter a bed."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerBedEnterEvent",
@@ -35,7 +35,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -44,7 +44,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -53,7 +53,7 @@
         "name": "event.bed_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the bed location value produced by this event.",
+        "description": "World position of the bed being entered or left.",
         "direction": "output"
       }
     ],
@@ -96,7 +96,7 @@
   {
     "id": "event.bed.leave",
     "displayName": "Event Bed Leave",
-    "description": "Runs when the event bed leave event occurs.",
+    "description": "Starts a Flow when a player leaves a bed.",
     "domain": "event",
     "family": "bed",
     "lifecycle": "active",
@@ -112,7 +112,7 @@
       "bed"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event bed leave event occurs."
+      "Connect Flow to the actions that should run when a player leaves a bed."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerBedLeaveEvent",
@@ -129,7 +129,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -138,7 +138,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -147,7 +147,7 @@
         "name": "event.bed_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the bed location value produced by this event.",
+        "description": "World position of the bed being entered or left.",
         "direction": "output"
       }
     ],
@@ -190,7 +190,7 @@
   {
     "id": "event.resync.command",
     "displayName": "Event Resync Command",
-    "description": "Runs when the event resync command event occurs.",
+    "description": "Starts a Flow when a registered ReSync command is invoked. Returns the arguments and sender for that invocation.",
     "domain": "event",
     "family": "system",
     "lifecycle": "active",
@@ -206,7 +206,7 @@
       "system"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event resync command event occurs."
+      "Connect Flow to the actions that should run when a registered ReSync command is invoked."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerCommandPreprocessEvent",
@@ -223,7 +223,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -232,7 +232,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -371,7 +371,7 @@
   {
     "id": "event.furnace.smelt",
     "displayName": "Event Furnace Smelt",
-    "description": "Runs when the event furnace smelt event occurs.",
+    "description": "Starts a Flow when a furnace turns its input into a smelting result. This event has no player sender.",
     "domain": "event",
     "family": "furnace",
     "lifecycle": "active",
@@ -387,7 +387,7 @@
       "furnace"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event furnace smelt event occurs."
+      "Connect Flow to the actions that should run when a furnace turns its input into a smelting result."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.inventory.FurnaceSmeltEvent",
@@ -404,7 +404,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -413,7 +413,7 @@
         "name": "event.furnace",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the furnace value produced by this event.",
+        "description": "Furnace block producing the smelting result.",
         "direction": "output"
       },
       {
@@ -422,7 +422,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -431,7 +431,7 @@
         "name": "event.result",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the result value produced by this event.",
+        "description": "Item stack produced by the crafting or smelting operation.",
         "direction": "output"
       },
       {
@@ -440,7 +440,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       }
     ],
@@ -497,7 +497,7 @@
   {
     "id": "event.sign.change",
     "displayName": "Event Sign Change",
-    "description": "Runs when the event sign change event occurs.",
+    "description": "Starts a Flow when a player edits the text on a sign.",
     "domain": "event",
     "family": "sign",
     "lifecycle": "active",
@@ -513,7 +513,7 @@
       "sign"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event sign change event occurs."
+      "Connect Flow to the actions that should run when a player edits the text on a sign."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.SignChangeEvent",
@@ -530,7 +530,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -539,7 +539,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -548,7 +548,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -557,7 +557,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -566,7 +566,7 @@
         "name": "event.lines",
         "pinType": "DATA",
         "dataType": "list<string>",
-        "description": "Provides the lines value produced by this event.",
+        "description": "Four sign lines in their displayed order.",
         "direction": "output"
       }
     ],
@@ -627,7 +627,7 @@
   {
     "id": "event.craft",
     "displayName": "Event Craft",
-    "description": "Runs when the event craft event occurs.",
+    "description": "Starts a Flow when a player clicks a crafting result.",
     "domain": "event",
     "family": "craft",
     "lifecycle": "active",
@@ -643,7 +643,7 @@
       "craft"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event craft event occurs."
+      "Connect Flow to the actions that should run when a player clicks a crafting result."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.inventory.CraftItemEvent",
@@ -660,7 +660,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -670,7 +670,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "optional": true,
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -679,7 +679,7 @@
         "name": "event.result",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the result value produced by this event.",
+        "description": "Item stack produced by the crafting or smelting operation.",
         "direction": "output"
       }
     ],
@@ -722,7 +722,7 @@
   {
     "id": "event.gamemode.change",
     "displayName": "Event Gamemode Change",
-    "description": "Runs when the event gamemode change event occurs.",
+    "description": "Starts a Flow when a player is about to change game mode.",
     "domain": "event",
     "family": "gamemode",
     "lifecycle": "active",
@@ -738,7 +738,7 @@
       "gamemode"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event gamemode change event occurs."
+      "Connect Flow to the actions that should run when a player is about to change game mode."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerGameModeChangeEvent",
@@ -755,7 +755,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -764,7 +764,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -773,7 +773,7 @@
         "name": "event.old_gamemode",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the old gamemode value produced by this event.",
+        "description": "Player game mode before the requested change.",
         "direction": "output"
       },
       {
@@ -782,7 +782,7 @@
         "name": "event.new_gamemode",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the new gamemode value produced by this event.",
+        "description": "Requested new player game mode.",
         "direction": "output"
       }
     ],
@@ -834,7 +834,7 @@
   {
     "id": "event.tab.complete",
     "displayName": "Event Tab Complete",
-    "description": "Runs when the event tab complete event occurs.",
+    "description": "Starts a Flow when a command sender requests tab completions for the current command text.",
     "domain": "event",
     "family": "tab",
     "lifecycle": "active",
@@ -850,7 +850,7 @@
       "tab"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event tab complete event occurs."
+      "Connect Flow to the actions that should run when a command sender requests tab completions for the current command text."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.server.TabCompleteEvent",
@@ -867,7 +867,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -877,7 +877,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "optional": true,
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -886,7 +886,7 @@
         "name": "event.command",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the command value produced by this event.",
+        "description": "Command text supplied by the sender, including arguments.",
         "direction": "output"
       },
       {
@@ -895,7 +895,7 @@
         "name": "event.completions",
         "pinType": "DATA",
         "dataType": "list<string>",
-        "description": "Provides the completions value produced by this event.",
+        "description": "Suggested completions for the current command text.",
         "direction": "output"
       }
     ],
@@ -947,7 +947,7 @@
   {
     "id": "event.smelt",
     "displayName": "Event Smelt",
-    "description": "Runs when the event smelt event occurs.",
+    "description": "Starts a Flow when a furnace produces a smelting result. This event has no player sender.",
     "domain": "event",
     "family": "smelt",
     "lifecycle": "active",
@@ -963,7 +963,7 @@
       "smelt"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event smelt event occurs."
+      "Connect Flow to the actions that should run when a furnace produces a smelting result."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.inventory.FurnaceSmeltEvent",
@@ -980,7 +980,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -989,7 +989,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -998,7 +998,7 @@
         "name": "event.result",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the result value produced by this event.",
+        "description": "Item stack produced by the crafting or smelting operation.",
         "direction": "output"
       }
     ],
@@ -1034,7 +1034,7 @@
   {
     "id": "event.weather.change",
     "displayName": "Event Weather Change",
-    "description": "Runs when the event weather change event occurs.",
+    "description": "Starts a Flow when a world is about to start or stop rainy weather.",
     "domain": "event",
     "family": "weather",
     "lifecycle": "active",
@@ -1050,7 +1050,7 @@
       "weather"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event weather change event occurs."
+      "Connect Flow to the actions that should run when a world is about to start or stop rainy weather."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.weather.WeatherChangeEvent",
@@ -1067,7 +1067,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -1076,7 +1076,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       },
       {
@@ -1085,7 +1085,7 @@
         "name": "event.old_weather",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the old weather value produced by this event.",
+        "description": "Whether rainy weather is active before the change.",
         "direction": "output"
       },
       {
@@ -1094,7 +1094,7 @@
         "name": "event.new_weather",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the new weather value produced by this event.",
+        "description": "Whether rainy weather will be active after the change.",
         "direction": "output"
       }
     ],
@@ -1146,7 +1146,7 @@
   {
     "id": "event.shoot",
     "displayName": "Event Shoot",
-    "description": "Runs when the event shoot event occurs.",
+    "description": "Starts a Flow when an entity shoots a bow. Player is present only when the shooter is a player.",
     "domain": "event",
     "family": "shoot",
     "lifecycle": "active",
@@ -1162,7 +1162,7 @@
       "shoot"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event shoot event occurs."
+      "Connect Flow to the actions that should run when an entity shoots a bow."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityShootBowEvent",
@@ -1179,7 +1179,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -1189,7 +1189,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "optional": true,
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -1198,7 +1198,7 @@
         "name": "event.projectile",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the projectile value produced by this event.",
+        "description": "Projectile fired or involved in the collision.",
         "direction": "output"
       }
     ],
@@ -1241,7 +1241,7 @@
   {
     "id": "event.block.break",
     "displayName": "Event Block Break",
-    "description": "Runs when the event block break event occurs.",
+    "description": "Starts a Flow when a player attempts to break a block.",
     "domain": "event",
     "family": "block",
     "lifecycle": "active",
@@ -1257,7 +1257,7 @@
       "block"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event block break event occurs."
+      "Connect Flow to the actions that should run when a player attempts to break a block."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockBreakEvent",
@@ -1274,7 +1274,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -1283,7 +1283,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -1292,7 +1292,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -1301,7 +1301,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -1310,7 +1310,7 @@
         "name": "event.is_cancelled",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the is cancelled value produced by this event.",
+        "description": "Whether this cancellable occurrence is currently cancelled.",
         "direction": "output"
       }
     ],
@@ -1371,7 +1371,7 @@
   {
     "id": "event.block.place",
     "displayName": "Event Block Place",
-    "description": "Runs when the event block place event occurs.",
+    "description": "Starts a Flow when a player attempts to place a block against another block.",
     "domain": "event",
     "family": "block",
     "lifecycle": "active",
@@ -1387,7 +1387,7 @@
       "block"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event block place event occurs."
+      "Connect Flow to the actions that should run when a player attempts to place a block against another block."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockPlaceEvent",
@@ -1404,7 +1404,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -1413,7 +1413,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -1422,7 +1422,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -1431,7 +1431,7 @@
         "name": "event.placed_against",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the placed against value produced by this event.",
+        "description": "Existing block against which the new block is placed.",
         "direction": "output"
       },
       {
@@ -1440,7 +1440,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -1449,7 +1449,7 @@
         "name": "event.against_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the against location value produced by this event.",
+        "description": "World position of the block against which placement occurs.",
         "direction": "output"
       },
       {
@@ -1458,7 +1458,7 @@
         "name": "event.is_cancelled",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the is cancelled value produced by this event.",
+        "description": "Whether this cancellable occurrence is currently cancelled.",
         "direction": "output"
       }
     ],
@@ -1537,7 +1537,7 @@
   {
     "id": "event.block.redstone",
     "displayName": "Event Block Redstone",
-    "description": "Runs when the event block redstone event occurs.",
+    "description": "Starts a Flow when a block changes its redstone power level.",
     "domain": "event",
     "family": "block",
     "lifecycle": "active",
@@ -1553,7 +1553,7 @@
       "block"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event block redstone event occurs."
+      "Connect Flow to the actions that should run when a block changes its redstone power level."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockRedstoneEvent",
@@ -1570,7 +1570,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -1579,7 +1579,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -1588,7 +1588,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -1597,7 +1597,7 @@
         "name": "event.old_power",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the old power value produced by this event.",
+        "description": "Previous redstone power level, from 0 through 15.",
         "direction": "output"
       },
       {
@@ -1606,7 +1606,7 @@
         "name": "event.new_power",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the new power value produced by this event.",
+        "description": "New redstone power level, from 0 through 15.",
         "direction": "output"
       }
     ],
@@ -1667,7 +1667,7 @@
   {
     "id": "event.block.from.to",
     "displayName": "Event Block From To",
-    "description": "Runs when the event block from to event occurs.",
+    "description": "Starts a Flow when a block flows or moves into a neighboring block, such as water or lava.",
     "domain": "event",
     "family": "block",
     "lifecycle": "active",
@@ -1683,7 +1683,7 @@
       "block"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event block from to event occurs."
+      "Connect Flow to the actions that should run when a block flows or moves into a neighboring block, such as water or lava."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockFromToEvent",
@@ -1700,7 +1700,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -1709,7 +1709,7 @@
         "name": "event.from_block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the from block value produced by this event.",
+        "description": "Source block from which the material is flowing or moving.",
         "direction": "output"
       },
       {
@@ -1718,7 +1718,7 @@
         "name": "event.to_block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the to block value produced by this event.",
+        "description": "Destination block into which the material is flowing or moving.",
         "direction": "output"
       },
       {
@@ -1727,7 +1727,7 @@
         "name": "event.from_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the from location value produced by this event.",
+        "description": "World position and rotation before the move or teleport.",
         "direction": "output"
       },
       {
@@ -1736,7 +1736,7 @@
         "name": "event.to_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the to location value produced by this event.",
+        "description": "Proposed world position and rotation after the move or teleport.",
         "direction": "output"
       }
     ],
@@ -1797,7 +1797,7 @@
   {
     "id": "event.block.dispense",
     "displayName": "Event Block Dispense",
-    "description": "Runs when the event block dispense event occurs.",
+    "description": "Starts a Flow when a dispenser or dropper ejects an item.",
     "domain": "event",
     "family": "block",
     "lifecycle": "active",
@@ -1813,7 +1813,7 @@
       "block"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event block dispense event occurs."
+      "Connect Flow to the actions that should run when a dispenser or dropper ejects an item."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockDispenseEvent",
@@ -1830,7 +1830,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -1839,7 +1839,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -1848,7 +1848,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -1857,7 +1857,7 @@
         "name": "event.item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item value produced by this event.",
+        "description": "Item stack being consumed, dispensed, moved, or otherwise affected.",
         "direction": "output"
       }
     ],
@@ -1909,7 +1909,7 @@
   {
     "id": "event.block.fade",
     "displayName": "Event Block Fade",
-    "description": "Runs when the event block fade event occurs.",
+    "description": "Starts a Flow when a block changes through fading, such as ice melting.",
     "domain": "event",
     "family": "block",
     "lifecycle": "active",
@@ -1925,7 +1925,7 @@
       "block"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event block fade event occurs."
+      "Connect Flow to the actions that should run when a block changes through fading, such as ice melting."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockFadeEvent",
@@ -1942,7 +1942,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -1951,7 +1951,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -1960,7 +1960,7 @@
         "name": "event.new_state",
         "pinType": "DATA",
         "dataType": "material",
-        "description": "Provides the new state value produced by this event.",
+        "description": "Proposed block state after the change. Structure growth provides a list of states.",
         "direction": "output"
       },
       {
@@ -1969,7 +1969,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       }
     ],
@@ -2021,7 +2021,7 @@
   {
     "id": "event.block.form",
     "displayName": "Event Block Form",
-    "description": "Runs when the event block form event occurs.",
+    "description": "Starts a Flow when a block forms naturally, such as snow or ice.",
     "domain": "event",
     "family": "block",
     "lifecycle": "active",
@@ -2037,7 +2037,7 @@
       "block"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event block form event occurs."
+      "Connect Flow to the actions that should run when a block forms naturally, such as snow or ice."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockFormEvent",
@@ -2054,7 +2054,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -2063,7 +2063,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -2072,7 +2072,7 @@
         "name": "event.new_state",
         "pinType": "DATA",
         "dataType": "material",
-        "description": "Provides the new state value produced by this event.",
+        "description": "Proposed block state after the change. Structure growth provides a list of states.",
         "direction": "output"
       },
       {
@@ -2081,7 +2081,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       }
     ],
@@ -2133,7 +2133,7 @@
   {
     "id": "event.block.spread",
     "displayName": "Event Block Spread",
-    "description": "Runs when the event block spread event occurs.",
+    "description": "Starts a Flow when a block spreads from another block, such as fire or mushrooms.",
     "domain": "event",
     "family": "block",
     "lifecycle": "active",
@@ -2149,7 +2149,7 @@
       "block"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event block spread event occurs."
+      "Connect Flow to the actions that should run when a block spreads from another block, such as fire or mushrooms."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockSpreadEvent",
@@ -2166,7 +2166,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -2175,7 +2175,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -2184,7 +2184,7 @@
         "name": "event.new_block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the new block value produced by this event.",
+        "description": "Source block from which the new block spreads.",
         "direction": "output"
       },
       {
@@ -2193,7 +2193,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       }
     ],
@@ -2245,7 +2245,7 @@
   {
     "id": "event.join",
     "displayName": "Event Join",
-    "description": "Runs when the event join event occurs.",
+    "description": "Starts a Flow when a player joins this server.",
     "domain": "event",
     "family": "join",
     "lifecycle": "active",
@@ -2261,7 +2261,7 @@
       "join"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event join event occurs."
+      "Connect Flow to the actions that should run when a player joins this server."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerJoinEvent",
@@ -2278,7 +2278,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -2287,7 +2287,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -2296,7 +2296,7 @@
         "name": "event.join_message",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the join message value produced by this event.",
+        "description": "Announcement for the player joining. May be absent when announcements are disabled.",
         "direction": "output"
       }
     ],
@@ -2339,7 +2339,7 @@
   {
     "id": "event.exp.change",
     "displayName": "Event Exp Change",
-    "description": "Runs when the event exp change event occurs.",
+    "description": "Starts a Flow when the amount of experience awarded to a player changes.",
     "domain": "event",
     "family": "exp",
     "lifecycle": "active",
@@ -2355,7 +2355,7 @@
       "exp"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event exp change event occurs."
+      "Connect Flow to the actions that should run when the amount of experience awarded to a player changes."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerExpChangeEvent",
@@ -2372,7 +2372,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -2381,7 +2381,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -2390,7 +2390,7 @@
         "name": "event.amount",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the amount value produced by this event.",
+        "description": "Amount of experience awarded or health restored by this occurrence.",
         "direction": "output"
       }
     ],
@@ -2433,7 +2433,7 @@
   {
     "id": "event.sneak",
     "displayName": "Event Sneak",
-    "description": "Runs when the event sneak event occurs.",
+    "description": "Starts a Flow when a player starts or stops sneaking.",
     "domain": "event",
     "family": "sneak",
     "lifecycle": "active",
@@ -2449,7 +2449,7 @@
       "sneak"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event sneak event occurs."
+      "Connect Flow to the actions that should run when a player starts or stops sneaking."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerToggleSneakEvent",
@@ -2466,7 +2466,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -2475,7 +2475,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -2484,7 +2484,7 @@
         "name": "event.is_sneaking",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the is sneaking value produced by this event.",
+        "description": "True when the player starts sneaking. False when they stop.",
         "direction": "output"
       }
     ],
@@ -2528,7 +2528,7 @@
   {
     "id": "event.vanish.toggle",
     "displayName": "Event Vanish Toggle",
-    "description": "Runs when the event vanish toggle event occurs.",
+    "description": "Starts a Flow when an entity is hidden from a player. The visibility change applies to that viewer.",
     "domain": "event",
     "family": "vanish",
     "lifecycle": "active",
@@ -2544,7 +2544,7 @@
       "vanish"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event vanish toggle event occurs."
+      "Connect Flow to the actions that should run when an entity is hidden from a player."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerHideEntityEvent",
@@ -2561,7 +2561,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -2570,7 +2570,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -2579,7 +2579,7 @@
         "name": "event.is_vanished",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the is vanished value produced by this event.",
+        "description": "Visibility state reported by the hide-entity occurrence.",
         "direction": "output",
         "optional": true
       },
@@ -2589,7 +2589,7 @@
         "name": "event.hidden_entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the hidden entity value produced by this event.",
+        "description": "Entity hidden from the viewing player.",
         "direction": "output"
       }
     ],
@@ -2637,7 +2637,7 @@
   {
     "id": "event.lightning.strike",
     "displayName": "Event Lightning Strike",
-    "description": "Runs when the event lightning strike event occurs.",
+    "description": "Starts a Flow when lightning strikes in a world.",
     "domain": "event",
     "family": "lightning",
     "lifecycle": "active",
@@ -2653,7 +2653,7 @@
       "lightning"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event lightning strike event occurs."
+      "Connect Flow to the actions that should run when lightning strikes in a world."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.weather.LightningStrikeEvent",
@@ -2670,7 +2670,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -2679,7 +2679,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -2688,7 +2688,7 @@
         "name": "event.struck_entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the struck entity value produced by this event.",
+        "description": "Lightning entity associated with the strike.",
         "direction": "output"
       },
       {
@@ -2697,7 +2697,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       }
     ],
@@ -2749,7 +2749,7 @@
   {
     "id": "event.item.merge",
     "displayName": "Event Item Merge",
-    "description": "Runs when the event item merge event occurs.",
+    "description": "Starts a Flow when one dropped item entity attempts to merge into another.",
     "domain": "event",
     "family": "item",
     "lifecycle": "active",
@@ -2765,7 +2765,7 @@
       "item"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event item merge event occurs."
+      "Connect Flow to the actions that should run when one dropped item entity attempts to merge into another."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.ItemMergeEvent",
@@ -2782,7 +2782,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -2791,7 +2791,7 @@
         "name": "event.item1",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item1 value produced by this event.",
+        "description": "Dropped item entity that is merging into the destination.",
         "direction": "output"
       },
       {
@@ -2800,7 +2800,7 @@
         "name": "event.item2",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item2 value produced by this event.",
+        "description": "Destination dropped item entity receiving the merge.",
         "direction": "output"
       },
       {
@@ -2809,7 +2809,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -2818,7 +2818,7 @@
         "name": "event.result",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the result value produced by this event.",
+        "description": "Item stack produced by the crafting or smelting operation.",
         "direction": "output"
       }
     ],
@@ -2879,7 +2879,7 @@
   {
     "id": "event.item.damage",
     "displayName": "Event Item Damage",
-    "description": "Runs when the event item damage event occurs.",
+    "description": "Starts a Flow when an item used by a player is about to lose durability.",
     "domain": "event",
     "family": "item",
     "lifecycle": "active",
@@ -2895,7 +2895,7 @@
       "item"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event item damage event occurs."
+      "Connect Flow to the actions that should run when an item used by a player is about to lose durability."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerItemDamageEvent",
@@ -2912,7 +2912,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -2921,7 +2921,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -2930,7 +2930,7 @@
         "name": "event.item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item value produced by this event.",
+        "description": "Item stack being consumed, dispensed, moved, or otherwise affected.",
         "direction": "output"
       },
       {
@@ -2939,7 +2939,7 @@
         "name": "event.damage",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the damage value produced by this event.",
+        "description": "Damage amount. Entity damage uses health points. Item damage uses durability points.",
         "direction": "output"
       }
     ],
@@ -2991,7 +2991,7 @@
   {
     "id": "event.item.break",
     "displayName": "Event Item Break",
-    "description": "Runs when the event item break event occurs.",
+    "description": "Starts a Flow when an item held by a player breaks after exhausting its durability.",
     "domain": "event",
     "family": "item",
     "lifecycle": "active",
@@ -3007,7 +3007,7 @@
       "item"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event item break event occurs."
+      "Connect Flow to the actions that should run when an item held by a player breaks after exhausting its durability."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerItemBreakEvent",
@@ -3024,7 +3024,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -3033,7 +3033,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -3042,7 +3042,7 @@
         "name": "event.broken_item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the broken item value produced by this event.",
+        "description": "Item stack whose durability has just been exhausted.",
         "direction": "output"
       }
     ],
@@ -3085,7 +3085,7 @@
   {
     "id": "event.grow",
     "displayName": "Event Grow",
-    "description": "Runs when the event grow event occurs.",
+    "description": "Starts a Flow when a block grows naturally, such as a crop advancing to its next stage.",
     "domain": "event",
     "family": "grow",
     "lifecycle": "active",
@@ -3101,7 +3101,7 @@
       "grow"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event grow event occurs."
+      "Connect Flow to the actions that should run when a block grows naturally, such as a crop advancing to its next stage."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockGrowEvent",
@@ -3118,7 +3118,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -3127,7 +3127,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -3136,7 +3136,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -3145,7 +3145,7 @@
         "name": "event.new_state",
         "pinType": "DATA",
         "dataType": "material",
-        "description": "Provides the new state value produced by this event.",
+        "description": "Proposed block state after the change. Structure growth provides a list of states.",
         "direction": "output"
       }
     ],
@@ -3197,7 +3197,7 @@
   {
     "id": "event.level.up",
     "displayName": "Event Level Up",
-    "description": "Runs when the event level up event occurs.",
+    "description": "Starts a Flow when a player changes experience level, including a decrease.",
     "domain": "event",
     "family": "level",
     "lifecycle": "active",
@@ -3213,7 +3213,7 @@
       "level"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event level up event occurs."
+      "Connect Flow to the actions that should run when a player changes experience level, including a decrease."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerLevelChangeEvent",
@@ -3230,7 +3230,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -3239,7 +3239,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -3248,7 +3248,7 @@
         "name": "event.old_level",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the old level value produced by this event.",
+        "description": "Experience level before the change.",
         "direction": "output"
       },
       {
@@ -3257,7 +3257,7 @@
         "name": "event.new_level",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the new level value produced by this event.",
+        "description": "Experience level after the change. It may be lower than Old Level.",
         "direction": "output"
       }
     ],
@@ -3309,7 +3309,7 @@
   {
     "id": "event.click",
     "displayName": "Event Click",
-    "description": "Runs when the event click event occurs.",
+    "description": "Starts a Flow when a player clicks an inventory slot. Slot is the index within its inventory. Raw Slot is the index across the complete inventory view.",
     "domain": "event",
     "family": "click",
     "lifecycle": "active",
@@ -3325,7 +3325,7 @@
       "click"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event click event occurs."
+      "Connect Flow to the actions that should run when a player clicks a slot in an open inventory."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.inventory.InventoryClickEvent",
@@ -3342,7 +3342,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -3352,7 +3352,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "optional": true,
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -3361,7 +3361,7 @@
         "name": "event.slot",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the slot value produced by this event.",
+        "description": "Slot index within the clicked inventory, starting at 0.",
         "direction": "output"
       },
       {
@@ -3370,7 +3370,7 @@
         "name": "event.raw_slot",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the raw slot value produced by this event.",
+        "description": "Slot index across the complete inventory view, starting at 0.",
         "direction": "output"
       },
       {
@@ -3379,7 +3379,7 @@
         "name": "event.button",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the button value produced by this event.",
+        "description": "Click type, such as left click, right click, or shift click.",
         "direction": "output"
       },
       {
@@ -3388,7 +3388,7 @@
         "name": "event.action",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the action value produced by this event.",
+        "description": "Inventory action produced by the click, such as pickup, placement, or swapping.",
         "direction": "output"
       },
       {
@@ -3397,7 +3397,7 @@
         "name": "event.item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item value produced by this event.",
+        "description": "Item stack being consumed, dispensed, moved, or otherwise affected.",
         "direction": "output"
       },
       {
@@ -3406,7 +3406,7 @@
         "name": "event.cursor_item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the cursor item value produced by this event.",
+        "description": "Item stack attached to the player cursor before the click.",
         "direction": "output"
       }
     ],
@@ -3494,7 +3494,7 @@
   {
     "id": "event.respawn",
     "displayName": "Event Respawn",
-    "description": "Runs when the event respawn event occurs.",
+    "description": "Starts a Flow when a player respawns after death or returning from the End.",
     "domain": "event",
     "family": "respawn",
     "lifecycle": "active",
@@ -3510,7 +3510,7 @@
       "respawn"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event respawn event occurs."
+      "Connect Flow to the actions that should run when a player respawns after death or returning from the End."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerRespawnEvent",
@@ -3527,7 +3527,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -3536,7 +3536,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -3545,7 +3545,7 @@
         "name": "event.respawn_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the respawn location value produced by this event.",
+        "description": "World position selected for the player respawn.",
         "direction": "output"
       }
     ],
@@ -3588,7 +3588,7 @@
   {
     "id": "event.drop",
     "displayName": "Event Drop",
-    "description": "Runs when the event drop event occurs.",
+    "description": "Starts a Flow when a player drops an item from their inventory.",
     "domain": "event",
     "family": "drop",
     "lifecycle": "active",
@@ -3604,7 +3604,7 @@
       "drop"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event drop event occurs."
+      "Connect Flow to the actions that should run when a player drops an item from their inventory."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerDropItemEvent",
@@ -3621,7 +3621,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -3630,7 +3630,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -3639,7 +3639,7 @@
         "name": "event.item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item value produced by this event.",
+        "description": "Item stack being consumed, dispensed, moved, or otherwise affected.",
         "direction": "output"
       }
     ],
@@ -3682,7 +3682,7 @@
   {
     "id": "event.note.play",
     "displayName": "Event Note Play",
-    "description": "Runs when the event note play event occurs.",
+    "description": "Starts a Flow when a note block plays a note.",
     "domain": "event",
     "family": "note",
     "lifecycle": "active",
@@ -3698,7 +3698,7 @@
       "note"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event note play event occurs."
+      "Connect Flow to the actions that should run when a note block plays a note."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.NotePlayEvent",
@@ -3715,7 +3715,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -3724,7 +3724,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -3733,7 +3733,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -3742,7 +3742,7 @@
         "name": "event.instrument",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the instrument value produced by this event.",
+        "description": "Instrument selected for the note block.",
         "direction": "output"
       },
       {
@@ -3751,7 +3751,7 @@
         "name": "event.note",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the note value produced by this event.",
+        "description": "Note played by the note block.",
         "direction": "output"
       }
     ],
@@ -3812,7 +3812,7 @@
   {
     "id": "event.server.start",
     "displayName": "Event Server Start",
-    "description": "Runs when the event server start event occurs.",
+    "description": "Starts a Flow when ReSync dispatches its server startup trigger.",
     "domain": "event",
     "family": "server",
     "lifecycle": "active",
@@ -3828,7 +3828,7 @@
       "server"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event server start event occurs."
+      "Connect Flow to the actions that should run when ReSync dispatches its server startup trigger."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.server.ServerLoadEvent",
@@ -3845,7 +3845,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -3854,7 +3854,7 @@
         "name": "event.server_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the server name value produced by this event.",
+        "description": "Name of the server associated with this lifecycle trigger.",
         "direction": "output"
       }
     ],
@@ -3885,7 +3885,7 @@
   {
     "id": "event.server.stop",
     "displayName": "Event Server Stop",
-    "description": "Runs when the event server stop event occurs.",
+    "description": "Starts a Flow when ReSync dispatches its server shutdown trigger.",
     "domain": "event",
     "family": "server",
     "lifecycle": "active",
@@ -3901,7 +3901,7 @@
       "server"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event server stop event occurs."
+      "Connect Flow to the actions that should run when ReSync dispatches its server shutdown trigger."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.server.PluginDisableEvent",
@@ -3918,7 +3918,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -3927,7 +3927,7 @@
         "name": "event.server_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the server name value produced by this event.",
+        "description": "Name of the server associated with this lifecycle trigger.",
         "direction": "output"
       }
     ],
@@ -3958,7 +3958,7 @@
   {
     "id": "event.server.tick",
     "displayName": "Event Server Tick",
-    "description": "Runs when the event server tick event occurs.",
+    "description": "Starts a Flow on each ReSync tick trigger. All connected actions run again on the next trigger.",
     "domain": "event",
     "family": "server",
     "lifecycle": "active",
@@ -3974,7 +3974,7 @@
       "server"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event server tick event occurs."
+      "Connect Flow to the actions that should run when ReSync dispatches its tick trigger."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.server.ServerLoadEvent",
@@ -3991,7 +3991,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4000,7 +4000,7 @@
         "name": "event.tick_number",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the tick number value produced by this event.",
+        "description": "Server tick number reported by the tick trigger.",
         "direction": "output"
       }
     ],
@@ -4031,7 +4031,7 @@
   {
     "id": "event.server.save",
     "displayName": "Event Server Save",
-    "description": "Runs when the event server save event occurs.",
+    "description": "Starts a Flow when a world is saved through the server save trigger.",
     "domain": "event",
     "family": "server",
     "lifecycle": "active",
@@ -4047,7 +4047,7 @@
       "server"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event server save event occurs."
+      "Connect Flow to the actions that should run when a world is saved through the server save trigger."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.world.WorldSaveEvent",
@@ -4064,7 +4064,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4073,7 +4073,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       }
     ],
@@ -4104,7 +4104,7 @@
   {
     "id": "event.flight.toggle",
     "displayName": "Event Flight Toggle",
-    "description": "Runs when the event flight toggle event occurs.",
+    "description": "Starts a Flow when a player starts or stops flying.",
     "domain": "event",
     "family": "flight",
     "lifecycle": "active",
@@ -4120,7 +4120,7 @@
       "flight"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event flight toggle event occurs."
+      "Connect Flow to the actions that should run when a player starts or stops flying."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerToggleFlightEvent",
@@ -4137,7 +4137,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4146,7 +4146,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -4155,7 +4155,7 @@
         "name": "event.is_flying",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the is flying value produced by this event.",
+        "description": "True when flight starts. False when flight stops.",
         "direction": "output"
       }
     ],
@@ -4198,7 +4198,7 @@
   {
     "id": "event.death",
     "displayName": "Event Death",
-    "description": "Runs when the event death event occurs.",
+    "description": "Starts a Flow when a player dies.",
     "domain": "event",
     "family": "death",
     "lifecycle": "active",
@@ -4214,7 +4214,7 @@
       "death"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event death event occurs."
+      "Connect Flow to the actions that should run when a player dies."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.PlayerDeathEvent",
@@ -4231,7 +4231,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4240,7 +4240,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -4249,7 +4249,7 @@
         "name": "event.death_message",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the death message value produced by this event.",
+        "description": "Announcement for the player death. May be absent when announcements are disabled.",
         "direction": "output"
       }
     ],
@@ -4292,7 +4292,7 @@
   {
     "id": "event.teleport",
     "displayName": "Event Teleport",
-    "description": "Runs when the event teleport event occurs.",
+    "description": "Starts a Flow when a player is about to teleport between locations.",
     "domain": "event",
     "family": "teleport",
     "lifecycle": "active",
@@ -4308,7 +4308,7 @@
       "teleport"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event teleport event occurs."
+      "Connect Flow to the actions that should run when a player is about to teleport between locations."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerTeleportEvent",
@@ -4325,7 +4325,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4334,7 +4334,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -4343,7 +4343,7 @@
         "name": "event.from_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the from location value produced by this event.",
+        "description": "World position and rotation before the move or teleport.",
         "direction": "output"
       },
       {
@@ -4352,7 +4352,7 @@
         "name": "event.to_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the to location value produced by this event.",
+        "description": "Proposed world position and rotation after the move or teleport.",
         "direction": "output"
       },
       {
@@ -4361,7 +4361,7 @@
         "name": "event.cause",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the cause value produced by this event.",
+        "description": "Named cause of the damage or teleport.",
         "direction": "output"
       }
     ],
@@ -4422,7 +4422,7 @@
   {
     "id": "event.interact",
     "displayName": "Event Interact",
-    "description": "Runs when the event interact event occurs.",
+    "description": "Starts a Flow when a player interacts with a block or the air. Clicking an entity uses Entity Interact.",
     "domain": "event",
     "family": "interact",
     "lifecycle": "active",
@@ -4438,7 +4438,7 @@
       "interact"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event interact event occurs."
+      "Connect Flow to the actions that should run when a player interacts with a block or the air."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerInteractEvent",
@@ -4455,7 +4455,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4464,7 +4464,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -4473,7 +4473,7 @@
         "name": "event.clicked_block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the clicked block value produced by this event.",
+        "description": "Block clicked by the player. Absent for interactions with the air.",
         "direction": "output"
       },
       {
@@ -4482,7 +4482,7 @@
         "name": "event.clicked_entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the clicked entity value produced by this event.",
+        "description": "Entity associated with the interaction when the occurrence supplies one.",
         "direction": "output",
         "optional": true
       },
@@ -4492,7 +4492,7 @@
         "name": "event.action_type",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the action type value produced by this event.",
+        "description": "Interaction kind, such as left click, right click, or physical contact.",
         "direction": "output"
       }
     ],
@@ -4549,7 +4549,7 @@
   {
     "id": "event.chunk.load",
     "displayName": "Event Chunk Load",
-    "description": "Runs when the event chunk load event occurs.",
+    "description": "Starts a Flow when a chunk is loaded into a world.",
     "domain": "event",
     "family": "chunk",
     "lifecycle": "active",
@@ -4565,7 +4565,7 @@
       "chunk"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event chunk load event occurs."
+      "Connect Flow to the actions that should run when a chunk is loaded into a world."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.world.ChunkLoadEvent",
@@ -4582,7 +4582,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4591,7 +4591,7 @@
         "name": "event.chunk",
         "pinType": "DATA",
         "dataType": "any",
-        "description": "Provides the chunk value produced by this event.",
+        "description": "Chunk being loaded or unloaded.",
         "direction": "output"
       },
       {
@@ -4600,7 +4600,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       },
       {
@@ -4609,7 +4609,7 @@
         "name": "event.chunk_x",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the chunk x value produced by this event.",
+        "description": "Chunk X coordinate. Each chunk is 16 blocks wide.",
         "direction": "output"
       },
       {
@@ -4618,7 +4618,7 @@
         "name": "event.chunk_z",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the chunk z value produced by this event.",
+        "description": "Chunk Z coordinate. Each chunk is 16 blocks long.",
         "direction": "output"
       }
     ],
@@ -4679,7 +4679,7 @@
   {
     "id": "event.chunk.unload",
     "displayName": "Event Chunk Unload",
-    "description": "Runs when the event chunk unload event occurs.",
+    "description": "Starts a Flow when a chunk is about to unload from a world.",
     "domain": "event",
     "family": "chunk",
     "lifecycle": "active",
@@ -4695,7 +4695,7 @@
       "chunk"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event chunk unload event occurs."
+      "Connect Flow to the actions that should run when a chunk is about to unload from a world."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.world.ChunkUnloadEvent",
@@ -4712,7 +4712,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4721,7 +4721,7 @@
         "name": "event.chunk",
         "pinType": "DATA",
         "dataType": "any",
-        "description": "Provides the chunk value produced by this event.",
+        "description": "Chunk being loaded or unloaded.",
         "direction": "output"
       },
       {
@@ -4730,7 +4730,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       },
       {
@@ -4739,7 +4739,7 @@
         "name": "event.chunk_x",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the chunk x value produced by this event.",
+        "description": "Chunk X coordinate. Each chunk is 16 blocks wide.",
         "direction": "output"
       },
       {
@@ -4748,7 +4748,7 @@
         "name": "event.chunk_z",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the chunk z value produced by this event.",
+        "description": "Chunk Z coordinate. Each chunk is 16 blocks long.",
         "direction": "output"
       }
     ],
@@ -4809,7 +4809,7 @@
   {
     "id": "event.consume",
     "displayName": "Event Consume",
-    "description": "Runs when the event consume event occurs.",
+    "description": "Starts a Flow when a player is about to finish consuming an item.",
     "domain": "event",
     "family": "consume",
     "lifecycle": "active",
@@ -4825,7 +4825,7 @@
       "consume"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event consume event occurs."
+      "Connect Flow to the actions that should run when a player is about to finish consuming an item."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerItemConsumeEvent",
@@ -4842,7 +4842,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4851,7 +4851,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -4860,7 +4860,7 @@
         "name": "event.item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item value produced by this event.",
+        "description": "Item stack being consumed, dispensed, moved, or otherwise affected.",
         "direction": "output"
       }
     ],
@@ -4903,7 +4903,7 @@
   {
     "id": "event.inventory.open",
     "displayName": "Event Inventory Open",
-    "description": "Runs when the event inventory open event occurs.",
+    "description": "Starts a Flow when an inventory is opened for a player.",
     "domain": "event",
     "family": "inventory",
     "lifecycle": "active",
@@ -4919,7 +4919,7 @@
       "inventory"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event inventory open event occurs."
+      "Connect Flow to the actions that should run when an inventory is opened for a player."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.inventory.InventoryOpenEvent",
@@ -4936,7 +4936,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -4946,7 +4946,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "optional": true,
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -4955,7 +4955,7 @@
         "name": "event.inventory_title",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the inventory title value produced by this event.",
+        "description": "Title displayed by the opened inventory view.",
         "direction": "output"
       },
       {
@@ -4964,7 +4964,7 @@
         "name": "event.inventory_type",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the inventory type value produced by this event.",
+        "description": "Inventory kind, such as chest, furnace, or crafting.",
         "direction": "output"
       },
       {
@@ -4974,7 +4974,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "optional": true,
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       }
     ],
@@ -5031,7 +5031,7 @@
   {
     "id": "event.inventory.close",
     "displayName": "Event Inventory Close",
-    "description": "Runs when the event inventory close event occurs.",
+    "description": "Starts a Flow when a player closes an inventory.",
     "domain": "event",
     "family": "inventory",
     "lifecycle": "active",
@@ -5047,7 +5047,7 @@
       "inventory"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event inventory close event occurs."
+      "Connect Flow to the actions that should run when a player closes an inventory."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.inventory.InventoryCloseEvent",
@@ -5064,7 +5064,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5074,7 +5074,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "optional": true,
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -5083,7 +5083,7 @@
         "name": "event.inventory_title",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the inventory title value produced by this event.",
+        "description": "Title displayed by the opened inventory view.",
         "direction": "output"
       },
       {
@@ -5092,7 +5092,7 @@
         "name": "event.inventory_type",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the inventory type value produced by this event.",
+        "description": "Inventory kind, such as chest, furnace, or crafting.",
         "direction": "output"
       },
       {
@@ -5102,7 +5102,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "optional": true,
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       }
     ],
@@ -5159,7 +5159,7 @@
   {
     "id": "event.world.load",
     "displayName": "Event World Load",
-    "description": "Runs when the event world load event occurs.",
+    "description": "Starts a Flow when a world is loaded.",
     "domain": "event",
     "family": "world",
     "lifecycle": "active",
@@ -5175,7 +5175,7 @@
       "world"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event world load event occurs."
+      "Connect Flow to the actions that should run when a world is loaded."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.world.WorldLoadEvent",
@@ -5192,7 +5192,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5201,7 +5201,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       }
     ],
@@ -5235,7 +5235,7 @@
   {
     "id": "event.world.unload",
     "displayName": "Event World Unload",
-    "description": "Runs when the event world unload event occurs.",
+    "description": "Starts a Flow when a world is about to unload.",
     "domain": "event",
     "family": "world",
     "lifecycle": "active",
@@ -5251,7 +5251,7 @@
       "world"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event world unload event occurs."
+      "Connect Flow to the actions that should run when a world is about to unload."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.world.WorldUnloadEvent",
@@ -5268,7 +5268,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5277,7 +5277,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       }
     ],
@@ -5311,7 +5311,7 @@
   {
     "id": "event.world.save",
     "displayName": "Event World Save",
-    "description": "Runs when the event world save event occurs.",
+    "description": "Starts a Flow when a world is saved.",
     "domain": "event",
     "family": "world",
     "lifecycle": "active",
@@ -5327,7 +5327,7 @@
       "world"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event world save event occurs."
+      "Connect Flow to the actions that should run when a world is saved."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.world.WorldSaveEvent",
@@ -5344,7 +5344,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5353,7 +5353,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       }
     ],
@@ -5387,7 +5387,7 @@
   {
     "id": "event.physics",
     "displayName": "Event Physics",
-    "description": "Runs when the event physics event occurs.",
+    "description": "Starts a Flow when a block receives a physics update from changes around it.",
     "domain": "event",
     "family": "physics",
     "lifecycle": "active",
@@ -5403,7 +5403,7 @@
       "physics"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event physics event occurs."
+      "Connect Flow to the actions that should run when a block receives a physics update from changes around it."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockPhysicsEvent",
@@ -5420,7 +5420,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5429,7 +5429,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -5438,7 +5438,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       }
     ],
@@ -5481,7 +5481,7 @@
   {
     "id": "event.move",
     "displayName": "Event Move",
-    "description": "Runs when the event move event occurs.",
+    "description": "Starts a Flow when a player moves or changes their view direction. From and To include position and rotation.",
     "domain": "event",
     "family": "move",
     "lifecycle": "active",
@@ -5497,7 +5497,7 @@
       "move"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event move event occurs."
+      "Connect Flow to the actions that should run when a player moves or changes their view direction."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerMoveEvent",
@@ -5514,7 +5514,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5523,7 +5523,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -5532,7 +5532,7 @@
         "name": "event.from_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the from location value produced by this event.",
+        "description": "World position and rotation before the move or teleport.",
         "direction": "output"
       },
       {
@@ -5541,7 +5541,7 @@
         "name": "event.to_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the to location value produced by this event.",
+        "description": "Proposed world position and rotation after the move or teleport.",
         "direction": "output"
       },
       {
@@ -5550,7 +5550,7 @@
         "name": "event.distance",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the distance value produced by this event.",
+        "description": "Distance between From and To in blocks, when both positions share a world.",
         "direction": "output"
       }
     ],
@@ -5607,7 +5607,7 @@
   {
     "id": "event.shear",
     "displayName": "Event Shear",
-    "description": "Runs when the event shear event occurs.",
+    "description": "Starts a Flow when a player attempts to shear an entity.",
     "domain": "event",
     "family": "shear",
     "lifecycle": "active",
@@ -5623,7 +5623,7 @@
       "shear"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event shear event occurs."
+      "Connect Flow to the actions that should run when a player attempts to shear an entity."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerShearEntityEvent",
@@ -5640,7 +5640,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5649,7 +5649,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -5658,7 +5658,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       }
     ],
@@ -5702,7 +5702,7 @@
   {
     "id": "event.piston.extend",
     "displayName": "Event Piston Extend",
-    "description": "Runs when the event piston extend event occurs.",
+    "description": "Starts a Flow when a piston is about to extend and move its affected blocks.",
     "domain": "event",
     "family": "piston",
     "lifecycle": "active",
@@ -5718,7 +5718,7 @@
       "piston"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event piston extend event occurs."
+      "Connect Flow to the actions that should run when a piston is about to extend and move its affected blocks."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockPistonExtendEvent",
@@ -5735,7 +5735,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5744,7 +5744,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -5753,7 +5753,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -5762,7 +5762,7 @@
         "name": "event.length",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the length value produced by this event.",
+        "description": "Number of blocks pushed by the extending piston.",
         "direction": "output"
       }
     ],
@@ -5814,7 +5814,7 @@
   {
     "id": "event.piston.retract",
     "displayName": "Event Piston Retract",
-    "description": "Runs when the event piston retract event occurs.",
+    "description": "Starts a Flow when a piston is about to retract.",
     "domain": "event",
     "family": "piston",
     "lifecycle": "active",
@@ -5830,7 +5830,7 @@
       "piston"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event piston retract event occurs."
+      "Connect Flow to the actions that should run when a piston is about to retract."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.BlockPistonRetractEvent",
@@ -5847,7 +5847,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5856,7 +5856,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -5865,7 +5865,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       }
     ],
@@ -5908,7 +5908,7 @@
   {
     "id": "event.pickup",
     "displayName": "Event Pickup",
-    "description": "Runs when the event pickup event occurs.",
+    "description": "Starts a Flow when a living entity attempts to pick up a dropped item. Player is present only when the picker is a player.",
     "domain": "event",
     "family": "pickup",
     "lifecycle": "active",
@@ -5924,7 +5924,7 @@
       "pickup"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event pickup event occurs."
+      "Connect Flow to the actions that should run when a living entity attempts to pick up a dropped item."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityPickupItemEvent",
@@ -5941,7 +5941,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -5951,7 +5951,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "optional": true,
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -5960,7 +5960,7 @@
         "name": "event.item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item value produced by this event.",
+        "description": "Item stack being consumed, dispensed, moved, or otherwise affected.",
         "direction": "output"
       }
     ],
@@ -6003,7 +6003,7 @@
   {
     "id": "event.leaf.decay",
     "displayName": "Event Leaf Decay",
-    "description": "Runs when the event leaf decay event occurs.",
+    "description": "Starts a Flow when a leaf block is about to decay.",
     "domain": "event",
     "family": "leaf",
     "lifecycle": "active",
@@ -6019,7 +6019,7 @@
       "leaf"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event leaf decay event occurs."
+      "Connect Flow to the actions that should run when a leaf block is about to decay."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.block.LeavesDecayEvent",
@@ -6036,7 +6036,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -6045,7 +6045,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -6054,7 +6054,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       }
     ],
@@ -6097,7 +6097,7 @@
   {
     "id": "event.structure.spawn",
     "displayName": "Event Structure Spawn",
-    "description": "Runs when the event structure spawn event occurs.",
+    "description": "Starts a Flow when a tree or other natural structure grows. New State contains the proposed block states.",
     "domain": "event",
     "family": "structure",
     "lifecycle": "active",
@@ -6113,7 +6113,7 @@
       "structure"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event structure spawn event occurs."
+      "Connect Flow to the actions that should run when a tree or other natural structure grows."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.world.StructureGrowEvent",
@@ -6130,7 +6130,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -6139,7 +6139,7 @@
         "name": "event.block",
         "pinType": "DATA",
         "dataType": "block",
-        "description": "Provides the block value produced by this event.",
+        "description": "Block affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -6148,7 +6148,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -6157,7 +6157,7 @@
         "name": "event.structure_type",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the structure type value produced by this event.",
+        "description": "Kind of tree or natural structure being grown.",
         "direction": "output"
       },
       {
@@ -6166,7 +6166,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       },
       {
@@ -6175,7 +6175,7 @@
         "name": "event.new_state",
         "pinType": "DATA",
         "dataType": "list<block>",
-        "description": "Provides the new state value produced by this event.",
+        "description": "Proposed block state after the change. Structure growth provides a list of states.",
         "direction": "output"
       }
     ],
@@ -6245,7 +6245,7 @@
   {
     "id": "event.command",
     "displayName": "Event Command",
-    "description": "Runs when the event command event occurs.",
+    "description": "Starts a Flow when a player sends a command. The command text includes its label and arguments.",
     "domain": "event",
     "family": "command",
     "lifecycle": "active",
@@ -6261,7 +6261,7 @@
       "command"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event command event occurs."
+      "Connect Flow to the actions that should run when a player sends a command."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerCommandPreprocessEvent",
@@ -6278,7 +6278,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -6287,7 +6287,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -6296,7 +6296,7 @@
         "name": "event.command",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the command value produced by this event.",
+        "description": "Command text supplied by the sender, including arguments.",
         "direction": "output"
       },
       {
@@ -6305,7 +6305,7 @@
         "name": "event.is_cancelled",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the is cancelled value produced by this event.",
+        "description": "Whether this cancellable occurrence is currently cancelled.",
         "direction": "output"
       },
       {
@@ -6466,7 +6466,7 @@
   {
     "id": "event.explosion",
     "displayName": "Event Explosion",
-    "description": "Runs when the event explosion event occurs.",
+    "description": "Starts a Flow when an entity explosion selects the blocks it will affect.",
     "domain": "event",
     "family": "explosion",
     "lifecycle": "active",
@@ -6482,7 +6482,7 @@
       "explosion"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event explosion event occurs."
+      "Connect Flow to the actions that should run when an entity explosion selects the blocks it will affect."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityExplodeEvent",
@@ -6499,7 +6499,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -6508,7 +6508,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -6517,7 +6517,7 @@
         "name": "event.power",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the power value produced by this event.",
+        "description": "Explosion value supplied by the occurrence.",
         "direction": "output"
       },
       {
@@ -6526,7 +6526,7 @@
         "name": "event.break_blocks",
         "pinType": "DATA",
         "dataType": "list<block>",
-        "description": "Provides the break blocks value produced by this event.",
+        "description": "Blocks selected to be affected by the explosion.",
         "direction": "output"
       },
       {
@@ -6535,7 +6535,7 @@
         "name": "event.fire",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the fire value produced by this event.",
+        "description": "Whether the explosion occurrence reports fire creation.",
         "direction": "output"
       },
       {
@@ -6544,7 +6544,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -6553,7 +6553,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       }
     ],
@@ -6628,7 +6628,7 @@
   {
     "id": "event.plugin.enable",
     "displayName": "Event Plugin Enable",
-    "description": "Runs when the event plugin enable event occurs.",
+    "description": "Starts a Flow when a plugin is enabled.",
     "domain": "event",
     "family": "plugin",
     "lifecycle": "active",
@@ -6644,7 +6644,7 @@
       "plugin"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event plugin enable event occurs."
+      "Connect Flow to the actions that should run when a plugin is enabled."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.server.PluginEnableEvent",
@@ -6661,7 +6661,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -6670,7 +6670,7 @@
         "name": "event.plugin_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the plugin name value produced by this event.",
+        "description": "Name of the plugin being enabled or disabled.",
         "direction": "output"
       }
     ],
@@ -6704,7 +6704,7 @@
   {
     "id": "event.plugin.disable",
     "displayName": "Event Plugin Disable",
-    "description": "Runs when the event plugin disable event occurs.",
+    "description": "Starts a Flow when a plugin is disabled.",
     "domain": "event",
     "family": "plugin",
     "lifecycle": "active",
@@ -6720,7 +6720,7 @@
       "plugin"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event plugin disable event occurs."
+      "Connect Flow to the actions that should run when a plugin is disabled."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.server.PluginDisableEvent",
@@ -6737,7 +6737,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -6746,7 +6746,7 @@
         "name": "event.plugin_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the plugin name value produced by this event.",
+        "description": "Name of the plugin being enabled or disabled.",
         "direction": "output"
       }
     ],
@@ -6780,7 +6780,7 @@
   {
     "id": "event.chat",
     "displayName": "Event Chat",
-    "description": "Runs when the event chat event occurs.",
+    "description": "Starts a Flow when a player sends a chat message. Message is their text. Format controls its displayed layout.",
     "domain": "event",
     "family": "chat",
     "lifecycle": "active",
@@ -6796,7 +6796,7 @@
       "chat"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event chat event occurs."
+      "Connect Flow to the actions that should run when a player sends a chat message."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.AsyncPlayerChatEvent",
@@ -6813,7 +6813,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -6822,7 +6822,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -6831,7 +6831,7 @@
         "name": "event.message",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the message value produced by this event.",
+        "description": "Player chat text before it is displayed.",
         "direction": "output"
       },
       {
@@ -6840,7 +6840,7 @@
         "name": "event.format",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the format value produced by this event.",
+        "description": "Chat layout used to combine the player name and message.",
         "direction": "output"
       }
     ],
@@ -6892,7 +6892,7 @@
   {
     "id": "event.fish",
     "displayName": "Event Fish",
-    "description": "Runs when the event fish event occurs.",
+    "description": "Starts a Flow when a player changes fishing state, such as casting, catching, or reeling in.",
     "domain": "event",
     "family": "fish",
     "lifecycle": "active",
@@ -6908,7 +6908,7 @@
       "fish"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event fish event occurs."
+      "Connect Flow to the actions that should run when a player changes fishing state, such as casting, catching, or reeling in."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerFishEvent",
@@ -6925,7 +6925,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -6934,7 +6934,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -6943,7 +6943,7 @@
         "name": "event.state",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the state value produced by this event.",
+        "description": "Fishing state, such as casting, catching an entity, or reeling in.",
         "direction": "output"
       },
       {
@@ -6952,7 +6952,7 @@
         "name": "event.caught",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the caught value produced by this event.",
+        "description": "Caught entity, when this fishing state has one.",
         "direction": "output"
       }
     ],
@@ -7004,7 +7004,7 @@
   {
     "id": "event.enchant",
     "displayName": "Event Enchant",
-    "description": "Runs when the event enchant event occurs.",
+    "description": "Starts a Flow when a player enchants an item at an enchanting table.",
     "domain": "event",
     "family": "enchant",
     "lifecycle": "active",
@@ -7020,7 +7020,7 @@
       "enchant"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event enchant event occurs."
+      "Connect Flow to the actions that should run when a player enchants an item at an enchanting table."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.enchantment.EnchantItemEvent",
@@ -7037,7 +7037,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -7046,7 +7046,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -7055,7 +7055,7 @@
         "name": "event.item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item value produced by this event.",
+        "description": "Item stack being consumed, dispensed, moved, or otherwise affected.",
         "direction": "output"
       },
       {
@@ -7064,7 +7064,7 @@
         "name": "event.enchantment",
         "pinType": "DATA",
         "dataType": "any",
-        "description": "Provides the enchantment value produced by this event.",
+        "description": "Enchantments being added to the item, with their levels.",
         "direction": "output",
         "optional": true
       },
@@ -7074,7 +7074,7 @@
         "name": "event.level",
         "pinType": "DATA",
         "dataType": "any",
-        "description": "Provides the level value produced by this event.",
+        "description": "Experience level cost of the enchantment.",
         "direction": "output",
         "optional": true
       }
@@ -7132,7 +7132,7 @@
   {
     "id": "event.quit",
     "displayName": "Event Quit",
-    "description": "Runs when the event quit event occurs.",
+    "description": "Starts a Flow when a player leaves this server.",
     "domain": "event",
     "family": "quit",
     "lifecycle": "active",
@@ -7148,7 +7148,7 @@
       "quit"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event quit event occurs."
+      "Connect Flow to the actions that should run when a player leaves this server."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerQuitEvent",
@@ -7165,7 +7165,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -7174,7 +7174,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -7183,7 +7183,7 @@
         "name": "event.quit_message",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the quit message value produced by this event.",
+        "description": "Announcement for the player leaving. May be absent when announcements are disabled.",
         "direction": "output"
       }
     ],
@@ -7226,7 +7226,7 @@
   {
     "id": "event.time.change",
     "displayName": "Event Time Change",
-    "description": "Runs when the event time change event occurs.",
+    "description": "Starts a Flow when a world skips time, such as when players sleep through the night.",
     "domain": "event",
     "family": "time",
     "lifecycle": "active",
@@ -7242,7 +7242,7 @@
       "time"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event time change event occurs."
+      "Connect Flow to the actions that should run when a world skips time, such as when players sleep through the night."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.world.TimeSkipEvent",
@@ -7259,7 +7259,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -7268,7 +7268,7 @@
         "name": "event.world_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the world name value produced by this event.",
+        "description": "Name of the world involved in this occurrence.",
         "direction": "output"
       },
       {
@@ -7277,7 +7277,7 @@
         "name": "event.old_time",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the old time value produced by this event.",
+        "description": "World time value before the skip, when supplied by the occurrence.",
         "direction": "output"
       },
       {
@@ -7286,7 +7286,7 @@
         "name": "event.new_time",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the new time value produced by this event.",
+        "description": "World time value after the skip, when supplied by the occurrence.",
         "direction": "output"
       }
     ],
@@ -7338,7 +7338,7 @@
   {
     "id": "event.projectile.hit",
     "displayName": "Event Projectile Hit",
-    "description": "Runs when the event projectile hit event occurs.",
+    "description": "Starts a Flow when a projectile hits a block or entity. Hit Entity is absent for a block hit.",
     "domain": "event",
     "family": "projectile",
     "lifecycle": "active",
@@ -7354,7 +7354,7 @@
       "projectile"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event projectile hit event occurs."
+      "Connect Flow to the actions that should run when a projectile hits a block or entity."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.ProjectileHitEvent",
@@ -7371,7 +7371,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -7381,7 +7381,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "optional": true,
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -7390,7 +7390,7 @@
         "name": "event.projectile",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the projectile value produced by this event.",
+        "description": "Projectile fired or involved in the collision.",
         "direction": "output"
       },
       {
@@ -7399,7 +7399,7 @@
         "name": "event.hit_entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the hit entity value produced by this event.",
+        "description": "Entity hit by the projectile. Absent when only a block is hit.",
         "direction": "output"
       }
     ],
@@ -7451,7 +7451,7 @@
   {
     "id": "event.entity.spawn",
     "displayName": "Event Entity Spawn",
-    "description": "Runs when the event entity spawn event occurs.",
+    "description": "Starts a Flow when an entity spawns in a world.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -7467,7 +7467,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity spawn event occurs."
+      "Connect Flow to the actions that should run when an entity spawns in a world."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntitySpawnEvent",
@@ -7484,7 +7484,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -7493,7 +7493,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -7502,7 +7502,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -7511,7 +7511,7 @@
         "name": "event.entity_type",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the entity type value produced by this event.",
+        "description": "Minecraft type of the spawned or tamed entity.",
         "direction": "output"
       }
     ],
@@ -7564,7 +7564,7 @@
   {
     "id": "event.entity.target",
     "displayName": "Event Entity Target",
-    "description": "Runs when the event entity target event occurs.",
+    "description": "Starts a Flow when a mob changes or clears its target.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -7580,7 +7580,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity target event occurs."
+      "Connect Flow to the actions that should run when a mob changes or clears its target."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityTargetEvent",
@@ -7597,7 +7597,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -7606,7 +7606,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -7615,7 +7615,7 @@
         "name": "event.target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the target value produced by this event.",
+        "description": "New target selected by the mob. Absent when its target is cleared.",
         "direction": "output"
       }
     ],
@@ -7658,7 +7658,7 @@
   {
     "id": "event.entity.breed",
     "displayName": "Event Entity Breed",
-    "description": "Runs when the event entity breed event occurs.",
+    "description": "Starts a Flow when two animals breed and produce an offspring.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -7674,7 +7674,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity breed event occurs."
+      "Connect Flow to the actions that should run when two animals breed and produce an offspring."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityBreedEvent",
@@ -7691,7 +7691,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -7700,7 +7700,7 @@
         "name": "event.entity1",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity1 value produced by this event.",
+        "description": "First parent involved in breeding.",
         "direction": "output"
       },
       {
@@ -7709,7 +7709,7 @@
         "name": "event.entity2",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity2 value produced by this event.",
+        "description": "Second parent involved in breeding.",
         "direction": "output"
       },
       {
@@ -7718,7 +7718,7 @@
         "name": "event.experience",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the experience value produced by this event.",
+        "description": "Experience points awarded by breeding.",
         "direction": "output"
       },
       {
@@ -7727,7 +7727,7 @@
         "name": "event.bred_entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the bred entity value produced by this event.",
+        "description": "Offspring produced by the breeding occurrence.",
         "direction": "output"
       }
     ],
@@ -7788,7 +7788,7 @@
   {
     "id": "event.entity.tame",
     "displayName": "Event Entity Tame",
-    "description": "Runs when the event entity tame event occurs.",
+    "description": "Starts a Flow when an entity is tamed by an owner.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -7804,7 +7804,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity tame event occurs."
+      "Connect Flow to the actions that should run when an entity is tamed by an owner."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityTameEvent",
@@ -7821,7 +7821,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -7830,7 +7830,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -7840,7 +7840,7 @@
         "pinType": "DATA",
         "dataType": "entity",
         "optional": true,
-        "description": "Provides the tamer value produced by this event.",
+        "description": "Owner who has tamed the entity.",
         "direction": "output"
       },
       {
@@ -7849,7 +7849,7 @@
         "name": "event.entity_type",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the entity type value produced by this event.",
+        "description": "Minecraft type of the spawned or tamed entity.",
         "direction": "output"
       }
     ],
@@ -7901,7 +7901,7 @@
   {
     "id": "event.entity.transform",
     "displayName": "Event Entity Transform",
-    "description": "Runs when the event entity transform event occurs.",
+    "description": "Starts a Flow when an entity transforms into one or more replacement entities.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -7917,7 +7917,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity transform event occurs."
+      "Connect Flow to the actions that should run when an entity transforms into one or more replacement entities."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityTransformEvent",
@@ -7934,7 +7934,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -7943,7 +7943,7 @@
         "name": "event.old_entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the old entity value produced by this event.",
+        "description": "Entity being replaced by the transformation.",
         "direction": "output"
       },
       {
@@ -7952,7 +7952,7 @@
         "name": "event.new_entity",
         "pinType": "DATA",
         "dataType": "any",
-        "description": "Provides the new entity value produced by this event.",
+        "description": "Replacement entity or entities produced by the transformation.",
         "direction": "output",
         "optional": true
       },
@@ -7962,7 +7962,7 @@
         "name": "event.new_entity_type",
         "pinType": "DATA",
         "dataType": "any",
-        "description": "Provides the new entity type value produced by this event.",
+        "description": "Minecraft types of the replacement entities.",
         "direction": "output",
         "optional": true
       }
@@ -8015,7 +8015,7 @@
   {
     "id": "event.entity.death",
     "displayName": "Event Entity Death",
-    "description": "Runs when the event entity death event occurs.",
+    "description": "Starts a Flow when a living entity dies. Killer is absent when no player is credited with the kill.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -8031,7 +8031,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity death event occurs."
+      "Connect Flow to the actions that should run when a living entity dies."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityDeathEvent",
@@ -8048,7 +8048,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -8057,7 +8057,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -8066,7 +8066,7 @@
         "name": "event.killer",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the killer value produced by this event.",
+        "description": "Player credited with the kill. Absent when there is no credited player.",
         "direction": "output"
       }
     ],
@@ -8109,7 +8109,7 @@
   {
     "id": "event.entity.combust",
     "displayName": "Event Entity Combust",
-    "description": "Runs when the event entity combust event occurs.",
+    "description": "Starts a Flow when an entity is about to catch fire.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -8125,7 +8125,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity combust event occurs."
+      "Connect Flow to the actions that should run when an entity is about to catch fire."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityCombustEvent",
@@ -8142,7 +8142,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -8151,7 +8151,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -8160,7 +8160,7 @@
         "name": "event.duration",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the duration value produced by this event.",
+        "description": "Requested burning duration in seconds.",
         "direction": "output"
       },
       {
@@ -8169,7 +8169,7 @@
         "name": "event.cancelled",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the cancelled value produced by this event.",
+        "description": "Whether the combustion is currently cancelled.",
         "direction": "output"
       }
     ],
@@ -8221,7 +8221,7 @@
   {
     "id": "event.entity.damaged",
     "displayName": "Event Entity Damaged",
-    "description": "Runs when the event entity damaged event occurs.",
+    "description": "Starts a Flow when an entity receives damage. Damager is present only when another entity caused the damage.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -8237,7 +8237,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity damaged event occurs."
+      "Connect Flow to the actions that should run when an entity receives damage from any cause."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityDamageEvent",
@@ -8254,7 +8254,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -8263,7 +8263,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -8272,7 +8272,7 @@
         "name": "event.damager",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the damager value produced by this event.",
+        "description": "Entity responsible for this damage. Absent for environmental damage.",
         "direction": "output",
         "optional": true
       },
@@ -8282,7 +8282,7 @@
         "name": "event.damage",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the damage value produced by this event.",
+        "description": "Damage amount. Entity damage uses health points. Item damage uses durability points.",
         "direction": "output"
       },
       {
@@ -8291,7 +8291,7 @@
         "name": "event.cause",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the cause value produced by this event.",
+        "description": "Named cause of the damage or teleport.",
         "direction": "output"
       }
     ],
@@ -8349,7 +8349,7 @@
   {
     "id": "event.entity.heal",
     "displayName": "Event Entity Heal",
-    "description": "Runs when the event entity heal event occurs.",
+    "description": "Starts a Flow when a living entity is about to regain health.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -8365,7 +8365,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity heal event occurs."
+      "Connect Flow to the actions that should run when a living entity is about to regain health."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityRegainHealthEvent",
@@ -8382,7 +8382,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -8391,7 +8391,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -8400,7 +8400,7 @@
         "name": "event.amount",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the amount value produced by this event.",
+        "description": "Amount of experience awarded or health restored by this occurrence.",
         "direction": "output"
       },
       {
@@ -8409,7 +8409,7 @@
         "name": "event.new_health",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the new health value produced by this event.",
+        "description": "Health after the healing amount is applied, when supplied by the occurrence.",
         "direction": "output"
       },
       {
@@ -8418,7 +8418,7 @@
         "name": "event.reason",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the reason value produced by this event.",
+        "description": "Named healing reason, such as regeneration, magic, or eating.",
         "direction": "output"
       }
     ],
@@ -8472,7 +8472,7 @@
   {
     "id": "event.entity.regain.health",
     "displayName": "Event Entity Regain Health",
-    "description": "Runs when the event entity regain health event occurs.",
+    "description": "Starts a Flow when a living entity is about to regain health, with the amount and healing reason.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -8488,7 +8488,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity regain health event occurs."
+      "Connect Flow to the actions that should run when a living entity is about to regain health, with the amount and healing reason."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityRegainHealthEvent",
@@ -8505,7 +8505,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -8514,7 +8514,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -8523,7 +8523,7 @@
         "name": "event.amount",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the amount value produced by this event.",
+        "description": "Amount of experience awarded or health restored by this occurrence.",
         "direction": "output"
       },
       {
@@ -8532,7 +8532,7 @@
         "name": "event.new_health",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the new health value produced by this event.",
+        "description": "Health after the healing amount is applied, when supplied by the occurrence.",
         "direction": "output"
       },
       {
@@ -8541,7 +8541,7 @@
         "name": "event.reason",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the reason value produced by this event.",
+        "description": "Named healing reason, such as regeneration, magic, or eating.",
         "direction": "output"
       }
     ],
@@ -8599,7 +8599,7 @@
   {
     "id": "event.entity.pickup",
     "displayName": "Event Entity Pickup",
-    "description": "Runs when the event entity pickup event occurs.",
+    "description": "Starts a Flow when a living entity attempts to pick up a dropped item.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -8615,7 +8615,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity pickup event occurs."
+      "Connect Flow to the actions that should run when a living entity attempts to pick up a dropped item."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityPickupItemEvent",
@@ -8632,7 +8632,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -8641,7 +8641,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -8650,7 +8650,7 @@
         "name": "event.item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the item value produced by this event.",
+        "description": "Item stack being consumed, dispensed, moved, or otherwise affected.",
         "direction": "output"
       },
       {
@@ -8659,7 +8659,7 @@
         "name": "event.remaining",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the remaining value produced by this event.",
+        "description": "Number of dropped items left after the pickup.",
         "direction": "output"
       }
     ],
@@ -8712,7 +8712,7 @@
   {
     "id": "event.entity.drop",
     "displayName": "Event Entity Drop",
-    "description": "Runs when the event entity drop event occurs.",
+    "description": "Starts a Flow when an entity drops an item into the world.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -8728,7 +8728,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity drop event occurs."
+      "Connect Flow to the actions that should run when an entity drops an item into the world."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityDropItemEvent",
@@ -8745,7 +8745,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -8754,7 +8754,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -8763,7 +8763,7 @@
         "name": "event.dropped",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the dropped value produced by this event.",
+        "description": "Dropped item entity created in the world.",
         "direction": "output"
       }
     ],
@@ -8807,7 +8807,7 @@
   {
     "id": "event.entity.enter.portal",
     "displayName": "Event Entity Enter Portal",
-    "description": "Runs when the event entity enter portal event occurs.",
+    "description": "Starts a Flow when an entity touches a portal.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -8823,7 +8823,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity enter portal event occurs."
+      "Connect Flow to the actions that should run when an entity touches a portal."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityPortalEnterEvent",
@@ -8840,7 +8840,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -8849,7 +8849,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -8858,7 +8858,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -8867,7 +8867,7 @@
         "name": "event.portal_type",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the portal type value produced by this event.",
+        "description": "Portal type reported by this occurrence, when available.",
         "direction": "output"
       }
     ],
@@ -8919,7 +8919,7 @@
   {
     "id": "event.entity.exit.portal",
     "displayName": "Event Entity Exit Portal",
-    "description": "Runs when the event entity exit portal event occurs.",
+    "description": "Starts a Flow when an entity exits a portal.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -8935,7 +8935,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity exit portal event occurs."
+      "Connect Flow to the actions that should run when an entity exits a portal."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityPortalExitEvent",
@@ -8952,7 +8952,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -8961,7 +8961,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       },
       {
@@ -8970,7 +8970,7 @@
         "name": "event.location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the location value produced by this event.",
+        "description": "World position where this occurrence takes place.",
         "direction": "output"
       },
       {
@@ -8979,7 +8979,7 @@
         "name": "event.portal_type",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the portal type value produced by this event.",
+        "description": "Portal type reported by this occurrence, when available.",
         "direction": "output"
       }
     ],
@@ -9031,7 +9031,7 @@
   {
     "id": "event.entity.interact",
     "displayName": "Event Entity Interact",
-    "description": "Runs when the event entity interact event occurs.",
+    "description": "Starts a Flow when a player clicks an entity.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -9047,7 +9047,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity interact event occurs."
+      "Connect Flow to the actions that should run when a player clicks an entity."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.player.PlayerInteractEntityEvent",
@@ -9064,7 +9064,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -9073,7 +9073,7 @@
         "name": "event.player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -9082,7 +9082,7 @@
         "name": "event.entity",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the entity value produced by this event.",
+        "description": "Entity affected by this occurrence.",
         "direction": "output"
       }
     ],
@@ -9125,7 +9125,7 @@
   {
     "id": "event.entity.damage",
     "displayName": "Event Entity Damage",
-    "description": "Runs when the event entity damage event occurs.",
+    "description": "Starts a Flow when one entity damages another. Damager and Victim identify the attacker and target.",
     "domain": "event",
     "family": "entity",
     "lifecycle": "active",
@@ -9141,7 +9141,7 @@
       "entity"
     ],
     "examples": [
-      "Connect Flow to the actions that should run when the event entity damage event occurs."
+      "Connect Flow to the actions that should run when one entity damages another."
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.entity.EntityDamageByEntityEvent",
@@ -9158,7 +9158,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts the connected flow for this event.",
+        "description": "Runs the connected actions for this occurrence.",
         "direction": "output"
       },
       {
@@ -9168,7 +9168,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "optional": true,
-        "description": "Provides the player value produced by this event.",
+        "description": "Player associated with this occurrence. Absent when the sender or acting entity is not a player.",
         "direction": "output"
       },
       {
@@ -9177,7 +9177,7 @@
         "name": "event.damager",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the damager value produced by this event.",
+        "description": "Entity responsible for this damage. Absent for environmental damage.",
         "direction": "output"
       },
       {
@@ -9186,7 +9186,7 @@
         "name": "event.victim",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the victim value produced by this event.",
+        "description": "Entity receiving the damage.",
         "direction": "output"
       },
       {
@@ -9195,7 +9195,7 @@
         "name": "event.damage",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the damage value produced by this event.",
+        "description": "Damage amount. Entity damage uses health points. Item damage uses durability points.",
         "direction": "output"
       },
       {
@@ -9204,7 +9204,7 @@
         "name": "event.cause",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the cause value produced by this event.",
+        "description": "Named cause of the damage or teleport.",
         "direction": "output"
       }
     ],

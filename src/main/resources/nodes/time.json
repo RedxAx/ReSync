@@ -21,8 +21,8 @@
     "inputs": [
       {"id": "time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "instant", "description": "Epoch-millisecond instant to format."},
       {"id": "format", "displayName": "Format", "name": "format", "pinType": "DATA", "dataType": "string", "defaultValue": "uuuu-MM-dd HH:mm:ss", "description": "Strict Java date-time pattern. Invalid or incomplete patterns fail with valid=false and error text."},
-      {"id": "time_zone", "displayName": "Time Zone", "name": "time_zone", "pinType": "DATA", "dataType": "string", "defaultValue": "UTC", "description": "IANA time-zone ID used to render the instant. UTC is used by default; an invalid zone is reported through valid and error."},
-      {"id": "locale", "displayName": "Locale", "name": "locale", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "BCP 47 language tag used by the formatter. Blank uses neutral locale rules; an invalid locale is reported through valid and error."}
+      {"id": "time_zone", "displayName": "Time Zone", "name": "time_zone", "pinType": "DATA", "dataType": "string", "defaultValue": "UTC", "description": "IANA time-zone ID used to render the instant. UTC is used by default. An invalid zone is reported through valid and error."},
+      {"id": "locale", "displayName": "Locale", "name": "locale", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "BCP 47 language tag used by the formatter. Blank uses neutral locale rules. An invalid locale is reported through valid and error."}
     ],
     "outputs": [
       {"id": "string", "displayName": "String", "name": "string", "pinType": "DATA", "dataType": "string", "description": "Formatted time text, or empty text when formatting fails."},
@@ -52,8 +52,8 @@
     "inputs": [
       {"id": "string", "displayName": "String", "name": "string", "pinType": "DATA", "dataType": "string", "description": "Complete date and time text to parse. Blank text fails with valid=false and error text."},
       {"id": "format", "displayName": "Format", "name": "format", "pinType": "DATA", "dataType": "string", "defaultValue": "uuuu-MM-dd HH:mm:ss", "description": "Strict Java date-time pattern containing a complete date and time. Invalid or incomplete patterns fail with valid=false and error text."},
-      {"id": "time_zone", "displayName": "Time Zone", "name": "time_zone", "pinType": "DATA", "dataType": "string", "defaultValue": "UTC", "description": "IANA time-zone ID for local date-time text. UTC is used by default; an invalid zone is reported through valid and error."},
-      {"id": "locale", "displayName": "Locale", "name": "locale", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "BCP 47 language tag used by the parser. Blank uses neutral locale rules; an invalid locale is reported through valid and error."}
+      {"id": "time_zone", "displayName": "Time Zone", "name": "time_zone", "pinType": "DATA", "dataType": "string", "defaultValue": "UTC", "description": "IANA time-zone ID for local date-time text. UTC is used by default. An invalid zone is reported through valid and error."},
+      {"id": "locale", "displayName": "Locale", "name": "locale", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "BCP 47 language tag used by the parser. Blank uses neutral locale rules. An invalid locale is reported through valid and error."}
     ],
     "outputs": [
       {"id": "time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "instant", "description": "Parsed epoch-millisecond instant, or zero when parsing fails."},
@@ -64,7 +64,7 @@
   {
     "id": "time_add",
     "displayName": "Add Time",
-    "description": "Add a whole finite amount to an epoch-millisecond instant. Milliseconds, ticks, seconds, minutes, hours, days, and weeks use fixed units; months and years use calendar arithmetic in the IANA zone. Unsupported units or overflow publish valid=false with diagnostic error text.",
+    "description": "Add a whole finite amount to an epoch-millisecond instant. Milliseconds, ticks, seconds, minutes, hours, days, and weeks use fixed units. Months and years use calendar arithmetic in the IANA zone. Unsupported units or overflow publish valid=false with diagnostic error text.",
     "domain": "core",
     "family": "time",
     "lifecycle": "active",
@@ -97,8 +97,8 @@
     "inputs": [
       {"id": "time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "instant", "description": "Epoch-millisecond instant to change."},
       {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Whole finite amount to add. Fractional, non-finite, or overflowing values fail before a new instant is published."},
-      {"id": "unit", "displayName": "Unit", "name": "unit", "pinType": "DATA", "dataType": "string", "defaultValue": "seconds", "options": ["milliseconds", "ticks", "seconds", "minutes", "hours", "days", "weeks", "months", "years"], "description": "Unit for the amount. Fixed units are milliseconds, ticks, seconds, minutes, hours, and days or weeks; months and years use calendar arithmetic."},
-      {"id": "time_zone", "displayName": "Time Zone", "name": "time_zone", "pinType": "DATA", "dataType": "string", "defaultValue": "UTC", "description": "IANA time-zone ID used for calendar months and years. UTC is used by default; invalid zones and overflow are reported through valid and error."}
+      {"id": "unit", "displayName": "Unit", "name": "unit", "pinType": "DATA", "dataType": "string", "defaultValue": "seconds", "options": ["milliseconds", "ticks", "seconds", "minutes", "hours", "days", "weeks", "months", "years"], "description": "Unit for the amount. Fixed units are milliseconds, ticks, seconds, minutes, hours, and days or weeks. Months and years use calendar arithmetic."},
+      {"id": "time_zone", "displayName": "Time Zone", "name": "time_zone", "pinType": "DATA", "dataType": "string", "defaultValue": "UTC", "description": "IANA time-zone ID used for calendar months and years. UTC is used by default. Invalid zones and overflow are reported through valid and error."}
     ],
     "outputs": [
       {"id": "output_time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "instant", "description": "Instant after adding the amount, or the original instant when the operation fails."},
@@ -109,7 +109,7 @@
   {
     "id": "time_diff",
     "displayName": "Time Difference",
-    "description": "Compare two epoch-millisecond instants and publish absolute and signed differences. Signed is time2 minus time1; unit_diff truncates in a supported fixed unit. Months and years are unsupported; invalid units or overflow publish valid=false with diagnostic error text.",
+    "description": "Compare two epoch-millisecond instants and publish absolute and signed differences. Signed is time2 minus time1. The unit_diff output truncates in a supported fixed unit. Months and years are unsupported. Invalid units or overflow publish valid=false with diagnostic error text.",
     "domain": "core",
     "family": "time",
     "lifecycle": "active",
@@ -128,7 +128,7 @@
     "inputs": [
       {"id": "time1", "displayName": "Time 1", "name": "time1", "pinType": "DATA", "dataType": "instant", "description": "First epoch-millisecond instant. The signed result subtracts this value from time2."},
       {"id": "time2", "displayName": "Time 2", "name": "time2", "pinType": "DATA", "dataType": "instant", "description": "Second epoch-millisecond instant. The signed result is time2 minus time1."},
-      {"id": "unit", "displayName": "Unit", "name": "unit", "pinType": "DATA", "dataType": "string", "defaultValue": "milliseconds", "options": ["milliseconds", "ticks", "seconds", "minutes", "hours", "days", "weeks"], "description": "Unit for unit_diff. Milliseconds, ticks, seconds, minutes, hours, days, and weeks are supported; calendar units such as months and years are unsupported."}
+      {"id": "unit", "displayName": "Unit", "name": "unit", "pinType": "DATA", "dataType": "string", "defaultValue": "milliseconds", "options": ["milliseconds", "ticks", "seconds", "minutes", "hours", "days", "weeks"], "description": "Unit for unit_diff. Milliseconds, ticks, seconds, minutes, hours, days, and weeks are supported. Calendar units such as months and years are unsupported."}
     ],
     "outputs": [
       {"id": "diff", "displayName": "Difference", "name": "diff", "pinType": "DATA", "dataType": "duration", "description": "Absolute non-negative millisecond difference between time1 and time2."},
@@ -223,7 +223,7 @@
   {
     "id": "time_get_current_time",
     "displayName": "Current World Time",
-    "description": "Read the selected world's current day-time tick value. A world is required; failures publish valid=false and diagnostic error text.",
+    "description": "Read the selected world's current day-time tick value. A world is required. Failures publish valid=false and diagnostic error text.",
     "domain": "world",
     "family": "time",
     "lifecycle": "active",

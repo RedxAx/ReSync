@@ -2,7 +2,7 @@
   {
     "id": "list_sort",
     "displayName": "List Sort",
-    "description": "Stable sort; detached shallow result. Ascending: nulls last; descending: nulls first. Finite numeric values use exact comparison; other values use natural comparable ordering. Unsupported mixed/object values fail. Cap 0..65536. sort_order accepts exactly ascending or descending.",
+    "description": "Apply a stable sort to a shallow copy. Ascending puts nulls last and descending puts them first. Finite numbers compare exactly. Other values use natural comparable order. Unsupported mixed or object values fail. Lists allow 65536 items. Choose exactly ascending or descending.",
     "domain": "core",
     "family": "list",
     "lifecycle": "active",
@@ -18,17 +18,17 @@
     "handler": "GenericListHandler",
     "handlerConfig": {"operation": "sort"},
     "inputs": [
-      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to sort. The result is a detached shallow copy; values are not deep-copied. Inputs over 65536 items fail before output."},
-      {"id": "sort_order", "displayName": "Sort Order", "name": "sort_order", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["ascending", "descending"], "defaultValue": "ascending", "description": "Order accepts exactly ascending or descending; ascending places null values last and descending places null values first."}
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to sort. The result is a detached shallow copy. Values are not deep-copied. Inputs over 65536 items fail before output."},
+      {"id": "sort_order", "displayName": "Sort Order", "name": "sort_order", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["ascending", "descending"], "defaultValue": "ascending", "description": "Order accepts exactly ascending or descending. Ascending places null values last and descending places null values first."}
     ],
     "outputs": [
-      {"id": "sorted_list", "displayName": "Sorted List", "name": "sorted_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Stable sorted detached shallow copy. Finite numeric values use exact comparison and other homogeneous values use natural comparable ordering; results over 65536 items fail before output."}
+      {"id": "sorted_list", "displayName": "Sorted List", "name": "sorted_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Stable sorted detached shallow copy. Finite numeric values use exact comparison and other homogeneous values use natural comparable ordering. Results over 65536 items fail before output."}
     ]
   },
   {
     "id": "list_sort_descending",
     "displayName": "Sort Descending",
-    "description": "Stable descending sort; detached shallow result. Descending: nulls first. Finite numeric values use exact comparison; other values use natural comparable ordering. Unsupported mixed/object values fail. Cap 0..65536.",
+    "description": "Perform a stable descending sort into a shallow copy. Null values come first. Finite numbers use exact comparison and other values use natural comparable order. Unsupported mixed or object values fail. Inputs and results are limited to 65536 items.",
     "domain": "core",
     "family": "list",
     "lifecycle": "active",
@@ -53,10 +53,10 @@
       ]
     },
     "inputs": [
-      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to sort descending. The result is a detached shallow copy; values are not deep-copied. Inputs over 65536 items fail before output."}
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to sort descending. The result is a detached shallow copy. Values are not deep-copied. Inputs over 65536 items fail before output."}
     ],
     "outputs": [
-      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Stable descending sorted detached shallow copy with null values first. Finite numeric values use exact comparison and other values use natural comparable ordering; results over 65536 items fail before output."}
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Stable descending sorted detached shallow copy with null values first. Finite numeric values use exact comparison and other values use natural comparable ordering. Results over 65536 items fail before output."}
     ]
   },
   {
@@ -78,7 +78,7 @@
     "handler": "GenericListHandler",
     "handlerConfig": {"operation": "sort_by_property"},
     "inputs": [
-      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to sort. The result is a detached shallow copy; missing or null input uses an empty list, and inputs over 65536 items fail before output."},
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to sort. The result is a detached shallow copy. Missing or null input uses an empty list, and inputs over 65536 items fail before output."},
       {"id": "property", "displayName": "Property", "name": "property", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Property used for comparison. A non-blank property is required."}
     ],
     "outputs": [

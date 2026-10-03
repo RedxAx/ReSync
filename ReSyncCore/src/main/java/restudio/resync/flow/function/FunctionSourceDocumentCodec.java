@@ -18,6 +18,7 @@ import restudio.resync.flow.type.TypedValue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -58,12 +59,31 @@ public final class FunctionSourceDocumentCodec implements CanonicalCodec<Functio
 
     @Override
     public FunctionSourceDocument decode(JsonValue value) {
+        Objects.requireNonNull(value, "Function source document is required");
+        return decodeDetached(CanonicalCodec.decode(value.canonicalText()));
+    }
+
+    @Override
+    public FunctionSourceDocument decodeBytes(byte[] input) {
+        return decodeDetached(CanonicalCodec.decode(input));
+    }
+
+    @Override
+    public FunctionSourceDocument decodeText(String input) {
+        return decodeDetached(CanonicalCodec.decode(input));
+    }
+
+    private FunctionSourceDocument decodeDetached(JsonValue value) {
         JsonValue.JsonObject object = object(value, "Function source document");
         FunctionSignature signature = decodeSignature(require(object, "signature"));
         GraphDocument graph = graphCodec.decode(require(object, "graph"));
         FunctionSourceDocument decoded = new FunctionSourceDocument(signature, graph, OpaqueData.of(unknown(object, SOURCE_KNOWN)));
-        if (!encode(decoded).canonicalText().equals(object.canonicalText())) {
+        String canonical = object.canonicalText();
+        if (!encode(decoded).canonicalText().equals(canonical)) {
             throw new IllegalArgumentException("Function source document is not in the exact canonical shape");
+        }
+        if (graphCodec == GraphDocumentCodec.INSTANCE) {
+            decoded.retainChecksum(ContentHash.of(CanonicalJson.sha256Canonical("function-source", canonical.getBytes(StandardCharsets.UTF_8))));
         }
         return decoded;
     }

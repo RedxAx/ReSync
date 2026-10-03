@@ -7,6 +7,7 @@ import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowResourceReference;
 import restudio.resync.flow.function.CompiledFunctionRunner;
 import restudio.resync.flow.function.FunctionExecutionRequest;
+import restudio.resync.flow.function.FunctionLocator;
 import restudio.resync.flow.function.FunctionOutputMap;
 import restudio.resync.flow.function.FunctionParameterContract;
 import restudio.resync.flow.function.FunctionResult;
@@ -69,6 +70,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompiledFunctionExecutionBridgeTest {
@@ -85,6 +87,41 @@ class CompiledFunctionExecutionBridgeTest {
     private static final ContractRef<CapabilityId> CAPABILITY = ContractRef.of(new OwnerId("typed"), CapabilityId.of("function-test"));
     private static final ContractRef<OperationId> OPERATION = ContractRef.of(new OwnerId("typed"), OperationId.of("copy"));
     private static final PinId VALUE = PinId.of("value");
+
+    @Test
+    void legacyOutputAdapterPreservesTypedLocatorsAndOptionalNulls() {
+        TypeExpr reference = TypeExpr.resource(TypeReference.of("resync", "function"));
+        TypeExpr optional = TypeExpr.optional(reference);
+        FunctionSignature signature = new FunctionSignature(FunctionLocator.of(RESOURCE), FunctionRevision.of(4),
+            List.of(), List.of(new FunctionParameterContract(OUTPUT, optional)));
+        FlowGraph graph = new FlowGraph("typed-function", Map.of(), List.of(), List.of());
+        graph.setFunction(true);
+        graph.setFunctionOutputs(List.of(new FlowGraph.FunctionParameter(OUTPUT, "reference", FlowDataType.ANY)));
+        CompiledFunctionExecutionBridge bridge = new CompiledFunctionExecutionBridge(null, null);
+        FunctionResult locator = FunctionResult.success(signature,
+            new FunctionOutputMap(Map.of(OUTPUT, TypedValue.locator(optional, RESOURCE))), 0);
+        FunctionResult absent = FunctionResult.success(signature,
+            new FunctionOutputMap(Map.of(OUTPUT, TypedValue.nullValue(optional))), 0);
+
+        assertEquals(RESOURCE, bridge.outputsForLegacyGraph(graph, locator).get("reference"));
+        Map<String, Object> outputs = bridge.outputsForLegacyGraph(graph, absent);
+        assertTrue(outputs.containsKey("reference"));
+        assertEquals(null, outputs.get("reference"));
+
+        GraphDocument document = new GraphDocument(new CatalogVersion(1, 0), RESOURCE, 4, BINDING,
+            Set.of(), List.of(), List.of(), List.of(), List.of(), OpaqueData.empty());
+        FunctionSourceDocument source = new FunctionSourceDocument(signature, document);
+        assertEquals(RESOURCE, bridge.outputsForSource(source, locator).get(OUTPUT.canonicalText()));
+        Map<String, Object> sourceOutputs = bridge.outputsForSource(source, absent);
+        assertTrue(sourceOutputs.containsKey(OUTPUT.canonicalText()));
+        assertEquals(null, sourceOutputs.get(OUTPUT.canonicalText()));
+        FunctionSignature named = new FunctionSignature(signature.function(), signature.revision(), List.of(),
+            List.of(new FunctionParameterContract(OUTPUT, optional, true, null, Map.of("name", "reference"))));
+        assertThrows(IllegalArgumentException.class,
+            () -> bridge.outputsForSource(new FunctionSourceDocument(named, document), locator));
+        assertEquals(RESOURCE, bridge.outputsForSource(new FunctionSourceDocument(named, document),
+            FunctionResult.success(named, locator.outputs(), 0)).get("reference"));
+    }
 
     @Test
     void injectedTypedSourceAndCapabilitiesExecuteThroughExplicitCompiledEntryPoint() {

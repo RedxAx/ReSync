@@ -69,7 +69,7 @@
     },
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the event cancellation attempt."},
-      {"id": "cancel", "displayName": "Cancel", "name": "cancel", "pinType": "DATA", "dataType": "boolean", "defaultValue": true, "description": "When true, requests cancellation of the active event; when false, the operation succeeds without changing it."}
+      {"id": "cancel", "displayName": "Cancel", "name": "cancel", "pinType": "DATA", "dataType": "boolean", "defaultValue": true, "description": "When true, requests cancellation of the active event. When false, the operation succeeds without changing it."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the cancellation request is evaluated."},

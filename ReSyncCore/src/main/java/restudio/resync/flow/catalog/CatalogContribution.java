@@ -40,6 +40,7 @@ public final class CatalogContribution {
     private final CatalogProvenance provenance;
     private final Map<String, CatalogProvenance.SourceEntry> definitionProvenance;
     private final List<String> provenanceErrors;
+    private volatile CatalogCanonicalizer.StartupContracts startupContracts;
 
     public CatalogContribution(OwnerId ownerId, String version, CatalogContractRange contractRange, List<CatalogDependency> dependencies, List<CatalogNodeDescriptor> definitions, List<TypeDescriptor> types, List<ConversionGraph.ConversionEdge> conversions, List<CatalogCategoryDescriptor> categories, List<InspectorDescriptor> inspectors, List<CatalogCapabilityDescriptor> capabilities, List<RuntimeOperationDescriptor> runtimeRequirements, List<CatalogMigrationEdge> migrations, CatalogProvenance provenance) {
         this(ownerId, version, contractRange, dependencies, definitions, types, conversions, categories, inspectors, capabilities, runtimeRequirements, migrations, null, null, List.of(), List.of(), provenance);
@@ -80,6 +81,23 @@ public final class CatalogContribution {
     }
 
     public OwnerId ownerId() { return ownerId; }
+
+    String startupContracts() {
+        return startupData().identity();
+    }
+
+    CatalogCanonicalizer.StartupContracts startupData() {
+        CatalogCanonicalizer.StartupContracts current = startupContracts;
+        if (current != null) {
+            return current;
+        }
+        synchronized (this) {
+            if (startupContracts == null) {
+                startupContracts = CatalogCanonicalizer.startupContracts(this);
+            }
+            return startupContracts;
+        }
+    }
     public String version() { return version; }
     public CatalogContractRange contractRange() { return contractRange; }
     public List<CatalogDependency> dependencies() { return dependencies; }

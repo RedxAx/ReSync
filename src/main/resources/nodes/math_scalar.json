@@ -77,7 +77,7 @@
   {
     "id": "math_sqrt",
     "displayName": "Sqrt",
-    "description": "Returns the square root of a non-negative number; negative inputs fail because no finite real result exists.",
+    "description": "Returns the square root of a finite non-negative number. Negative or non-finite inputs fail before producing a value.",
     "domain": "core",
     "family": "math",
     "lifecycle": "active",
@@ -93,10 +93,10 @@
     "handler": "GenericMathHandler",
     "handlerConfig": {"operation": "sqrt"},
     "inputs": [
-      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number whose square root should be returned."}
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number greater than or equal to zero. Negative or non-finite values fail."}
     ],
     "outputs": [
-      {"id": "sqrt", "displayName": "Square Root", "name": "sqrt", "pinType": "DATA", "dataType": "number", "description": "Returns the finite square root of the input; negative inputs fail."}
+      {"id": "sqrt", "displayName": "Square Root", "name": "sqrt", "pinType": "DATA", "dataType": "number", "description": "Finite square root of the input. Negative or non-finite inputs fail."}
     ]
   },
   {
@@ -270,7 +270,7 @@
   {
     "id": "math_random_choice_weighted",
     "displayName": "Random Choice Weighted",
-    "description": "Selects one item at random using the matching weight at each list position. A missing, empty, or mismatched list returns null.",
+    "description": "Chooses a random list value using matching non-negative finite weights. Entries with zero weight are never selected. Empty input or all-zero weights returns no value. Mismatched lengths or invalid weights fail.",
     "domain": "core",
     "family": "math",
     "lifecycle": "active",

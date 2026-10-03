@@ -101,7 +101,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the score update."},
       {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should change; uses the current Flow player when omitted."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should change. The current Flow player is used when omitted."},
       {"id": "score", "displayName": "Score", "name": "score", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 0, "description": "Sets the player's score."}
     ],
     "outputs": [
@@ -142,7 +142,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts resetting the score."},
       {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should be reset; uses the current Flow player when omitted."}
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should be reset. The current Flow player is used when omitted."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the score is reset."}
@@ -202,7 +202,7 @@
     },
     "inputs": [
       {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to inspect."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should be read; uses the current Flow player when omitted."}
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should be read. The current Flow player is used when omitted."}
     ],
     "outputs": [
       {"id": "score", "displayName": "Score", "name": "score", "pinType": "DATA", "direction": "output", "dataType": "integer", "description": "Returns the player's current score."}
@@ -267,7 +267,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts increasing the score."},
       {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should increase; uses the current Flow player when omitted."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should increase. The current Flow player is used when omitted."},
       {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 1, "description": "Sets the exact number of points to add."}
     ],
     "outputs": [
@@ -308,7 +308,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts decreasing the score."},
       {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should decrease; uses the current Flow player when omitted."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should decrease. The current Flow player is used when omitted."},
       {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 1, "description": "Sets the exact number of points to remove."}
     ],
     "outputs": [
@@ -462,7 +462,7 @@
     "handlerConfig": {"operation": "scoreboard_set_sidebar_line"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the sidebar line."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose scoreboard should change; uses the current Flow player when omitted."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose scoreboard should change. The current Flow player is used when omitted."},
       {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the sidebar objective on the player's scoreboard."},
       {"id": "title", "displayName": "Text", "name": "title", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Sets the line text after placeholder expansion."},
       {"id": "line", "displayName": "Line", "name": "line", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 0, "description": "Sets the logical line number."},
@@ -546,7 +546,7 @@
     "handlerConfig": {"operation": "scoreboard_hide_active"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts hiding the active scoreboard."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose scoreboard should be hidden; uses the current Flow player when omitted."}
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose scoreboard should be hidden. The current Flow player is used when omitted."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the active scoreboard is hidden."}
@@ -583,7 +583,7 @@
     "handlerConfig": {"operation": "scoreboard_show_template"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts showing the scoreboard template."},
-      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player who should see the template; uses the current Flow player when omitted."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player who should see the template. The current Flow player is used when omitted."},
       {"id": "scoreboard_id", "displayName": "Scoreboard Template", "name": "scoreboard_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the managed scoreboard template to show."},
       {"id": "use_papi", "displayName": "Use PlaceholderAPI", "name": "use_papi", "pinType": "DATA", "direction": "input", "dataType": "boolean", "defaultValue": false, "description": "Controls whether PlaceholderAPI placeholders are expanded."}
     ],

@@ -147,7 +147,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the ordered batch request."},
       {"id": "webhook_url", "displayName": "Webhook URL", "name": "webhook_url", "dataType": "string", "description": "Official HTTPS Discord webhook URL."},
-      {"id": "messages", "displayName": "Messages", "name": "messages", "dataType": "list<any>", "optional": true, "description": "Ordered message maps. Each map may contain content and an embed value; an empty list sends nothing."}
+      {"id": "messages", "displayName": "Messages", "name": "messages", "dataType": "list<any>", "optional": true, "description": "Ordered message maps. Each map may contain content and an embed value. An empty list sends nothing."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after every message in the batch has been accepted."},
@@ -339,7 +339,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts color assignment."},
       {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
-      {"id": "color", "displayName": "Color", "name": "color", "dataType": "number", "optional": true, "description": "Discord RGB color integer; absent input leaves the existing color unchanged."}
+      {"id": "color", "displayName": "Color", "name": "color", "dataType": "number", "optional": true, "description": "Discord RGB color integer. Absent input leaves the existing color unchanged."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after color assignment."},
@@ -569,7 +569,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts thumbnail editing."},
       {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
-      {"id": "url", "displayName": "URL", "name": "url", "dataType": "string", "optional": true, "description": "Thumbnail URL; blank input removes the thumbnail."}
+      {"id": "url", "displayName": "URL", "name": "url", "dataType": "string", "optional": true, "description": "Thumbnail URL. Blank input removes the thumbnail."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after thumbnail editing."},
@@ -610,7 +610,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts image editing."},
       {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
-      {"id": "url", "displayName": "URL", "name": "url", "dataType": "string", "optional": true, "description": "Main image URL; blank input removes the image."}
+      {"id": "url", "displayName": "URL", "name": "url", "dataType": "string", "optional": true, "description": "Main image URL. Blank input removes the image."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after image editing."},
@@ -653,7 +653,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts author editing."},
       {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
-      {"id": "name", "displayName": "Name", "name": "name", "dataType": "string", "optional": true, "description": "Author display name; blank values remove the author when all fields are blank."},
+      {"id": "name", "displayName": "Name", "name": "name", "dataType": "string", "optional": true, "description": "Author display name. Blank values remove the author when all fields are blank."},
       {"id": "url", "displayName": "URL", "name": "url", "dataType": "string", "optional": true, "description": "Optional author link."},
       {"id": "icon_url", "displayName": "Icon URL", "name": "icon_url", "dataType": "string", "optional": true, "description": "Optional author icon URL."}
     ],
@@ -697,7 +697,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts footer editing."},
       {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
-      {"id": "text", "displayName": "Text", "name": "text", "dataType": "string", "optional": true, "description": "Footer text; blank values remove the footer when all fields are blank."},
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "string", "optional": true, "description": "Footer text. Blank values remove the footer when all fields are blank."},
       {"id": "icon_url", "displayName": "Icon URL", "name": "icon_url", "dataType": "string", "optional": true, "description": "Optional footer icon URL."}
     ],
     "outputs": [
@@ -739,7 +739,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts timestamp editing."},
       {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
-      {"id": "timestamp", "displayName": "Timestamp", "name": "timestamp", "dataType": "string", "optional": true, "description": "Timestamp text accepted by Discord; blank input removes the timestamp."}
+      {"id": "timestamp", "displayName": "Timestamp", "name": "timestamp", "dataType": "string", "optional": true, "description": "Timestamp text accepted by Discord. Blank input removes the timestamp."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after timestamp editing."},

@@ -7,6 +7,7 @@ import restudio.resync.flow.diagnostic.Diagnostic;
 import restudio.resync.flow.diagnostic.DiagnosticPhase;
 import restudio.resync.flow.diagnostic.DiagnosticSeverity;
 import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.function.FunctionInputMap;
 import restudio.resync.flow.graph.CompiledExecutionPlan;
 import restudio.resync.flow.graph.CompiledExecutionRunner;
 import restudio.resync.flow.graph.CompiledPlanAuthority;
@@ -17,6 +18,7 @@ import restudio.resync.flow.graph.GraphCompiler;
 import restudio.resync.flow.identity.CapabilityId;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.identity.NodeInstanceId;
 import restudio.resync.flow.identity.OwnerId;
 import restudio.resync.flow.runtime.RuntimeAuthority;
@@ -28,11 +30,14 @@ import restudio.resync.flow.runtime.RuntimePrincipal;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridge {
@@ -45,6 +50,7 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
     private final CompiledGraphMaterializer materializer;
     private final CompiledExecutionRunner runner;
     private final CompiledPlanAuthority planAuthority;
+    private final Map<CorrelationId, ExecutionObservation> observations = new ConcurrentHashMap<>();
 
     public CompiledCoreFlowExecutionBridge(
         Supplier<CatalogSnapshot> catalogSupplier,
@@ -165,6 +171,35 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
         return runner.prepare(plan, startNodeId);
     }
 
+    public CompiledExecutionRunner.FunctionExecutionHandle executeFunctionObserved(FunctionSourceDocument source,
+            NodeInstanceId entry, FunctionInputMap inputs, RuntimeCancellationToken cancellation,
+            CompiledRuntimeContext context, CorrelationId invocationId, long deadlineMillis) {
+        Objects.requireNonNull(source, "Authoritative Function Source Is Required");
+        if (planAuthority == null) {
+            throw new IllegalStateException("Function Execution Requires The Resident Compiled Plan Authority");
+        }
+        ExecutionTarget target = new ExecutionTarget(source.graph().resource(), entry, source.graph().revision(),
+            source.graph().catalogBinding());
+        CompiledPlanLease lease = planAuthority.acquireRequired(target);
+        try {
+            CompiledExecutionRunner.ExecutionTemplate template = lease.executionTemplate().orElseThrow(() ->
+                new IllegalStateException("Function Execution Requires An Admitted Resident Template"));
+            CompiledExecutionRunner.FunctionExecutionHandle handle = runner.executeFunctionObserved(template,
+                source.signature(), inputs, cancellation, context, invocationId, deadlineMillis);
+            return new CompiledExecutionRunner.FunctionExecutionHandle(handle.result(),
+                handle.physicalCompletion().whenComplete((ignored, failure) -> lease.close()));
+        } catch (RuntimeException | Error failure) {
+            try {
+                lease.close();
+            } catch (RuntimeException | Error closeFailure) {
+                if (closeFailure != failure) {
+                    failure.addSuppressed(closeFailure);
+                }
+            }
+            throw failure;
+        }
+    }
+
     public int activeInvocationCount() {
         return runner.activeInvocationCount();
     }
@@ -175,6 +210,31 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
 
     @Override
     public CompletionStage<Result> execute(Context context) {
+        ExecutionObservation observation = context == null ? null : observations.remove(context.invocationId());
+        try {
+            CompletionStage<Result> execution = executeCore(context, observation);
+            if (observation != null) {
+                execution.whenComplete(observation::finish);
+            }
+            return execution;
+        } catch (RuntimeException | Error failure) {
+            if (observation != null) {
+                observation.finish(null, failure);
+            }
+            throw failure;
+        }
+    }
+
+    public ExecutionObservation observeInvocation(CorrelationId invocationId) {
+        ExecutionObservation observation = new ExecutionObservation(Objects.requireNonNull(invocationId,
+            "Observed Invocation Identity Is Required"));
+        if (observations.putIfAbsent(invocationId, observation) != null) {
+            throw new IllegalStateException("The Invocation Already Has An Observer");
+        }
+        return observation;
+    }
+
+    private CompletionStage<Result> executeCore(Context context, ExecutionObservation observation) {
         if (context == null) {
             return CompletableFuture.completedFuture(Result.unsupported("A compiled Core context is required", List.of(diagnostic(
                 "GRAPH.NULL", null, "Compiled Core context is unavailable", Map.of()))));
@@ -206,10 +266,12 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
                         "eventVariablesPresent", context.eventVariables() != null && !context.eventVariables().isEmpty())))));
         }
         if (planAuthority != null) {
-            return executeFromPlanAuthority(context, runtimeContext);
+            return executeFromPlanAuthority(context, runtimeContext, observation);
         }
         CompiledGraphMetadata metadata = context.compiledGraphMetadata();
-        CompiledGraphMaterializer.Result materialized = materializer.materialize(context.graph(), metadata);
+        CompiledGraphMaterializer.Result materialized = context.sourceDocument() == null
+            ? materializer.materialize(context.graph(), metadata)
+            : materializer.materialize(context.sourceDocument(), metadata == null ? null : metadata.functionSource());
         if (!materialized.materialized()) {
             return CompletableFuture.completedFuture(Result.unsupported(
                 "The legacy graph is missing complete canonical execution metadata", materialized.diagnostics()));
@@ -257,8 +319,12 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
                         "startNodeId", context.startNodeId() == null ? "" : context.startNodeId())))));
         }
         try {
-            return runner.execute(compilation.plan(), startNodeId, Map.of(), new RuntimeCancellationToken(), runtimeContext,
-                    context.invocationId(), context.requestedDeadlineMillis())
+            CompiledExecutionRunner.ExecutionHandle handle = runner.executeObserved(runner.prepare(compilation.plan(), startNodeId),
+                Map.of(), new RuntimeCancellationToken(), runtimeContext, context.invocationId(), context.requestedDeadlineMillis());
+            if (observation != null) {
+                observation.attach(handle);
+            }
+            return handle.result()
                 .thenApply(CompiledCoreFlowExecutionBridge::executionResult);
         } catch (RuntimeException failure) {
             return CompletableFuture.completedFuture(Result.failed(
@@ -267,7 +333,8 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
         }
     }
 
-    private CompletionStage<Result> executeFromPlanAuthority(Context context, CompiledRuntimeContext runtimeContext) {
+    private CompletionStage<Result> executeFromPlanAuthority(Context context, CompiledRuntimeContext runtimeContext,
+                                                           ExecutionObservation observation) {
         CompiledGraphMetadata metadata = context.compiledGraphMetadata();
         if (metadata == null) {
             return CompletableFuture.completedFuture(Result.unsupported(
@@ -317,7 +384,10 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
         CompiledPlanLease planLease;
         try {
             planLease = planAuthority.acquireRequired(target);
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | Error failure) {
+            if (observation != null) {
+                observation.releaseFailed();
+            }
             return CompletableFuture.completedFuture(Result.failed(
                 "The immutable compiled plan could not be admitted", failure, List.of(diagnostic(
                     "GRAPH.OPAQUE_UNAVAILABLE", metadata, failure.getMessage(), Map.of(
@@ -326,18 +396,29 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
                         "revision", target.expectedRevision(),
                         "catalogBinding", target.expectedBinding().canonicalText())))));
         }
-        CompiledExecutionPlan plan = planLease.plan();
         CompletionStage<CompiledExecutionRunner.ExecutionResult> execution;
         try {
+            CompiledExecutionPlan plan = planLease.plan();
             CompiledExecutionRunner.ExecutionTemplate template = planLease.executionTemplate()
                 .orElseGet(() -> runner.prepare(plan, startNodeId));
-            execution = runner.execute(template, Map.of(), new RuntimeCancellationToken(), runtimeContext,
-                context.invocationId(), context.requestedDeadlineMillis());
-        } catch (RuntimeException failure) {
+            CompiledExecutionRunner.ExecutionHandle handle = runner.executeObserved(template, Map.of(), new RuntimeCancellationToken(),
+                runtimeContext, context.invocationId(), context.requestedDeadlineMillis());
+            handle = new CompiledExecutionRunner.ExecutionHandle(handle.result(),
+                handle.physicalCompletion().whenComplete((ignored, failure) -> planLease.close()));
+            if (observation != null) {
+                observation.attach(handle);
+            }
+            execution = handle.result();
+        } catch (RuntimeException | Error failure) {
             try {
                 planLease.close();
-            } catch (RuntimeException closeFailure) {
-                failure.addSuppressed(closeFailure);
+            } catch (RuntimeException | Error closeFailure) {
+                if (closeFailure != failure) {
+                    failure.addSuppressed(closeFailure);
+                }
+                if (observation != null) {
+                    observation.releaseFailed();
+                }
             }
             return CompletableFuture.completedFuture(Result.failed(
                 "The immutable compiled plan could not start", failure, List.of(diagnostic(
@@ -347,7 +428,10 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
         if (execution == null) {
             try {
                 planLease.close();
-            } catch (RuntimeException closeFailure) {
+            } catch (RuntimeException | Error closeFailure) {
+                if (observation != null) {
+                    observation.releaseFailed();
+                }
                 return CompletableFuture.completedFuture(Result.failed(
                     "The immutable compiled plan lease could not be released", closeFailure,
                     List.of(diagnostic("GRAPH.RUNTIME_BINDING_MISSING", metadata,
@@ -361,15 +445,6 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
         }
         return execution.handle((result, failure) -> {
             Throwable executionFailure = failure;
-            try {
-                planLease.close();
-            } catch (RuntimeException closeFailure) {
-                if (executionFailure != null) {
-                    executionFailure.addSuppressed(closeFailure);
-                } else {
-                    executionFailure = closeFailure;
-                }
-            }
             if (executionFailure != null) {
                 return Result.failed("Compiled Core execution failed", executionFailure, List.of(diagnostic(
                     "GRAPH.RUNTIME_BINDING_MISSING", metadata, executionFailure.getMessage(), Map.of(
@@ -377,6 +452,111 @@ public final class CompiledCoreFlowExecutionBridge implements FlowExecutionBridg
             }
             return executionResult(result);
         });
+    }
+
+    public final class ExecutionObservation implements AutoCloseable {
+        private final CorrelationId invocationId;
+        private final CompletableFuture<ObservedExecution> completion = new CompletableFuture<>();
+        private CompiledExecutionRunner.ExecutionHandle handle;
+        private boolean releaseConfirmed = true;
+
+        private ExecutionObservation(CorrelationId invocationId) {
+            this.invocationId = invocationId;
+        }
+
+        private synchronized void attach(CompiledExecutionRunner.ExecutionHandle handle) {
+            this.handle = Objects.requireNonNull(handle, "Observed Execution Is Required");
+        }
+
+        private synchronized void releaseFailed() {
+            releaseConfirmed = false;
+        }
+
+        private void finish(Result boundary, Throwable failure) {
+            Throwable boundaryFailure = failure == null && boundary != null ? boundary.failure() : failure;
+            CompiledExecutionRunner.ExecutionHandle execution;
+            boolean physicalComplete;
+            synchronized (this) {
+                execution = handle;
+                physicalComplete = releaseConfirmed;
+            }
+            if (execution == null) {
+                completion.complete(new ObservedExecution(invocationId, null, boundary, boundaryFailure, physicalComplete));
+                return;
+            }
+            execution.result().handle((result, executionFailure) -> new ObservedExecution(invocationId, result, boundary,
+                boundaryFailure == null ? executionFailure : boundaryFailure)).thenCombine(
+                    execution.physicalCompletion().handle((ignored, physicalFailure) -> physicalFailure),
+                    (result, physicalFailure) -> physicalFailure == null ? result
+                        : new ObservedExecution(invocationId, result.execution(), result.boundary(), physicalFailure, false))
+                .whenComplete((result, observationFailure) -> {
+                    if (observationFailure == null) {
+                        completion.complete(result);
+                    } else {
+                        completion.completeExceptionally(observationFailure);
+                    }
+                });
+        }
+
+        public CompletionStage<ObservedExecution> completion() {
+            return completion.minimalCompletionStage();
+        }
+
+        public void finishWithoutExecution(Throwable failure) {
+            if (observations.remove(invocationId, this)) {
+                finish(null, failure);
+            }
+        }
+
+        @Override
+        public void close() {
+            finishWithoutExecution(new IllegalStateException("The Observed Invocation Did Not Reach Compiled Execution"));
+        }
+    }
+
+    public record ObservedExecution(CorrelationId invocationId, CompiledExecutionRunner.ExecutionResult execution,
+                                    Result boundary, Throwable failure, boolean physicalComplete) {
+        public ObservedExecution(CorrelationId invocationId, CompiledExecutionRunner.ExecutionResult execution,
+                Result boundary, Throwable failure) {
+            this(invocationId, execution, boundary, failure, true);
+        }
+
+        public Map<String, Object> canonicalValue() {
+            Map<String, Object> value = new LinkedHashMap<>();
+            value.put("invocationId", invocationId.canonicalText());
+            value.put("physicalComplete", physicalComplete);
+            if (execution != null) {
+                value.put("status", execution.status().name().toLowerCase(Locale.ROOT));
+                Map<String, Object> nodes = new LinkedHashMap<>();
+                execution.nodeResults().entrySet().stream().sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> nodes.put(entry.getKey().canonicalText(), entry.getValue().canonicalValue()));
+                value.put("nodeResults", Map.copyOf(nodes));
+                value.put("outputs", execution.outputs().entrySet().stream().map(entry -> {
+                    Map<String, Object> output = new LinkedHashMap<>();
+                    output.put("nodeId", entry.getKey().nodeId().canonicalText());
+                    output.put("pinId", entry.getKey().pinId().canonicalText());
+                    if (entry.getKey().elementId() != null) {
+                        output.put("elementId", entry.getKey().elementId().canonicalText());
+                    }
+                    if (entry.getKey().branchId() != null) {
+                        output.put("branchId", entry.getKey().branchId().canonicalText());
+                    }
+                    output.put("value", entry.getValue().canonicalValue());
+                    return Map.copyOf(output);
+                }).toList());
+            } else {
+                value.put("status", "rejected");
+            }
+            if (boundary != null) {
+                value.put("boundary", boundary.status().name().toLowerCase(Locale.ROOT));
+                value.put("diagnostics", boundary.diagnostics().stream().map(Diagnostic::toMap).toList());
+            }
+            if (failure != null) {
+                value.put("failure", Map.of("type", failure.getClass().getName(), "message",
+                    failure.getMessage() == null ? "Execution Failed" : failure.getMessage()));
+            }
+            return Map.copyOf(value);
+        }
     }
 
     private static Result executionResult(CompiledExecutionRunner.ExecutionResult result) {

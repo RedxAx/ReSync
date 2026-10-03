@@ -18,7 +18,7 @@
     "handler": "UuidHandler",
     "handlerConfig": {"operation": "uuid_from_string"},
     "inputs": [
-      {"id": "uuid_string", "displayName": "UUID String", "name": "uuid_string", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Canonical UUID text to parse; blank or malformed text causes an Invalid UUID error."}
+      {"id": "uuid_string", "displayName": "UUID String", "name": "uuid_string", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Canonical UUID text to parse. Blank or malformed text causes an Invalid UUID error."}
     ],
     "outputs": [
       {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "Returns the parsed UUID value when the input is valid."}
@@ -43,7 +43,7 @@
     "handler": "UuidHandler",
     "handlerConfig": {"operation": "uuid_to_string"},
     "inputs": [
-      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "UUID value to format; missing input causes a UUID is required error."}
+      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "UUID value to format. Missing input causes a UUID is required error."}
     ],
     "outputs": [
       {"id": "uuid_string", "displayName": "UUID String", "name": "uuid_string", "pinType": "DATA", "dataType": "string", "description": "Returns the UUID in canonical lowercase string form."}
@@ -91,7 +91,7 @@
     "handler": "UuidHandler",
     "handlerConfig": {"operation": "uuid_version"},
     "inputs": [
-      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "UUID value to inspect; missing input causes a UUID is required error."}
+      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "UUID value to inspect. Missing input causes a UUID is required error."}
     ],
     "outputs": [
       {"id": "version", "displayName": "Version", "name": "version", "pinType": "DATA", "dataType": "number", "description": "Returns the UUID version number."}
@@ -116,10 +116,10 @@
     "handler": "UuidHandler",
     "handlerConfig": {"operation": "uuid_timestamp"},
     "inputs": [
-      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "Time-based UUID to inspect; missing input causes a UUID is required error."}
+      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "Time-based UUID to inspect. Missing input causes a UUID is required error."}
     ],
     "outputs": [
-      {"id": "timestamp", "displayName": "Timestamp", "name": "timestamp", "pinType": "DATA", "dataType": "number", "description": "Returns the UUID timestamp; non-time-based UUIDs fail because they do not provide one."}
+      {"id": "timestamp", "displayName": "Timestamp", "name": "timestamp", "pinType": "DATA", "dataType": "number", "description": "Returns the UUID timestamp. Non-time-based UUIDs fail because they do not provide one."}
     ]
   }
 ]

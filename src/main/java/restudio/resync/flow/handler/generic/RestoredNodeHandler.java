@@ -6,6 +6,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
@@ -310,10 +311,11 @@ public class RestoredNodeHandler implements NodeHandler {
 
     private void playerCountItem(FlowContext ctx, FlowNode node) {
         Player player = requirePlayer(ctx, node);
+        Object value = ctx.getInputValue(node, "material_or_item", Object.class, null);
         ItemStack target = requireMaterialOrItem(ctx, node);
         int count = 0;
         for (ItemStack item : player.getInventory().getStorageContents()) {
-            if (item != null && item.isSimilar(target)) {
+            if (item != null && (value instanceof ItemStack ? item.isSimilar(target) : item.getType() == target.getType())) {
                 count += item.getAmount();
             }
         }
@@ -389,7 +391,7 @@ public class RestoredNodeHandler implements NodeHandler {
         Player player = requirePlayer(ctx, node);
         EntityDamageEvent lastDamage = player.getLastDamageCause();
         ctx.setOutput(node, "damage_cause", lastDamage != null ? lastDamage.getCause().name() : null);
-        ctx.setOutput(node, "damage_source", lastDamage != null ? lastDamage.getEntity() : null);
+        ctx.setOutput(node, "damage_source", lastDamage instanceof EntityDamageByEntityEvent damage ? damage.getDamager() : null);
     }
 
     private void playerGetKiller(FlowContext ctx, FlowNode node) {
@@ -442,13 +444,15 @@ public class RestoredNodeHandler implements NodeHandler {
     }
 
     private ItemStack requireMaterialOrItem(FlowContext ctx, FlowNode node) {
-        ItemStack item = ctx.getInputValue(node, "material_or_item", ItemStack.class, null);
-        if (item != null && !item.getType().isAir()) {
+        Object value = ctx.getInputValue(node, "material_or_item", Object.class, null);
+        if (value instanceof ItemStack item && !item.getType().isAir()) {
             return item;
         }
-        String materialName = ctx.getInputValue(node, "material", String.class, "");
-        Material material = Material.matchMaterial(materialName);
-        if (material == null || material.isAir()) throw new IllegalArgumentException("Material or item is required");
+        Material material = value instanceof Material type ? type
+            : value instanceof String name ? Material.matchMaterial(name) : null;
+        if (material == null || material.isAir() || !material.isItem()) {
+            throw new IllegalArgumentException("Material or item is required");
+        }
         return new ItemStack(material);
     }
 

@@ -2,7 +2,7 @@
   {
     "id": "ability_strike_lightning",
     "displayName": "Strike Lightning",
-    "description": "Run the Strike Lightning ability effect through the registered runtime handler.",
+    "description": "Strikes real lightning at the selected world location, allowing normal lightning damage and fire.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -35,7 +35,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Strike Lightning when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -44,7 +44,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       }
     ],
@@ -55,7 +55,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -85,7 +85,7 @@
   {
     "id": "ability_fake_lightning",
     "displayName": "Fake Lightning",
-    "description": "Run the Fake Lightning ability effect through the registered runtime handler.",
+    "description": "Shows lightning at the selected world location without creating a damaging lightning strike.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -118,7 +118,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Fake Lightning when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -127,7 +127,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       }
     ],
@@ -138,7 +138,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -168,7 +168,7 @@
   {
     "id": "ability_damage_area",
     "displayName": "Damage Area",
-    "description": "Run the Damage Area ability effect through the registered runtime handler.",
+    "description": "Damages matching living entities in a box centered on Location, extending Radius blocks along each axis. Damage uses health points, with two points per heart.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -201,7 +201,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Damage Area when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -210,7 +210,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -221,7 +221,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 5,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Range in blocks along each axis of the search box centered on Location. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -250,7 +250,7 @@
           "passive"
         ],
         "defaultValue": "living_entity",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -261,7 +261,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -272,7 +272,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -322,7 +322,7 @@
   {
     "id": "ability_heal_area",
     "displayName": "Heal Area",
-    "description": "Run the Heal Area ability effect through the registered runtime handler.",
+    "description": "Heals matching living entities in a box centered on Location, extending Radius blocks along each axis. Health cannot exceed each entity's maximum.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -355,7 +355,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Heal Area when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -364,7 +364,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -375,7 +375,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 5,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Range in blocks along each axis of the search box centered on Location. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -404,7 +404,7 @@
           "passive"
         ],
         "defaultValue": "living_entity",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -415,7 +415,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": false,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -426,7 +426,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -476,7 +476,7 @@
   {
     "id": "ability_knockback_area",
     "displayName": "Knockback Area",
-    "description": "Run the Knockback Area ability effect through the registered runtime handler.",
+    "description": "Pushes matching entities away from Location and adds upward velocity. Targets are found in a box extending Radius blocks along each axis.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -509,7 +509,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Knockback Area when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -518,7 +518,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -529,7 +529,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 5,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Range in blocks along each axis of the search box centered on Location. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -569,7 +569,7 @@
           "passive"
         ],
         "defaultValue": "living_entity",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -580,7 +580,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -591,7 +591,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -646,7 +646,7 @@
   {
     "id": "ability_find_entities_radius",
     "displayName": "Find Entities Radius",
-    "description": "Run the Find Entities Radius ability effect through the registered runtime handler.",
+    "description": "Finds entities in a box centered on Location, extending Radius blocks along each axis. Applies Target Filter and Exclude Caster.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -679,7 +679,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Find Entities Radius when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -688,7 +688,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -699,7 +699,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 5,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Range in blocks along each axis of the search box centered on Location. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -717,7 +717,7 @@
           "passive"
         ],
         "defaultValue": "any",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -728,7 +728,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": false,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -739,7 +739,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -798,7 +798,7 @@
   {
     "id": "ability_raycast",
     "displayName": "Raycast",
-    "description": "Run the Raycast ability effect through the registered runtime handler.",
+    "description": "Traces from a player's eye position in their view direction and reports an entity or block hit according to the selected hit and stop modes.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -831,7 +831,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Raycast when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -908,7 +908,7 @@
           "passive"
         ],
         "defaultValue": "any",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -931,7 +931,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -1047,7 +1047,7 @@
   {
     "id": "ability_play_sound",
     "displayName": "Play Sound",
-    "description": "Run the Play Sound ability effect through the registered runtime handler.",
+    "description": "Plays one sound in the world at Location using the selected volume and pitch.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -1080,7 +1080,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Play Sound when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -1089,7 +1089,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -1134,7 +1134,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -1179,7 +1179,7 @@
   {
     "id": "ability_potion_effect",
     "displayName": "Potion Effect",
-    "description": "Run the Potion Effect ability effect through the registered runtime handler.",
+    "description": "Applies a named potion effect to a living target for the selected number of server ticks. Amplifier 0 means level I.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -1212,7 +1212,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Potion Effect when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -1221,7 +1221,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -1244,7 +1244,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 100,
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       },
       {
@@ -1255,7 +1255,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 0,
-        "description": "Provides the Amplifier value used by this ability.",
+        "description": "Potion strength starting at 0 for level I, 1 for level II, and so on.",
         "direction": "input"
       }
     ],
@@ -1266,7 +1266,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -1311,7 +1311,7 @@
   {
     "id": "ability_launch_projectile",
     "displayName": "Launch Projectile",
-    "description": "Run the Launch Projectile ability effect through the registered runtime handler.",
+    "description": "Launches a supported projectile from the current player, with selected speed, gravity, fire, and projectile-specific settings.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -1344,7 +1344,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Launch Projectile when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -1453,7 +1453,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -1532,7 +1532,7 @@
   {
     "id": "ability_nearest_entity",
     "displayName": "Nearest Entity",
-    "description": "Run the Nearest Entity ability effect through the registered runtime handler.",
+    "description": "Finds the nearest matching entity in a box centered on Location, extending Radius blocks along each axis. Found reports whether a target was available.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -1565,7 +1565,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Nearest Entity when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -1574,7 +1574,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -1585,7 +1585,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 8,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Range in blocks along each axis of the search box centered on Location. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -1603,7 +1603,7 @@
           "passive"
         ],
         "defaultValue": "living_entity",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -1614,7 +1614,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -1625,7 +1625,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -1698,7 +1698,7 @@
   {
     "id": "ability_random_entity",
     "displayName": "Random Entity",
-    "description": "Run the Random Entity ability effect through the registered runtime handler.",
+    "description": "Selects a matching entity at random from a box centered on Location, extending Radius blocks along each axis. Found reports whether a target was available.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -1731,7 +1731,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Random Entity when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -1740,7 +1740,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -1751,7 +1751,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 8,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Range in blocks along each axis of the search box centered on Location. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -1769,7 +1769,7 @@
           "passive"
         ],
         "defaultValue": "living_entity",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -1780,7 +1780,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -1791,7 +1791,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -1864,7 +1864,7 @@
   {
     "id": "ability_cone_entities",
     "displayName": "Cone Entities",
-    "description": "Run the Cone Entities ability effect through the registered runtime handler.",
+    "description": "Finds matching entities inside a directional cone defined by Location, Range, and Angle.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -1897,7 +1897,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Cone Entities when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -1906,7 +1906,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -1915,7 +1915,7 @@
         "name": "direction",
         "pinType": "DATA",
         "dataType": "vector",
-        "description": "Provides the Direction value used by this ability.",
+        "description": "Effect direction. Uses the current player's view direction when omitted and available.",
         "direction": "input"
       },
       {
@@ -1926,7 +1926,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 8,
-        "description": "Provides the Range value used by this ability.",
+        "description": "Forward search length in blocks.",
         "direction": "input"
       },
       {
@@ -1937,7 +1937,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 60,
-        "description": "Provides the Angle value used by this ability.",
+        "description": "Cone opening angle in degrees.",
         "direction": "input"
       },
       {
@@ -1955,7 +1955,7 @@
           "passive"
         ],
         "defaultValue": "living_entity",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -1966,7 +1966,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -1977,7 +1977,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -2046,7 +2046,7 @@
   {
     "id": "ability_line_entities",
     "displayName": "Line Entities",
-    "description": "Run the Line Entities ability effect through the registered runtime handler.",
+    "description": "Finds matching entities along a directional line segment, using Range and Width to bound the search.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -2079,7 +2079,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Line Entities when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -2088,7 +2088,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -2097,7 +2097,7 @@
         "name": "direction",
         "pinType": "DATA",
         "dataType": "vector",
-        "description": "Provides the Direction value used by this ability.",
+        "description": "Effect direction. Uses the current player's view direction when omitted and available.",
         "direction": "input"
       },
       {
@@ -2108,7 +2108,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 12,
-        "description": "Provides the Range value used by this ability.",
+        "description": "Forward search length in blocks.",
         "direction": "input"
       },
       {
@@ -2119,7 +2119,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 1,
-        "description": "Provides the Width value used by this ability.",
+        "description": "Width used by the line or box search, in blocks.",
         "direction": "input"
       },
       {
@@ -2137,7 +2137,7 @@
           "passive"
         ],
         "defaultValue": "living_entity",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -2148,7 +2148,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -2159,7 +2159,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -2228,7 +2228,7 @@
   {
     "id": "ability_dash",
     "displayName": "Dash",
-    "description": "Run the Dash ability effect through the registered runtime handler.",
+    "description": "Applies a directional velocity to the selected target, with an additional upward component.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -2261,7 +2261,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Dash when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -2270,7 +2270,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -2279,7 +2279,7 @@
         "name": "direction",
         "pinType": "DATA",
         "dataType": "vector",
-        "description": "Provides the Direction value used by this ability.",
+        "description": "Effect direction. Uses the current player's view direction when omitted and available.",
         "direction": "input"
       },
       {
@@ -2312,7 +2312,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -2357,7 +2357,7 @@
   {
     "id": "ability_teleport_caster",
     "displayName": "Teleport Caster",
-    "description": "Run the Teleport Caster ability effect through the registered runtime handler.",
+    "description": "Teleports the current player to Location. Keep Direction preserves the player's current yaw and pitch.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -2390,7 +2390,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Teleport Caster when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -2399,7 +2399,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -2410,7 +2410,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Keep Direction value used by this ability.",
+        "description": "True preserves the player's current yaw and pitch during teleport.",
         "direction": "input"
       }
     ],
@@ -2421,7 +2421,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -2456,7 +2456,7 @@
   {
     "id": "ability_teleport_target",
     "displayName": "Teleport Target",
-    "description": "Run the Teleport Target ability effect through the registered runtime handler.",
+    "description": "Teleports the selected or event target to a world location.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -2489,7 +2489,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Teleport Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -2498,7 +2498,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -2507,7 +2507,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       }
     ],
@@ -2518,7 +2518,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -2553,7 +2553,7 @@
   {
     "id": "ability_beam",
     "displayName": "Beam",
-    "description": "Run the Beam ability effect through the registered runtime handler.",
+    "description": "Draws a particle beam between two world positions using the selected number of steps. Does not damage entities along the beam.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -2586,7 +2586,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Beam when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -2595,7 +2595,7 @@
         "name": "start",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Start value used by this ability.",
+        "description": "World position where the particle beam begins.",
         "direction": "input"
       },
       {
@@ -2604,7 +2604,7 @@
         "name": "end",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the End value used by this ability.",
+        "description": "World position where the particle beam ends.",
         "direction": "input"
       },
       {
@@ -2613,7 +2613,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -2636,7 +2636,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 24,
-        "description": "Provides the Steps value used by this ability.",
+        "description": "Number of positions sampled along the particle beam.",
         "direction": "input"
       }
     ],
@@ -2647,7 +2647,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -2697,7 +2697,7 @@
   {
     "id": "ability_temporary_block",
     "displayName": "Temporary Block",
-    "description": "Run the Temporary Block ability effect through the registered runtime handler.",
+    "description": "Replaces a block for Duration Ticks, then restores its original state, including stored items. Restoration runs only if the temporary block data is still unchanged. Repeated placements keep the first original state.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -2730,7 +2730,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Temporary Block when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -2739,7 +2739,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -2762,7 +2762,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 60,
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       }
     ],
@@ -2773,7 +2773,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -2813,7 +2813,7 @@
   {
     "id": "ability_pull_entities",
     "displayName": "Pull Entities",
-    "description": "Run the Pull Entities ability effect through the registered runtime handler.",
+    "description": "Pulls matching entities toward Location using velocity. Finds targets in a box extending Radius blocks along each axis.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -2846,7 +2846,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Pull Entities when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -2855,7 +2855,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -2866,7 +2866,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 5,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Range in blocks along each axis of the search box centered on Location. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -2895,7 +2895,7 @@
           "passive"
         ],
         "defaultValue": "any",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -2906,7 +2906,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -2917,7 +2917,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -2967,7 +2967,7 @@
   {
     "id": "ability_push_entities",
     "displayName": "Push Entities",
-    "description": "Run the Push Entities ability effect through the registered runtime handler.",
+    "description": "Pushes matching entities away from Location using velocity. Finds targets in a box extending Radius blocks along each axis.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -3000,7 +3000,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Push Entities when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -3009,7 +3009,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -3020,7 +3020,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 5,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Range in blocks along each axis of the search box centered on Location. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -3049,7 +3049,7 @@
           "passive"
         ],
         "defaultValue": "any",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -3060,7 +3060,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -3071,7 +3071,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -3121,7 +3121,7 @@
   {
     "id": "ability_ignite_target",
     "displayName": "Ignite Target",
-    "description": "Run the Ignite Target ability effect through the registered runtime handler.",
+    "description": "Sets the target's burning time in server ticks.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -3154,7 +3154,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Ignite Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -3163,7 +3163,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -3185,7 +3185,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -3220,7 +3220,7 @@
   {
     "id": "ability_freeze_target",
     "displayName": "Freeze Target",
-    "description": "Run the Freeze Target ability effect through the registered runtime handler.",
+    "description": "Sets the target's freezing progress in server ticks.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -3253,7 +3253,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Freeze Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -3262,7 +3262,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -3284,7 +3284,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -3319,7 +3319,7 @@
   {
     "id": "ability_set_velocity",
     "displayName": "Set Velocity",
-    "description": "Run the Set Velocity ability effect through the registered runtime handler.",
+    "description": "Replaces the target's velocity with the selected X, Y, and Z components in blocks per server tick.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -3352,7 +3352,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Set Velocity when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -3361,7 +3361,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -3405,7 +3405,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -3450,7 +3450,7 @@
   {
     "id": "ability_mark_target",
     "displayName": "Mark Target",
-    "description": "Run the Mark Target ability effect through the registered runtime handler.",
+    "description": "Adds or replaces a temporary named mark on the target. The mark expires after Duration Ticks converted at 50 milliseconds per tick.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -3483,7 +3483,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Mark Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -3492,7 +3492,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -3513,7 +3513,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 100,
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       }
     ],
@@ -3524,7 +3524,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -3564,7 +3564,7 @@
   {
     "id": "ability_has_mark",
     "displayName": "Has Mark",
-    "description": "Run the Has Mark ability effect through the registered runtime handler.",
+    "description": "Checks whether the target's named mark is still active, then runs exactly one of the True or False branches.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -3597,7 +3597,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Has Mark when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -3606,7 +3606,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -3627,7 +3627,7 @@
         "name": "true",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the True branch.",
+        "description": "Runs when this node's check succeeds. False is skipped.",
         "direction": "output"
       },
       {
@@ -3636,7 +3636,7 @@
         "name": "false",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the False branch.",
+        "description": "Runs when this node's check fails. True is skipped.",
         "direction": "output"
       },
       {
@@ -3690,7 +3690,7 @@
   {
     "id": "ability_remove_mark",
     "displayName": "Remove Mark",
-    "description": "Run the Remove Mark ability effect through the registered runtime handler.",
+    "description": "Clears the target's named mark. Removing an absent mark has no effect.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -3723,7 +3723,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Remove Mark when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -3732,7 +3732,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -3753,7 +3753,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -3788,7 +3788,7 @@
   {
     "id": "ability_damage_target",
     "displayName": "Damage Target",
-    "description": "Run the Damage Target ability effect through the registered runtime handler.",
+    "description": "Damages a living target by a finite, non-negative amount of health points. Use Source credits the current player as the damage source.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -3821,7 +3821,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Damage Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -3830,7 +3830,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -3863,7 +3863,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -3903,7 +3903,7 @@
   {
     "id": "ability_heal_target",
     "displayName": "Heal Target",
-    "description": "Run the Heal Target ability effect through the registered runtime handler.",
+    "description": "Adds health to a living target without exceeding its maximum health. Amount uses health points, with two points per heart.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -3936,7 +3936,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Heal Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -3945,7 +3945,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -3967,7 +3967,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -4002,7 +4002,7 @@
   {
     "id": "ability_set_health",
     "displayName": "Set Health",
-    "description": "Run the Set Health ability effect through the registered runtime handler.",
+    "description": "Sets a living target's health in health points. Zero kills the target. The value must not exceed its maximum health.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -4035,7 +4035,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Set Health when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -4044,7 +4044,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -4066,7 +4066,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -4101,7 +4101,7 @@
   {
     "id": "ability_cancel_damage",
     "displayName": "Cancel Damage",
-    "description": "Run the Cancel Damage ability effect through the registered runtime handler.",
+    "description": "Changes cancellation on the current entity-damage occurrence while its mutation window is open. Cancelling also sets its damage to zero.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -4134,7 +4134,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Cancel Damage when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -4156,7 +4156,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -4186,7 +4186,7 @@
   {
     "id": "ability_shield_target",
     "displayName": "Shield Target",
-    "description": "Run the Shield Target ability effect through the registered runtime handler.",
+    "description": "Gives a living target temporary absorption health for the selected duration. Amount uses health points, with two points per heart.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -4219,7 +4219,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Shield Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -4228,7 +4228,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -4250,7 +4250,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 100,
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       }
     ],
@@ -4261,7 +4261,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -4301,7 +4301,7 @@
   {
     "id": "ability_reflect_damage",
     "displayName": "Reflect Damage",
-    "description": "Run the Reflect Damage ability effect through the registered runtime handler.",
+    "description": "Damages the living attacker from the current entity-damage occurrence by a percentage of the original damage. Reflection runs after that damage occurrence settles.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -4334,7 +4334,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Reflect Damage when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -4356,7 +4356,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -4386,7 +4386,7 @@
   {
     "id": "ability_launch_target",
     "displayName": "Launch Target",
-    "description": "Run the Launch Target ability effect through the registered runtime handler.",
+    "description": "Launches the selected target in a normalized direction with additional upward velocity.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -4419,7 +4419,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Launch Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -4428,7 +4428,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -4437,7 +4437,7 @@
         "name": "direction",
         "pinType": "DATA",
         "dataType": "vector",
-        "description": "Provides the Direction value used by this ability.",
+        "description": "Effect direction. Uses the current player's view direction when omitted and available.",
         "direction": "input"
       },
       {
@@ -4470,7 +4470,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -4515,7 +4515,7 @@
   {
     "id": "ability_pull_target",
     "displayName": "Pull Target",
-    "description": "Run the Pull Target ability effect through the registered runtime handler.",
+    "description": "Pulls the selected target toward Location by applying a normalized velocity of Strength. Fails when the target is already at the destination.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -4548,7 +4548,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Pull Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -4557,7 +4557,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -4566,7 +4566,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -4588,7 +4588,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -4628,7 +4628,7 @@
   {
     "id": "ability_leap_to_location",
     "displayName": "Leap To Location",
-    "description": "Run the Leap To Location ability effect through the registered runtime handler.",
+    "description": "Moves the target along a timed leap toward Location and reports its chosen destination and whether the path was blocked.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -4661,7 +4661,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Leap To Location when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -4670,7 +4670,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -4679,7 +4679,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -4690,7 +4690,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 20,
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       },
       {
@@ -4701,7 +4701,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 0.35,
-        "description": "Provides the Arrival Radius value used by this ability.",
+        "description": "Distance from the destination, in blocks, at which the leap counts as arrived.",
         "direction": "input"
       }
     ],
@@ -4712,7 +4712,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -4785,7 +4785,7 @@
   {
     "id": "ability_stun_target",
     "displayName": "Stun Target",
-    "description": "Run the Stun Target ability effect through the registered runtime handler.",
+    "description": "Applies strong Slowness and jump-suppressing potion effects to a living target for the selected duration.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -4818,7 +4818,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Stun Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -4827,7 +4827,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -4838,7 +4838,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 60,
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       }
     ],
@@ -4849,7 +4849,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -4884,7 +4884,7 @@
   {
     "id": "ability_root_target",
     "displayName": "Root Target",
-    "description": "Run the Root Target ability effect through the registered runtime handler.",
+    "description": "Restricts a living target's movement with strong Slowness and jump-suppressing potion effects for the selected duration.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -4917,7 +4917,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Root Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -4926,7 +4926,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -4937,7 +4937,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 60,
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       }
     ],
@@ -4948,7 +4948,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -4983,7 +4983,7 @@
   {
     "id": "ability_silence_target",
     "displayName": "Silence Target",
-    "description": "Run the Silence Target ability effect through the registered runtime handler.",
+    "description": "Adds a temporary silenced mark to the target for ability rules that check it. This does not mute entity sounds.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -5016,7 +5016,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Silence Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -5025,7 +5025,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -5036,7 +5036,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 100,
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       }
     ],
@@ -5047,7 +5047,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -5082,7 +5082,7 @@
   {
     "id": "ability_disarm_target",
     "displayName": "Disarm Target",
-    "description": "Run the Disarm Target ability effect through the registered runtime handler.",
+    "description": "Temporarily removes a player's held item and restores it after the selected duration. Requires a player target.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -5115,7 +5115,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Disarm Target when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -5124,7 +5124,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -5135,7 +5135,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 60,
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       }
     ],
@@ -5146,7 +5146,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       }
     ],
@@ -5181,7 +5181,7 @@
   {
     "id": "ability_find_blocks",
     "displayName": "Find Blocks",
-    "description": "Run the Find Blocks ability effect through the registered runtime handler.",
+    "description": "Lists blocks matching Material in a cube centered on Location. Any matches all materials. Count is the number of results.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -5214,7 +5214,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Find Blocks when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -5223,7 +5223,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -5234,7 +5234,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 5,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Distance from Location to each side of the search cube, in blocks.",
         "direction": "input"
       },
       {
@@ -5257,7 +5257,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -5275,7 +5275,7 @@
         "name": "count",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Count value produced by this ability.",
+        "description": "Number of entities or blocks found or changed by this node.",
         "direction": "output"
       }
     ],
@@ -5325,7 +5325,7 @@
   {
     "id": "ability_break_blocks",
     "displayName": "Break Blocks",
-    "description": "Run the Break Blocks ability effect through the registered runtime handler.",
+    "description": "Breaks matching non-air blocks in a sphere, up to Max Blocks. With Drops enabled, blocks drop items normally. Otherwise, they become Air without drops.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -5358,7 +5358,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Break Blocks when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -5367,7 +5367,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -5378,7 +5378,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 3,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Radius of the affected sphere in blocks, centered on Location.",
         "direction": "input"
       },
       {
@@ -5401,7 +5401,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Drops value used by this ability.",
+        "description": "True breaks blocks with their normal drops. False removes them without drops.",
         "direction": "input"
       },
       {
@@ -5412,7 +5412,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 128,
-        "description": "Provides the Max Blocks value used by this ability.",
+        "description": "Maximum number of blocks this action may change.",
         "direction": "input"
       }
     ],
@@ -5423,7 +5423,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -5432,7 +5432,7 @@
         "name": "count",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Count value produced by this ability.",
+        "description": "Number of entities or blocks found or changed by this node.",
         "direction": "output"
       }
     ],
@@ -5487,7 +5487,7 @@
   {
     "id": "ability_replace_blocks",
     "displayName": "Replace Blocks",
-    "description": "Run the Replace Blocks ability effect through the registered runtime handler.",
+    "description": "Replaces matching blocks in a sphere, up to Max Blocks. From Any matches all materials. To must name a block material.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -5520,7 +5520,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Replace Blocks when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -5529,7 +5529,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -5540,7 +5540,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 3,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Radius of the affected sphere in blocks, centered on Location.",
         "direction": "input"
       },
       {
@@ -5575,7 +5575,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 128,
-        "description": "Provides the Max Blocks value used by this ability.",
+        "description": "Maximum number of blocks this action may change.",
         "direction": "input"
       }
     ],
@@ -5586,7 +5586,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -5595,7 +5595,7 @@
         "name": "count",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Count value produced by this ability.",
+        "description": "Number of entities or blocks found or changed by this node.",
         "direction": "output"
       }
     ],
@@ -5650,7 +5650,7 @@
   {
     "id": "ability_place_shape",
     "displayName": "Place Shape",
-    "description": "Run the Place Shape ability effect through the registered runtime handler.",
+    "description": "Places a selected material in a sphere, cube, or other supported block shape, up to Max Blocks. Air Only preserves existing non-air blocks.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -5683,7 +5683,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Place Shape when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -5692,7 +5692,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -5731,7 +5731,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 3,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Size of the shape in blocks. Used by shapes that have a radius.",
         "direction": "input"
       },
       {
@@ -5742,7 +5742,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Air Only value used by this ability.",
+        "description": "True places blocks only in currently empty positions.",
         "direction": "input"
       },
       {
@@ -5753,7 +5753,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 128,
-        "description": "Provides the Max Blocks value used by this ability.",
+        "description": "Maximum number of blocks this action may change.",
         "direction": "input"
       }
     ],
@@ -5764,7 +5764,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -5773,7 +5773,7 @@
         "name": "count",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Count value produced by this ability.",
+        "description": "Number of entities or blocks found or changed by this node.",
         "direction": "output"
       }
     ],
@@ -5833,7 +5833,7 @@
   {
     "id": "ability_extinguish_area",
     "displayName": "Extinguish Area",
-    "description": "Run the Extinguish Area ability effect through the registered runtime handler.",
+    "description": "Removes Fire and Soul Fire blocks within a spherical radius. This does not clear burning time on entities.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -5866,7 +5866,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Extinguish Area when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -5875,7 +5875,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -5886,7 +5886,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 5,
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Radius of the affected sphere in blocks, centered on Location.",
         "direction": "input"
       }
     ],
@@ -5897,7 +5897,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -5906,7 +5906,7 @@
         "name": "count",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Count value produced by this ability.",
+        "description": "Number of entities or blocks found or changed by this node.",
         "direction": "output"
       }
     ],
@@ -5946,7 +5946,7 @@
   {
     "id": "ability_grow_block",
     "displayName": "Grow Block",
-    "description": "Run the Grow Block ability effect through the registered runtime handler.",
+    "description": "Applies bone meal to the selected block from 1 through 64 times. Success is true if at least one attempt succeeds.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -5979,7 +5979,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Grow Block when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -5988,7 +5988,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -5999,7 +5999,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 1,
-        "description": "Provides the Attempts value used by this ability.",
+        "description": "Number of bone-meal attempts from 1 through 64.",
         "direction": "input"
       }
     ],
@@ -6010,7 +6010,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -6059,7 +6059,7 @@
   {
     "id": "ability_filter_entities",
     "displayName": "Filter Entities",
-    "description": "Run the Filter Entities ability effect through the registered runtime handler.",
+    "description": "Returns a new list containing entities that match the selected target filter, optionally excluding the caster.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -6092,7 +6092,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Filter Entities when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -6101,7 +6101,7 @@
         "name": "entities",
         "pinType": "DATA",
         "dataType": "list<entity>",
-        "description": "Provides the Entities value used by this ability.",
+        "description": "Entity list to filter, sort, limit, or affect.",
         "direction": "input"
       },
       {
@@ -6119,7 +6119,7 @@
           "passive"
         ],
         "defaultValue": "any",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -6130,7 +6130,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": false,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       }
     ],
@@ -6141,7 +6141,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -6159,7 +6159,7 @@
         "name": "count",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Count value produced by this ability.",
+        "description": "Number of entities or blocks found or changed by this node.",
         "direction": "output"
       }
     ],
@@ -6209,7 +6209,7 @@
   {
     "id": "ability_sort_entities",
     "displayName": "Sort Entities",
-    "description": "Run the Sort Entities ability effect through the registered runtime handler.",
+    "description": "Returns entities ordered by the selected sort mode relative to Location.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -6242,7 +6242,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Sort Entities when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -6251,7 +6251,7 @@
         "name": "entities",
         "pinType": "DATA",
         "dataType": "list<entity>",
-        "description": "Provides the Entities value used by this ability.",
+        "description": "Entity list to filter, sort, limit, or affect.",
         "direction": "input"
       },
       {
@@ -6260,7 +6260,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -6286,7 +6286,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -6340,7 +6340,7 @@
   {
     "id": "ability_limit_entities",
     "displayName": "Limit Entities",
-    "description": "Run the Limit Entities ability effect through the registered runtime handler.",
+    "description": "Returns the first Limit entities from the supplied list, preserving their order.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -6373,7 +6373,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Limit Entities when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -6382,7 +6382,7 @@
         "name": "entities",
         "pinType": "DATA",
         "dataType": "list<entity>",
-        "description": "Provides the Entities value used by this ability.",
+        "description": "Entity list to filter, sort, limit, or affect.",
         "direction": "input"
       },
       {
@@ -6404,7 +6404,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -6422,7 +6422,7 @@
         "name": "count",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Count value produced by this ability.",
+        "description": "Number of entities or blocks found or changed by this node.",
         "direction": "output"
       }
     ],
@@ -6467,7 +6467,7 @@
   {
     "id": "ability_is_holding_content",
     "displayName": "Is Holding Content",
-    "description": "Run the Is Holding Content ability effect through the registered runtime handler.",
+    "description": "Checks a player's selected hand for a matching custom-content item. Returns the matching stack and runs True or False.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -6500,7 +6500,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Is Holding Content when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -6518,7 +6518,7 @@
         "name": "content_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Content Id value used by this ability.",
+        "description": "Stable ID of the custom-content definition to match or trigger.",
         "direction": "input"
       },
       {
@@ -6534,7 +6534,7 @@
           "offhand"
         ],
         "defaultValue": "any",
-        "description": "Provides the Hand value used by this ability.",
+        "description": "Hand to inspect: main, off, or any.",
         "direction": "input"
       }
     ],
@@ -6545,7 +6545,7 @@
         "name": "true",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the True branch.",
+        "description": "Runs when this node's check succeeds. False is skipped.",
         "direction": "output"
       },
       {
@@ -6554,7 +6554,7 @@
         "name": "false",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the False branch.",
+        "description": "Runs when this node's check fails. True is skipped.",
         "direction": "output"
       },
       {
@@ -6627,7 +6627,7 @@
   {
     "id": "ability_is_wearing_content",
     "displayName": "Is Wearing Content",
-    "description": "Run the Is Wearing Content ability effect through the registered runtime handler.",
+    "description": "Checks a player's selected armor slot for matching custom content. Returns the matching stack and runs True or False.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -6660,7 +6660,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Is Wearing Content when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -6678,7 +6678,7 @@
         "name": "content_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Content Id value used by this ability.",
+        "description": "Stable ID of the custom-content definition to match or trigger.",
         "direction": "input"
       },
       {
@@ -6707,7 +6707,7 @@
         "name": "true",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the True branch.",
+        "description": "Runs when this node's check succeeds. False is skipped.",
         "direction": "output"
       },
       {
@@ -6716,7 +6716,7 @@
         "name": "false",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the False branch.",
+        "description": "Runs when this node's check fails. True is skipped.",
         "direction": "output"
       },
       {
@@ -6789,7 +6789,7 @@
   {
     "id": "ability_has_content_set",
     "displayName": "Has Content Set",
-    "description": "Run the Has Content Set ability effect through the registered runtime handler.",
+    "description": "Checks whether a player wears a matching custom-content armor set using the selected content-ID prefix.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -6822,7 +6822,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Has Content Set when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -6840,7 +6840,7 @@
         "name": "content_prefix",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Content Prefix value used by this ability.",
+        "description": "Prefix used to identify matching pieces of the custom-content armor set.",
         "direction": "input"
       }
     ],
@@ -6851,7 +6851,7 @@
         "name": "true",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the True branch.",
+        "description": "Runs when this node's check succeeds. False is skipped.",
         "direction": "output"
       },
       {
@@ -6860,7 +6860,7 @@
         "name": "false",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the False branch.",
+        "description": "Runs when this node's check fails. True is skipped.",
         "direction": "output"
       },
       {
@@ -6914,7 +6914,7 @@
   {
     "id": "ability_custom_block_at",
     "displayName": "Custom Block At",
-    "description": "Run the Custom Block At ability effect through the registered runtime handler.",
+    "description": "Identifies a custom-content block at Location. Returns its content ID and type, then runs True if identified or False otherwise.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -6947,7 +6947,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Custom Block At when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -6956,7 +6956,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       }
     ],
@@ -6967,7 +6967,7 @@
         "name": "true",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the True branch.",
+        "description": "Runs when this node's check succeeds. False is skipped.",
         "direction": "output"
       },
       {
@@ -6976,7 +6976,7 @@
         "name": "false",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the False branch.",
+        "description": "Runs when this node's check fails. True is skipped.",
         "direction": "output"
       },
       {
@@ -7053,7 +7053,7 @@
   {
     "id": "ability_trigger_content_ability",
     "displayName": "Trigger Content Ability",
-    "description": "Run the Trigger Content Ability ability effect through the registered runtime handler.",
+    "description": "Dispatches a named ability trigger for a custom-content definition and player, passing the selected location and target. Success reports dispatch acceptance.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -7086,7 +7086,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Trigger Content Ability when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -7104,7 +7104,7 @@
         "name": "content_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Content Id value used by this ability.",
+        "description": "Stable ID of the custom-content definition to match or trigger.",
         "direction": "input"
       },
       {
@@ -7152,7 +7152,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -7161,7 +7161,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       }
     ],
@@ -7172,7 +7172,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -7236,7 +7236,7 @@
   {
     "id": "ability_get_charge",
     "displayName": "Get Charge",
-    "description": "Run the Get Charge ability effect through the registered runtime handler.",
+    "description": "Reads a named numeric charge stored on an item. An item without that charge returns zero.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -7269,7 +7269,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Get Charge when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -7299,7 +7299,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -7348,7 +7348,7 @@
   {
     "id": "ability_set_charge",
     "displayName": "Set Charge",
-    "description": "Run the Set Charge ability effect through the registered runtime handler.",
+    "description": "Stores a named numeric charge on an item and returns the changed item and charge.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -7381,7 +7381,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Set Charge when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -7422,7 +7422,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -7490,7 +7490,7 @@
   {
     "id": "ability_add_charge",
     "displayName": "Add Charge",
-    "description": "Run the Add Charge ability effect through the registered runtime handler.",
+    "description": "Adds Amount to an item's named charge and returns the changed item and resulting charge.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -7523,7 +7523,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Add Charge when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -7564,7 +7564,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -7632,7 +7632,7 @@
   {
     "id": "ability_consume_charge",
     "displayName": "Consume Charge",
-    "description": "Run the Consume Charge ability effect through the registered runtime handler.",
+    "description": "Subtracts Amount from an item's charge when enough charge is available. Success runs after consumption. Fail leaves the charge unchanged.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -7665,7 +7665,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Consume Charge when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -7706,7 +7706,7 @@
         "name": "success",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Success branch.",
+        "description": "Runs after the requested charge is consumed successfully. Fail is skipped.",
         "direction": "output"
       },
       {
@@ -7715,7 +7715,7 @@
         "name": "fail",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Fail branch.",
+        "description": "Runs when the item has insufficient charge or the selected holding effect cannot apply.",
         "direction": "output"
       },
       {
@@ -7802,7 +7802,7 @@
   {
     "id": "ability_entity_query",
     "displayName": "Entity Query",
-    "description": "Run the Entity Query ability effect through the registered runtime handler.",
+    "description": "Finds entities by radius, cone, line, box, or raycast, then filters, sorts, limits, and selects a result. Found or Empty runs alongside Flow. An active cooldown runs only Cooldown.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -7835,7 +7835,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Entity Query when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -7867,7 +7867,7 @@
         "visibleWhen": {
           "mode": "radius,nearest,random,cone,line,box"
         },
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -7879,7 +7879,7 @@
         "visibleWhen": {
           "mode": "cone,line"
         },
-        "description": "Provides the Direction value used by this ability.",
+        "description": "Effect direction. Uses the current player's view direction when omitted and available.",
         "direction": "input"
       },
       {
@@ -7893,7 +7893,7 @@
         "visibleWhen": {
           "mode": "radius,nearest,random"
         },
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Range in blocks along each axis of the search box for Radius, Nearest, and Random modes. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -7907,7 +7907,7 @@
         "visibleWhen": {
           "mode": "cone,line,raycast"
         },
-        "description": "Provides the Range value used by this ability.",
+        "description": "Forward search length in blocks.",
         "direction": "input"
       },
       {
@@ -7921,7 +7921,7 @@
         "visibleWhen": {
           "mode": "cone"
         },
-        "description": "Provides the Angle value used by this ability.",
+        "description": "Cone opening angle in degrees.",
         "direction": "input"
       },
       {
@@ -7935,7 +7935,7 @@
         "visibleWhen": {
           "mode": "line,box"
         },
-        "description": "Provides the Width value used by this ability.",
+        "description": "Width used by the line or box search, in blocks.",
         "direction": "input"
       },
       {
@@ -7981,7 +7981,7 @@
           "passive"
         ],
         "defaultValue": "living_entity",
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -7992,7 +7992,7 @@
         "dataType": "boolean",
         "widget": "TOGGLE",
         "defaultValue": true,
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       },
       {
@@ -8050,7 +8050,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 0,
-        "description": "Provides the Cooldown Ticks value used by this ability.",
+        "description": "Time before this effect can run again for the same cooldown key. Zero disables the cooldown. Each tick is 50 milliseconds.",
         "direction": "input"
       },
       {
@@ -8068,7 +8068,7 @@
           "global"
         ],
         "defaultValue": "player",
-        "description": "Provides the Cooldown Scope value used by this ability.",
+        "description": "Owner of the cooldown: player, target, global, content, or item instance. The selected context must be available.",
         "direction": "input"
       },
       {
@@ -8078,7 +8078,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "entity_query",
-        "description": "Provides the Cooldown Key value used by this ability.",
+        "description": "Name identifying this cooldown within its selected scope.",
         "direction": "input"
       }
     ],
@@ -8089,7 +8089,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -8098,7 +8098,7 @@
         "name": "found",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Found branch.",
+        "description": "Runs when the query returns at least one entity, together with Flow.",
         "direction": "output"
       },
       {
@@ -8107,7 +8107,7 @@
         "name": "empty",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Empty branch.",
+        "description": "Runs when no entity is found or affected, together with Flow.",
         "direction": "output"
       },
       {
@@ -8116,7 +8116,7 @@
         "name": "cooldown",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Cooldown branch.",
+        "description": "Runs instead of Flow while the selected cooldown still has time remaining.",
         "direction": "output"
       },
       {
@@ -8143,7 +8143,7 @@
         "name": "count",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Count value produced by this ability.",
+        "description": "Number of entities or blocks found or changed by this node.",
         "direction": "output"
       },
       {
@@ -8152,7 +8152,7 @@
         "name": "has_result",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Has Result value produced by this ability.",
+        "description": "True when at least one entity was found.",
         "direction": "output"
       },
       {
@@ -8170,7 +8170,7 @@
         "name": "cooldown_ticks_left",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Cooldown Ticks Left value produced by this ability.",
+        "description": "Remaining cooldown rounded up to ticks, using 50 milliseconds per tick.",
         "direction": "output"
       }
     ],
@@ -8325,7 +8325,7 @@
   {
     "id": "ability_entity_effect",
     "displayName": "Entity Effect",
-    "description": "Run the Entity Effect ability effect through the registered runtime handler.",
+    "description": "Applies an effect to an explicit target, an event target, or a connected entity list. Empty runs alongside Flow when nothing is affected. An active cooldown runs only Cooldown.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -8358,7 +8358,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Entity Effect when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -8418,7 +8418,7 @@
         "visibleWhen": {
           "target_source": "target"
         },
-        "description": "Provides the Target value used by this ability.",
+        "description": "Entity to affect. If omitted, uses the event target, hit entity, event entity, or current player when available.",
         "direction": "input"
       },
       {
@@ -8430,7 +8430,7 @@
         "visibleWhen": {
           "target_source": "entities"
         },
-        "description": "Provides the Entities value used by this ability.",
+        "description": "Entity list to filter, sort, limit, or affect.",
         "direction": "input"
       },
       {
@@ -8442,7 +8442,7 @@
         "visibleWhen": {
           "mode": "pull,push,knockback"
         },
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -8454,7 +8454,7 @@
         "visibleWhen": {
           "mode": "launch"
         },
-        "description": "Provides the Direction value used by this ability.",
+        "description": "Effect direction. Uses the current player's view direction when omitted and available.",
         "direction": "input"
       },
       {
@@ -8510,7 +8510,7 @@
         "visibleWhen": {
           "mode": "potion,ignite,freeze,stun,root,silence,disarm,no_damage_ticks,mark"
         },
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       },
       {
@@ -8539,7 +8539,7 @@
         "visibleWhen": {
           "mode": "potion"
         },
-        "description": "Provides the Amplifier value used by this ability.",
+        "description": "Potion strength starting at 0 for level I, 1 for level II, and so on.",
         "direction": "input"
       },
       {
@@ -8605,7 +8605,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 0,
-        "description": "Provides the Cooldown Ticks value used by this ability.",
+        "description": "Time before this effect can run again for the same cooldown key. Zero disables the cooldown. Each tick is 50 milliseconds.",
         "direction": "input"
       },
       {
@@ -8623,7 +8623,7 @@
           "global"
         ],
         "defaultValue": "player",
-        "description": "Provides the Cooldown Scope value used by this ability.",
+        "description": "Owner of the cooldown: player, target, global, content, or item instance. The selected context must be available.",
         "direction": "input"
       },
       {
@@ -8633,7 +8633,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "entity_effect",
-        "description": "Provides the Cooldown Key value used by this ability.",
+        "description": "Name identifying this cooldown within its selected scope.",
         "direction": "input"
       }
     ],
@@ -8644,7 +8644,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -8653,7 +8653,7 @@
         "name": "empty",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Empty branch.",
+        "description": "Runs when no entity is found or affected, together with Flow.",
         "direction": "output"
       },
       {
@@ -8662,7 +8662,7 @@
         "name": "cooldown",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Cooldown branch.",
+        "description": "Runs instead of Flow while the selected cooldown still has time remaining.",
         "direction": "output"
       },
       {
@@ -8671,7 +8671,7 @@
         "name": "affected",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Affected value produced by this ability.",
+        "description": "Number of entities to which the selected effect was applied.",
         "direction": "output"
       },
       {
@@ -8680,7 +8680,7 @@
         "name": "cooldown_ticks_left",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Cooldown Ticks Left value produced by this ability.",
+        "description": "Remaining cooldown rounded up to ticks, using 50 milliseconds per tick.",
         "direction": "output"
       }
     ],
@@ -8820,7 +8820,7 @@
   {
     "id": "ability_area_effect",
     "displayName": "Area Effect",
-    "description": "Run the Area Effect ability effect through the registered runtime handler.",
+    "description": "Applies an entity or world effect in a sphere, cone, line, or box. Sphere includes targets whose distance from Location is at most Radius. Returns affected entities and their count. An active cooldown runs only Cooldown.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -8853,7 +8853,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Area Effect when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -8903,7 +8903,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this ability.",
+        "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.",
         "direction": "input"
       },
       {
@@ -8915,7 +8915,7 @@
         "visibleWhen": {
           "shape": "cone,line"
         },
-        "description": "Provides the Direction value used by this ability.",
+        "description": "Effect direction. Uses the current player's view direction when omitted and available.",
         "direction": "input"
       },
       {
@@ -8929,7 +8929,7 @@
         "visibleWhen": {
           "shape": "sphere"
         },
-        "description": "Provides the Radius value used by this ability.",
+        "description": "Maximum distance from Location to a target for Sphere mode, in blocks. Accepts 0 through 128.",
         "direction": "input"
       },
       {
@@ -8943,7 +8943,7 @@
         "visibleWhen": {
           "shape": "cone,line"
         },
-        "description": "Provides the Range value used by this ability.",
+        "description": "Forward search length in blocks.",
         "direction": "input"
       },
       {
@@ -8957,7 +8957,7 @@
         "visibleWhen": {
           "shape": "cone"
         },
-        "description": "Provides the Angle value used by this ability.",
+        "description": "Cone opening angle in degrees.",
         "direction": "input"
       },
       {
@@ -8971,7 +8971,7 @@
         "visibleWhen": {
           "shape": "line,box"
         },
-        "description": "Provides the Width value used by this ability.",
+        "description": "Width used by the line or box search, in blocks.",
         "direction": "input"
       },
       {
@@ -8992,7 +8992,7 @@
         "visibleWhen": {
           "mode": "damage,heal,potion,ignite,freeze,knockback,pull,push"
         },
-        "description": "Provides the Target Filter value used by this ability.",
+        "description": "Entity kinds to include, such as Any, Player, Living Entity, Hostile, Passive, or a Minecraft entity type.",
         "direction": "input"
       },
       {
@@ -9006,7 +9006,7 @@
         "visibleWhen": {
           "mode": "damage,heal,potion,ignite,freeze,knockback,pull,push"
         },
-        "description": "Provides the Exclude Caster value used by this ability.",
+        "description": "True removes the current player from the target results.",
         "direction": "input"
       },
       {
@@ -9062,7 +9062,7 @@
         "visibleWhen": {
           "mode": "potion,ignite,freeze"
         },
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       },
       {
@@ -9091,7 +9091,7 @@
         "visibleWhen": {
           "mode": "potion"
         },
-        "description": "Provides the Amplifier value used by this ability.",
+        "description": "Potion strength starting at 0 for level I, 1 for level II, and so on.",
         "direction": "input"
       },
       {
@@ -9146,7 +9146,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 0,
-        "description": "Provides the Cooldown Ticks value used by this ability.",
+        "description": "Time before this effect can run again for the same cooldown key. Zero disables the cooldown. Each tick is 50 milliseconds.",
         "direction": "input"
       },
       {
@@ -9164,7 +9164,7 @@
           "global"
         ],
         "defaultValue": "player",
-        "description": "Provides the Cooldown Scope value used by this ability.",
+        "description": "Owner of the cooldown: player, target, global, content, or item instance. The selected context must be available.",
         "direction": "input"
       },
       {
@@ -9174,7 +9174,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "area_effect",
-        "description": "Provides the Cooldown Key value used by this ability.",
+        "description": "Name identifying this cooldown within its selected scope.",
         "direction": "input"
       }
     ],
@@ -9185,7 +9185,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -9194,7 +9194,7 @@
         "name": "cooldown",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Cooldown branch.",
+        "description": "Runs instead of Flow while the selected cooldown still has time remaining.",
         "direction": "output"
       },
       {
@@ -9212,7 +9212,7 @@
         "name": "affected",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Affected value produced by this ability.",
+        "description": "Number of entities to which the selected effect was applied.",
         "direction": "output"
       },
       {
@@ -9230,7 +9230,7 @@
         "name": "cooldown_ticks_left",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Cooldown Ticks Left value produced by this ability.",
+        "description": "Remaining cooldown rounded up to ticks, using 50 milliseconds per tick.",
         "direction": "output"
       }
     ],
@@ -9390,7 +9390,7 @@
   {
     "id": "ability_holding_effect",
     "displayName": "Holding Effect",
-    "description": "Run the Holding Effect ability effect through the registered runtime handler.",
+    "description": "Applies a potion, particle, sound, charge, or durability effect to a player and held item. Fail runs alongside Flow when the effect cannot apply. An active cooldown runs only Cooldown.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -9423,7 +9423,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Starts execution for the Flow branch.",
+        "description": "Starts Holding Effect when execution reaches this input.",
         "direction": "input"
       },
       {
@@ -9489,7 +9489,7 @@
         "visibleWhen": {
           "mode": "potion"
         },
-        "description": "Provides the Duration Ticks value used by this ability.",
+        "description": "Effect duration in server ticks, normally 20 ticks per second. Named marks convert ticks to 50 milliseconds each.",
         "direction": "input"
       },
       {
@@ -9503,7 +9503,7 @@
         "visibleWhen": {
           "mode": "potion"
         },
-        "description": "Provides the Amplifier value used by this ability.",
+        "description": "Potion strength starting at 0 for level I, 1 for level II, and so on.",
         "direction": "input"
       },
       {
@@ -9599,7 +9599,7 @@
         "dataType": "number",
         "widget": "NUMBER",
         "defaultValue": 20,
-        "description": "Provides the Cooldown Ticks value used by this ability.",
+        "description": "Time before this effect can run again for the same cooldown key. Zero disables the cooldown. Each tick is 50 milliseconds.",
         "direction": "input"
       },
       {
@@ -9616,7 +9616,7 @@
           "global"
         ],
         "defaultValue": "item instance",
-        "description": "Provides the Cooldown Scope value used by this ability.",
+        "description": "Owner of the cooldown: player, target, global, content, or item instance. The selected context must be available.",
         "direction": "input"
       },
       {
@@ -9626,7 +9626,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "holding_effect",
-        "description": "Provides the Cooldown Key value used by this ability.",
+        "description": "Name identifying this cooldown within its selected scope.",
         "direction": "input"
       }
     ],
@@ -9637,7 +9637,7 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Flow branch.",
+        "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.",
         "direction": "output"
       },
       {
@@ -9646,7 +9646,7 @@
         "name": "fail",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Fail branch.",
+        "description": "Runs when the item has insufficient charge or the selected holding effect cannot apply.",
         "direction": "output"
       },
       {
@@ -9655,7 +9655,7 @@
         "name": "cooldown",
         "pinType": "FLOW",
         "dataType": "execution",
-        "description": "Continues execution through the Cooldown branch.",
+        "description": "Runs instead of Flow while the selected cooldown still has time remaining.",
         "direction": "output"
       },
       {
@@ -9691,7 +9691,7 @@
         "name": "cooldown_ticks_left",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Cooldown Ticks Left value produced by this ability.",
+        "description": "Remaining cooldown rounded up to ticks, using 50 milliseconds per tick.",
         "direction": "output"
       }
     ],
@@ -9821,7 +9821,7 @@
   {
     "id": "ability_particle_burst",
     "displayName": "Particle Burst",
-    "description": "Spawn a burst of particles at a location.",
+    "description": "Spawns a burst of particles at Location with the selected count, spread, and speed. Does not apply entity damage.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -9838,15 +9838,15 @@
     "handler": "AbilityEffectHandler",
     "handlerConfig": {"operation": "particle_burst"},
     "inputs": [
-      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the particle burst.", "direction": "input"},
-      {"id": "location", "displayName": "Location", "name": "location", "pinType": "DATA", "dataType": "location", "description": "Provides the center location for the burst.", "direction": "input"},
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts Particle Burst when execution reaches this input.", "direction": "input"},
+      {"id": "location", "displayName": "Location", "name": "location", "pinType": "DATA", "dataType": "location", "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.", "direction": "input"},
       {"id": "particle", "displayName": "Particle", "name": "particle", "pinType": "DATA", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME", "description": "Selects the Minecraft particle type.", "direction": "input"},
       {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 24, "constraints": {"min": 0, "max": 10000, "step": 1}, "description": "Sets the number of particles to spawn.", "direction": "input"},
       {"id": "spread", "displayName": "Spread", "name": "spread", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.6, "constraints": {"min": 0, "max": 1024}, "description": "Sets the burst spread.", "direction": "input"},
       {"id": "speed", "displayName": "Speed", "name": "speed", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.02, "constraints": {"min": 0, "max": 100}, "description": "Sets the particle motion speed.", "direction": "input"}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the particle burst is spawned.", "direction": "output"}
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.", "direction": "output"}
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
@@ -9866,7 +9866,7 @@
   {
     "id": "ability_spawn_particle_burst",
     "displayName": "Spawn Particle Burst",
-    "description": "Spawn a burst of particles at a location.",
+    "description": "Spawns a burst of particles at Location with the selected count, spread, and speed. Does not apply entity damage.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -9883,15 +9883,15 @@
     "handler": "AbilityEffectHandler",
     "handlerConfig": {"operation": "particle_burst"},
     "inputs": [
-      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the particle burst.", "direction": "input"},
-      {"id": "location", "displayName": "Location", "name": "location", "pinType": "DATA", "dataType": "location", "description": "Provides the center location for the burst.", "direction": "input"},
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts Spawn Particle Burst when execution reaches this input.", "direction": "input"},
+      {"id": "location", "displayName": "Location", "name": "location", "pinType": "DATA", "dataType": "location", "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.", "direction": "input"},
       {"id": "particle", "displayName": "Particle", "name": "particle", "pinType": "DATA", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME", "description": "Selects the Minecraft particle type.", "direction": "input"},
       {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 24, "constraints": {"min": 0, "max": 10000, "step": 1}, "description": "Sets the number of particles to spawn.", "direction": "input"},
       {"id": "spread", "displayName": "Spread", "name": "spread", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.6, "constraints": {"min": 0, "max": 1024}, "description": "Sets the burst spread.", "direction": "input"},
       {"id": "speed", "displayName": "Speed", "name": "speed", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.02, "constraints": {"min": 0, "max": 100}, "description": "Sets the particle motion speed.", "direction": "input"}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the particle burst is spawned.", "direction": "output"}
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.", "direction": "output"}
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
@@ -9911,7 +9911,7 @@
   {
     "id": "ability_particle_shape",
     "displayName": "Particle Shape",
-    "description": "Spawn particles in a burst, ring, line, or orbit shape.",
+    "description": "Spawns particles in the selected burst, ring, line, or orbit arrangement around Location.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -9928,16 +9928,16 @@
     "handler": "AbilityEffectHandler",
     "handlerConfig": {"operation": "particle_shape"},
     "inputs": [
-      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the particle shape.", "direction": "input"},
-      {"id": "location", "displayName": "Location", "name": "location", "pinType": "DATA", "dataType": "location", "description": "Provides the center location for the shape.", "direction": "input"},
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts Particle Shape when execution reaches this input.", "direction": "input"},
+      {"id": "location", "displayName": "Location", "name": "location", "pinType": "DATA", "dataType": "location", "description": "World position for the effect or search. If omitted, uses the event location or current player location when available.", "direction": "input"},
       {"id": "mode", "displayName": "Mode", "name": "mode", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["burst", "ring", "line", "orbit"], "defaultValue": "ring", "description": "Chooses the particle shape.", "direction": "input"},
       {"id": "particle", "displayName": "Particle", "name": "particle", "pinType": "DATA", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME", "description": "Selects the Minecraft particle type.", "direction": "input"},
       {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 32, "constraints": {"min": 0, "max": 10000, "step": 1}, "description": "Sets the number of particles to spawn.", "direction": "input"},
-      {"id": "radius", "displayName": "Radius", "name": "radius", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 2, "constraints": {"min": 0, "max": 1024}, "description": "Sets the shape radius.", "direction": "input"},
+      {"id": "radius", "displayName": "Radius", "name": "radius", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 2, "constraints": {"min": 0, "max": 1024}, "description": "Burst spread, Ring or Orbit radius, or half the Line length, in blocks. Accepts 0 through 128.", "direction": "input"},
       {"id": "speed", "displayName": "Speed", "name": "speed", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "constraints": {"min": 0, "max": 100}, "description": "Sets the particle motion speed.", "direction": "input"}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the particle shape is spawned.", "direction": "output"}
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.", "direction": "output"}
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
@@ -9958,7 +9958,7 @@
   {
     "id": "ability_cooldown_remaining",
     "displayName": "Cooldown Remaining",
-    "description": "Read cooldown time, progress, and readiness for an ability.",
+    "description": "Reads an ability cooldown by key and scope. Ready runs when no time remains. Cooldown runs otherwise. Each tick is 50 milliseconds.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -9975,23 +9975,23 @@
     "handler": "AbilityEffectHandler",
     "handlerConfig": {"operation": "cooldown_remaining"},
     "inputs": [
-      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the cooldown query.", "direction": "input"},
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts Cooldown Remaining when execution reaches this input.", "direction": "input"},
       {"id": "key", "displayName": "Key", "name": "key", "pinType": "DATA", "dataType": "string", "defaultValue": "ability", "description": "Identifies the cooldown to read.", "direction": "input"},
       {"id": "scope", "displayName": "Scope", "name": "scope", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "content", "global"], "defaultValue": "player", "description": "Chooses which owner shares the cooldown.", "direction": "input"},
-      {"id": "content_id", "displayName": "Content ID", "name": "content_id", "pinType": "DATA", "dataType": "string", "optional": true, "description": "Provides the content ID when the scope is content.", "direction": "input"}
+      {"id": "content_id", "displayName": "Content ID", "name": "content_id", "pinType": "DATA", "dataType": "string", "optional": true, "description": "Stable ID of the custom-content definition to match or trigger.", "direction": "input"}
     ],
     "outputs": [
-      {"id": "ready", "displayName": "Ready", "name": "ready", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the cooldown is ready.", "direction": "output"},
-      {"id": "cooldown", "displayName": "Cooldown", "name": "cooldown", "pinType": "FLOW", "dataType": "execution", "description": "Continues while the cooldown is active.", "direction": "output"},
-      {"id": "ticks", "displayName": "Ticks", "name": "ticks", "pinType": "DATA", "dataType": "number", "description": "Returns the remaining cooldown in server ticks.", "direction": "output"},
-      {"id": "seconds", "displayName": "Seconds", "name": "seconds", "pinType": "DATA", "dataType": "number", "description": "Returns the remaining cooldown in seconds.", "direction": "output"},
-      {"id": "duration_ticks", "displayName": "Duration Ticks", "name": "duration_ticks", "pinType": "DATA", "dataType": "number", "description": "Returns the configured cooldown duration in ticks.", "direction": "output"},
-      {"id": "elapsed_ticks", "displayName": "Elapsed Ticks", "name": "elapsed_ticks", "pinType": "DATA", "dataType": "number", "description": "Returns the elapsed cooldown time in ticks.", "direction": "output"},
-      {"id": "progress", "displayName": "Progress", "name": "progress", "pinType": "DATA", "dataType": "number", "description": "Returns normalized cooldown progress from zero to one.", "direction": "output"},
-      {"id": "progress_percent", "displayName": "Progress Percent", "name": "progress_percent", "pinType": "DATA", "dataType": "number", "description": "Returns cooldown progress as a percentage.", "direction": "output"},
-      {"id": "started_at", "displayName": "Started At", "name": "started_at", "pinType": "DATA", "dataType": "number", "description": "Returns the cooldown start timestamp.", "direction": "output"},
-      {"id": "ready_at", "displayName": "Ready At", "name": "ready_at", "pinType": "DATA", "dataType": "number", "description": "Returns the timestamp when the cooldown is ready.", "direction": "output"},
-      {"id": "is_ready", "displayName": "Is Ready", "name": "is_ready", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the cooldown is ready.", "direction": "output"}
+      {"id": "ready", "displayName": "Ready", "name": "ready", "pinType": "FLOW", "dataType": "execution", "description": "Runs when no cooldown time remains. Cooldown is skipped.", "direction": "output"},
+      {"id": "cooldown", "displayName": "Cooldown", "name": "cooldown", "pinType": "FLOW", "dataType": "execution", "description": "Runs while time remains on the cooldown. Ready is skipped.", "direction": "output"},
+      {"id": "ticks", "displayName": "Ticks", "name": "ticks", "pinType": "DATA", "dataType": "number", "description": "Remaining cooldown rounded up to ticks, using 50 milliseconds per tick.", "direction": "output"},
+      {"id": "seconds", "displayName": "Seconds", "name": "seconds", "pinType": "DATA", "dataType": "number", "description": "Remaining cooldown in seconds, including a fractional part.", "direction": "output"},
+      {"id": "duration_ticks", "displayName": "Duration Ticks", "name": "duration_ticks", "pinType": "DATA", "dataType": "number", "description": "Configured cooldown duration rounded up to ticks, using 50 milliseconds per tick.", "direction": "output"},
+      {"id": "elapsed_ticks", "displayName": "Elapsed Ticks", "name": "elapsed_ticks", "pinType": "DATA", "dataType": "number", "description": "Elapsed cooldown time rounded down to ticks, using 50 milliseconds per tick.", "direction": "output"},
+      {"id": "progress", "displayName": "Progress", "name": "progress", "pinType": "DATA", "dataType": "number", "description": "Elapsed fraction of the cooldown from 0 through 1. One means ready.", "direction": "output"},
+      {"id": "progress_percent", "displayName": "Progress Percent", "name": "progress_percent", "pinType": "DATA", "dataType": "number", "description": "Elapsed percentage of the cooldown from 0 through 100.", "direction": "output"},
+      {"id": "started_at", "displayName": "Started At", "name": "started_at", "pinType": "DATA", "dataType": "number", "description": "Cooldown start as Unix epoch milliseconds.", "direction": "output"},
+      {"id": "ready_at", "displayName": "Ready At", "name": "ready_at", "pinType": "DATA", "dataType": "number", "description": "Cooldown expiry as Unix epoch milliseconds.", "direction": "output"},
+      {"id": "is_ready", "displayName": "Is Ready", "name": "is_ready", "pinType": "DATA", "dataType": "boolean", "description": "True when no cooldown time remains.", "direction": "output"}
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
@@ -10019,7 +10019,7 @@
   {
     "id": "ability_set_cooldown",
     "displayName": "Set Cooldown",
-    "description": "Start or replace an ability cooldown.",
+    "description": "Starts or replaces an ability cooldown for the given key and scope. Ticks accepts 0 through 72000, at 50 milliseconds per tick. Zero makes the cooldown ready.",
     "domain": "ability",
     "family": "ability-effect",
     "lifecycle": "active",
@@ -10036,14 +10036,14 @@
     "handler": "AbilityEffectHandler",
     "handlerConfig": {"operation": "set_cooldown"},
     "inputs": [
-      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the cooldown update.", "direction": "input"},
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts Set Cooldown when execution reaches this input.", "direction": "input"},
       {"id": "key", "displayName": "Key", "name": "key", "pinType": "DATA", "dataType": "string", "defaultValue": "ability", "description": "Identifies the cooldown to start.", "direction": "input"},
       {"id": "scope", "displayName": "Scope", "name": "scope", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "content", "global"], "defaultValue": "player", "description": "Chooses which owner shares the cooldown.", "direction": "input"},
-      {"id": "content_id", "displayName": "Content ID", "name": "content_id", "pinType": "DATA", "dataType": "string", "optional": true, "description": "Provides the content ID when the scope is content.", "direction": "input"},
+      {"id": "content_id", "displayName": "Content ID", "name": "content_id", "pinType": "DATA", "dataType": "string", "optional": true, "description": "Stable ID of the custom-content definition to match or trigger.", "direction": "input"},
       {"id": "ticks", "displayName": "Ticks", "name": "ticks", "pinType": "DATA", "dataType": "number", "widget": "NUMBER", "defaultValue": 100, "constraints": {"min": 0, "max": 72000, "step": 1}, "description": "Sets the cooldown duration in server ticks.", "direction": "input"}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the cooldown is set.", "direction": "output"}
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after this effect or query returns. A cooldown branch, when present, bypasses this output.", "direction": "output"}
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,

@@ -87,10 +87,17 @@ public class FlowRuntime {
     }
 
     private static final class ExecutionAuthority {
+        private final Map<String, Object> globalVariables;
+        private final Map<String, Object> eventVariables;
         private final AtomicInteger operations = new AtomicInteger();
         private final AtomicBoolean eventMutationOpen = new AtomicBoolean();
         private final long startedAtNanos = System.nanoTime();
         private final String executionId = UUID.randomUUID().toString();
+
+        private ExecutionAuthority(Map<String, Object> globalVariables, Map<String, Object> eventVariables) {
+            this.globalVariables = concurrentVariables(globalVariables);
+            this.eventVariables = concurrentVariables(eventVariables);
+        }
     }
 
     private record BranchBaseline(Map<String, Object> nodeOutputs,
@@ -128,7 +135,7 @@ public class FlowRuntime {
 
     public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
                        NodeDefinitionRegistry nodeDefinitions) {
-        this(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, new ExecutionAuthority(), CorrelationId.random());
+        this(graph, typeAdapter, nodeDefinitions, new ExecutionAuthority(globalVariables, eventVariables), CorrelationId.random());
     }
 
     public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
@@ -138,17 +145,28 @@ public class FlowRuntime {
 
     public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
                        NodeDefinitionRegistry nodeDefinitions, LegacyRuntimeActivationGate legacyRuntimeGate, CorrelationId invocationId) {
-        this(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions,
-            new ExecutionAuthority(), invocationId != null ? invocationId : CorrelationId.random());
+        this(graph, typeAdapter, nodeDefinitions,
+            new ExecutionAuthority(globalVariables, eventVariables), invocationId != null ? invocationId : CorrelationId.random());
     }
 
-    private FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
-                        NodeDefinitionRegistry nodeDefinitions, ExecutionAuthority executionAuthority, CorrelationId invocationId) {
+    private FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, NodeDefinitionRegistry nodeDefinitions,
+                        ExecutionAuthority executionAuthority, CorrelationId invocationId) {
+        this(graph, typeAdapter, nodeDefinitions, executionAuthority, invocationId, null);
+    }
+
+    public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
+                       Map<String, Object> eventVariables, NodeDefinitionRegistry nodeDefinitions,
+                       LegacyRuntimeActivationGate legacyRuntimeGate, CorrelationId invocationId, Map<String, Object> locals) {
+        this(graph, typeAdapter, nodeDefinitions, new ExecutionAuthority(globalVariables, eventVariables), invocationId, locals);
+    }
+
+    private FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, NodeDefinitionRegistry nodeDefinitions,
+                        ExecutionAuthority executionAuthority, CorrelationId invocationId, Map<String, Object> locals) {
         this.graph = graph;
         this.nodeOutputs = new LinkedHashMap<>();
-        this.localVariables = new HashMap<>();
-        this.globalVariables = concurrentVariables(globalVariables);
-        this.eventVariables = concurrentVariables(eventVariables);
+        this.localVariables = locals == null ? new HashMap<>() : locals;
+        this.globalVariables = executionAuthority.globalVariables;
+        this.eventVariables = executionAuthority.eventVariables;
         this.typeAdapter = typeAdapter;
         this.nodeDefinitions = nodeDefinitions;
         this.executionAuthority = executionAuthority;
@@ -159,16 +177,16 @@ public class FlowRuntime {
         }
     }
 
-    private Map<String, Object> concurrentVariables(Map<String, Object> variables) {
-        if (variables == null || variables.isEmpty()) {
-            return new HashMap<>();
-        }
+    private static Map<String, Object> concurrentVariables(Map<String, Object> variables) {
         if (variables instanceof ConcurrentMap<?, ?>) {
             return variables;
         }
-        HashMap<String, Object> copy = HashMap.newHashMap(variables.size());
+        Map<String, Object> copy = Collections.synchronizedMap(new HashMap<>());
+        if (variables == null) {
+            return copy;
+        }
         variables.forEach((key, value) -> {
-            if (key != null && value != null) {
+            if (key != null) {
                 copy.put(key, value);
             }
         });
@@ -176,12 +194,12 @@ public class FlowRuntime {
     }
 
     public FlowRuntime createSubRuntime(FlowGraph subGraph) {
-        return new FlowRuntime(subGraph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, executionAuthority,
+        return new FlowRuntime(subGraph, typeAdapter, nodeDefinitions, executionAuthority,
             CorrelationId.random());
     }
 
     FlowRuntime forkBranch() {
-        FlowRuntime branch = new FlowRuntime(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, executionAuthority, invocationId);
+        FlowRuntime branch = new FlowRuntime(graph, typeAdapter, nodeDefinitions, executionAuthority, invocationId);
         Map<String, Object> outputSnapshot = nodeOutputSnapshot();
         branch.replaceNodeOutputs(outputSnapshot);
         branch.localVariables.clear();
@@ -595,11 +613,13 @@ public class FlowRuntime {
         try {
             StringBuilder result = new StringBuilder();
             int index = 0;
+            int escaped = 0;
             while (index < template.length()) {
                 char current = template.charAt(index);
                 if (current == '{') {
                     if (index + 1 < template.length() && template.charAt(index + 1) == '{') {
                         result.append('{');
+                        escaped++;
                         index += 2;
                         continue;
                     }
@@ -619,8 +639,9 @@ public class FlowRuntime {
                             continue;
                         }
                     }
-                } else if (current == '}' && index + 1 < template.length() && template.charAt(index + 1) == '}') {
+                } else if (current == '}' && escaped > 0 && index + 1 < template.length() && template.charAt(index + 1) == '}') {
                     result.append('}');
+                    escaped--;
                     index += 2;
                     continue;
                 }
@@ -1122,6 +1143,10 @@ public class FlowRuntime {
 
     public Map<FunctionParameterId, Object> getFunctionInputsById() {
         return Collections.unmodifiableMap(functionInputs);
+    }
+
+    public void setFunctionInput(FunctionParameterId id, Object value) {
+        functionInputs.put(Objects.requireNonNull(id, "Function Input Identity Is Required"), value);
     }
 
     public Map<FunctionParameterId, Object> getReturnedFunctionOutputsById() {

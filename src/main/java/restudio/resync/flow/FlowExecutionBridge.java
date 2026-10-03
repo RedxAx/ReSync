@@ -4,6 +4,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import restudio.flow.data.FlowGraph;
 import restudio.resync.flow.diagnostic.Diagnostic;
+import restudio.resync.flow.graph.GraphDocument;
 import restudio.resync.flow.identity.CanonicalText;
 import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.CorrelationId;
@@ -33,7 +34,7 @@ public interface FlowExecutionBridge {
     record Context(FlowGraph graph, String startNodeId, Player player, Event event, Map<String, Object> eventVariables,
                    MappingContext mappingContext, CompiledGraphMetadata compiledGraphMetadata,
                    CompiledRuntimeContext compiledRuntimeContext,
-                   CorrelationId invocationId, long requestedDeadlineMillis) {
+                   CorrelationId invocationId, long requestedDeadlineMillis, GraphDocument sourceDocument) {
         public Context(FlowGraph graph, String startNodeId, Player player, Event event, Map<String, Object> eventVariables) {
             this(graph, startNodeId, player, event, eventVariables, null, null,
                 legacyContext(player, event, eventVariables), CorrelationId.random(), RuntimeExecutionContext.NO_DEADLINE);
@@ -71,6 +72,13 @@ public interface FlowExecutionBridge {
                 compiledRuntimeContext, invocationId, RuntimeExecutionContext.NO_DEADLINE);
         }
 
+        public Context(FlowGraph graph, String startNodeId, Player player, Event event, Map<String, Object> eventVariables,
+                       MappingContext mappingContext, CompiledGraphMetadata compiledGraphMetadata,
+                       CompiledRuntimeContext compiledRuntimeContext, CorrelationId invocationId, long requestedDeadlineMillis) {
+            this(graph, startNodeId, player, event, eventVariables, mappingContext, compiledGraphMetadata,
+                compiledRuntimeContext, invocationId, requestedDeadlineMillis, null);
+        }
+
         public Context {
             Objects.requireNonNull(graph, "Legacy Flow Graph Is Required");
             invocationId = Objects.requireNonNull(invocationId, "Invocation ID Is Required");
@@ -82,6 +90,14 @@ public interface FlowExecutionBridge {
                     || !mappingContext.catalogBinding().equals(compiledGraphMetadata.catalogBinding())
                     || !mappingContext.snapshotId().equals(compiledGraphMetadata.snapshotId()))) {
                 throw new IllegalArgumentException("Compiled mapping context must match compiled graph metadata");
+            }
+            if (sourceDocument != null && (compiledGraphMetadata == null || compiledRuntimeContext == null
+                || !sourceDocument.resource().equals(compiledGraphMetadata.resource())
+                || !sourceDocument.catalogBinding().equals(compiledGraphMetadata.catalogBinding())
+                || !sourceDocument.resource().id().equals(graph.getId())
+                || !sourceDocument.resource().resourceType().value().equals(graph.getResourceType())
+                || sourceDocument.revision() != graph.getResourceRevision())) {
+                throw new IllegalArgumentException("Typed Source Must Match The Compiled Execution Identity");
             }
             if (compiledRuntimeContext != null && (player != null || event != null
                 || (eventVariables != null && !eventVariables.isEmpty()))) {
@@ -105,7 +121,8 @@ public interface FlowExecutionBridge {
             if (mappingContext == null) {
                 return Optional.of("Complete compiled Core mapping context is required");
             }
-            return mappingContext.validationFailure(graph, startNodeId);
+            return sourceDocument == null ? mappingContext.validationFailure(graph, startNodeId)
+                : mappingContext.validationFailure(sourceDocument, startNodeId);
         }
 
         private static CompiledRuntimeContext legacyContext(Player player, Event event, Map<String, Object> eventVariables) {
@@ -168,6 +185,34 @@ public interface FlowExecutionBridge {
                     || !pinMappings.containsKey(pinMappingKey(connection.getSourceNodeId(), connection.getSourcePin()))
                     || !pinMappings.containsKey(pinMappingKey(connection.getTargetNodeId(), connection.getTargetPin()))) {
                     return Optional.of("Connection pins must have pin mappings");
+                }
+            }
+            return Optional.empty();
+        }
+
+        public Optional<String> validationFailure(GraphDocument document, String startNodeId) {
+            Objects.requireNonNull(document, "Typed Graph Source Is Required");
+            if (startNodeId == null || startNodeId.isBlank() || !startNodeId.equals(startNodeId.strip())) {
+                return Optional.of("A non-blank start node ID is required");
+            }
+            if (!resourceLocator.equals(document.resource()) || !catalogBinding.equals(document.catalogBinding())) {
+                return Optional.of("The typed source must match its compiled mapping identity");
+            }
+            Set<String> nodes = new HashSet<>();
+            for (var node : document.nodes()) {
+                String id = node.instanceId().canonicalText();
+                nodes.add(id);
+                if (!node.definition().id().equals(nodeMappings.get(id))) {
+                    return Optional.of("Node mappings must match each typed node definition");
+                }
+            }
+            if (!nodes.contains(startNodeId) || !nodes.equals(nodeMappings.keySet())) {
+                return Optional.of("Node mappings must cover the typed graph and requested start node");
+            }
+            for (var connection : document.connections()) {
+                if (!pinMappings.containsKey(pinMappingKey(connection.source().nodeId().canonicalText(), connection.source().pinId().value()))
+                    || !pinMappings.containsKey(pinMappingKey(connection.target().nodeId().canonicalText(), connection.target().pinId().value()))) {
+                    return Optional.of("Connection pins must have typed pin mappings");
                 }
             }
             return Optional.empty();

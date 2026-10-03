@@ -1,15 +1,19 @@
 package restudio.resync.velocity;
 
 import restudio.resync.network.NetworkRoute;
+import restudio.resync.network.NetworkRouteSet;
+import restudio.resync.network.NetworkRoutingGroup;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-public record VelocityNetworkConfig(boolean enabled, String networkId, String nodeId, String displayName, String bindHost, int port, Path databasePath, int maximumFrameBytes, int maximumPayloadBytes, long heartbeatTimeoutMillis, long snapshotRetentionMillis, int snapshotRetentionPerPlayerFamily, Tls tls, Map<String, EnrollmentNode> enrollmentNodes, Map<String, NetworkRoute> routes, String maintenanceRoute, Path dataDirectory) {
+public record VelocityNetworkConfig(boolean enabled, String networkId, String nodeId, String displayName, String bindHost, int port, Path databasePath, int maximumFrameBytes, int maximumPayloadBytes, long heartbeatTimeoutMillis, long snapshotRetentionMillis, int snapshotRetentionPerPlayerFamily, Tls tls, Map<String, EnrollmentNode> enrollmentNodes, Map<String, NetworkRoute> routes, String maintenanceRoute, List<NetworkRoutingGroup> routingGroups, Path dataDirectory) {
     public VelocityNetworkConfig {
         networkId = normalize(networkId);
         nodeId = normalize(nodeId);
@@ -19,9 +23,11 @@ public record VelocityNetworkConfig(boolean enabled, String networkId, String no
         dataDirectory = dataDirectory == null ? databasePath.getParent() : dataDirectory.toAbsolutePath().normalize();
         tls = tls == null ? Tls.disabled() : tls;
         enrollmentNodes = enrollmentNodes == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(enrollmentNodes));
-        routes = routes == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(routes));
+        routes = routes == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(routes));
         maintenanceRoute = normalize(maintenanceRoute).toLowerCase(Locale.ROOT);
+        routingGroups = routingGroups == null ? List.of() : List.copyOf(routingGroups);
         if (enabled) {
+            new NetworkRouteSet(1, maintenanceRoute, List.copyOf(routes.values()), routingGroups);
             if (networkId.isBlank() || nodeId.isBlank()) {
                 throw new IllegalArgumentException("Network ID And Proxy Node ID Are Required");
             }
@@ -52,6 +58,10 @@ public record VelocityNetworkConfig(boolean enabled, String networkId, String no
                 throw new IllegalArgumentException("Network Maintenance Route Is Unknown");
             }
         }
+    }
+
+    public NetworkRouteSet routeSet() {
+        return new NetworkRouteSet(1, maintenanceRoute, List.copyOf(routes.values()), routingGroups);
     }
 
     public record Tls(boolean enabled, Path keyStore, String keyStorePassword, Path trustStore, String trustStorePassword) {

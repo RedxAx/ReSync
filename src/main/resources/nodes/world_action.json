@@ -2,7 +2,7 @@
   {
     "id": "world_set_day_time",
     "displayName": "World Set Day Time",
-    "description": "Run the world set day time operation against a loaded world.",
+    "description": "Sets a loaded world's time of day in ticks. A Minecraft day lasts 24000 ticks. This changes the day clock, not the world's total elapsed time.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -49,7 +49,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "time",
@@ -58,7 +58,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the time number used by this operation."
+        "description": "Time of day in world ticks. A Minecraft day contains 24000 ticks."
       }
     ],
     "outputs": [
@@ -69,7 +69,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -105,7 +105,7 @@
   {
     "id": "world_set_weather",
     "displayName": "World Set Weather",
-    "description": "Run the world set weather operation against a loaded world.",
+    "description": "Changes a loaded world to clear, rain, or thunder. A positive Duration Ticks sets the weather duration. Zero keeps its current duration.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -151,7 +151,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "weather_type",
@@ -160,7 +160,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the weather type string used by this operation.",
+        "description": "Weather mode: clear, rain, or thunder.",
         "widget": "DROPDOWN",
         "options": [
           "clear",
@@ -176,7 +176,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the duration ticks number used by this operation."
+        "description": "Weather duration in server ticks. A positive value sets the duration. Zero keeps the current duration."
       }
     ],
     "outputs": [
@@ -187,7 +187,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -228,7 +228,7 @@
   {
     "id": "world_spawn_set",
     "displayName": "World Spawn Set",
-    "description": "Run the world spawn set operation against a loaded world.",
+    "description": "Sets a loaded world's default spawn to a location in that same world.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -274,7 +274,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "location",
@@ -283,7 +283,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location location used by this operation."
+        "description": "World location used for spawn, lightning, or biome changes. Must belong to the selected world."
       }
     ],
     "outputs": [
@@ -294,7 +294,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -330,7 +330,7 @@
   {
     "id": "world_set_difficulty",
     "displayName": "World Set Difficulty",
-    "description": "Run the world set difficulty operation against a loaded world.",
+    "description": "Sets a loaded world's difficulty to Peaceful, Easy, Normal, or Hard.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -376,7 +376,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "difficulty",
@@ -386,7 +386,7 @@
         "dataType": "difficulty",
         "optionsSource": "server:minecraft:difficulty",
         "direction": "input",
-        "description": "Provides the difficulty difficulty used by this operation."
+        "description": "World difficulty: Peaceful, Easy, Normal, or Hard."
       }
     ],
     "outputs": [
@@ -397,7 +397,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -433,7 +433,7 @@
   {
     "id": "world_save",
     "displayName": "World Save",
-    "description": "Run the world save operation against a loaded world.",
+    "description": "Saves a loaded world's current state to disk.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -478,7 +478,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       }
     ],
     "outputs": [
@@ -489,7 +489,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -518,7 +518,7 @@
   {
     "id": "world_auto_save_set",
     "displayName": "World Auto Save Set",
-    "description": "Run the world auto save set operation against a loaded world.",
+    "description": "Enables automatic world saving when Interval Ticks is positive, or disables it when zero. This action does not set a custom save interval.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -565,7 +565,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "interval_ticks",
@@ -574,7 +574,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the interval ticks number used by this operation."
+        "description": "Positive values enable automatic saving. Zero disables it. This does not change the save interval."
       }
     ],
     "outputs": [
@@ -585,7 +585,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -623,7 +623,7 @@
   {
     "id": "world_set_spawn_limits",
     "displayName": "World Set Spawn Limits",
-    "description": "Run the world set spawn limits operation against a loaded world.",
+    "description": "Sets non-negative creature spawn limits for monsters, animals, and water-creature categories in a loaded world.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -670,7 +670,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "monsters",
@@ -679,7 +679,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the monsters number used by this operation."
+        "description": "Non-negative monster spawn limit for this world."
       },
       {
         "id": "animals",
@@ -688,7 +688,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the animals number used by this operation."
+        "description": "Non-negative animal spawn limit for this world."
       },
       {
         "id": "water_ambient",
@@ -697,7 +697,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the water ambient number used by this operation."
+        "description": "Non-negative ambient water-creature spawn limit."
       },
       {
         "id": "water_animals",
@@ -706,7 +706,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the water animals number used by this operation."
+        "description": "Non-negative water-animal spawn limit."
       },
       {
         "id": "water_underground",
@@ -715,7 +715,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the water underground number used by this operation."
+        "description": "Non-negative underground water-creature spawn limit."
       }
     ],
     "outputs": [
@@ -726,7 +726,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -780,7 +780,7 @@
   {
     "id": "world_management_get_snapshot",
     "displayName": "World Management Get Snapshot",
-    "description": "Run the world management get snapshot operation against a loaded world.",
+    "description": "Reads the world manager's world and portal registry snapshot.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -828,7 +828,7 @@
         "pinType": "DATA",
         "dataType": "map<any,any>",
         "direction": "output",
-        "description": "Returns the snapshot map produced by this operation."
+        "description": "World-manager registry or map snapshot produced by the selected query."
       },
       {
         "id": "output_flow",
@@ -837,7 +837,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -868,7 +868,7 @@
   {
     "id": "world_management_get_worlds",
     "displayName": "World Management Get Worlds",
-    "description": "Run the world management get worlds operation against a loaded world.",
+    "description": "Lists world registry entries from the world manager. Entries describe managed worlds and are not loaded World objects.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -916,7 +916,7 @@
         "pinType": "DATA",
         "dataType": "list<world>",
         "direction": "output",
-        "description": "Returns the worlds list produced by this operation."
+        "description": "World registry entries describing managed worlds."
       },
       {
         "id": "output_flow",
@@ -925,7 +925,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -956,7 +956,7 @@
   {
     "id": "world_management_get_world",
     "displayName": "World Management Get World",
-    "description": "Run the world management get world operation against a loaded world.",
+    "description": "Finds a world registry entry by name without requiring that world to be loaded. Returns no value when the name is not registered.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -1001,7 +1001,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       }
     ],
     "outputs": [
@@ -1012,7 +1012,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "output",
-        "description": "Returns the world world produced by this operation."
+        "description": "Matching managed-world registry entry, or no value when no entry is registered."
       },
       {
         "id": "output_flow",
@@ -1021,7 +1021,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -1057,7 +1057,7 @@
   {
     "id": "world_management_get_portals",
     "displayName": "World Management Get Portals",
-    "description": "Run the world management get portals operation against a loaded world.",
+    "description": "Lists managed portals, optionally restricted to their source world.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -1103,7 +1103,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       }
     ],
     "outputs": [
@@ -1114,7 +1114,7 @@
         "pinType": "DATA",
         "dataType": "list<any>",
         "direction": "output",
-        "description": "Returns the portals list produced by this operation."
+        "description": "Managed portals matching the optional source-world filter."
       },
       {
         "id": "output_flow",
@@ -1123,7 +1123,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -1159,7 +1159,7 @@
   {
     "id": "world_management_get_portal",
     "displayName": "World Management Get Portal",
-    "description": "Run the world management get portal operation against a loaded world.",
+    "description": "Finds one managed portal by its stable ID. Returns no value when no portal has that ID.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -1205,7 +1205,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the portal id string used by this operation."
+        "description": "Stable ID of the existing managed portal."
       }
     ],
     "outputs": [
@@ -1216,7 +1216,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the portal string produced by this operation."
+        "description": "Matching managed portal, or no value when its ID is unknown."
       },
       {
         "id": "output_flow",
@@ -1225,7 +1225,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -1261,7 +1261,7 @@
   {
     "id": "world_management_get_game_rules",
     "displayName": "World Management Get Game Rules",
-    "description": "Run the world management get game rules operation against a loaded world.",
+    "description": "Reads stored game-rule names and values for a managed world. Returns an empty map when the world has no stored rules or is not registered.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -1308,7 +1308,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       }
     ],
     "outputs": [
@@ -1319,7 +1319,7 @@
         "pinType": "DATA",
         "dataType": "map<any,any>",
         "direction": "output",
-        "description": "Returns the game rules map produced by this operation."
+        "description": "Stored game-rule names and text values for the selected world."
       },
       {
         "id": "output_flow",
@@ -1328,7 +1328,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -1364,7 +1364,7 @@
   {
     "id": "world_management_get_game_rule_descriptors",
     "displayName": "World Management Get Game Rule Descriptors",
-    "description": "Run the world management get game rule descriptors operation against a loaded world.",
+    "description": "Lists game rules known to the world manager, including the information needed to choose and validate their values.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -1414,7 +1414,7 @@
         "pinType": "DATA",
         "dataType": "list<any>",
         "direction": "output",
-        "description": "Returns the descriptors list produced by this operation."
+        "description": "Known game-rule descriptions and value types."
       },
       {
         "id": "output_flow",
@@ -1423,7 +1423,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -1454,7 +1454,7 @@
   {
     "id": "world_management_get_map_snapshot",
     "displayName": "World Management Get Map Snapshot",
-    "description": "Run the world management get map snapshot operation against a loaded world.",
+    "description": "Reads a prepared world-map view centered on the selected X and Z coordinates at the selected zoom.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -1501,7 +1501,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "center_x",
@@ -1510,7 +1510,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the center x number used by this operation."
+        "description": "World-map center X coordinate in blocks."
       },
       {
         "id": "center_z",
@@ -1519,7 +1519,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the center z number used by this operation."
+        "description": "World-map center Z coordinate in blocks."
       },
       {
         "id": "zoom",
@@ -1528,7 +1528,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the zoom number used by this operation."
+        "description": "World-map zoom value accepted by the map service."
       }
     ],
     "outputs": [
@@ -1539,7 +1539,7 @@
         "pinType": "DATA",
         "dataType": "map<any,any>",
         "direction": "output",
-        "description": "Returns the snapshot map produced by this operation."
+        "description": "World-manager registry or map snapshot produced by the selected query."
       },
       {
         "id": "output_flow",
@@ -1548,7 +1548,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -1599,7 +1599,7 @@
   {
     "id": "world_set_spawn",
     "displayName": "World Set Spawn",
-    "description": "Run the world set spawn operation against a loaded world.",
+    "description": "Sets a loaded world's default spawn to a location in that same world.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -1645,7 +1645,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "location",
@@ -1654,7 +1654,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location location used by this operation."
+        "description": "World location used for spawn, lightning, or biome changes. Must belong to the selected world."
       }
     ],
     "outputs": [
@@ -1665,7 +1665,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -1701,7 +1701,7 @@
   {
     "id": "world_set_keep_spawn",
     "displayName": "World Set Keep Spawn",
-    "description": "Run the world set keep spawn operation against a loaded world.",
+    "description": "Changes whether a loaded world keeps its spawn area in memory. This action does not schedule a temporary retention period.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -1748,7 +1748,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "keep_spawn_time",
@@ -1757,7 +1757,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the keep spawn time boolean used by this operation."
+        "description": "Positive values keep the spawn area in memory. Zero releases it. This does not set a duration."
       }
     ],
     "outputs": [
@@ -1768,7 +1768,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -1851,7 +1851,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "auto_save",
@@ -1860,7 +1860,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the auto save boolean used by this operation."
+        "description": "True enables automatic world saving. False disables it."
       }
     ],
     "outputs": [
@@ -1871,7 +1871,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -1905,7 +1905,7 @@
   {
     "id": "world_spawn_lightning",
     "displayName": "World Spawn Lightning",
-    "description": "Run the world spawn lightning operation against a loaded world.",
+    "description": "Creates lightning in the selected world. Strike creates real lightning. Effect or Visual creates only the visual effect.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -1951,7 +1951,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "location",
@@ -1960,7 +1960,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location location used by this operation."
+        "description": "World location used for spawn, lightning, or biome changes. Must belong to the selected world."
       },
       {
         "id": "effect",
@@ -1969,7 +1969,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the effect string used by this operation."
+        "description": "Strike or Lightning creates real lightning. Effect or Visual creates only the visual effect."
       }
     ],
     "outputs": [
@@ -1980,7 +1980,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -2019,7 +2019,7 @@
   {
     "id": "world_set_border_size",
     "displayName": "World Set Border Size",
-    "description": "Run the world set border size operation against a loaded world.",
+    "description": "Sets a loaded world's square border size from 1 through 59999968 blocks. Size is the side length, not the distance from its center.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -2066,7 +2066,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "size",
@@ -2075,7 +2075,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the size number used by this operation."
+        "description": "World-border side length from 1 through 59999968 blocks."
       }
     ],
     "outputs": [
@@ -2086,7 +2086,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -2120,7 +2120,7 @@
   {
     "id": "world_set_border_damage",
     "displayName": "World Set Border Damage",
-    "description": "Run the world set border damage operation against a loaded world.",
+    "description": "Sets damage per block outside a loaded world's border. The amount must be finite and non-negative.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -2167,7 +2167,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "damage_amount",
@@ -2176,7 +2176,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the damage amount number used by this operation."
+        "description": "Finite, non-negative damage per block outside the world border."
       }
     ],
     "outputs": [
@@ -2187,7 +2187,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -2221,7 +2221,7 @@
   {
     "id": "world_set_border_warning",
     "displayName": "World Set Border Warning",
-    "description": "Run the world set border warning operation against a loaded world.",
+    "description": "Sets the distance from a world border at which the client shows its warning, in blocks.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -2268,7 +2268,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "warning_distance",
@@ -2277,7 +2277,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the warning distance number used by this operation."
+        "description": "Distance from the world border at which its warning appears, in blocks."
       }
     ],
     "outputs": [
@@ -2288,7 +2288,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -2367,7 +2367,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "New world folder and registry name"
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "seed",
@@ -2376,7 +2376,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Numeric or textual seed",
+        "description": "World-generation seed accepted by the world manager. Leave empty to use its default.",
         "optional": true
       },
       {
@@ -2386,7 +2386,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the environment string used by this operation.",
+        "description": "World environment, such as Normal, Nether, or The End.",
         "widget": "DROPDOWN",
         "options": [
           "NORMAL",
@@ -2402,7 +2402,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the generator string used by this operation.",
+        "description": "Built-in, plugin, or ReSync WorldGen generator selected for the new world.",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:resync:world_generator",
         "optional": true
@@ -2431,7 +2431,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       },
       {
         "id": "failed",
@@ -2449,7 +2449,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the success boolean produced by this operation."
+        "description": "Whether the world-manager request succeeded or was accepted."
       },
       {
         "id": "message",
@@ -2458,7 +2458,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the message string produced by this operation."
+        "description": "World-manager result or failure explanation."
       },
       {
         "id": "error_code",
@@ -2467,7 +2467,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the error code string produced by this operation."
+        "description": "Stable world-manager failure code, or empty text on success."
       },
       {
         "id": "world",
@@ -2476,7 +2476,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "output",
-        "description": "Returns the world world produced by this operation."
+        "description": "Matching managed-world registry entry, or no value when no entry is registered."
       }
     ],
     "migrationMapping": {
@@ -2551,7 +2551,7 @@
   {
     "id": "world_management_scan_worlds",
     "displayName": "World Management Scan Worlds",
-    "description": "Run the world management scan worlds operation against a loaded world.",
+    "description": "Scans world folders to discover worlds that are not yet registered with the world manager.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -2599,7 +2599,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -2625,7 +2625,7 @@
   {
     "id": "world_management_import_worlds",
     "displayName": "World Management Import Worlds",
-    "description": "Run the world management import worlds operation against a loaded world.",
+    "description": "Registers world folders discovered outside the world manager so they can be managed.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -2673,7 +2673,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -2699,7 +2699,7 @@
   {
     "id": "world_management_clone_world",
     "displayName": "World Management Clone World",
-    "description": "Run the world management clone world operation against a loaded world.",
+    "description": "Requests a managed world clone under a new name, with an option to load the clone afterward. The result reports request acceptance or failure.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -2744,7 +2744,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the source world string used by this operation."
+        "description": "Existing world to clone, or the world containing a portal's source box."
       },
       {
         "id": "target_world",
@@ -2753,7 +2753,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the target world string used by this operation."
+        "description": "New world name for the clone."
       },
       {
         "id": "load_after_clone",
@@ -2762,7 +2762,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the load after clone boolean used by this operation."
+        "description": "True asks the world manager to load the clone after copying completes."
       }
     ],
     "outputs": [
@@ -2773,7 +2773,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -2814,7 +2814,7 @@
   {
     "id": "world_management_load_world",
     "displayName": "World Management Load World",
-    "description": "Run the world management load world operation against a loaded world.",
+    "description": "Loads a registered world using the world manager and reports its operation result.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -2859,7 +2859,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       }
     ],
     "outputs": [
@@ -2870,7 +2870,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -2901,7 +2901,7 @@
   {
     "id": "world_management_unload_world",
     "displayName": "World Management Unload World",
-    "description": "Run the world management unload world operation against a loaded world.",
+    "description": "Unloads a managed world and moves affected players to the chosen fallback world according to the world manager's policy.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -2946,7 +2946,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "fallback_world",
@@ -2955,7 +2955,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the fallback world string used by this operation."
+        "description": "World to receive players before the source world is unloaded or deleted."
       }
     ],
     "outputs": [
@@ -2966,7 +2966,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -3002,7 +3002,7 @@
   {
     "id": "world_management_delete_world",
     "displayName": "World Management Delete World",
-    "description": "Run the world management delete world operation against a loaded world.",
+    "description": "Removes a world from management, optionally deleting its files. Fallback World provides a destination for players before removal.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -3047,7 +3047,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "delete_files",
@@ -3056,7 +3056,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the delete files boolean used by this operation."
+        "description": "True also deletes the world files. False removes management without requesting file deletion."
       },
       {
         "id": "fallback_world",
@@ -3065,7 +3065,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the fallback world string used by this operation."
+        "description": "World to receive players before the source world is unloaded or deleted."
       }
     ],
     "outputs": [
@@ -3076,7 +3076,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -3119,7 +3119,7 @@
   {
     "id": "world_management_set_rule",
     "displayName": "World Management Set Rule",
-    "description": "Run the world management set rule operation against a loaded world.",
+    "description": "Sets one managed world game rule from its name and text value. The value must match that rule's Boolean or numeric type.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -3165,7 +3165,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "rule_name",
@@ -3174,7 +3174,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the rule name string used by this operation."
+        "description": "Registered game-rule name to change."
       },
       {
         "id": "value",
@@ -3183,7 +3183,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the value string used by this operation."
+        "description": "Text value for the selected game rule, matching its Boolean or numeric type."
       }
     ],
     "outputs": [
@@ -3194,7 +3194,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -3235,7 +3235,7 @@
   {
     "id": "world_management_set_difficulty",
     "displayName": "World Management Set Difficulty",
-    "description": "Run the world management set difficulty operation against a loaded world.",
+    "description": "Changes the configured difficulty of a managed world.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -3281,7 +3281,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "difficulty",
@@ -3291,7 +3291,7 @@
         "dataType": "difficulty",
         "optionsSource": "server:minecraft:difficulty",
         "direction": "input",
-        "description": "Provides the difficulty difficulty used by this operation."
+        "description": "World difficulty: Peaceful, Easy, Normal, or Hard."
       }
     ],
     "outputs": [
@@ -3302,7 +3302,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -3338,7 +3338,7 @@
   {
     "id": "world_management_set_time_lock",
     "displayName": "World Management Set Time Lock",
-    "description": "Run the world management set time lock operation against a loaded world.",
+    "description": "Enables or disables a managed world's fixed time of day. Locked Time uses world-day ticks, with 24000 ticks per day.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -3385,7 +3385,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the locked time number used by this operation."
+        "description": "Fixed time of day in world ticks while the time lock is enabled."
       },
       {
         "id": "world_name",
@@ -3394,7 +3394,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "enabled",
@@ -3403,7 +3403,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the enabled boolean used by this operation."
+        "description": "True enables this world or portal setting. False disables it."
       }
     ],
     "outputs": [
@@ -3414,7 +3414,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -3455,7 +3455,7 @@
   {
     "id": "world_management_set_weather_lock",
     "displayName": "World Management Set Weather Lock",
-    "description": "Run the world management set weather lock operation against a loaded world.",
+    "description": "Enables or disables a managed world's fixed weather. Storm and Thundering choose the weather retained while the lock is enabled.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -3502,7 +3502,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "enabled",
@@ -3511,7 +3511,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the enabled boolean used by this operation."
+        "description": "True enables this world or portal setting. False disables it."
       },
       {
         "id": "storm",
@@ -3520,7 +3520,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the storm boolean used by this operation."
+        "description": "Whether rain is active while the weather lock is enabled."
       },
       {
         "id": "thundering",
@@ -3529,7 +3529,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the thundering boolean used by this operation."
+        "description": "Whether thunder is active while the weather lock is enabled."
       }
     ],
     "outputs": [
@@ -3540,7 +3540,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -3586,7 +3586,7 @@
   {
     "id": "world_management_set_isolated_state",
     "displayName": "World Management Set Isolated State",
-    "description": "Run the world management set isolated state operation against a loaded world.",
+    "description": "Enables or disables separate player state for a managed world, according to the world manager's isolation settings.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -3633,7 +3633,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "enabled",
@@ -3642,7 +3642,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the enabled boolean used by this operation."
+        "description": "True enables this world or portal setting. False disables it."
       }
     ],
     "outputs": [
@@ -3653,7 +3653,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -3689,7 +3689,7 @@
   {
     "id": "world_management_create_portal",
     "displayName": "World Management Create Portal",
-    "description": "Run the world management create portal operation against a loaded world.",
+    "description": "Creates a managed portal with a source-world box and a destination world, position, and rotation.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -3735,7 +3735,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the portal name string used by this operation."
+        "description": "Human-readable name for the new portal."
       },
       {
         "id": "source_world",
@@ -3744,7 +3744,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the source world string used by this operation."
+        "description": "Existing world to clone, or the world containing a portal's source box."
       },
       {
         "id": "min_x",
@@ -3753,7 +3753,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the min x number used by this operation."
+        "description": "Minimum X block coordinate of the portal source box."
       },
       {
         "id": "min_y",
@@ -3762,7 +3762,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the min y number used by this operation."
+        "description": "Minimum Y block coordinate of the portal source box."
       },
       {
         "id": "min_z",
@@ -3771,7 +3771,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the min z number used by this operation."
+        "description": "Minimum Z block coordinate of the portal source box."
       },
       {
         "id": "max_x",
@@ -3780,7 +3780,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max x number used by this operation."
+        "description": "Maximum X block coordinate of the portal source box."
       },
       {
         "id": "max_y",
@@ -3789,7 +3789,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max y number used by this operation."
+        "description": "Maximum Y block coordinate of the portal source box."
       },
       {
         "id": "max_z",
@@ -3798,7 +3798,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max z number used by this operation."
+        "description": "Maximum Z block coordinate of the portal source box."
       },
       {
         "id": "destination_world",
@@ -3807,7 +3807,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the destination world string used by this operation."
+        "description": "Name of the world receiving players through the portal."
       },
       {
         "id": "destination_x",
@@ -3816,7 +3816,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination x number used by this operation."
+        "description": "Portal destination X coordinate in blocks."
       },
       {
         "id": "destination_y",
@@ -3825,7 +3825,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination y number used by this operation."
+        "description": "Portal destination Y coordinate in blocks."
       },
       {
         "id": "destination_z",
@@ -3834,7 +3834,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination z number used by this operation."
+        "description": "Portal destination Z coordinate in blocks."
       },
       {
         "id": "destination_yaw",
@@ -3843,7 +3843,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination yaw number used by this operation."
+        "description": "Portal destination horizontal rotation in degrees."
       },
       {
         "id": "destination_pitch",
@@ -3852,7 +3852,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination pitch number used by this operation."
+        "description": "Portal destination vertical rotation in degrees."
       },
       {
         "id": "enabled",
@@ -3861,7 +3861,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the enabled boolean used by this operation."
+        "description": "True enables this world or portal setting. False disables it."
       }
     ],
     "outputs": [
@@ -3872,7 +3872,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -3973,7 +3973,7 @@
   {
     "id": "world_management_delete_portal",
     "displayName": "World Management Delete Portal",
-    "description": "Run the world management delete portal operation against a loaded world.",
+    "description": "Deletes a managed portal by its stable ID.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -4019,7 +4019,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the portal id string used by this operation."
+        "description": "Stable ID of the existing managed portal."
       }
     ],
     "outputs": [
@@ -4030,7 +4030,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -4063,7 +4063,7 @@
   {
     "id": "world_management_set_portal_enabled",
     "displayName": "World Management Set Portal Enabled",
-    "description": "Run the world management set portal enabled operation against a loaded world.",
+    "description": "Enables or disables an existing managed portal.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -4110,7 +4110,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the portal id string used by this operation."
+        "description": "Stable ID of the existing managed portal."
       },
       {
         "id": "enabled",
@@ -4119,7 +4119,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the enabled boolean used by this operation."
+        "description": "True enables this world or portal setting. False disables it."
       }
     ],
     "outputs": [
@@ -4130,7 +4130,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -4166,7 +4166,7 @@
   {
     "id": "world_management_set_portal_destination",
     "displayName": "World Management Set Portal Destination",
-    "description": "Run the world management set portal destination operation against a loaded world.",
+    "description": "Replaces a managed portal's destination world, coordinates, yaw, and pitch.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -4213,7 +4213,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the portal id string used by this operation."
+        "description": "Stable ID of the existing managed portal."
       },
       {
         "id": "destination_world",
@@ -4222,7 +4222,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the destination world string used by this operation."
+        "description": "Name of the world receiving players through the portal."
       },
       {
         "id": "destination_x",
@@ -4231,7 +4231,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination x number used by this operation."
+        "description": "Portal destination X coordinate in blocks."
       },
       {
         "id": "destination_y",
@@ -4240,7 +4240,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination y number used by this operation."
+        "description": "Portal destination Y coordinate in blocks."
       },
       {
         "id": "destination_z",
@@ -4249,7 +4249,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination z number used by this operation."
+        "description": "Portal destination Z coordinate in blocks."
       },
       {
         "id": "destination_yaw",
@@ -4258,7 +4258,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination yaw number used by this operation."
+        "description": "Portal destination horizontal rotation in degrees."
       },
       {
         "id": "destination_pitch",
@@ -4267,7 +4267,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination pitch number used by this operation."
+        "description": "Portal destination vertical rotation in degrees."
       }
     ],
     "outputs": [
@@ -4278,7 +4278,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -4339,7 +4339,7 @@
   {
     "id": "world_management_set_portal_bounds",
     "displayName": "World Management Set Portal Bounds",
-    "description": "Run the world management set portal bounds operation against a loaded world.",
+    "description": "Replaces a managed portal's source-world box using minimum and maximum block coordinates.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -4386,7 +4386,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the portal id string used by this operation."
+        "description": "Stable ID of the existing managed portal."
       },
       {
         "id": "source_world",
@@ -4395,7 +4395,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the source world string used by this operation."
+        "description": "Existing world to clone, or the world containing a portal's source box."
       },
       {
         "id": "min_x",
@@ -4404,7 +4404,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the min x number used by this operation."
+        "description": "Minimum X block coordinate of the portal source box."
       },
       {
         "id": "min_y",
@@ -4413,7 +4413,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the min y number used by this operation."
+        "description": "Minimum Y block coordinate of the portal source box."
       },
       {
         "id": "min_z",
@@ -4422,7 +4422,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the min z number used by this operation."
+        "description": "Minimum Z block coordinate of the portal source box."
       },
       {
         "id": "max_x",
@@ -4431,7 +4431,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max x number used by this operation."
+        "description": "Maximum X block coordinate of the portal source box."
       },
       {
         "id": "max_y",
@@ -4440,7 +4440,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max y number used by this operation."
+        "description": "Maximum Y block coordinate of the portal source box."
       },
       {
         "id": "max_z",
@@ -4449,7 +4449,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max z number used by this operation."
+        "description": "Maximum Z block coordinate of the portal source box."
       }
     ],
     "outputs": [
@@ -4460,7 +4460,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -4526,7 +4526,7 @@
   {
     "id": "world_management_teleport_player_to_world",
     "displayName": "World Management Teleport Player To World",
-    "description": "Run the world management teleport player to world operation against a loaded world.",
+    "description": "Teleports a player to selected coordinates and rotation in a managed world.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -4573,7 +4573,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "direction": "input",
-        "description": "Provides the target player used by this operation."
+        "description": "Player to teleport through the world manager."
       },
       {
         "id": "world_name",
@@ -4582,7 +4582,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       },
       {
         "id": "x",
@@ -4591,7 +4591,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the x number used by this operation."
+        "description": "Player teleport destination X coordinate in blocks."
       },
       {
         "id": "y",
@@ -4600,7 +4600,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the y number used by this operation."
+        "description": "Player teleport destination Y coordinate in blocks."
       },
       {
         "id": "z",
@@ -4609,7 +4609,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the z number used by this operation."
+        "description": "Player teleport destination Z coordinate in blocks."
       },
       {
         "id": "yaw",
@@ -4618,7 +4618,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the yaw number used by this operation."
+        "description": "Destination horizontal rotation in degrees."
       },
       {
         "id": "pitch",
@@ -4627,7 +4627,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the pitch number used by this operation."
+        "description": "Destination vertical rotation in degrees."
       }
     ],
     "outputs": [
@@ -4638,7 +4638,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -4699,7 +4699,7 @@
   {
     "id": "world_management_teleport_player_to_world_spawn",
     "displayName": "World Management Teleport Player To World Spawn",
-    "description": "Run the world management teleport player to world spawn operation against a loaded world.",
+    "description": "Teleports a player to a managed world's configured spawn.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -4747,7 +4747,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "direction": "input",
-        "description": "Provides the target player used by this operation."
+        "description": "Player to teleport through the world manager."
       },
       {
         "id": "world_name",
@@ -4756,7 +4756,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation."
+        "description": "Name of the managed world to inspect or change."
       }
     ],
     "outputs": [
@@ -4767,7 +4767,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -4803,7 +4803,7 @@
   {
     "id": "world_management_teleport_player_to_portal",
     "displayName": "World Management Teleport Player To Portal",
-    "description": "Run the world management teleport player to portal operation against a loaded world.",
+    "description": "Teleports a player through the selected managed portal using its configured destination and access policy.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -4851,7 +4851,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "direction": "input",
-        "description": "Provides the target player used by this operation."
+        "description": "Player to teleport through the world manager."
       },
       {
         "id": "portal_id",
@@ -4860,7 +4860,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the portal id string used by this operation."
+        "description": "Stable ID of the existing managed portal."
       }
     ],
     "outputs": [
@@ -4871,7 +4871,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -4907,7 +4907,7 @@
   {
     "id": "world_management",
     "displayName": "World Management",
-    "description": "Run the world management operation against a loaded world.",
+    "description": "Runs a selected world-manager action, such as loading a world, changing a rule, or updating a portal. Only inputs required by that action are used.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -4951,7 +4951,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the action string used by this operation.",
+        "description": "World-manager operation to run, or Get/Set for a selected world property.",
         "widget": "SEARCHABLE_LIST",
         "options": [
           "get_snapshot",
@@ -4992,7 +4992,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the world name string used by this operation.",
+        "description": "Name of the managed world to inspect or change.",
         "visibleWhen": {
           "action": "get_world,get_portals,get_game_rules,get_map_snapshot,create_world,load_world,unload_world,delete_world,set_rule,set_difficulty,set_time_lock,set_weather_lock,set_isolated_state,teleport_player_to_world,teleport_player_to_world_spawn"
         }
@@ -5004,7 +5004,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the seed string used by this operation.",
+        "description": "World-generation seed accepted by the world manager. Leave empty to use its default.",
         "visibleWhen": {
           "action": "create_world"
         }
@@ -5016,7 +5016,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the environment string used by this operation.",
+        "description": "World environment, such as Normal, Nether, or The End.",
         "widget": "SEARCHABLE_LIST",
         "options": [
           "NORMAL",
@@ -5035,7 +5035,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the generator string used by this operation.",
+        "description": "Built-in, plugin, or ReSync WorldGen generator selected for the new world.",
         "visibleWhen": {
           "action": "create_world"
         }
@@ -5047,7 +5047,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the source world string used by this operation.",
+        "description": "Existing world to clone, or the world containing a portal's source box.",
         "visibleWhen": {
           "action": "clone_world,set_portal_bounds"
         }
@@ -5059,7 +5059,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the target world string used by this operation.",
+        "description": "New world name for the clone.",
         "visibleWhen": {
           "action": "clone_world"
         }
@@ -5071,7 +5071,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the load after clone boolean used by this operation.",
+        "description": "True asks the world manager to load the clone after copying completes.",
         "visibleWhen": {
           "action": "clone_world"
         }
@@ -5083,7 +5083,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the fallback world string used by this operation.",
+        "description": "World to receive players before the source world is unloaded or deleted.",
         "visibleWhen": {
           "action": "unload_world,delete_world"
         }
@@ -5095,7 +5095,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the delete files boolean used by this operation.",
+        "description": "True also deletes the world files. False removes management without requesting file deletion.",
         "visibleWhen": {
           "action": "delete_world"
         }
@@ -5107,7 +5107,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the rule name string used by this operation.",
+        "description": "Registered game-rule name to change.",
         "visibleWhen": {
           "action": "set_rule"
         }
@@ -5119,7 +5119,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the value string used by this operation.",
+        "description": "Text value for the selected game rule, matching its Boolean or numeric type.",
         "visibleWhen": {
           "action": "set_rule"
         }
@@ -5132,7 +5132,7 @@
         "dataType": "difficulty",
         "optionsSource": "server:minecraft:difficulty",
         "direction": "input",
-        "description": "Provides the difficulty difficulty used by this operation.",
+        "description": "World difficulty: Peaceful, Easy, Normal, or Hard.",
         "visibleWhen": {
           "action": "set_difficulty"
         }
@@ -5144,7 +5144,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the enabled boolean used by this operation.",
+        "description": "True enables this world or portal setting. False disables it.",
         "visibleWhen": {
           "action": "set_time_lock,set_weather_lock,set_isolated_state,create_portal,set_portal_enabled"
         }
@@ -5156,7 +5156,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the locked time number used by this operation.",
+        "description": "Fixed time of day in world ticks while the time lock is enabled.",
         "visibleWhen": {
           "action": "set_time_lock"
         }
@@ -5168,7 +5168,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the storm boolean used by this operation.",
+        "description": "Whether rain is active while the weather lock is enabled.",
         "visibleWhen": {
           "action": "set_weather_lock"
         }
@@ -5180,7 +5180,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the thundering boolean used by this operation.",
+        "description": "Whether thunder is active while the weather lock is enabled.",
         "visibleWhen": {
           "action": "set_weather_lock"
         }
@@ -5192,7 +5192,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the portal name string used by this operation.",
+        "description": "Human-readable name for the new portal.",
         "visibleWhen": {
           "action": "create_portal"
         }
@@ -5204,7 +5204,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the portal id string used by this operation.",
+        "description": "Stable ID of the existing managed portal.",
         "visibleWhen": {
           "action": "get_portal,delete_portal,set_portal_enabled,set_portal_destination,set_portal_bounds,teleport_player_to_portal"
         }
@@ -5216,7 +5216,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the min x number used by this operation.",
+        "description": "Minimum X block coordinate of the portal source box.",
         "visibleWhen": {
           "action": "create_portal,set_portal_bounds"
         }
@@ -5228,7 +5228,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the min y number used by this operation.",
+        "description": "Minimum Y block coordinate of the portal source box.",
         "visibleWhen": {
           "action": "create_portal,set_portal_bounds"
         }
@@ -5240,7 +5240,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the min z number used by this operation.",
+        "description": "Minimum Z block coordinate of the portal source box.",
         "visibleWhen": {
           "action": "create_portal,set_portal_bounds"
         }
@@ -5252,7 +5252,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max x number used by this operation.",
+        "description": "Maximum X block coordinate of the portal source box.",
         "visibleWhen": {
           "action": "create_portal,set_portal_bounds"
         }
@@ -5264,7 +5264,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max y number used by this operation.",
+        "description": "Maximum Y block coordinate of the portal source box.",
         "visibleWhen": {
           "action": "create_portal,set_portal_bounds"
         }
@@ -5276,7 +5276,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max z number used by this operation.",
+        "description": "Maximum Z block coordinate of the portal source box.",
         "visibleWhen": {
           "action": "create_portal,set_portal_bounds"
         }
@@ -5288,7 +5288,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the destination world string used by this operation.",
+        "description": "Name of the world receiving players through the portal.",
         "visibleWhen": {
           "action": "create_portal,set_portal_destination"
         }
@@ -5300,7 +5300,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination x number used by this operation.",
+        "description": "Portal destination X coordinate in blocks.",
         "visibleWhen": {
           "action": "create_portal,set_portal_destination,teleport_player_to_world"
         }
@@ -5312,7 +5312,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination y number used by this operation.",
+        "description": "Portal destination Y coordinate in blocks.",
         "visibleWhen": {
           "action": "create_portal,set_portal_destination"
         }
@@ -5324,7 +5324,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination z number used by this operation.",
+        "description": "Portal destination Z coordinate in blocks.",
         "visibleWhen": {
           "action": "create_portal,set_portal_destination,teleport_player_to_world"
         }
@@ -5336,7 +5336,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination yaw number used by this operation.",
+        "description": "Portal destination horizontal rotation in degrees.",
         "visibleWhen": {
           "action": "create_portal,set_portal_destination"
         }
@@ -5348,7 +5348,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the destination pitch number used by this operation.",
+        "description": "Portal destination vertical rotation in degrees.",
         "visibleWhen": {
           "action": "create_portal,set_portal_destination"
         }
@@ -5360,7 +5360,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "direction": "input",
-        "description": "Provides the target player used by this operation.",
+        "description": "Player to teleport through the world manager.",
         "visibleWhen": {
           "action": "teleport_player_to_world,teleport_player_to_world_spawn,teleport_player_to_portal"
         }
@@ -5372,7 +5372,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the x number used by this operation.",
+        "description": "Player teleport destination X coordinate in blocks.",
         "visibleWhen": {
           "action": "teleport_player_to_world"
         }
@@ -5384,7 +5384,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the y number used by this operation.",
+        "description": "Player teleport destination Y coordinate in blocks.",
         "visibleWhen": {
           "action": "teleport_player_to_world"
         }
@@ -5396,7 +5396,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the z number used by this operation.",
+        "description": "Player teleport destination Z coordinate in blocks.",
         "visibleWhen": {
           "action": "teleport_player_to_world"
         }
@@ -5408,7 +5408,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the yaw number used by this operation.",
+        "description": "Destination horizontal rotation in degrees.",
         "visibleWhen": {
           "action": "teleport_player_to_world"
         }
@@ -5420,7 +5420,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the pitch number used by this operation.",
+        "description": "Destination vertical rotation in degrees.",
         "visibleWhen": {
           "action": "teleport_player_to_world"
         }
@@ -5432,7 +5432,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the center x number used by this operation.",
+        "description": "World-map center X coordinate in blocks.",
         "visibleWhen": {
           "action": "get_map_snapshot"
         }
@@ -5444,7 +5444,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the center z number used by this operation.",
+        "description": "World-map center Z coordinate in blocks.",
         "visibleWhen": {
           "action": "get_map_snapshot"
         }
@@ -5456,7 +5456,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the zoom number used by this operation.",
+        "description": "World-map zoom value accepted by the map service.",
         "visibleWhen": {
           "action": "get_map_snapshot"
         }
@@ -5470,7 +5470,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       },
       {
         "id": "success",
@@ -5479,7 +5479,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the success boolean produced by this operation.",
+        "description": "Whether the world-manager request succeeded or was accepted.",
         "visibleWhen": {
           "action": "create_world,scan_worlds,import_worlds,clone_world,load_world,unload_world,delete_world,set_rule,set_difficulty,set_time_lock,set_weather_lock,set_isolated_state,create_portal,delete_portal,set_portal_enabled,set_portal_destination,set_portal_bounds,teleport_player_to_world,teleport_player_to_world_spawn,teleport_player_to_portal"
         }
@@ -5491,7 +5491,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the message string produced by this operation.",
+        "description": "World-manager result or failure explanation.",
         "visibleWhen": {
           "action": "create_world,scan_worlds,import_worlds,clone_world,load_world,unload_world,delete_world,set_rule,set_difficulty,set_time_lock,set_weather_lock,set_isolated_state,create_portal,delete_portal,set_portal_enabled,set_portal_destination,set_portal_bounds,teleport_player_to_world,teleport_player_to_world_spawn,teleport_player_to_portal"
         }
@@ -5503,7 +5503,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the count number produced by this operation.",
+        "description": "Number of worlds or entries affected by the selected manager operation.",
         "visibleWhen": {
           "action": "scan_worlds,import_worlds"
         }
@@ -5515,7 +5515,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the portal id string produced by this operation.",
+        "description": "Stable ID of the created or changed portal.",
         "visibleWhen": {
           "action": "create_portal,set_portal_enabled,set_portal_destination,set_portal_bounds"
         }
@@ -5527,7 +5527,7 @@
         "pinType": "DATA",
         "dataType": "map<any,any>",
         "direction": "output",
-        "description": "Returns the snapshot map produced by this operation.",
+        "description": "World-manager registry or map snapshot produced by the selected query.",
         "visibleWhen": {
           "action": "get_snapshot,get_map_snapshot"
         }
@@ -5539,7 +5539,7 @@
         "pinType": "DATA",
         "dataType": "list<world>",
         "direction": "output",
-        "description": "Returns the worlds list produced by this operation.",
+        "description": "World registry entries describing managed worlds.",
         "visibleWhen": {
           "action": "get_worlds"
         }
@@ -5551,7 +5551,7 @@
         "pinType": "DATA",
         "dataType": "any",
         "direction": "output",
-        "description": "Returns the world any produced by this operation.",
+        "description": "Matching managed-world registry entry, or no value when no entry is registered.",
         "visibleWhen": {
           "action": "get_world"
         }
@@ -5563,7 +5563,7 @@
         "pinType": "DATA",
         "dataType": "list<any>",
         "direction": "output",
-        "description": "Returns the portals list produced by this operation.",
+        "description": "Managed portals matching the optional source-world filter.",
         "visibleWhen": {
           "action": "get_portals"
         }
@@ -5575,7 +5575,7 @@
         "pinType": "DATA",
         "dataType": "any",
         "direction": "output",
-        "description": "Returns the portal any produced by this operation.",
+        "description": "Matching managed portal, or no value when its ID is unknown.",
         "visibleWhen": {
           "action": "get_portal"
         }
@@ -5587,7 +5587,7 @@
         "pinType": "DATA",
         "dataType": "map<any,any>",
         "direction": "output",
-        "description": "Returns the game rules map produced by this operation.",
+        "description": "Stored game-rule names and text values for the selected world.",
         "visibleWhen": {
           "action": "get_game_rules"
         }
@@ -5599,7 +5599,7 @@
         "pinType": "DATA",
         "dataType": "list<any>",
         "direction": "output",
-        "description": "Returns the descriptors list produced by this operation.",
+        "description": "Known game-rule descriptions and value types.",
         "visibleWhen": {
           "action": "get_game_rule_descriptors"
         }
@@ -5881,7 +5881,7 @@
   {
     "id": "world_properties",
     "displayName": "World Properties",
-    "description": "Run the world properties operation against a loaded world.",
+    "description": "Reads or changes a loaded-world property, such as time, weather, spawn, difficulty, or a game rule. Get populates that property output. Set uses its matching input.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -5926,7 +5926,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "property",
@@ -5935,7 +5935,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the property string used by this operation.",
+        "description": "Loaded-world property to read or change.",
         "widget": "SEARCHABLE_LIST",
         "options": [
           "gamerule",
@@ -5966,7 +5966,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the action string used by this operation.",
+        "description": "World-manager operation to run, or Get/Set for a selected world property.",
         "widget": "DROPDOWN",
         "options": [
           "get",
@@ -5981,7 +5981,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the gamerule string used by this operation.",
+        "description": "Registered game-rule name used by the Game Rule property.",
         "widget": "SEARCHABLE_LIST",
         "options": [
           "announceAdvancements",
@@ -6032,7 +6032,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the gamerule value string used by this operation.",
+        "description": "Replacement game-rule value as text, matching the rule's Boolean or numeric type.",
         "visibleWhen": {
           "action": "set",
           "property": "gamerule"
@@ -6045,7 +6045,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the time number used by this operation.",
+        "description": "Time of day in world ticks. A Minecraft day contains 24000 ticks.",
         "visibleWhen": {
           "action": "set",
           "property": "time"
@@ -6058,7 +6058,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the weather string used by this operation.",
+        "description": "Weather mode: clear, rain, or thunder.",
         "widget": "DROPDOWN",
         "options": [
           "clear",
@@ -6079,7 +6079,7 @@
         "dataType": "difficulty",
         "optionsSource": "server:minecraft:difficulty",
         "direction": "input",
-        "description": "Provides the difficulty difficulty used by this operation.",
+        "description": "World difficulty: Peaceful, Easy, Normal, or Hard.",
         "visibleWhen": {
           "action": "set",
           "property": "difficulty"
@@ -6092,7 +6092,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location location used by this operation.",
+        "description": "World location used for spawn, lightning, or biome changes. Must belong to the selected world.",
         "visibleWhen": {
           "property": "spawn,biome"
         }
@@ -6104,7 +6104,7 @@
         "pinType": "DATA",
         "dataType": "biome",
         "direction": "input",
-        "description": "Provides the biome biome used by this operation.",
+        "description": "Minecraft biome used at Location.",
         "visibleWhen": {
           "action": "set",
           "property": "biome"
@@ -6117,7 +6117,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the full time number used by this operation.",
+        "description": "Total world time in ticks, including completed days.",
         "visibleWhen": {
           "action": "set",
           "property": "full_time"
@@ -6130,7 +6130,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the pvp boolean used by this operation.",
+        "description": "True allows players to damage other players. False disables player-versus-player combat.",
         "visibleWhen": {
           "action": "set",
           "property": "pvp"
@@ -6143,7 +6143,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the auto save boolean used by this operation.",
+        "description": "True enables automatic world saving. False disables it.",
         "visibleWhen": {
           "action": "set",
           "property": "auto_save"
@@ -6156,7 +6156,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the keep spawn boolean used by this operation.",
+        "description": "True keeps the world spawn area in memory. False allows it to unload.",
         "visibleWhen": {
           "action": "set",
           "property": "keep_spawn"
@@ -6171,7 +6171,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       },
       {
         "id": "success",
@@ -6180,7 +6180,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the success boolean produced by this operation."
+        "description": "Whether the world-manager request succeeded or was accepted."
       },
       {
         "id": "output_gamerule",
@@ -6189,7 +6189,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the gamerule string produced by this operation.",
+        "description": "Current value of the selected game rule as text.",
         "visibleWhen": {
           "action": "get",
           "property": "gamerule"
@@ -6202,7 +6202,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the time number produced by this operation.",
+        "description": "Time of day in world ticks, from 0 through 23999.",
         "visibleWhen": {
           "action": "get",
           "property": "time"
@@ -6215,7 +6215,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the weather string produced by this operation.",
+        "description": "Current weather: clear, rain, or thunder.",
         "visibleWhen": {
           "action": "get",
           "property": "weather"
@@ -6228,7 +6228,7 @@
         "pinType": "DATA",
         "dataType": "difficulty",
         "direction": "output",
-        "description": "Returns the difficulty difficulty produced by this operation.",
+        "description": "Current world difficulty: peaceful, easy, normal, or hard.",
         "visibleWhen": {
           "action": "get",
           "property": "difficulty"
@@ -6241,7 +6241,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "output",
-        "description": "Returns the spawn location produced by this operation.",
+        "description": "Current default world-spawn location.",
         "visibleWhen": {
           "action": "get",
           "property": "spawn"
@@ -6254,7 +6254,7 @@
         "pinType": "DATA",
         "dataType": "biome",
         "direction": "output",
-        "description": "Returns the biome biome produced by this operation.",
+        "description": "Minecraft biome at the selected Location.",
         "visibleWhen": {
           "action": "get",
           "property": "biome"
@@ -6267,7 +6267,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the seed number produced by this operation.",
+        "description": "World-generation seed.",
         "visibleWhen": {
           "action": "get",
           "property": "seed"
@@ -6280,7 +6280,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the name string produced by this operation.",
+        "description": "Name of the loaded world.",
         "visibleWhen": {
           "action": "get",
           "property": "name"
@@ -6293,7 +6293,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the environment string produced by this operation.",
+        "description": "World environment, such as normal, nether, or the_end.",
         "visibleWhen": {
           "action": "get",
           "property": "environment"
@@ -6306,7 +6306,7 @@
         "pinType": "DATA",
         "dataType": "list<entity>",
         "direction": "output",
-        "description": "Returns the entities list produced by this operation.",
+        "description": "Entities currently loaded in the selected world.",
         "visibleWhen": {
           "action": "get",
           "property": "entities"
@@ -6319,7 +6319,7 @@
         "pinType": "DATA",
         "dataType": "list<player>",
         "direction": "output",
-        "description": "Returns the players list produced by this operation.",
+        "description": "Players currently in the selected world.",
         "visibleWhen": {
           "action": "get",
           "property": "players"
@@ -6332,7 +6332,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the full time number produced by this operation.",
+        "description": "Total elapsed world time in ticks, including the day count.",
         "visibleWhen": {
           "action": "get",
           "property": "full_time"
@@ -6345,7 +6345,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the has storm boolean produced by this operation.",
+        "description": "True when the world has rainy weather active.",
         "visibleWhen": {
           "action": "get",
           "property": "has_storm"
@@ -6358,7 +6358,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the thundering boolean produced by this operation.",
+        "description": "True when thunder is active.",
         "visibleWhen": {
           "action": "get",
           "property": "thundering"
@@ -6371,7 +6371,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the weather type string produced by this operation.",
+        "description": "Current weather: clear, rain, or thunder.",
         "visibleWhen": {
           "action": "get",
           "property": "weather_type"
@@ -6384,7 +6384,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the pvp boolean produced by this operation.",
+        "description": "True when player-versus-player combat is enabled.",
         "visibleWhen": {
           "action": "get",
           "property": "pvp"
@@ -6397,7 +6397,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the auto save boolean produced by this operation.",
+        "description": "True when automatic world saving is enabled.",
         "visibleWhen": {
           "action": "get",
           "property": "auto_save"
@@ -6410,7 +6410,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the keep spawn boolean produced by this operation.",
+        "description": "True when the spawn area is kept in memory.",
         "visibleWhen": {
           "action": "get",
           "property": "keep_spawn"
@@ -6603,7 +6603,7 @@
   {
     "id": "world_set_time",
     "displayName": "World World Set Time",
-    "description": "Run the world world set time operation against a loaded world.",
+    "description": "Sets a loaded world's time of day in server ticks. A Minecraft day lasts 24000 ticks.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -6649,7 +6649,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "time_ticks",
@@ -6658,7 +6658,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the time ticks number used by this operation."
+        "description": "Time of day in world ticks. A Minecraft day contains 24000 ticks."
       }
     ],
     "outputs": [
@@ -6669,7 +6669,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -6705,7 +6705,7 @@
   {
     "id": "world_get_time",
     "displayName": "World World Get Time",
-    "description": "Run the world world get time operation against a loaded world.",
+    "description": "Reads a loaded world's current time of day in ticks, from 0 through 23999.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -6751,7 +6751,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       }
     ],
     "outputs": [
@@ -6762,7 +6762,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the time ticks number produced by this operation."
+        "description": "Time of day in world ticks, from 0 through 23999."
       },
       {
         "id": "output_flow",
@@ -6771,7 +6771,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -6808,7 +6808,7 @@
   {
     "id": "world_set_full_time",
     "displayName": "World World Set Full Time",
-    "description": "Run the world world set full time operation against a loaded world.",
+    "description": "Sets a loaded world's total elapsed time in ticks, including the day count. This can change the apparent world day as well as its time of day.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -6855,7 +6855,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "full_time_ticks",
@@ -6864,7 +6864,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the full time ticks number used by this operation."
+        "description": "Total world time in ticks, including completed days."
       }
     ],
     "outputs": [
@@ -6875,7 +6875,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -6911,7 +6911,7 @@
   {
     "id": "world_get_full_time",
     "displayName": "World World Get Full Time",
-    "description": "Run the world world get full time operation against a loaded world.",
+    "description": "Reads a loaded world's total elapsed time in ticks, including the day count.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -6958,7 +6958,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       }
     ],
     "outputs": [
@@ -6969,7 +6969,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the full time ticks number produced by this operation."
+        "description": "Total elapsed world time in ticks, including the day count."
       },
       {
         "id": "output_flow",
@@ -6978,7 +6978,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -7015,7 +7015,7 @@
   {
     "id": "world_get_weather",
     "displayName": "World World Get Weather",
-    "description": "Run the world world get weather operation against a loaded world.",
+    "description": "Reads a loaded world's weather as clear, rain, or thunder, together with its storm and thunder flags.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -7061,7 +7061,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       }
     ],
     "outputs": [
@@ -7072,7 +7072,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the weather type string produced by this operation."
+        "description": "Current weather: clear, rain, or thunder."
       },
       {
         "id": "thundering",
@@ -7081,7 +7081,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the thundering boolean produced by this operation."
+        "description": "True when thunder is active."
       },
       {
         "id": "has_storm",
@@ -7090,7 +7090,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the has storm boolean produced by this operation."
+        "description": "True when the world has rainy weather active."
       },
       {
         "id": "output_flow",
@@ -7099,7 +7099,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -7146,7 +7146,7 @@
   {
     "id": "world_spawn_get",
     "displayName": "World World Spawn Get",
-    "description": "Run the world world spawn get operation against a loaded world.",
+    "description": "Reads a loaded world's default spawn location.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -7192,7 +7192,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       }
     ],
     "outputs": [
@@ -7203,7 +7203,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "output",
-        "description": "Returns the spawn location location produced by this operation."
+        "description": "Current default world-spawn location."
       },
       {
         "id": "output_flow",
@@ -7212,7 +7212,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -7249,7 +7249,7 @@
   {
     "id": "world_get_difficulty",
     "displayName": "World World Get Difficulty",
-    "description": "Run the world world get difficulty operation against a loaded world.",
+    "description": "Reads a loaded world's difficulty as peaceful, easy, normal, or hard.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -7295,7 +7295,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       }
     ],
     "outputs": [
@@ -7306,7 +7306,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the difficulty string produced by this operation."
+        "description": "Current world difficulty: peaceful, easy, normal, or hard."
       },
       {
         "id": "output_flow",
@@ -7315,7 +7315,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -7352,7 +7352,7 @@
   {
     "id": "world_set_pvp",
     "displayName": "World World Set Pvp",
-    "description": "Run the world world set pvp operation against a loaded world.",
+    "description": "Enables or disables player-versus-player combat in a loaded world.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -7398,7 +7398,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       },
       {
         "id": "pvp_enabled",
@@ -7407,7 +7407,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the pvp enabled boolean used by this operation."
+        "description": "True allows players to damage other players. False disables player-versus-player combat."
       }
     ],
     "outputs": [
@@ -7418,7 +7418,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {
@@ -7454,7 +7454,7 @@
   {
     "id": "world_get_pvp",
     "displayName": "World World Get Pvp",
-    "description": "Run the world world get pvp operation against a loaded world.",
+    "description": "Checks whether player-versus-player combat is enabled in a loaded world.",
     "domain": "world",
     "family": "world_action",
     "lifecycle": "active",
@@ -7500,7 +7500,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "input",
-        "description": "Provides the world world used by this operation."
+        "description": "Loaded world to inspect or change."
       }
     ],
     "outputs": [
@@ -7511,7 +7511,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the pvp enabled boolean produced by this operation."
+        "description": "True when player-versus-player combat is enabled."
       },
       {
         "id": "output_flow",
@@ -7520,7 +7520,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Continues execution after this operation completes."
+        "description": "Continues after the selected world operation returns. World-manager failures are reported by its result outputs."
       }
     ],
     "migrationMapping": {

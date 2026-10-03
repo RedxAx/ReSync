@@ -12,11 +12,13 @@ public interface CompiledPlanAuthority {
         try {
             lease.requirePlan(target);
             return lease;
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | Error failure) {
             try {
                 lease.close();
-            } catch (RuntimeException closeFailure) {
-                failure.addSuppressed(closeFailure);
+            } catch (RuntimeException | Error closeFailure) {
+                if (closeFailure != failure) {
+                    failure.addSuppressed(closeFailure);
+                }
             }
             throw failure;
         }

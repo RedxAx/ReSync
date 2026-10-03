@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowExecutorTaskCancellationTest {
     private Plugin plugin;
@@ -29,6 +31,40 @@ class FlowExecutorTaskCancellationTest {
     void tearDown() {
         executor.shutdown();
         MockBukkit.unmock();
+    }
+
+    @Test
+    void replacementSurvivesTheOlderTasksCancellationCallback() {
+        BukkitTask first = Bukkit.getScheduler().runTaskLater(plugin, () -> {}, 100L);
+        BukkitTask second = Bukkit.getScheduler().runTaskLater(plugin, () -> {}, 100L);
+        CompletableFuture<Void> firstCompletion = new CompletableFuture<>();
+        CompletableFuture<Void> secondCompletion = new CompletableFuture<>();
+        executor.registerPendingTask("replacement", "old_graph", first, firstCompletion);
+
+        executor.registerPendingTask("replacement", "new_graph", second, secondCompletion);
+
+        assertTrue(first.isCancelled());
+        assertTrue(firstCompletion.isCancelled());
+        assertFalse(second.isCancelled());
+        assertFalse(secondCompletion.isDone());
+        assertEquals("new_graph", executor.getScheduledTaskSnapshot("replacement").graphId());
+        assertEquals(FlowExecutor.ScheduledTaskState.ACTIVE, executor.getScheduledTaskSnapshot("replacement").state());
+        assertEquals(FlowExecutor.TaskCancellationStatus.CANCELLED, executor.cancelPendingTaskWithStatus("replacement"));
+        assertTrue(secondCompletion.isCancelled());
+    }
+
+    @Test
+    void runningTrackedWorkRemainsPendingUntilItsPhysicalFinish() {
+        BukkitTask scheduled = Bukkit.getScheduler().runTaskLater(plugin, () -> {}, 100L);
+        FlowTask operation = new FlowTask();
+        assertTrue(operation.start());
+        executor.trackTask("running", "graph", scheduled, operation);
+
+        executor.cancelPendingTaskWithStatus("running");
+
+        assertFalse(operation.completion().isDone());
+        operation.finish(null);
+        assertTrue(operation.completion().isCancelled());
     }
 
     @Test

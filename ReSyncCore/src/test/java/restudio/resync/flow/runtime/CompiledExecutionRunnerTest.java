@@ -5,6 +5,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.catalog.CatalogNodeDescriptor;
+import restudio.resync.flow.diagnostic.Diagnostic;
+import restudio.resync.flow.diagnostic.DiagnosticPhase;
+import restudio.resync.flow.diagnostic.DiagnosticSeverity;
 import restudio.resync.flow.graph.CompiledExecutionPlan;
 import restudio.resync.flow.graph.CompiledExecutionRunner;
 import restudio.resync.flow.graph.CompiledExecutionStep;
@@ -106,6 +109,43 @@ class CompiledExecutionRunnerTest {
         assertEquals(3, invocationKeys.size());
         assertFalse(invocationKeys.get(0).equals(invocationKeys.get(1)));
         assertEquals(invocationKeys.get(1), invocationKeys.get(2));
+    }
+
+    @Test
+    void preparedTimeoutBudgetKeepsEquivalentBindingsAndRejectsChangedSemantics() {
+        RuntimeOperationDescriptor initial = operation("resident-timeout", List.of(), RuntimeSemantics.Cancellation.NONE);
+        Map<String, Object> firstSemantics = new LinkedHashMap<>(initial.semantics().canonicalValue());
+        firstSemantics.put("timeoutMillis", 1_000L);
+        RuntimeOperationDescriptor original = new RuntimeOperationDescriptor(initial.capability(), initial.operation(), initial.pins(),
+            RuntimeSemantics.fromCanonical(firstSemantics));
+        RuntimeBinding originalBinding = binding(original, ignored -> CompletableFuture.completedFuture(RuntimeResult.success()));
+        RuntimeBindingRegistry registry = registry(originalBinding);
+        CompiledExecutionRunner runner = new CompiledExecutionRunner(registry, new RuntimeAuthority("test-authority"));
+        CompiledExecutionPlan plan = plan(List.of(step(SOURCE_A, original, Map.of(), Map.of())), List.of(), List.of());
+        CompiledExecutionRunner.ExecutionTemplate prepared = runner.prepare(plan, SOURCE_A);
+
+        assertEquals(RuntimeUnloadResult.Status.REMOVED, registry.unload(PROVIDER).status());
+        registry.activate(new RuntimeProviderDescriptor(PROVIDER, "1.0.0", 0, 0, RuntimeSemantics.UnloadPolicy.DRAIN),
+            List.of(binding(original, ignored -> CompletableFuture.completedFuture(RuntimeResult.success()))));
+        assertEquals(CompiledExecutionRunner.Status.SUCCESS, runner.execute(prepared, Map.of(), new RuntimeCancellationToken(),
+            null, CorrelationId.random(), RuntimeExecutionContext.NO_DEADLINE).toCompletableFuture().join().status());
+
+        assertEquals(RuntimeUnloadResult.Status.REMOVED, registry.unload(PROVIDER).status());
+        Map<String, Object> changedSemantics = new LinkedHashMap<>(original.semantics().canonicalValue());
+        changedSemantics.put("timeoutMillis", 50L);
+        RuntimeOperationDescriptor changed = new RuntimeOperationDescriptor(original.capability(), original.operation(), original.pins(),
+            RuntimeSemantics.fromCanonical(changedSemantics));
+        AtomicBoolean called = new AtomicBoolean();
+        registry.activate(new RuntimeProviderDescriptor(PROVIDER, "1.0.0", 0, 0, RuntimeSemantics.UnloadPolicy.DRAIN),
+            List.of(binding(changed, ignored -> {
+                called.set(true);
+                return CompletableFuture.completedFuture(RuntimeResult.success());
+            })));
+
+        CompletionException failure = assertThrows(CompletionException.class, () -> runner.execute(prepared, Map.of(),
+            new RuntimeCancellationToken(), null, CorrelationId.random(), RuntimeExecutionContext.NO_DEADLINE).toCompletableFuture().join());
+        assertTrue(failure.getCause() instanceof RuntimeCapabilityUnavailableException);
+        assertFalse(called.get());
     }
 
     @Test
@@ -298,6 +338,48 @@ class CompiledExecutionRunnerTest {
             .toCompletableFuture().get(5, TimeUnit.SECONDS).status());
         assertEquals(Map.of(textPin, TypedValue.value(STRING, "Color: red, {literal}")), received.get());
         assertEquals(1L, runner.templatePreparationCount());
+    }
+
+    @Test
+    void connectedJsonReplacesThePreparedEmptyObjectDefault() throws Exception {
+        String json = "{\"outer\":{\"value\":1}}";
+        assertEquals(TypedValue.value(STRING, json), receiveConnectedString("{}", json));
+    }
+
+    @Test
+    void connectedStringsPreserveTemplateCharactersWithoutRenderingAgain() throws Exception {
+        String text = "Hello {name}, {{literal}}, }}";
+        assertEquals(TypedValue.value(STRING, text), receiveConnectedString("Configured {name}, {{escaped}}", text));
+    }
+
+    private TypedValue receiveConnectedString(String configured, String connected) throws Exception {
+        PinId text = PinId.of("text");
+        PinId name = PinId.of("name");
+        RuntimeOperationDescriptor sourceOperation = operation("connected-string-source", List.of(
+            new RuntimeOperationDescriptor.Pin(OUTPUT_A, RuntimeOperationDescriptor.Direction.OUTPUT, STRING)),
+            RuntimeSemantics.Cancellation.NONE);
+        RuntimeOperationDescriptor targetOperation = operation("connected-string-target", List.of(
+            new RuntimeOperationDescriptor.Pin(text, RuntimeOperationDescriptor.Direction.INPUT, STRING)),
+            RuntimeSemantics.Cancellation.NONE);
+        GraphEndpoint target = new GraphEndpoint(DOWNSTREAM, text);
+        GraphConnection connection = new GraphConnection(ConnectionId.interactive(), new GraphEndpoint(SOURCE_A, OUTPUT_A), target);
+        CompiledExecutionPlan plan = plan(List.of(
+            step(SOURCE_A, sourceOperation, Map.of(), outputBindings(OUTPUT_A, target)),
+            step(DOWNSTREAM, targetOperation, Map.of(text, TypedValue.value(STRING, configured),
+                name, TypedValue.value(STRING, "Authored")), Map.of())), List.of(connection), List.of());
+        AtomicReference<TypedValue> received = new AtomicReference<>();
+        CompiledExecutionRunner runner = new CompiledExecutionRunner(registry(
+            binding(sourceOperation, invocation -> CompletableFuture.completedFuture(RuntimeResult.success(
+                Map.of(OUTPUT_A, TypedValue.value(STRING, connected)), null))),
+            binding(targetOperation, invocation -> {
+                received.set(invocation.inputs().get(text));
+                return CompletableFuture.completedFuture(RuntimeResult.success());
+            })), new RuntimeAuthority("test-authority"));
+
+        assertEquals(CompiledExecutionRunner.Status.SUCCESS, runner.execute(runner.prepare(plan, SOURCE_A), Map.of(),
+            new RuntimeCancellationToken(), null, CorrelationId.random(), System.currentTimeMillis() + 60_000L)
+            .toCompletableFuture().get(5, TimeUnit.SECONDS).status());
+        return received.get();
     }
 
     @Test
@@ -708,11 +790,11 @@ class CompiledExecutionRunnerTest {
         return new RuntimeFailure(diagnostic(), false, TypedValue.value(FAILURE, "failed"));
     }
 
-    private static restudio.resync.flow.diagnostic.Diagnostic diagnostic() {
-        return restudio.resync.flow.diagnostic.Diagnostic.builder(
+    private static Diagnostic diagnostic() {
+        return Diagnostic.builder(
                 "RUNTIME.HANDLER_FAILURE",
-                restudio.resync.flow.diagnostic.DiagnosticSeverity.ERROR,
-                restudio.resync.flow.diagnostic.DiagnosticPhase.ENVIRONMENT,
+                DiagnosticSeverity.ERROR,
+                DiagnosticPhase.ENVIRONMENT,
                 "execution")
             .messageKey(ContractRef.of(OWNER, CapabilityId.of("runtime-handler-failure")))
             .message("The handler failed while executing the node.")

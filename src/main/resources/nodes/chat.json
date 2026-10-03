@@ -125,7 +125,7 @@
     },
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the active chat message update."},
-      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Player context used to render the replacement message; blank uses the event player."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Player context used to render the replacement message. Blank input uses the event player."},
       {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "defaultValue": "", "description": "Replacement chat text."}
     ],
     "outputs": [
@@ -245,7 +245,7 @@
     },
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts channel delivery."},
-      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Player who sends the message; blank uses the current flow player."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Player who sends the message. Blank input uses the current flow player."},
       {"id": "channel", "displayName": "Channel", "name": "channel", "dataType": "string", "description": "Configured chat channel identifier."},
       {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "widget": "MULTILINE", "description": "Message text to send through the channel."}
     ],

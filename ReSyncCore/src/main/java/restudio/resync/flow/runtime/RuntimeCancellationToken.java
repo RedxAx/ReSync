@@ -1,21 +1,21 @@
 package restudio.resync.flow.runtime;
 
-import java.util.UUID;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class RuntimeCancellationToken {
-    private static final Executor CALLBACKS = runnable -> {
-        Thread thread = new Thread(runnable, "resync-runtime-cancel-" + UUID.randomUUID());
-        thread.setDaemon(true);
-        thread.start();
-    };
     private final AtomicBoolean cancelled = new AtomicBoolean();
     private final CompletableFuture<Void> cancellation = new CompletableFuture<>();
+    private final CompletableFuture<Void> deadline = new CompletableFuture<>();
+    private final Set<Registration> callbacks = ConcurrentHashMap.newKeySet();
     private final long deadlineMillis;
+    private volatile Registration parentLink;
 
     public RuntimeCancellationToken() {
         this(RuntimeExecutionContext.NO_DEADLINE);
@@ -31,8 +31,11 @@ public final class RuntimeCancellationToken {
             if (deadlineMillis <= now) {
                 cancel();
             } else {
-                CompletableFuture.delayedExecutor(deadlineMillis - now, TimeUnit.MILLISECONDS, CALLBACKS)
-                    .execute(this::cancel);
+                deadline.orTimeout(deadlineMillis - now, TimeUnit.MILLISECONDS).whenComplete((ignored, failure) -> {
+                    if (failure != null) {
+                        cancel();
+                    }
+                });
             }
         }
     }
@@ -57,7 +60,11 @@ public final class RuntimeCancellationToken {
         if (!cancelled.compareAndSet(false, true)) {
             return false;
         }
-        CompletableFuture.runAsync(() -> cancellation.complete(null), CALLBACKS);
+        deadline.complete(null);
+        CompletableFuture.runAsync(() -> {
+            callbacks.forEach(registration -> CompletableFuture.runAsync(registration::fire));
+            cancellation.complete(null);
+        });
         return true;
     }
 
@@ -81,12 +88,48 @@ public final class RuntimeCancellationToken {
 
     RuntimeCancellationToken child(long childDeadlineMillis) {
         RuntimeCancellationToken child = new RuntimeCancellationToken(Math.min(deadlineMillis, childDeadlineMillis));
-        if (isCancelled()) {
-            child.cancel();
-        } else {
-            cancellation.thenRun(child::cancel);
-        }
+        child.parentLink = onCancel(child::cancel);
         return child;
+    }
+
+    public Registration onCancel(Runnable action) {
+        Registration registration = new Registration(Objects.requireNonNull(action, "Cancellation Action Is Required"));
+        callbacks.add(registration);
+        if (isCancelled()) {
+            CompletableFuture.runAsync(registration::fire);
+        }
+        return registration;
+    }
+
+    void finish() {
+        deadline.complete(null);
+        Registration link = parentLink;
+        if (link != null) {
+            link.close();
+            parentLink = null;
+        }
+    }
+
+    public final class Registration implements AutoCloseable {
+        private final AtomicReference<Runnable> action;
+
+        private Registration(Runnable action) {
+            this.action = new AtomicReference<>(action);
+        }
+
+        private void fire() {
+            Runnable callback = action.getAndSet(null);
+            callbacks.remove(this);
+            if (callback != null) {
+                callback.run();
+            }
+        }
+
+        @Override
+        public void close() {
+            action.set(null);
+            callbacks.remove(this);
+        }
     }
 
     public void cancelIfRequested() {

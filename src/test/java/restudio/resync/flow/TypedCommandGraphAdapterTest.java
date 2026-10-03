@@ -15,6 +15,7 @@ import restudio.resync.flow.function.FunctionParameterContract;
 import restudio.resync.flow.function.FunctionRevision;
 import restudio.resync.flow.function.FunctionSignature;
 import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.graph.FunctionBinding;
 import restudio.resync.flow.graph.GraphDocument;
 import restudio.resync.flow.graph.GraphNode;
 import restudio.resync.flow.graph.GraphVariable;
@@ -172,6 +173,45 @@ class TypedCommandGraphAdapterTest {
         assertFalse(graph.getContentProperties().containsKey("future"));
         assertTrue(graph.getOpaqueProperties().isEmpty());
         assertEquals("admin", TypedCommandGraphAdapter.read(graph).command());
+    }
+
+    @Test
+    void typedCommandHeadersRetainPermissionsAliasesAndPathsWithoutProjectingFunctionBindings() {
+        ServerId server = ServerId.deterministic("typed-command-header-test");
+        ServerResourceLocator resource = new ServerResourceLocator(server,
+            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("command")), "admin");
+        ServerResourceLocator child = new ServerResourceLocator(server,
+            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("function")), "child");
+        GraphNode start = new GraphNode(NodeInstanceId.deterministic("typed-command-header-start"), CommandGraphContract.CANONICAL_START, 3, Map.of());
+        FunctionBinding dependency = new FunctionBinding(child, 5L, List.of(), List.of());
+        GraphDocument document = new CommandGraphMetadata("admin", true, List.of("reload <target>")).apply(new GraphDocument(
+            new CatalogVersion(1, 0), resource, 1L, new CatalogBinding(1L, new ContentHash("a".repeat(64)), new ContentHash("b".repeat(64))),
+            Set.of(), List.of(start), List.of(), List.of(), List.of(), List.of(dependency), OpaqueData.of(Map.of(
+                "permission", "resync.admin", "command_aliases", List.of("staff"), "permission_message", "Permission Required",
+                "command_description", "Runs the administration command.", "command_usage", "/admin reload <target>"))));
+
+        TypedCommandGraphAdapter.CommandBinding binding = TypedCommandGraphAdapter.read(document, true);
+
+        assertEquals("admin", binding.command());
+        assertEquals("resync.admin", binding.permission());
+        assertEquals("Permission Required", binding.permissionMessage());
+        assertEquals(List.of("staff"), binding.aliases());
+        assertEquals(List.of(List.of("reload", "<target>")), binding.commandPaths());
+        assertTrue(binding.structured());
+        assertEquals(dependency, document.functions().getFirst());
+        assertThrows(IllegalStateException.class, () -> TypedCommandGraphAdapter.materialize(document, true, "mutation"));
+        TypedCommandGraphAdapter.CommandBinding competing = TypedCommandGraphAdapter.read(graph("other", "staff"));
+        assertTrue(TypedCommandGraphAdapter.indexBindings(List.of(binding, competing), List.of()).activeBindings().isEmpty());
+        assertEquals(2, TypedCommandGraphAdapter.indexBindings(List.of(binding, competing), List.of()).rejections().size());
+        assertFalse(TypedCommandGraphAdapter.read(document, false).enabled());
+        GraphDocument ambiguous = new GraphDocument(document.schemaVersion(), resource, 1L, document.catalogBinding(), Set.of(),
+            document.nodes(), List.of(), List.of(), List.of(), List.of(dependency),
+            document.unknown().with("permissionMessage", "Conflicting Permission Message"));
+        assertThrows(IllegalArgumentException.class, () -> TypedCommandGraphAdapter.read(ambiguous, true));
+        GraphDocument malformed = new GraphDocument(document.schemaVersion(), resource, 1L, document.catalogBinding(), Set.of(),
+            List.of(start, new GraphNode(NodeInstanceId.deterministic("second-command-start"), CommandGraphContract.CANONICAL_START, 2, Map.of())),
+            List.of(), List.of(), List.of(), List.of(dependency), document.unknown());
+        assertThrows(IllegalArgumentException.class, () -> TypedCommandGraphAdapter.read(malformed, true));
     }
 
     @Test

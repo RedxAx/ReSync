@@ -3,6 +3,8 @@ package restudio.resync.velocity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.resync.network.NetworkCredentials;
+import restudio.resync.network.NetworkRoutingStrategy;
+import restudio.resync.network.NetworkRouteSetCodec;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,6 +70,44 @@ class VelocityNetworkConfigLoaderTest {
         assertEquals("lobby-one", config.routes().get("lobby").nodeId());
         assertEquals(25566, config.routes().get("lobby").port());
         assertEquals("lobby", config.maintenanceRoute());
+    }
+
+    @Test
+    void restoresWeightedJoinRulesBeforeAnOperatorConnects() throws Exception {
+        Files.writeString(directory.resolve("network.properties"), """
+            network.enabled=true
+            network.id=network
+            network.node-id=proxy
+            routes=lobby
+            route.lobby.node-id=lobby-node
+            route.lobby.address=127.0.0.1
+            route.lobby.port=40001
+            maintenance-route=lobby
+            routing.groups=play,fallback
+            routing.group.play.name=Play
+            routing.group.play.strategy=WEIGHTED
+            routing.group.play.nodes=lobby-node
+            routing.group.play.weights=lobby-node
+            routing.group.play.weight.lobby-node=3
+            routing.group.play.fallback=fallback
+            routing.group.play.forced-hosts=play.example.com
+            routing.group.play.permission=network.play
+            routing.group.fallback.nodes=lobby-node
+            """);
+
+        VelocityNetworkConfig first = VelocityNetworkConfigLoader.load(directory);
+        VelocityNetworkConfig restarted = VelocityNetworkConfigLoader.load(directory);
+
+        assertEquals(first.routeSet(), restarted.routeSet());
+        assertEquals(2, restarted.routingGroups().size());
+        assertEquals(NetworkRoutingStrategy.WEIGHTED, restarted.routingGroups().getFirst().strategy());
+        assertEquals(3, restarted.routingGroups().getFirst().weights().get("lobby-node"));
+        assertEquals("fallback", restarted.routingGroups().getFirst().fallbackGroupId());
+        assertEquals("network.play", restarted.routingGroups().getFirst().permission());
+        assertTrue(restarted.routingGroups().getFirst().forcedHosts().contains("play.example.com"));
+        assertEquals(restarted.routeSet(), NetworkRouteSetCodec.decode(NetworkRouteSetCodec.encode(restarted.routeSet())));
+        Files.writeString(directory.resolve("network.properties"), Files.readString(directory.resolve("network.properties")).replace("routing.group.play.fallback=fallback", "routing.group.play.fallback=missing"));
+        assertThrows(IllegalArgumentException.class, () -> VelocityNetworkConfigLoader.load(directory));
     }
 
     @Test

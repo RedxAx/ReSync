@@ -493,9 +493,8 @@ public class EntityActionHandler implements NodeHandler {
             if (!success) throw new IllegalArgumentException("Entity state property or action is unsupported for " + entity.getType() + ": " + property + "." + action);
 
             ctx.setOutput(node, "success", success);
-            ctx.setOutput(node, "result", result);
-            if ("get".equalsIgnoreCase(action) && result != null && property != null && !property.isBlank()) {
-                ctx.setOutput(node, property, result);
+            if ("get".equalsIgnoreCase(action)) {
+                ctx.setOutput(node, property.toLowerCase(Locale.ROOT), result);
             }
         });
 
@@ -638,14 +637,14 @@ public class EntityActionHandler implements NodeHandler {
             Double radius = ctx.getInputValue(node, "radius", Double.class, 10.0);
             requireRadius(radius);
             String typeFilter = ctx.getInputValue(node, "entity_type", String.class, null);
-            List<Entity> mobs = new ArrayList<>();
+            List<LivingEntity> mobs = new ArrayList<>();
             EntityType filterType = typeFilter != null && !typeFilter.isBlank() ? entityType(typeFilter) : null;
             for (Entity entity : center.getWorld().getNearbyEntities(center, radius, radius, radius)) {
-                if (entity instanceof Player) {
+                if (!(entity instanceof LivingEntity living) || entity instanceof Player) {
                     continue;
                 }
                 if (filterType == null || entity.getType() == filterType) {
-                    mobs.add(entity);
+                    mobs.add(living);
                 }
             }
             ctx.setOutput(node, "mobs", mobs);

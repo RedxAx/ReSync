@@ -11,6 +11,7 @@ import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.flow.identity.FunctionParameterId;
 import restudio.resync.flow.registry.NodeDefinition;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -147,8 +148,8 @@ public class FunctionHandler implements NodeHandler {
             }
             Object value = ctx.getInputValue(node, "value", Object.class, null);
             boolean returned = ctx.getRuntime().getCallDepth() > 0 && (parameterId != null
-                ? ctx.getRuntime().returnFromFunctionById(Map.of(parameterId, value))
-                : ctx.getRuntime().returnFromFunction(Map.of(name.trim(), value)));
+                ? ctx.getRuntime().returnFromFunctionById(Collections.singletonMap(parameterId, value))
+                : ctx.getRuntime().returnFromFunction(Collections.singletonMap(name.trim(), value)));
             if (!returned) {
                 ctx.triggerOutput("flow");
             }

@@ -7,6 +7,11 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -15,21 +20,35 @@ import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Flow;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 
 public class HttpHandler implements NodeHandler {
     private static final Gson GSON = new Gson();
     private static final int DEFAULT_TIMEOUT_MS = 10000;
+    private static final int MAX_BODY_BYTES = 4 * 1024 * 1024;
     private static final Set<String> SUPPORTED_METHODS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");
 
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
+    private final Semaphore requests = new Semaphore(16);
     private volatile int legacyTimeoutMs = DEFAULT_TIMEOUT_MS;
+    private HttpClient client;
+    private boolean stopped;
 
     public HttpHandler() {
         operations.put("http_get", (ctx, node) -> executeRequest(ctx, node, "GET", null, null, false));
@@ -105,13 +124,10 @@ public class HttpHandler implements NodeHandler {
             String query = ctx.getInputValue(node, "query", String.class, "");
             String builtUrl = baseUrl;
             if (!path.isEmpty()) {
-                if (!builtUrl.endsWith("/") && !path.startsWith("/")) {
-                    builtUrl += "/";
-                }
-                builtUrl += path;
+                builtUrl = appendPath(builtUrl, path);
             }
             if (!query.isEmpty()) {
-                builtUrl += (builtUrl.contains("?") ? "&" : "?") + query;
+                builtUrl = appendQuery(builtUrl, query);
             }
             ctx.setOutput(node, "url", builtUrl);
             ctx.triggerOutput("flow");
@@ -173,7 +189,7 @@ public class HttpHandler implements NodeHandler {
         ctx.runAsync(() -> {
             FlowOperationResult<Map<String, Object>> result;
             Map<String, Object> response = Map.of();
-            String normalizedMethod = method != null ? method.toUpperCase() : "";
+            String normalizedMethod = method != null ? method.toUpperCase(Locale.ROOT) : "";
             String finalUrl = url != null ? url : "";
             try {
                 normalizedMethod = validateMethod(method);
@@ -185,6 +201,9 @@ public class HttpHandler implements NodeHandler {
                     : FlowOperationResult.failure("HTTP_STATUS_ERROR", "HTTP request returned status " + status,
                         Map.of("method", normalizedMethod, "url", finalUrl, "status", status));
             } catch (Exception exception) {
+                if (exception instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
                 String error = message(exception, "HTTP request failed");
                 response = createErrorResponse(error);
                 result = FlowOperationResult.failure(httpErrorCode(exception), error, Map.of("method", normalizedMethod, "url", finalUrl));
@@ -205,26 +224,46 @@ public class HttpHandler implements NodeHandler {
         }
 
         URI uri = validateUri(url);
-        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(timeoutMs)).build();
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(uri).timeout(Duration.ofMillis(timeoutMs));
-
-        if (headers != null) {
-            for (Map.Entry<String, Object> entry : headers.entrySet()) {
-                if (entry.getValue() != null) {
-                    requestBuilder.header(entry.getKey(), entry.getValue().toString());
+        if (!requests.tryAcquire()) {
+            throw new IOException("HTTP request limit reached; retry after a running request finishes");
+        }
+        HttpResponse<String> response;
+        try {
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(uri).timeout(Duration.ofMillis(timeoutMs));
+            if (headers != null) {
+                for (Map.Entry<String, Object> entry : headers.entrySet()) {
+                    if (entry.getValue() != null) {
+                        requestBuilder.header(entry.getKey(), entry.getValue().toString());
+                    }
                 }
             }
+            if (!"GET".equalsIgnoreCase(method) && !"DELETE".equalsIgnoreCase(method) && body != null) {
+                byte[] jsonBody = boundedBody(body);
+                if (headers == null || headers.keySet().stream().noneMatch(key -> "Content-Type".equalsIgnoreCase(key))) {
+                    requestBuilder.header("Content-Type", "application/json");
+                }
+                requestBuilder.method(method.toUpperCase(Locale.ROOT), HttpRequest.BodyPublishers.ofByteArray(jsonBody));
+            } else {
+                requestBuilder.method(method.toUpperCase(Locale.ROOT), HttpRequest.BodyPublishers.noBody());
+            }
+            HttpClient current = client();
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+            AtomicReference<LimitedBody> receiving = new AtomicReference<>();
+            try {
+                response = current.send(requestBuilder.build(), info -> {
+                    LimitedBody bodyReader = new LimitedBody(HttpResponse.BodyHandlers.ofString().apply(info), deadline);
+                    receiving.set(bodyReader);
+                    return bodyReader;
+                });
+            } catch (IOException failure) {
+                LimitedBody bodyReader = receiving.get();
+                IOException limitFailure = bodyReader != null ? bodyReader.limitFailure() : null;
+                if (limitFailure != null) throw limitFailure;
+                throw failure;
+            }
+        } finally {
+            requests.release();
         }
-
-        if (!"GET".equalsIgnoreCase(method) && !"DELETE".equalsIgnoreCase(method) && body != null) {
-            String jsonBody = GSON.toJson(body);
-            requestBuilder.header("Content-Type", "application/json");
-            requestBuilder.method(method.toUpperCase(), HttpRequest.BodyPublishers.ofString(jsonBody));
-        } else {
-            requestBuilder.method(method.toUpperCase(), HttpRequest.BodyPublishers.noBody());
-        }
-
-        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         Map<String, Object> responseMap = new HashMap<>();
         responseMap.put("status_code", response.statusCode());
         responseMap.put("body", response.body());
@@ -259,7 +298,7 @@ public class HttpHandler implements NodeHandler {
     }
 
     String validateMethod(String method) {
-        String normalized = method != null ? method.trim().toUpperCase() : "";
+        String normalized = method != null ? method.trim().toUpperCase(Locale.ROOT) : "";
         if (!SUPPORTED_METHODS.contains(normalized)) {
             throw new IllegalArgumentException("HTTP method must be GET, POST, PUT, PATCH, or DELETE");
         }
@@ -285,7 +324,174 @@ public class HttpHandler implements NodeHandler {
         if (query.isEmpty()) {
             return url;
         }
-        return url.contains("?") ? url + "&" + query : url + "?" + query;
+        return appendQuery(url, query);
+    }
+
+    private String appendPath(String url, String path) {
+        int query = url.indexOf('?');
+        int fragment = url.indexOf('#');
+        int split = query < 0 ? fragment : fragment < 0 ? query : Math.min(query, fragment);
+        String base = split < 0 ? url : url.substring(0, split);
+        String suffix = split < 0 ? "" : url.substring(split);
+        if (base.endsWith("/") && path.startsWith("/")) {
+            path = path.substring(1);
+        } else if (!base.endsWith("/") && !path.startsWith("/")) {
+            base += "/";
+        }
+        return base + path + suffix;
+    }
+
+    private byte[] boundedBody(Map<String, Object> body) throws IOException {
+        LimitedOutput output = new LimitedOutput();
+        try (Writer writer = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
+            GSON.toJson(body, writer);
+        }
+        return output.bytes.toByteArray();
+    }
+
+    private String appendQuery(String url, String query) {
+        int fragment = url.indexOf('#');
+        String base = fragment < 0 ? url : url.substring(0, fragment);
+        String suffix = fragment < 0 ? "" : url.substring(fragment);
+        String separator = base.endsWith("?") || base.endsWith("&") ? "" : base.contains("?") ? "&" : "?";
+        return base + separator + query + suffix;
+    }
+
+    private synchronized HttpClient client() {
+        if (stopped) {
+            throw new IllegalStateException("HTTP handler is shut down");
+        }
+        if (client == null) {
+            client = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(DEFAULT_TIMEOUT_MS)).build();
+        }
+        return client;
+    }
+
+    @Override
+    public synchronized void shutdown() {
+        stopped = true;
+        if (client != null) {
+            client.shutdownNow();
+            client = null;
+        }
+    }
+
+    private static final class BodyLimitException extends IOException {
+        private BodyLimitException() {
+            super("HTTP response body exceeds 4 MiB");
+        }
+    }
+
+    private static final class RequestLimitException extends IOException {
+        private RequestLimitException() {
+            super("HTTP request body exceeds 4 MiB");
+        }
+    }
+
+    private static final class LimitedOutput extends OutputStream {
+        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+
+        @Override
+        public void write(int value) throws IOException {
+            if (bytes.size() == MAX_BODY_BYTES) {
+                throw new RequestLimitException();
+            }
+            bytes.write(value);
+        }
+
+        @Override
+        public void write(byte[] source, int offset, int length) throws IOException {
+            if (length > MAX_BODY_BYTES - bytes.size()) {
+                throw new RequestLimitException();
+            }
+            bytes.write(source, offset, length);
+        }
+    }
+
+    private static final class LimitedBody implements HttpResponse.BodySubscriber<String> {
+        private final HttpResponse.BodySubscriber<String> delegate;
+        private final CompletableFuture<String> body = new CompletableFuture<>();
+        private final CompletableFuture<Void> alarm = new CompletableFuture<>();
+        private Flow.Subscription subscription;
+        private long received;
+        private boolean finished;
+        private IOException limitFailure;
+
+        private LimitedBody(HttpResponse.BodySubscriber<String> delegate, long deadline) {
+            this.delegate = delegate;
+            delegate.getBody().whenComplete((value, failure) -> {
+                if (failure == null) body.complete(value);
+                else body.completeExceptionally(failure);
+                alarm.complete(null);
+            });
+            alarm.orTimeout(Math.max(0L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS).whenComplete((unused, failure) -> {
+                if (failure != null) {
+                    fail(new HttpTimeoutException("HTTP response body timed out"));
+                }
+            });
+        }
+
+        @Override
+        public CompletionStage<String> getBody() {
+            return body;
+        }
+
+        @Override
+        public synchronized void onSubscribe(Flow.Subscription subscription) {
+            if (finished) {
+                subscription.cancel();
+                return;
+            }
+            this.subscription = subscription;
+            delegate.onSubscribe(subscription);
+        }
+
+        @Override
+        public synchronized void onNext(List<ByteBuffer> buffers) {
+            if (finished) {
+                return;
+            }
+            for (ByteBuffer buffer : buffers) {
+                received += buffer.remaining();
+                if (received > MAX_BODY_BYTES) {
+                    fail(new BodyLimitException());
+                    return;
+                }
+            }
+            delegate.onNext(buffers);
+        }
+
+        private synchronized void fail(Throwable failure) {
+            if (finished) {
+                return;
+            }
+            finished = true;
+            if (failure instanceof HttpTimeoutException timeout) limitFailure = timeout;
+            else if (failure instanceof BodyLimitException limit) limitFailure = limit;
+            body.completeExceptionally(failure);
+            try {
+                delegate.onError(failure);
+            } finally {
+                if (subscription != null) subscription.cancel();
+            }
+        }
+
+        private synchronized IOException limitFailure() {
+            return limitFailure;
+        }
+
+        @Override
+        public void onError(Throwable failure) {
+            fail(failure);
+        }
+
+        @Override
+        public synchronized void onComplete() {
+            if (!finished) {
+                finished = true;
+                delegate.onComplete();
+            }
+        }
     }
 
     private String buildQueryStringFromParams(Map<String, Object> params) {
@@ -329,7 +535,27 @@ public class HttpHandler implements NodeHandler {
     }
 
     private String httpErrorCode(Exception exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof BodyLimitException) {
+                return "HTTP_RESPONSE_TOO_LARGE";
+            }
+            if (cause instanceof RequestLimitException) {
+                return "HTTP_REQUEST_TOO_LARGE";
+            }
+            if (cause instanceof HttpTimeoutException) {
+                return "HTTP_TIMEOUT";
+            }
+        }
+        if (exception instanceof InterruptedException) {
+            return "HTTP_REQUEST_CANCELLED";
+        }
         String error = message(exception, "");
+        if (error.startsWith("HTTP request body")) {
+            return "HTTP_REQUEST_TOO_LARGE";
+        }
+        if (error.startsWith("HTTP request limit")) {
+            return "HTTP_BUSY";
+        }
         if (error.startsWith("HTTP URL")) {
             return "HTTP_URL_INVALID";
         }

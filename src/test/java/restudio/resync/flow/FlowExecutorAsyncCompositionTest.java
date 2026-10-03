@@ -40,6 +40,55 @@ class FlowExecutorAsyncCompositionTest {
     }
 
     @Test
+    void explicitOutputStillRetainsItsPhysicalAsyncWorkAndFailure() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        AtomicBoolean targetRan = new AtomicBoolean();
+        HandlerRegistry handlers = new HandlerRegistry();
+        handlers.register("source", (context, node) -> {
+            context.getAsyncOperations().put("physical", gate);
+            context.triggerOutput("flow");
+        });
+        handlers.register("target", (context, node) -> targetRan.set(true));
+        FlowGraph graph = new FlowGraph();
+        graph.getNodes().put("source", new FlowNode("source", 0, 0, Map.of()));
+        graph.getNodes().put("target", new FlowNode("target", 200, 0, Map.of()));
+        graph.getConnections().add(new FlowConnection("source", "flow", "target", "flow"));
+        FlowExecutor executor = new FlowExecutor(handlers, new TypeAdapterRegistry(), Map.of());
+
+        CompletableFuture<Void> execution = executor.execute(graph, "source", null, null, Map.of());
+        assertTrue(targetRan.get());
+        assertFalse(execution.isDone());
+
+        gate.completeExceptionally(new FlowHandlerException("PHYSICAL_FAILED", "Async work failed", "Retry the operation"));
+        CompletionException thrown = assertThrows(CompletionException.class, execution::join);
+        FlowExecutor.FlowExecutionException failure = assertInstanceOf(FlowExecutor.FlowExecutionException.class, thrown.getCause());
+        assertEquals("PHYSICAL_FAILED", failure.getCode());
+        assertEquals("source", failure.getNodeId());
+        executor.shutdown();
+    }
+
+    @Test
+    void synchronousHandlerFailureAwaitsStartedWorkAndKeepsItsCause() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        HandlerRegistry handlers = new HandlerRegistry();
+        handlers.register("source", (context, node) -> {
+            context.getAsyncOperations().put("physical", gate);
+            throw new FlowHandlerException("SOURCE_FAILED", "Handler failed", "Retry the node");
+        });
+        FlowGraph graph = new FlowGraph();
+        graph.getNodes().put("source", new FlowNode("source", 0, 0, Map.of()));
+        FlowExecutor executor = new FlowExecutor(handlers, new TypeAdapterRegistry(), Map.of());
+
+        CompletableFuture<Void> execution = executor.execute(graph, "source", null, null, Map.of());
+        assertFalse(execution.isDone());
+        gate.completeExceptionally(new IllegalStateException("Later async failure"));
+        CompletionException thrown = assertThrows(CompletionException.class, execution::join);
+        FlowExecutor.FlowExecutionException failure = assertInstanceOf(FlowExecutor.FlowExecutionException.class, thrown.getCause());
+        assertEquals("SOURCE_FAILED", failure.getCode());
+        executor.shutdown();
+    }
+
+    @Test
     void consumerAwaitsAsynchronousDataDependency() {
         CompletableFuture<Void> gate = new CompletableFuture<>();
         AtomicReference<String> observed = new AtomicReference<>();

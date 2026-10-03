@@ -130,7 +130,7 @@
       {"id": "flow", "displayName": "Flow", "name": "flow", "direction": "input", "pinType": "FLOW", "dataType": "execution", "description": "Starts the loop when execution reaches this node."},
       {"id": "condition", "displayName": "Condition", "name": "condition", "direction": "input", "dataType": "boolean", "defaultValue": true, "description": "Keeps the loop running while this value is true."},
       {"id": "interval_ticks", "displayName": "Interval Ticks", "name": "interval_ticks", "direction": "input", "dataType": "number", "defaultValue": 1, "constraints": {"min": 1}, "description": "Waits this many server ticks between loop iterations."},
-      {"id": "max_iterations", "displayName": "Max Iterations", "name": "max_iterations", "direction": "input", "dataType": "number", "defaultValue": 0, "constraints": {"min": 0}, "description": "Stops after this many iterations; zero means no configured limit."}
+      {"id": "max_iterations", "displayName": "Max Iterations", "name": "max_iterations", "direction": "input", "dataType": "number", "defaultValue": 0, "constraints": {"min": 0}, "description": "Stops after this many iterations. Zero means no configured limit."}
     ],
     "outputs": [
       {"id": "loop", "displayName": "Loop", "name": "loop", "direction": "output", "pinType": "FLOW", "dataType": "execution", "description": "Runs the loop body for the current iteration."},
@@ -415,7 +415,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "direction": "input", "pinType": "FLOW", "dataType": "execution", "description": "Starts the nearby entity loop when execution reaches this node."},
       {"id": "radius", "displayName": "Radius", "name": "radius", "direction": "input", "dataType": "number", "defaultValue": 10, "constraints": {"min": 0, "max": 128}, "description": "Sets the horizontal and vertical search radius around the center."},
-      {"id": "center", "displayName": "Center", "name": "center", "direction": "input", "dataType": "location", "description": "Sets the location used to find nearby entities; the triggering player location is used when omitted."}
+      {"id": "center", "displayName": "Center", "name": "center", "direction": "input", "dataType": "location", "description": "Sets the location used to find nearby entities. The triggering player location is used when omitted."}
     ],
     "outputs": [
       {"id": "loop", "displayName": "Loop", "name": "loop", "direction": "output", "pinType": "FLOW", "dataType": "execution", "description": "Runs the loop body for the current entity."},

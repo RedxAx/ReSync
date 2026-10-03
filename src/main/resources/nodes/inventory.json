@@ -1076,7 +1076,7 @@
         "name": "contents",
         "pinType": "DATA",
         "dataType": "list<itemstack>",
-        "description": "Replacement item slots; they must fit in the inventory.",
+        "description": "Replacement item slots. They must fit in the inventory.",
         "direction": "input"
       }
     ],
@@ -1372,7 +1372,7 @@
         "pinType": "DATA",
         "dataType": "itemstack",
         "optional": true,
-        "description": "Item to place; null clears the slot.",
+        "description": "Item to place. Null clears the slot.",
         "direction": "input"
       }
     ],
@@ -1950,7 +1950,7 @@
         "pinType": "DATA",
         "dataType": "inventory",
         "optional": true,
-        "description": "Inventory to sort; the player inventory is used when omitted.",
+        "description": "Inventory to sort. The player inventory is used when omitted.",
         "direction": "input"
       }
     ],
@@ -2030,7 +2030,7 @@
         "pinType": "DATA",
         "dataType": "inventory",
         "optional": true,
-        "description": "Inventory to clear; the player inventory is used when omitted.",
+        "description": "Inventory to clear. The player inventory is used when omitted.",
         "direction": "input"
       }
     ],
@@ -2111,7 +2111,7 @@
         "pinType": "DATA",
         "dataType": "inventory",
         "optional": true,
-        "description": "Inventory to change; the player inventory is used when omitted.",
+        "description": "Inventory to change. The player inventory is used when omitted.",
         "direction": "input"
       },
       {
@@ -2226,7 +2226,7 @@
         "pinType": "DATA",
         "dataType": "inventory",
         "optional": true,
-        "description": "Inventory to change; the player inventory is used when omitted.",
+        "description": "Inventory to change. The player inventory is used when omitted.",
         "direction": "input"
       },
       {
@@ -2321,7 +2321,7 @@
         "pinType": "DATA",
         "dataType": "inventory",
         "optional": true,
-        "description": "Inventory to change; the player inventory is used when omitted.",
+        "description": "Inventory to change. The player inventory is used when omitted.",
         "direction": "input"
       },
       {
@@ -2894,7 +2894,7 @@
         "constraints": {
           "min": 1
         },
-        "description": "Positive maximum damage; omitted uses the material default.",
+        "description": "Positive maximum damage. Omitted input uses the material default.",
         "direction": "input"
       }
     ],
@@ -3112,7 +3112,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "",
-        "description": "New display name; empty clears it.",
+        "description": "New display name. An empty name clears it.",
         "direction": "input"
       }
     ],
@@ -4566,7 +4566,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "",
-        "description": "Pages separated by a line containing ---; at most 100 pages are accepted.",
+        "description": "Pages separated by a line containing ---. At most 100 pages are accepted.",
         "direction": "input"
       }
     ],

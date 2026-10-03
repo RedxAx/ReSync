@@ -4,9 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
-import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.google.gson.TypeAdapter;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.stream.JsonReader;
@@ -22,10 +23,10 @@ import restudio.resync.flow.identity.PinId;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -67,7 +68,7 @@ public class NodeDefinitionLoader {
         }
 
         public byte[] rawBytes() {
-            return bytes;
+            return bytes.clone();
         }
 
         @Override
@@ -307,7 +308,6 @@ public class NodeDefinitionLoader {
                 present.add(sourceFile);
             }
         }
-        present.parallelStream().forEach(sourceFile -> CatalogSourceIndex.sourceHash(sourceFile.rawBytes()));
         for (SourceFile sourceFile : present) {
             try {
                 results.addAll(parse(sourceFile.rawBytes(), sourceFile.sourceUri(), selectedSource));
@@ -374,13 +374,15 @@ public class NodeDefinitionLoader {
             return results;
         }
         JsonElement root;
+        ContentHash sourceHash;
         try {
-            root = JsonParser.parseString(new String(sourceBytes, StandardCharsets.UTF_8));
+            CatalogSourceIndex.Entry indexed = CatalogSourceIndex.intern(sourceBytes);
+            root = jsonElement(indexed.parsed());
+            sourceHash = indexed.sourceHash();
         } catch (RuntimeException exception) {
             addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "FILE_PARSE_FAILED", source, -1, "", exception.getMessage());
             return results;
         }
-        ContentHash sourceHash = CatalogSourceIndex.sourceHash(sourceBytes);
 
         if (root.isJsonArray()) {
             for (int index = 0; index < root.getAsJsonArray().size(); index++) {
@@ -393,6 +395,47 @@ public class NodeDefinitionLoader {
         }
 
         return results;
+    }
+
+    private static JsonElement jsonElement(Object value) {
+        if (value == null) {
+            return JsonNull.INSTANCE;
+        }
+        if (value instanceof Map<?, ?> map) {
+            JsonObject object = new JsonObject();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                object.add((String) entry.getKey(), jsonElement(entry.getValue()));
+            }
+            return object;
+        }
+        if (value instanceof List<?> list) {
+            JsonArray array = new JsonArray(list.size());
+            for (Object element : list) {
+                array.add(jsonElement(element));
+            }
+            return array;
+        }
+        if (value instanceof BigDecimal decimal) {
+            return new JsonPrimitive(new PlainDecimal(decimal));
+        }
+        if (value instanceof Number number) {
+            return new JsonPrimitive(number);
+        }
+        if (value instanceof Boolean flag) {
+            return new JsonPrimitive(flag);
+        }
+        return new JsonPrimitive((String) value);
+    }
+
+    private static final class PlainDecimal extends BigDecimal {
+        private PlainDecimal(BigDecimal value) {
+            super(value.unscaledValue(), value.scale());
+        }
+
+        @Override
+        public String toString() {
+            return toPlainString();
+        }
     }
 
     private void parseElement(JsonElement element, String source, int index, CatalogSource sourceKind, ContentHash sourceHash, List<NodeDefinition> results) {

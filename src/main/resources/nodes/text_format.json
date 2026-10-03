@@ -28,7 +28,7 @@
       ]
     },
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to color; missing input uses empty text."},
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to color. Missing input uses empty text."},
       {"id": "color", "displayName": "Color", "name": "color", "dataType": "string", "widget": "DROPDOWN", "options": ["black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"], "defaultValue": "white", "direction": "input", "description": "Chooses the named or legacy numeric color to apply."}
     ],
     "outputs": [
@@ -55,7 +55,7 @@
     "handlerConfig": {"operation": "format_bold"},
     "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to make bold; missing input uses empty text."}
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to make bold. Missing input uses empty text."}
     ],
     "outputs": [
       {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with bold styling enabled."}
@@ -81,7 +81,7 @@
     "handlerConfig": {"operation": "format_italic"},
     "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to italicize; missing input uses empty text."}
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to italicize. Missing input uses empty text."}
     ],
     "outputs": [
       {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with italic styling enabled."}
@@ -107,7 +107,7 @@
     "handlerConfig": {"operation": "format_underline"},
     "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to underline; missing input uses empty text."}
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to underline. Missing input uses empty text."}
     ],
     "outputs": [
       {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with underlined styling enabled."}
@@ -133,7 +133,7 @@
     "handlerConfig": {"operation": "format_strikethrough"},
     "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to strike through; missing input uses empty text."}
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to strike through. Missing input uses empty text."}
     ],
     "outputs": [
       {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with strikethrough styling enabled."}
@@ -238,7 +238,7 @@
     "handlerConfig": {"operation": "obfuscated"},
     "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to obfuscate; missing input uses empty text."}
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to obfuscate. Missing input uses empty text."}
     ],
     "outputs": [
       {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with obfuscated styling enabled."}

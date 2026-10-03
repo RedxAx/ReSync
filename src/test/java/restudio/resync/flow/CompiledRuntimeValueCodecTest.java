@@ -18,7 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowItem;
+import restudio.flow.data.FlowNpcHandle;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowOperationResult;
 import restudio.flow.data.FlowTypeRef;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.family.JsonFamilyHandler;
@@ -272,6 +274,61 @@ class CompiledRuntimeValueCodecTest {
         assertFalse(world.isChunkLoaded(unloaded >> 4, unloaded >> 4));
         Location invalid = new Location(world, Double.NaN, 1, 2);
         assertThrows(IllegalArgumentException.class, () -> encode("location", invalid));
+    }
+
+    @Test
+    void npcHandleSnapshotsPreserveEntityAndPacketIdentityAcrossCanonicalResults() {
+        Entity entity = world.spawnEntity(new Location(world, 5.5, 65, -3.25, 90, -15), EntityType.VILLAGER);
+        FlowNpcHandle entityHandle = npcHandle(entity.getUniqueId().toString(), false, true);
+        FlowNpcHandle packetHandle = npcHandle("", true, true);
+        for (FlowNpcHandle handle : List.of(entityHandle, packetHandle)) {
+            TypedValue encoded = encode("npc_handle", handle);
+            TypedValue restored = RuntimeResult.fromCanonical(RuntimeResult.success(encoded).canonicalJson()).value();
+            assertEquals(handle, decode(restored));
+            Map<?, ?> snapshot = assertInstanceOf(Map.class, restored.value());
+            assertEquals(SERVER.canonicalText(), snapshot.get("serverId"));
+            assertEquals(world.getUID().toString(), snapshot.get("worldId"));
+            TypedValue portable = encode("any", handle);
+            assertInstanceOf(Map.class, decode(portable));
+            assertEquals(handle, decode(encode("npc_handle", decode(portable))));
+            assertEquals(handle, decode(encode("npc_handle", decode(encode("any", encoded)))));
+        }
+        TypeExpr list = TypeExpr.list(type("npc_handle"));
+        TypedValue handles = CompiledRuntimeValueCodec.encode(SERVER, list, List.of(entityHandle, packetHandle));
+        assertEquals(List.of(entityHandle, packetHandle), decode(RuntimeResult.fromCanonical(RuntimeResult.success(handles).canonicalJson()).value()));
+        TypeExpr result = TypeExpr.result(type("npc_handle"), type("any"));
+        TypedValue operation = CompiledRuntimeValueCodec.encode(SERVER, result, FlowOperationResult.success(packetHandle));
+        TypedValue restored = RuntimeResult.fromCanonical(RuntimeResult.success(operation).canonicalJson()).value();
+        assertEquals(packetHandle, ((Map<?, ?>) decode(restored)).get("value"));
+        assertNull(decode(encode("npc_handle", null)));
+    }
+
+    @Test
+    void npcHandlesRejectForgedFieldsNonFiniteCoordinatesAndForeignWorlds() {
+        Entity entity = world.spawnEntity(new Location(world, 5, 65, -3), EntityType.VILLAGER);
+        TypedValue handle = encode("npc_handle", npcHandle(entity.getUniqueId().toString(), false, true));
+        assertThrows(IllegalArgumentException.class, () -> CompiledRuntimeValueCodec.decode(FOREIGN, handle));
+        assertThrows(IllegalArgumentException.class, () -> CompiledRuntimeValueCodec.encode(null, type("npc_handle"), npcHandle("", true, true)));
+        for (Map.Entry<String, Object> invalid : Map.<String, Object>of("packetBacked", "false", "active", 1,
+                "entityUuid", "1-1-1-1-1", "definitionId", "", "kind", "entity", "x", Double.NaN,
+                "yaw", new BigDecimal("1E100"), "worldId", UUID.randomUUID().toString(), "extra", true).entrySet()) {
+            assertThrows(IllegalArgumentException.class, () -> decode(changed(handle, invalid.getKey(), invalid.getValue())), invalid.getKey());
+        }
+        assertThrows(IllegalArgumentException.class, () -> decode(changed(handle, "entityUuid", "")));
+        TypedValue packet = encode("npc_handle", npcHandle("", true, true));
+        assertThrows(IllegalArgumentException.class, () -> decode(changed(packet, "entityUuid", entity.getUniqueId().toString())));
+        assertThrows(IllegalArgumentException.class, () -> encode("npc_handle",
+            new FlowNpcHandle("qa_npc", "", true, true, world.getName(), Double.POSITIVE_INFINITY, 65, 0, 0, 0)));
+        World other = MockBukkit.getMock().addSimpleWorld("npc-other");
+        entity.teleport(new Location(other, 5, 65, -3));
+        assertThrows(IllegalArgumentException.class, () -> decode(handle));
+        entity.remove();
+        FlowNpcHandle inactive = npcHandle(entity.getUniqueId().toString(), false, false);
+        assertEquals(inactive, decode(encode("npc_handle", inactive)));
+    }
+
+    private FlowNpcHandle npcHandle(String entityId, boolean packet, boolean active) {
+        return new FlowNpcHandle("qa_npc", entityId, packet, active, world.getName(), 5.5, 65, -3.25, 90, -15);
     }
 
     @Test

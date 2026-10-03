@@ -39,6 +39,7 @@ import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
+import restudio.resync.modules.AdvancementModule;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -580,19 +581,31 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             boolean hasAdvancement = false;
             NamespacedKey namespacedKey = NamespacedKey.fromString(key.toLowerCase(Locale.ROOT));
             if (namespacedKey == null) throw new IllegalArgumentException("Invalid advancement key: " + key);
-            Advancement advancement = Bukkit.getAdvancement(namespacedKey);
+            Advancement advancement = callSync(() -> {
+                requireAdvancementCurrent(namespacedKey);
+                return Bukkit.getAdvancement(namespacedKey);
+            });
             if (advancement == null) throw new IllegalArgumentException("Unknown advancement: " + key);
             switch (mode.toLowerCase(Locale.ROOT)) {
                             case "grant" -> {
-                                runPlayerMutation(target, "flow-player-advancement-grant", () -> target.getAdvancementProgress(advancement).awardCriteria(criterion));
+                                runPlayerMutation(target, "flow-player-advancement-grant", () -> {
+                                    requireAdvancementCurrent(namespacedKey);
+                                    target.getAdvancementProgress(advancement).awardCriteria(criterion);
+                                });
                                 success = true;
                             }
                             case "revoke" -> {
-                                runPlayerMutation(target, "flow-player-advancement-revoke", () -> target.getAdvancementProgress(advancement).revokeCriteria(criterion));
+                                runPlayerMutation(target, "flow-player-advancement-revoke", () -> {
+                                    requireAdvancementCurrent(namespacedKey);
+                                    target.getAdvancementProgress(advancement).revokeCriteria(criterion);
+                                });
                                 success = true;
                             }
                             case "has" -> {
-                                hasAdvancement = callSync(() -> target.getAdvancementProgress(advancement).getAwardedCriteria().contains(criterion));
+                                hasAdvancement = callSync(() -> {
+                                    requireAdvancementCurrent(namespacedKey);
+                                    return target.getAdvancementProgress(advancement).getAwardedCriteria().contains(criterion);
+                                });
                                 success = true;
                             }
                             default -> throw new IllegalArgumentException("Unknown player advancement mode: " + mode);
@@ -999,6 +1012,17 @@ public class PlayerActionHandler implements NodeHandler, Listener {
         }
         op.accept(ctx, node);
         ctx.triggerOutput("flow");
+    }
+
+    private static void requireAdvancementCurrent(NamespacedKey key) {
+        if (!"resync".equals(key.getNamespace())) return;
+        ReSync plugin = ReSync.getInstance();
+        if (plugin == null || plugin.getReSyncServer() == null) {
+            throw new IllegalStateException("ReSync advancement runtime is unavailable");
+        }
+        AdvancementModule module = plugin.getReSyncServer().getModuleContext().getService(AdvancementModule.class);
+        if (module == null) throw new IllegalStateException("ReSync advancement runtime is unavailable");
+        module.requireRuntimeCurrent();
     }
 
     private Player requirePlayer(FlowContext context, FlowNode node, String input) {

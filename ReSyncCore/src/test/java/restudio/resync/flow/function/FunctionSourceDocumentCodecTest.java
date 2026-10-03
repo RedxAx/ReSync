@@ -1,9 +1,12 @@
 package restudio.resync.flow.function;
 
 import org.junit.jupiter.api.Test;
+import restudio.resync.contract.canonical.CanonicalCodec;
 import restudio.resync.contract.canonical.JsonValue;
 import restudio.resync.flow.catalog.CatalogVersion;
 import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.graph.GraphDocumentCodec;
+import restudio.resync.flow.graph.GraphVariable;
 import restudio.resync.flow.graph.OpaqueData;
 import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.ContentHash;
@@ -17,6 +20,7 @@ import restudio.resync.flow.type.TypeExpr;
 import restudio.resync.flow.type.TypeReference;
 import restudio.resync.flow.type.TypedValue;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,6 +33,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class FunctionSourceDocumentCodecTest {
     private static final ServerResourceLocator RESOURCE = new ServerResourceLocator(
@@ -66,6 +71,55 @@ class FunctionSourceDocumentCodecTest {
     }
 
     @Test
+    void directJsonDecodeDetachesMutableNumbersBeforeAdmittingTheSource() {
+        MutableDecimal number = new MutableDecimal("1");
+        Map<String, JsonValue> fields = new LinkedHashMap<>(CODEC.encode(new FunctionSourceDocument(signature(9), graph(9))).fields());
+        fields.put("numericFuture", JsonValue.of(number));
+        JsonValue.JsonObject supplied = new JsonValue.JsonObject(fields);
+        String original = supplied.canonicalText();
+        FunctionSourceDocument decoded = CODEC.decode(supplied);
+        ContentHash admitted = decoded.checksum();
+
+        number.replace("2");
+
+        assertNotEquals(original, supplied.canonicalText());
+        assertEquals(original, decoded.canonicalJson());
+        assertEquals(BigDecimal.ONE, decoded.unknown().get("numericFuture"));
+        assertEquals(admitted, decoded.checksum());
+        assertEquals(admitted, CODEC.checksum(decoded));
+        assertEquals(admitted, CODEC.decodeText(original).checksum());
+        assertEquals(admitted, CODEC.decodeBytes(CODEC.encodeBytes(decoded)).checksum());
+    }
+
+    @Test
+    void customGraphCodecsCannotRetainMutableDecodedSources() {
+        TypeExpr numberType = TypeExpr.named(new TypeReference("builtin", "number"));
+        MutableDecimal number = new MutableDecimal("1");
+        GraphVariable variable = new GraphVariable(UUID.randomUUID(), "saved", numberType, TypedValue.value(numberType, number)) {};
+        GraphDocument graph = new GraphDocument(GraphDocument.CURRENT_SCHEMA_VERSION, RESOURCE, 9, binding(), Set.of(),
+            List.of(), List.of(), List.of(variable), List.of(), OpaqueData.empty());
+        FunctionSourceDocumentCodec custom = FunctionSourceDocumentCodec.of(new CanonicalCodec<GraphDocument>() {
+            @Override
+            public JsonValue encode(GraphDocument value) {
+                return GraphDocumentCodec.INSTANCE.encode(value);
+            }
+
+            @Override
+            public GraphDocument decode(JsonValue value) {
+                return graph;
+            }
+        });
+        FunctionSourceDocument supplied = new FunctionSourceDocument(signature(9), graph);
+        FunctionSourceDocument decoded = custom.decode(custom.encode(supplied));
+        ContentHash original = decoded.checksum();
+
+        number.replace("2");
+
+        assertNotEquals(original, decoded.checksum());
+        assertEquals(custom.checksum(decoded), decoded.checksum());
+    }
+
+    @Test
     void knownFieldsAreRequiredAndDuplicateParameterIdsAreRejected() {
         JsonValue.JsonObject signature = CODEC.encodeSignature(signature(9));
         Map<String, Object> missingRequired = mutableObject(signature.toJava());
@@ -97,6 +151,34 @@ class FunctionSourceDocumentCodecTest {
         noDefaultParameter.remove("defaultValue");
         FunctionSignature decoded = CODEC.decodeSignature(JsonValue.fromJava(noDefault));
         assertEquals(null, decoded.inputs().getFirst().defaultValue());
+    }
+
+    private static final class MutableDecimal extends BigDecimal {
+        private BigDecimal current;
+
+        private MutableDecimal(String value) {
+            super(value);
+            current = new BigDecimal(value);
+        }
+
+        private void replace(String value) {
+            current = new BigDecimal(value);
+        }
+
+        @Override
+        public int signum() {
+            return current == null ? super.signum() : current.signum();
+        }
+
+        @Override
+        public BigDecimal stripTrailingZeros() {
+            return this;
+        }
+
+        @Override
+        public String toPlainString() {
+            return current == null ? super.toPlainString() : current.toPlainString();
+        }
     }
 
     private static FunctionSignature signature(long revision) {

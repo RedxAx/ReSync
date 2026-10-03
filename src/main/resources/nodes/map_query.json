@@ -2,7 +2,7 @@
   {
     "id": "core.map.get",
     "displayName": "Map Get",
-    "description": "Read a value by key from a string-keyed map.",
+    "description": "Reads the value under an exact text key. A missing key returns no value. Contains Key distinguishes a missing key from one holding no value.",
     "domain": "data",
     "family": "map-query",
     "lifecycle": "active",
@@ -21,13 +21,13 @@
       {"id": "key", "displayName": "Key", "name": "key", "dataType": "string", "description": "Provides the key to read."}
     ],
     "outputs": [
-      {"id": "value", "displayName": "Value", "name": "value", "dataType": "type:t", "description": "Returns the value stored at the key."}
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "type:t", "description": "Value stored at Key, or no value if the key is missing or stores null."}
     ]
   },
   {
     "id": "core.map.contains_key",
     "displayName": "Contains Key",
-    "description": "Check whether a map contains a key.",
+    "description": "Checks whether an exact text key exists in a map, even when its stored value is empty or null.",
     "domain": "data",
     "family": "map-query",
     "lifecycle": "active",
@@ -52,7 +52,7 @@
   {
     "id": "core.map.contains_value",
     "displayName": "Contains Value",
-    "description": "Check whether a map contains a value.",
+    "description": "Checks whether any map entry has a value equal to the supplied value.",
     "domain": "data",
     "family": "map-query",
     "lifecycle": "active",
@@ -77,7 +77,7 @@
   {
     "id": "core.map.keys",
     "displayName": "Keys",
-    "description": "Return the ordered keys from a map.",
+    "description": "Returns a new list of map keys in the map's iteration order.",
     "domain": "data",
     "family": "map-query",
     "lifecycle": "active",
@@ -101,7 +101,7 @@
   {
     "id": "core.map.values",
     "displayName": "Values",
-    "description": "Return the ordered values from a map.",
+    "description": "Returns a new list of map values in the same order as Keys. Duplicate values are retained.",
     "domain": "data",
     "family": "map-query",
     "lifecycle": "active",
@@ -125,7 +125,7 @@
   {
     "id": "core.map.size",
     "displayName": "Map Size",
-    "description": "Count the entries in a map.",
+    "description": "Counts key-value entries in a map. Entries with empty or null values still count.",
     "domain": "data",
     "family": "map-query",
     "lifecycle": "active",
@@ -149,7 +149,7 @@
   {
     "id": "core.map.is_empty",
     "displayName": "Map Is Empty",
-    "description": "Check whether a map has no entries.",
+    "description": "Returns true when a map has zero entries, regardless of the values its entries might otherwise hold.",
     "domain": "data",
     "family": "map-query",
     "lifecycle": "active",

@@ -31,9 +31,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class RuntimePlanLease implements AutoCloseable {
     private static final ContentHash OMITTED_HASH = ContentHash.of("0".repeat(64));
-    private static final ScheduledExecutorService TIMER = Executors.newScheduledThreadPool(1, daemonThreadFactory("resync-runtime-timer"));
+    private static final ScheduledThreadPoolExecutor TIMER = timer();
     private static final Set<String> RUNTIME_CODES = Set.of(
         "RUNTIME.AUTHORIZATION_DENIED",
         "RUNTIME.AUDIT_FAILURE",
@@ -76,12 +76,11 @@ public final class RuntimePlanLease implements AutoCloseable {
     private final RuntimeRegistrySnapshot runtimeSnapshot;
     private final Runnable release;
     private final RuntimeExecutionBarrier executionBarrier = new RuntimeExecutionBarrier();
+    private final CompletableFuture<Void> physicalCompletion = new CompletableFuture<>();
     private final Object monitor = new Object();
     private final Set<ContractRef<ProviderId>> fencedProviders = ConcurrentHashMap.newKeySet();
     private final Set<RuntimeBindingKey> fencedBindings = ConcurrentHashMap.newKeySet();
     private final List<RuntimeLeaseInput.AuditEvent> auditEvents = new ArrayList<>();
-    private final List<RuntimeExecutionBarrier.Admission> executionAdmissions = new ArrayList<>();
-    private final List<RuntimeReceiptStore.InvocationLease> receiptAdmissions = new ArrayList<>();
     private final Map<RuntimeBindingKey, Long> stableSemanticDeadlines = new ConcurrentHashMap<>();
     private volatile boolean closing;
     private volatile boolean released;
@@ -194,6 +193,7 @@ public final class RuntimePlanLease implements AutoCloseable {
         RuntimeBinding binding;
         RuntimeCancellationToken providerToken;
         RuntimeCancellationToken bindingToken;
+        InvocationAdmission admission;
         synchronized (monitor) {
             if (closing || released) {
                 throw new IllegalStateException("Runtime Lease Is Closed");
@@ -211,22 +211,37 @@ public final class RuntimePlanLease implements AutoCloseable {
             }
             bindingToken.throwIfCancelled();
             providerToken = providerTokens.get(binding.provider());
-            admitInvocationLocked();
+            admission = admitInvocationLocked();
         }
 
+        try {
+            return executeAdmitted(binding, invocationInputs, normalizedKey, suppliedToken, runtimeContext,
+                rootInvocationId, providerToken, bindingToken, admission);
+        } catch (RuntimeException | Error failure) {
+            admission.close();
+            throw failure;
+        }
+    }
+
+    private CompletionStage<RuntimeResult> executeAdmitted(RuntimeBinding binding, Map<PinId, TypedValue> invocationInputs,
+                                                           String normalizedKey, RuntimeCancellationToken suppliedToken,
+                                                           CompiledRuntimeContext runtimeContext, CorrelationId rootInvocationId,
+                                                           RuntimeCancellationToken providerToken, RuntimeCancellationToken bindingToken,
+                                                           InvocationAdmission admission) {
+        RuntimeBindingKey key = binding.key();
         long deadlineMillis = effectiveDeadline(binding, suppliedToken, providerToken, bindingToken);
         ContentHash invocationInputHash = inputHash(binding, invocationInputs, runtimeContext, deadlineMillis);
         RuntimeResult policyFailure;
         try {
             policyFailure = preflight(binding, invocationInputs);
         } catch (RuntimeException | Error failure) {
-            invocationFinished();
+            admission.close();
             throw failure;
         }
         if (policyFailure != null) {
             RuntimeResult audited = audited(binding, normalizedKey, policyFailure, invocationInputHash, runtimeContext,
                 deadlineMillis, rootInvocationId);
-            invocationFinished();
+            admission.close();
             return CompletableFuture.completedFuture(audited);
         }
         RuntimeResult preExecutionFailure = null;
@@ -238,11 +253,11 @@ public final class RuntimePlanLease implements AutoCloseable {
         if (binding.descriptor().semantics().ephemeral()
             && deadlineMillis == RuntimeExecutionContext.NO_DEADLINE) {
             if (preExecutionFailure != null) {
-                invocationFinished();
+                admission.close();
                 return CompletableFuture.completedFuture(preExecutionFailure);
             }
             return executeEphemeral(binding, invocationInputs, normalizedKey, suppliedToken, runtimeContext,
-                rootInvocationId);
+                rootInvocationId, admission);
         }
 
         CompletableFuture<RuntimeResult> outcome = null;
@@ -255,7 +270,7 @@ public final class RuntimePlanLease implements AutoCloseable {
                 ? null
                 : receiptStore.claim(receiptKey, invocationInputHash);
         } catch (RuntimeException | Error failure) {
-            invocationFinished();
+            admission.close();
             throw failure;
         }
         if (claim == null) {
@@ -318,26 +333,26 @@ public final class RuntimePlanLease implements AutoCloseable {
             }
         }
         if (leaseFailure != null) {
-            invocationFinished();
+            admission.close();
             throw leaseFailure;
         }
         if (receiptFailure != null) {
             if ((claim != null && claim.owner()) || (claim == null && auditAttempt != null)) {
                 completeOutcome(binding, normalizedKey, outcome, receiptFailure, invocationInputHash,
                     runtimeContext, deadlineMillis, rootInvocationId);
-                invocationFinished();
+                admission.close();
                 return outcome;
             }
-            invocationFinished();
+            admission.close();
             return CompletableFuture.completedFuture(receiptFailure);
         }
         if (existingOutcome != null) {
-            invocationFinished();
+            admission.close();
             return existingOutcome;
         }
 
         runAttempts(binding, invocationInputs, normalizedKey, invocationInputHash, outcome, 0, suppliedToken, deadlineMillis,
-            runtimeContext, rootInvocationId);
+            runtimeContext, rootInvocationId, admission);
         return outcome;
     }
 
@@ -523,23 +538,24 @@ public final class RuntimePlanLease implements AutoCloseable {
         String idempotencyKey,
         RuntimeCancellationToken suppliedToken,
         CompiledRuntimeContext runtimeContext,
-        CorrelationId invocationId
+        CorrelationId invocationId,
+        InvocationAdmission admission
     ) {
         RuntimeCancellationToken token = suppliedToken != null ? suppliedToken : bindingTokens.get(binding.key());
         RuntimeInvocation invocation = new RuntimeInvocation(binding.key(), inputs, idempotencyKey, token)
             .withRuntimeContext(runtimeContext)
-            .withInvocationId(invocationId);
+            .withInvocationId(invocationId).withFunctionBindings(input.functionBindings()).withScope(input.scope());
         AtomicReference<RuntimeExecutionContext> executionContext = new AtomicReference<>();
         CompletionStage<RuntimeResult> stage;
         try {
             stage = invoke(binding, invocation, executionContext, RuntimeExecutionContext.NO_DEADLINE);
         } catch (Throwable throwable) {
-            invocationFinished();
+            admission.close();
             return CompletableFuture.completedFuture(normalizeFailure(binding, throwable,
                 RuntimeExecutionContext.NO_DEADLINE));
         }
         if (stage == null) {
-            invocationFinished();
+            admission.close();
             return CompletableFuture.completedFuture(runtimeFailureResult(binding, "RUNTIME.INVALID_INVOCATION",
                 "Runtime Handler Returned No Result"));
         }
@@ -555,18 +571,23 @@ public final class RuntimePlanLease implements AutoCloseable {
                     "Runtime Handler Returned No Result");
             }
             RuntimeResult validated = validateAttemptResult(binding, result, executionContext.get(), false);
-            invocationFinished();
+            admission.close();
             return CompletableFuture.completedFuture(validated);
         }
         CompletableFuture<RuntimeResult> outcome = new CompletableFuture<>();
         stage.whenComplete((result, failure) -> {
-            RuntimeResult terminal = failure != null
-                ? normalizeFailure(binding, failure, RuntimeExecutionContext.NO_DEADLINE)
-                : result == null
-                    ? runtimeFailureResult(binding, "RUNTIME.INVALID_INVOCATION", "Runtime Handler Returned No Result")
-                    : validateAttemptResult(binding, result, executionContext.get(), false);
-            outcome.complete(terminal);
-            invocationFinished();
+            try {
+                RuntimeResult terminal = failure != null
+                    ? normalizeFailure(binding, failure, RuntimeExecutionContext.NO_DEADLINE)
+                    : result == null
+                        ? runtimeFailureResult(binding, "RUNTIME.INVALID_INVOCATION", "Runtime Handler Returned No Result")
+                        : validateAttemptResult(binding, result, executionContext.get(), false);
+                outcome.complete(terminal);
+            } catch (RuntimeException | Error completionFailure) {
+                outcome.completeExceptionally(completionFailure);
+            } finally {
+                admission.close();
+            }
         });
         return outcome;
     }
@@ -581,7 +602,8 @@ public final class RuntimePlanLease implements AutoCloseable {
         RuntimeCancellationToken suppliedToken,
         long deadlineMillis,
         CompiledRuntimeContext runtimeContext,
-        CorrelationId invocationId
+        CorrelationId invocationId,
+        InvocationAdmission admission
     ) {
         RuntimeBindingKey key = binding.key();
         RuntimeCancellationToken providerToken = providerTokens.get(binding.provider());
@@ -590,13 +612,13 @@ public final class RuntimePlanLease implements AutoCloseable {
         if (deadlineExpired(deadlineMillis)) {
             completeOutcome(binding, idempotencyKey, outcome, timeoutResult(binding), invocationInputHash,
                 runtimeContext, deadlineMillis, invocationId);
-            invocationFinished();
+            admission.close();
             return;
         }
         if (cancellable && cancellationRequested(suppliedToken, providerToken, bindingToken)) {
             completeOutcome(binding, idempotencyKey, outcome, cancellationResult(binding), invocationInputHash,
                 runtimeContext, deadlineMillis, invocationId);
-            invocationFinished();
+            admission.close();
             return;
         }
         RuntimeCancellationToken invocationToken = bindingToken.child(deadlineMillis);
@@ -609,9 +631,12 @@ public final class RuntimePlanLease implements AutoCloseable {
         AtomicReference<ScheduledFuture<?>> timeoutReference = new AtomicReference<>();
         AtomicReference<RuntimeExecutionContext> executionContext = new AtomicReference<>();
         AtomicBoolean runtimeTerminal = new AtomicBoolean();
+        List<RuntimeCancellationToken.Registration> cancellationLinks = new CopyOnWriteArrayList<>();
         Runnable releaseAttempt = () -> {
             if (attemptReleased.compareAndSet(false, true)) {
-                invocationFinished();
+                cancellationLinks.forEach(RuntimeCancellationToken.Registration::close);
+                invocationToken.finish();
+                admission.close();
             }
         };
 
@@ -623,19 +648,21 @@ public final class RuntimePlanLease implements AutoCloseable {
                     ? timeoutResult(binding)
                     : cancellationResult(binding);
                 RuntimeResult validated = validateAttemptResult(binding, cancelled, executionContext.get(), true);
-                releaseAttempt.run();
                 completeOutcome(binding, idempotencyKey, outcome, validated, invocationInputHash,
                     runtimeContext, deadlineMillis, invocationId);
+                if (!stageAttached.get()) {
+                    releaseAttempt.run();
+                }
             }
         };
         if (cancellable && suppliedToken != null) {
-            suppliedToken.cancelled().thenRun(cancellationAction);
+            registerCancellation(suppliedToken, cancellationAction, cancellationLinks, attemptReleased);
         }
         if (cancellable) {
-            bindingToken.cancelled().thenRun(cancellationAction);
+            registerCancellation(bindingToken, cancellationAction, cancellationLinks, attemptReleased);
         }
         if (cancellable && providerToken != null) {
-            providerToken.cancelled().thenRun(cancellationAction);
+            registerCancellation(providerToken, cancellationAction, cancellationLinks, attemptReleased);
         }
         if (!deadlineExpired(deadlineMillis) && cancellable
             && cancellationRequested(suppliedToken, providerToken, bindingToken)) {
@@ -673,7 +700,7 @@ public final class RuntimePlanLease implements AutoCloseable {
         stageAttached.set(true);
         RuntimeInvocation invocation = new RuntimeInvocation(key, inputs, idempotencyKey, invocationToken)
             .withRuntimeContext(runtimeContext)
-            .withInvocationId(invocationId);
+            .withInvocationId(invocationId).withFunctionBindings(input.functionBindings()).withScope(input.scope());
         CompletionStage<RuntimeResult> stage;
         if (attemptFinished.get()) {
             stage = CompletableFuture.completedFuture(cancellationResult(binding));
@@ -691,21 +718,34 @@ public final class RuntimePlanLease implements AutoCloseable {
         }
         stage.whenComplete((result, failure) -> {
             cancel(timeoutReference.get());
-            if (!attemptFinished.compareAndSet(false, true)) {
+            try {
+                if (!attemptFinished.compareAndSet(false, true)) {
+                    return;
+                }
+                RuntimeResult normalized = failure == null
+                    ? result == null
+                        ? RuntimeResult.failure(runtimeFailure(binding, "RUNTIME.NULL_RESULT", "Runtime Handler Returned No Result"))
+                        : result
+                    : normalizeFailure(binding, failure, deadlineMillis);
+                normalized = validateAttemptResult(binding, normalized, executionContext.get(),
+                    runtimeTerminal.get() || (failure != null && isCancellation(failure)));
+                finishAttempt(binding, inputs, idempotencyKey, invocationInputHash, outcome, attempt, suppliedToken,
+                    deadlineMillis, runtimeContext, invocationId, normalized);
+            } catch (RuntimeException | Error completionFailure) {
+                outcome.completeExceptionally(completionFailure);
+            } finally {
                 releaseAttempt.run();
-                return;
             }
-            RuntimeResult normalized = failure == null
-                ? result == null
-                    ? RuntimeResult.failure(runtimeFailure(binding, "RUNTIME.NULL_RESULT", "Runtime Handler Returned No Result"))
-                    : result
-                : normalizeFailure(binding, failure, deadlineMillis);
-            normalized = validateAttemptResult(binding, normalized, executionContext.get(),
-                runtimeTerminal.get() || (failure != null && isCancellation(failure)));
-            finishAttempt(binding, inputs, idempotencyKey, invocationInputHash, outcome, attempt, suppliedToken,
-                deadlineMillis, runtimeContext, invocationId, normalized);
-            releaseAttempt.run();
         });
+    }
+
+    private static void registerCancellation(RuntimeCancellationToken token, Runnable action,
+                                              List<RuntimeCancellationToken.Registration> links, AtomicBoolean released) {
+        RuntimeCancellationToken.Registration registration = token.onCancel(action);
+        links.add(registration);
+        if (released.get()) {
+            registration.close();
+        }
     }
 
     private void finishAttempt(
@@ -722,9 +762,15 @@ public final class RuntimePlanLease implements AutoCloseable {
         RuntimeResult result
     ) {
         if (!outcome.isDone() && shouldRetry(binding, result, attempt, suppliedToken, deadlineMillis)) {
-            if (invocationStarted()) {
-                runAttempts(binding, inputs, idempotencyKey, invocationInputHash, outcome, attempt + 1, suppliedToken,
-                    deadlineMillis, runtimeContext, invocationId);
+            InvocationAdmission retryAdmission = invocationStarted();
+            if (retryAdmission != null) {
+                try {
+                    runAttempts(binding, inputs, idempotencyKey, invocationInputHash, outcome, attempt + 1, suppliedToken,
+                        deadlineMillis, runtimeContext, invocationId, retryAdmission);
+                } catch (RuntimeException | Error retryFailure) {
+                    retryAdmission.close();
+                    throw retryFailure;
+                }
                 return;
             }
             result = runtimeFailureResult(binding, "RUNTIME.PROVIDER_DRAINING", "Runtime Lease Is Closing");
@@ -1124,6 +1170,12 @@ public final class RuntimePlanLease implements AutoCloseable {
         };
     }
 
+    private static ScheduledThreadPoolExecutor timer() {
+        ScheduledThreadPoolExecutor timer = new ScheduledThreadPoolExecutor(1, daemonThreadFactory("resync-runtime-timer"));
+        timer.setRemoveOnCancelPolicy(true);
+        return timer;
+    }
+
     private static String message(Throwable throwable) {
         Throwable cause = throwable;
         while (cause.getCause() != null && cause.getMessage() == null) {
@@ -1248,40 +1300,16 @@ public final class RuntimePlanLease implements AutoCloseable {
         return Math.min(deadline, bindingToken.deadlineMillis());
     }
 
-    private void invocationFinished() {
-        RuntimeExecutionBarrier.Admission admission;
-        RuntimeReceiptStore.InvocationLease receiptAdmission;
-        Runnable releaseNow = null;
-        synchronized (monitor) {
-            if (inFlight <= 0) {
-                return;
-            }
-            inFlight--;
-            admission = executionAdmissions.removeLast();
-            receiptAdmission = receiptAdmissions.removeLast();
-            if (closing && inFlight == 0 && !released) {
-                released = true;
-                releaseNow = release;
-            }
-        }
-        admission.close();
-        receiptAdmission.close();
-        if (releaseNow != null) {
-            releaseNow.run();
-        }
-    }
-
-    private boolean invocationStarted() {
+    private InvocationAdmission invocationStarted() {
         synchronized (monitor) {
             if (closing || released) {
-                return false;
+                return null;
             }
-            admitInvocationLocked();
-            return true;
+            return admitInvocationLocked();
         }
     }
 
-    private void admitInvocationLocked() {
+    private InvocationAdmission admitInvocationLocked() {
         RuntimeReceiptStore.InvocationLease receiptAdmission = receiptStore.acquireInvocationLease();
         RuntimeExecutionBarrier.Admission admission;
         try {
@@ -1292,8 +1320,46 @@ public final class RuntimePlanLease implements AutoCloseable {
             throw failure;
         }
         inFlight++;
-        executionAdmissions.add(admission);
-        receiptAdmissions.add(receiptAdmission);
+        return new InvocationAdmission(admission, receiptAdmission);
+    }
+
+    private final class InvocationAdmission implements AutoCloseable {
+        private final RuntimeExecutionBarrier.Admission execution;
+        private final RuntimeReceiptStore.InvocationLease receipt;
+        private final AtomicBoolean closed = new AtomicBoolean();
+
+        private InvocationAdmission(RuntimeExecutionBarrier.Admission execution, RuntimeReceiptStore.InvocationLease receipt) {
+            this.execution = execution;
+            this.receipt = receipt;
+        }
+
+        @Override
+        public void close() {
+            if (!closed.compareAndSet(false, true)) {
+                return;
+            }
+            Runnable releaseNow = null;
+            synchronized (monitor) {
+                inFlight--;
+                if (closing && inFlight == 0 && !released) {
+                    released = true;
+                    releaseNow = release;
+                }
+            }
+            try {
+                execution.close();
+            } finally {
+                try {
+                    receipt.close();
+                } finally {
+                    if (releaseNow != null) {
+                        bindingTokens.values().forEach(RuntimeCancellationToken::finish);
+                        providerTokens.values().forEach(RuntimeCancellationToken::finish);
+                        releaseOwner(releaseNow);
+                    }
+                }
+            }
+        }
     }
 
     private void fenceExecutionAdmissions() {
@@ -1388,7 +1454,21 @@ public final class RuntimePlanLease implements AutoCloseable {
             }
         }
         if (releaseNow != null) {
+            releaseOwner(releaseNow);
+        }
+    }
+
+    public CompletionStage<Void> physicalCompletion() {
+        return physicalCompletion.minimalCompletionStage();
+    }
+
+    private void releaseOwner(Runnable releaseNow) {
+        try {
             releaseNow.run();
+            physicalCompletion.complete(null);
+        } catch (RuntimeException | Error failure) {
+            physicalCompletion.completeExceptionally(failure);
+            throw failure;
         }
     }
 

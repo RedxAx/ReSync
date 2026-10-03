@@ -88,7 +88,7 @@
     },
     "inputs": [
       {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to copy before removing a value. Missing or null input uses an empty list."},
-      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Value to remove. Missing or null input uses null; no match leaves the copied list unchanged."}
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Value to remove. Missing or null input uses null. No match leaves the copied list unchanged."}
     ],
     "outputs": [
       {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "Returns the copied list without its first matching value, or unchanged when no match exists."}
@@ -124,7 +124,7 @@
     },
     "inputs": [
       {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to copy before removing an item. Missing or null input uses an empty list."},
-      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based item index. Missing or null input uses 0; a negative or out-of-range index leaves the copied list unchanged."}
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based item index. Missing or null input uses 0. A negative or out-of-range index leaves the copied list unchanged."}
     ],
     "outputs": [
       {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "Returns the copied list after removal, or unchanged when the index is invalid."}
@@ -184,7 +184,7 @@
     "handlerConfig": {"operation": "get"},
     "inputs": [
       {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to read. Missing or null input uses an empty list."},
-      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based item index. Missing or null input uses 0; a negative or out-of-range index returns null."}
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based item index. Missing or null input uses 0. A negative or out-of-range index returns null."}
     ],
     "outputs": [
       {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Returns the item at the index, or null when the index is invalid."}
@@ -221,7 +221,7 @@
     },
     "inputs": [
       {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to copy before replacing an item. Missing or null input uses an empty list."},
-      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based item index. Missing or null input uses 0; a negative or out-of-range index leaves the copied list unchanged."},
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based item index. Missing or null input uses 0. A negative or out-of-range index leaves the copied list unchanged."},
       {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Replacement value. Missing or null input uses null."}
     ],
     "outputs": [
@@ -334,8 +334,8 @@
       ]
     },
     "inputs": [
-      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to update. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
-      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based insertion index. Missing or null input uses 0; a negative or out-of-range index leaves the list unchanged."},
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to update. Missing or null input uses an empty list. Inputs over 65536 items fail before output."},
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based insertion index. Missing or null input uses 0. A negative or out-of-range index leaves the list unchanged."},
       {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Value to insert. Missing or null input uses null."}
     ],
     "outputs": [
@@ -361,8 +361,8 @@
     "handler": "GenericListHandler",
     "handlerConfig": {"operation": "insert"},
     "inputs": [
-      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to update. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
-      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based insertion index. Missing or null input uses 0; a negative or out-of-range index leaves the list unchanged."},
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to update. Missing or null input uses an empty list. Inputs over 65536 items fail before output."},
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based insertion index. Missing or null input uses 0. A negative or out-of-range index leaves the list unchanged."},
       {"id": "item", "displayName": "Item", "name": "item", "pinType": "DATA", "dataType": "type:t", "description": "Item to insert. Missing or null input uses null."}
     ],
     "outputs": [

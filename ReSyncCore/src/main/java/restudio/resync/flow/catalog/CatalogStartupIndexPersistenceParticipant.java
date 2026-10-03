@@ -27,6 +27,7 @@ public final class CatalogStartupIndexPersistenceParticipant
 
             @Override
             public void quiesce(Path activeRoot) {
+                CatalogStartupIndex.invalidate(activeRoot);
             }
 
             @Override
@@ -35,6 +36,8 @@ public final class CatalogStartupIndexPersistenceParticipant
 
             @Override
             public void rebind(Path previousRoot, Path nextRoot) throws IOException {
+                CatalogStartupIndex.invalidate(previousRoot);
+                CatalogStartupIndex.invalidate(nextRoot);
                 Files.createDirectories(nextRoot);
             }
 

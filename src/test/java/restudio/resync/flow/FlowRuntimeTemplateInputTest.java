@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.resync.flow.handler.generic.JsonHandler;
 
 import java.util.List;
 import java.util.Map;
@@ -38,4 +39,38 @@ class FlowRuntimeTemplateInputTest {
 
         assertEquals("{Color}: blue", runtime.resolveInput(target, "text", String.class));
     }
+
+    @Test
+    void nestedJsonLiteralRoundTripsThroughTheActualJsonHandlers() {
+        String literal = "{\"key\":42,\"nested\":{\"value\":\"ok\"}}";
+        FlowNode parse = new FlowNode("json_parse", 0, 0, Map.of("json_string", literal));
+        parse.setHandlerConfig(Map.of("operation", "json_parse"));
+        FlowNode stringify = new FlowNode("json_to_string", 0, 0, Map.of());
+        stringify.setHandlerConfig(Map.of("operation", "json_to_string"));
+        FlowGraph graph = new FlowGraph("json_roundtrip", Map.of("parse", parse, "stringify", stringify),
+            List.of(new FlowConnection("parse", "object", "stringify", "object")), List.of());
+        FlowRuntime runtime = new FlowRuntime(graph, new TypeAdapterRegistry(), Map.of());
+        FlowContext context = new FlowContext(runtime, null, null);
+        JsonHandler handler = new JsonHandler();
+
+        assertEquals(literal, runtime.resolveInput(parse, "json_string", String.class));
+        handler.execute(context, parse);
+        handler.execute(context, stringify);
+        assertEquals(literal, runtime.getNodeOutput("stringify", "string"));
+    }
+
+    @Test
+    void escapedLiteralBracesDoNotConsumeJsonClosingsFromAnotherInput() {
+        String literal = "{\"nested\":{\"value\":\"ok\"}}";
+        FlowNode target = new FlowNode("target", 0, 0, Map.of("text", "{{{body}}}", "body", literal,
+            "unclosed", "{{Open", "closing", "}}"));
+        FlowGraph graph = new FlowGraph("separate_escapes", Map.of("target", target), List.of(), List.of());
+        FlowRuntime runtime = new FlowRuntime(graph, new TypeAdapterRegistry(), Map.of());
+
+        assertEquals("{" + literal + "}", runtime.resolveInput(target, "text", String.class));
+        assertEquals("{Open", runtime.resolveInput(target, "unclosed", String.class));
+        assertEquals(literal, runtime.resolveInput(target, "body", String.class));
+        assertEquals("}}", runtime.resolveInput(target, "closing", String.class));
+    }
+
 }

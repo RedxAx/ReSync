@@ -5,6 +5,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowDataType;
@@ -22,9 +23,14 @@ import restudio.resync.flow.diagnostics.FlowDebugService;
 import restudio.resync.flow.diagnostics.FlowTraceRecord;
 import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.diagnostic.Diagnostic;
+import restudio.resync.flow.diagnostic.DiagnosticPhase;
+import restudio.resync.flow.diagnostic.DiagnosticSeverity;
 import restudio.resync.flow.function.FunctionDiagnostic;
 import restudio.resync.flow.function.FunctionOutputMap;
 import restudio.resync.flow.function.FunctionResult;
+import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.graph.GraphNode;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.identity.FunctionParameterId;
@@ -46,6 +52,7 @@ import restudio.resync.flow.runtime.RuntimeAuditEvent;
 import restudio.resync.flow.runtime.RuntimeSemantics;
 import restudio.resync.flow.runtime.RuntimeReceiptStore;
 import restudio.resync.flow.runtime.RuntimeResult;
+import restudio.resync.flow.runtime.RuntimeFailure;
 import restudio.resync.flow.type.TypedValue;
 import restudio.resync.flow.identity.CapabilityId;
 import restudio.resync.flow.identity.ContractRef;
@@ -61,6 +68,7 @@ import restudio.resync.flow.validation.FlowGraphValidator;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -75,6 +83,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import restudio.resync.flow.runtime.RuntimeCancellationToken;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -82,10 +91,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.time.Duration;
 import java.util.function.Predicate;
 import java.util.function.BiPredicate;
 import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 public class FlowExecutor {
     private static final long DEFAULT_MAX_EXECUTION_DURATION_MILLIS = 300_000L;
@@ -190,7 +202,8 @@ public class FlowExecutor {
     }
 
     private record PendingTask(String graphId, String runtimeOwner, BukkitTask task, CompletableFuture<Void> completion,
-                               long createdAt, long nextFireAt, boolean recurring, String lastFailure) {
+                               long createdAt, long nextFireAt, boolean recurring, String lastFailure, FlowTask operation,
+                               Runnable cancelAction) {
     }
 
     private record TerminalTask(ScheduledTaskSnapshot snapshot, long completedAt) {
@@ -288,6 +301,7 @@ public class FlowExecutor {
         private final String graphId;
         private final String runtimeOwner;
         private final CompletableFuture<Void> completion;
+        private final FlowTask operation;
         private final long createdAt;
         private final long nextFireAt;
         private final boolean recurring;
@@ -299,6 +313,7 @@ public class FlowExecutor {
             this.graphId = graphId != null ? graphId : "";
             this.runtimeOwner = runtimeOwner != null && !runtimeOwner.isBlank() ? runtimeOwner : "flow_wall_clock";
             this.completion = completion;
+            this.operation = new FlowTask(completion);
             this.createdAt = createdAt;
             this.nextFireAt = nextFireAt;
             this.recurring = recurring;
@@ -317,9 +332,7 @@ public class FlowExecutor {
             if (activeTimer != null) {
                 activeTimer.cancel(false);
             }
-            if (completion != null && !completion.isDone()) {
-                completion.cancel(false);
-            }
+            operation.cancel();
         }
     }
 
@@ -727,6 +740,27 @@ public class FlowExecutor {
                 runtimeContext, bridge, invocationId, requestedDeadlineMillis));
     }
 
+    public CompletableFuture<Void> executeCompiledSource(GraphDocument source, FlowGraph identity, String startNodeId,
+                                                         CompiledRuntimeContext runtimeContext,
+                                                         FlowExecutionBridge.MappingContext mappingContext,
+                                                         CompiledGraphMetadata metadata, CompiledExecutionAuthority authority,
+                                                         CompiledCoreFlowExecutionBridge bridge, CorrelationId invocationId,
+                                                         long deadlineMillis) {
+        if (source == null || identity == null || runtimeContext == null || metadata == null || authority == null
+            || bridge == null || invocationId == null || deadlineMillis < 0 || !authority.matches(bridge, metadata)) {
+            return bridgeUnsupported("Complete typed compiled execution authority is required", identity, startNodeId);
+        }
+        return withLegacyAdmission(true, () -> {
+            if (!identity.isEnabled() || !compiledExecutionAuthority.test(identity, metadata)) {
+                return bridgeFailure("CORE_EXECUTION_UNSUPPORTED", "The typed source is no longer authorized for execution",
+                    null, identity, startNodeId, "Refresh the committed source and compiled catalog binding");
+            }
+            notifyExecutionListeners(identity, startNodeId, null, null);
+            return executeThroughBridge(bridge, identity, startNodeId, null, null, Map.of(), mappingContext,
+                metadata, runtimeContext, invocationId, deadlineMillis, source);
+        });
+    }
+
     private CompletableFuture<Void> executeCompiledRoot(FlowGraph graph, String startNodeId, Player player, Event event,
                                                         Map<String, Object> eventVars,
                                                         FlowExecutionBridge.MappingContext mappingContext,
@@ -813,6 +847,17 @@ public class FlowExecutor {
                                                           CompiledRuntimeContext runtimeContext,
                                                           CorrelationId invocationId,
                                                           long requestedDeadlineMillis) {
+        return executeThroughBridge(bridge, graph, startNodeId, player, event, eventVars, mappingContext,
+            compiledGraphMetadata, runtimeContext, invocationId, requestedDeadlineMillis, null);
+    }
+
+    private CompletableFuture<Void> executeThroughBridge(FlowExecutionBridge bridge, FlowGraph graph, String startNodeId,
+                                                          Player player, Event event, Map<String, Object> eventVars,
+                                                          FlowExecutionBridge.MappingContext mappingContext,
+                                                          CompiledGraphMetadata compiledGraphMetadata,
+                                                          CompiledRuntimeContext runtimeContext,
+                                                          CorrelationId invocationId, long requestedDeadlineMillis,
+                                                          GraphDocument sourceDocument) {
         FlowExecutionBridge.Context context;
         try {
             CompiledRuntimeContext legacyRuntimeContext = player == null && event == null
@@ -821,7 +866,7 @@ public class FlowExecutor {
                 ? new FlowExecutionBridge.Context(graph, startNodeId, player, event, eventVars, mappingContext,
                     compiledGraphMetadata, legacyRuntimeContext, invocationId, requestedDeadlineMillis)
                 : new FlowExecutionBridge.Context(graph, startNodeId, null, null, Map.of(), mappingContext,
-                    compiledGraphMetadata, runtimeContext, invocationId, requestedDeadlineMillis);
+                    compiledGraphMetadata, runtimeContext, invocationId, requestedDeadlineMillis, sourceDocument);
         } catch (Throwable failure) {
             return bridgeFailure("CORE_EXECUTION_FAILED", "Unable to create the compiled Core execution context", failure, graph, startNodeId,
                 "Repair the legacy execution context before enabling the compiled Core bridge");
@@ -1004,6 +1049,13 @@ public class FlowExecutor {
 
     public CompletableFuture<Map<String, Object>> executeFunction(FlowGraph functionGraph, Player player, Event event,
                                                                    Map<String, Object> inputs, Map<String, Object> eventVars) {
+        if (compiledFunctionExecutionBridge != null && compiledFunctionExecutionBridge.hasTypedFunctionProviders()) {
+            FunctionInvocationContext context = defaultFunctionInvocationContext(player, event, eventVars);
+            if (context == null) {
+                return CompletableFuture.failedFuture(new IllegalStateException("The Compiled Function Principal Is Unavailable"));
+            }
+            return executeFunction(functionGraph, player, event, inputs, eventVars, context);
+        }
         return withLegacyAdmission(true, () -> executeFunctionRoot(functionGraph, player, event, inputs, eventVars));
     }
 
@@ -1044,6 +1096,63 @@ public class FlowExecutor {
     public CompletableFuture<Map<String, Object>> executeFunction(FlowGraph functionGraph, Player player, Event event,
                                                                    Map<String, Object> inputs, Map<String, Object> eventVars,
                                                                    FunctionInvocationContext invocationContext) {
+        return executeFunction(functionGraph, player, event, inputs, eventVars, invocationContext, null);
+    }
+
+    public CompletableFuture<Map<String, Object>> executeFunctionSource(FunctionSourceDocument source, Player player, Event event,
+            Map<String, Object> inputs, Map<String, Object> eventVars, FunctionInvocationContext invocationContext) {
+        return executeFunctionSource(source, player, event, inputs, eventVars, invocationContext, null);
+    }
+
+    public CompletableFuture<Map<String, Object>> executeFunctionSource(FunctionSourceDocument source, Player player, Event event,
+            Map<String, Object> inputs, Map<String, Object> eventVars, FunctionInvocationContext invocationContext,
+            RuntimeCancellationToken parentCancellation) {
+        CompiledFunctionExecutionBridge bridge = compiledFunctionExecutionBridge;
+        ServerId serverId = compiledFunctionServerId;
+        RuntimeAuthority authority = compiledFunctionAuthority;
+        if (bridge == null || !bridge.hasTypedFunctionProviders() || serverId == null || authority == null) {
+            return CompletableFuture.failedFuture(new FlowExecutionException("FUNCTION_COMPILED_EXECUTION_UNAVAILABLE",
+                "The compiled Function source runtime is unavailable", null, null, "Restore the compiled Function runtime"));
+        }
+        if (invocationContext == null || compiledFunctionPrincipalAuthority == null
+            || !compiledFunctionPrincipalAuthority.trusts(invocationContext.principal(), authority)) {
+            return CompletableFuture.failedFuture(new FlowExecutionException("FUNCTION_AUTHORIZATION_DENIED",
+                "An authenticated Function invocation context is required", null, null, "Use a trusted runtime principal"));
+        }
+        Map<String, Object> contextVariables = new LinkedHashMap<>();
+        if (eventVars != null) {
+            contextVariables.putAll(eventVars);
+        }
+        if (invocationContext.sessionReference() != null) {
+            contextVariables.put("runtime.sessionId", invocationContext.sessionReference());
+        }
+        CompiledFunctionExecutionRequest request;
+        try {
+            request = bridge.requestForSource(source, player, event, inputs, contextVariables, serverId, authority,
+                invocationContext.principal(), invocationContext.invocationId(), invocationContext.runtimeContext(),
+                invocationContext.requestedDeadlineMillis(), invocationContext.creatorPrincipal(), invocationContext.creatorSessionReference());
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(new FlowExecutionException("FUNCTION_COMPILED_EXECUTION_UNSUPPORTED",
+                "The Function source could not be admitted", failure, null, "Restore the exact Function source and active catalog binding"));
+        }
+        return executeCompiledFunction(request, bridge, parentCancellation).thenCompose(result -> {
+            if (!result.successful()) {
+                return CompletableFuture.failedFuture(new FlowExecutionException("FUNCTION_COMPILED_EXECUTION_FAILED",
+                    "Compiled Function execution failed", null, null, "Inspect the typed Function diagnostics",
+                    Map.of("status", result.status().wireName(), "diagnosticCount", result.diagnostics().size())));
+            }
+            try {
+                return CompletableFuture.completedFuture(bridge.outputsForSource(source, result));
+            } catch (RuntimeException failure) {
+                return CompletableFuture.failedFuture(new FlowExecutionException("FUNCTION_COMPILED_EXECUTION_FAILED",
+                    "Compiled Function outputs do not match the Function source", failure, null, "Correct the Function output signature"));
+            }
+        });
+    }
+
+    public CompletableFuture<Map<String, Object>> executeFunction(FlowGraph functionGraph, Player player, Event event,
+            Map<String, Object> inputs, Map<String, Object> eventVars, FunctionInvocationContext invocationContext,
+            RuntimeCancellationToken parentCancellation) {
         Objects.requireNonNull(invocationContext, "Function Invocation Context Is Required");
         Map<String, Object> contextVariables = new LinkedHashMap<>();
         if (eventVars != null) {
@@ -1051,6 +1160,12 @@ public class FlowExecutor {
         }
         if (invocationContext.sessionReference() != null) {
             contextVariables.put("runtime.sessionId", invocationContext.sessionReference());
+        }
+        CompiledFunctionExecutionBridge bridge = compiledFunctionExecutionBridge;
+        if (bridge != null && bridge.hasTypedFunctionProviders()) {
+            return executeTypedFunctionGraph(functionGraph, player, event, inputs, contextVariables, invocationContext.principal(),
+                invocationContext.invocationId(), invocationContext.runtimeContext(), invocationContext.requestedDeadlineMillis(),
+                invocationContext.creatorPrincipal(), invocationContext.creatorSessionReference(), bridge, parentCancellation);
         }
         return executeFunction(functionGraph, player, event, inputs, contextVariables, invocationContext.principal(),
             invocationContext.invocationId(), invocationContext.runtimeContext(), invocationContext.requestedDeadlineMillis(),
@@ -1071,6 +1186,14 @@ public class FlowExecutor {
         String creatorSessionReference,
         CompiledFunctionExecutionBridge bridge
     ) {
+        return executeTypedFunctionGraph(functionGraph, player, event, inputs, eventVars, principal, invocationId, runtimeContext,
+            requestedDeadlineMillis, creatorPrincipal, creatorSessionReference, bridge, null);
+    }
+
+    private CompletableFuture<Map<String, Object>> executeTypedFunctionGraph(FlowGraph functionGraph, Player player, Event event,
+            Map<String, Object> inputs, Map<String, Object> eventVars, RuntimePrincipal principal, CorrelationId invocationId,
+            CompiledRuntimeContext runtimeContext, long requestedDeadlineMillis, String creatorPrincipal,
+            String creatorSessionReference, CompiledFunctionExecutionBridge bridge, RuntimeCancellationToken parentCancellation) {
         ServerId serverId = compiledFunctionServerId;
         RuntimeAuthority authority = compiledFunctionAuthority;
         if (serverId == null || authority == null) {
@@ -1090,7 +1213,7 @@ public class FlowExecutor {
                 "The legacy Function graph cannot be admitted to the compiled Function boundary",
                 failure, null, "Correct the Function signature and active catalog binding"));
         }
-        return executeCompiledFunction(request, bridge).thenCompose(result -> {
+        return executeCompiledFunction(request, bridge, parentCancellation).thenCompose(result -> {
             if (!result.successful()) {
                 return CompletableFuture.failedFuture(new FlowExecutionException(
                     "FUNCTION_COMPILED_EXECUTION_FAILED",
@@ -1193,12 +1316,18 @@ public class FlowExecutor {
         CompiledFunctionExecutionRequest request,
         CompiledFunctionExecutionBridge bridge
     ) {
-        return withLegacyAdmission(true, () -> executeCompiledFunctionAdmitted(request, bridge));
+        return executeCompiledFunction(request, bridge, null);
+    }
+
+    public CompletableFuture<FunctionResult> executeCompiledFunction(CompiledFunctionExecutionRequest request,
+            CompiledFunctionExecutionBridge bridge, RuntimeCancellationToken parentCancellation) {
+        return withLegacyAdmission(true, () -> executeCompiledFunctionAdmitted(request, bridge, parentCancellation)).copy();
     }
 
     private CompletableFuture<FunctionResult> executeCompiledFunctionAdmitted(
         CompiledFunctionExecutionRequest request,
-        CompiledFunctionExecutionBridge bridge
+        CompiledFunctionExecutionBridge bridge,
+        RuntimeCancellationToken parentCancellation
     ) {
         if (request == null) {
             return CompletableFuture.failedFuture(new FlowExecutionException(
@@ -1235,10 +1364,10 @@ public class FlowExecutor {
                     "The compiled Function runtime context principal does not match the request principal",
                     null, null, "Use one authenticated principal throughout the Function invocation"));
             }
-            return executeCompiledFunctionDurably(request, bridge, authority, principal);
+            return executeCompiledFunctionDurably(request, bridge, authority, principal, parentCancellation);
         }
         try {
-            return CompletableFuture.completedFuture(bridge.execute(request));
+            return bridge.executeAsync(request, parentCancellation).toCompletableFuture();
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "FUNCTION_COMPILED_EXECUTION_FAILED",
@@ -1254,7 +1383,8 @@ public class FlowExecutor {
         CompiledFunctionExecutionRequest request,
         CompiledFunctionExecutionBridge bridge,
         RuntimeAuthority authority,
-        RuntimePrincipal principal
+        RuntimePrincipal principal,
+        RuntimeCancellationToken parentCancellation
     ) {
         RuntimeReceiptStore store = compiledFunctionReceiptStore;
         if (store == null) {
@@ -1275,6 +1405,7 @@ public class FlowExecutor {
                 "FUNCTION_DURABILITY_UNAVAILABLE", "The compiled Function receipt store rejected the invocation lease",
                 failure, null, "Restore the runtime receipt authority before retrying"));
         }
+        boolean retained = false;
         try {
             RuntimeReceiptStore.Key key = functionReceiptKey(request, authority, principal);
             ContentHash inputHash = functionInputHash(request, principal);
@@ -1338,37 +1469,50 @@ public class FlowExecutor {
                 running.completeExceptionally(reservationFailure);
                 return running;
             }
+            CompletionStage<FunctionResult> execution;
             try {
-                FunctionResult result = bridge.execute(request);
-                RuntimeResult persisted = functionReceiptResult(result);
-                RuntimeLeaseInput.AuditEvent auditEvent = functionAuditEvent(key, authority, provenance,
-                    persisted.status(), "outcome");
-                store.complete(key, persisted, provenance, auditEvent);
-                deliverFunctionAudit(store, key, provenance, auditEvent);
-                compiledFunctionReplayResults.put(replayKey, result);
-                running.complete(result);
+                execution = Objects.requireNonNull(bridge.executeAsync(request, parentCancellation), "Function Physical Completion Stage Is Required");
             } catch (Throwable failure) {
-                FunctionDiagnostic diagnostic = FunctionDiagnostic.error("FUNCTION.EXECUTION_FAILURE", "execution",
-                    "Compiled Function execution failed", null);
-                FunctionResult failed = FunctionResult.failure(request.execution().signature(), List.of(diagnostic), 0);
+                execution = CompletableFuture.failedFuture(failure);
+            }
+            retained = true;
+            execution.whenComplete((result, failure) -> {
                 try {
-                    RuntimeResult persisted = functionReceiptResult(failed);
+                    if (failure != null) {
+                        throw new CompletionException(failure);
+                    }
+                    RuntimeResult persisted = functionReceiptResult(result);
                     RuntimeLeaseInput.AuditEvent auditEvent = functionAuditEvent(key, authority, provenance,
                         persisted.status(), "outcome");
                     store.complete(key, persisted, provenance, auditEvent);
                     deliverFunctionAudit(store, key, provenance, auditEvent);
-                } catch (RuntimeException ignored) {
+                    compiledFunctionReplayResults.put(replayKey, result);
+                    running.complete(result);
+                } catch (Throwable executionFailure) {
+                    FunctionDiagnostic diagnostic = FunctionDiagnostic.error("FUNCTION.EXECUTION_FAILURE", "execution",
+                        "Compiled Function execution failed", null);
+                    FunctionResult failed = FunctionResult.failure(request.execution().signature(), List.of(diagnostic), 0);
+                    try {
+                        RuntimeResult persisted = functionReceiptResult(failed);
+                        RuntimeLeaseInput.AuditEvent auditEvent = functionAuditEvent(key, authority, provenance,
+                            persisted.status(), "outcome");
+                        store.complete(key, persisted, provenance, auditEvent);
+                        deliverFunctionAudit(store, key, provenance, auditEvent);
+                    } catch (RuntimeException | Error ignored) {
+                    }
+                    running.completeExceptionally(new FlowExecutionException(
+                        "FUNCTION_COMPILED_EXECUTION_FAILED", "Compiled Function execution failed", executionFailure,
+                        null, "Inspect the typed Function source and capability binding"));
+                } finally {
+                    compiledFunctionInFlight.remove(replayKey, running);
+                    invocationLease.close();
                 }
-                FlowExecutionException executionFailure = new FlowExecutionException(
-                    "FUNCTION_COMPILED_EXECUTION_FAILED", "Compiled Function execution failed", failure,
-                    null, "Inspect the typed Function source and capability binding");
-                running.completeExceptionally(executionFailure);
-            } finally {
-                compiledFunctionInFlight.remove(replayKey, running);
-            }
+            });
             return running;
         } finally {
-            invocationLease.close();
+            if (!retained) {
+                invocationLease.close();
+            }
         }
     }
 
@@ -1444,15 +1588,15 @@ public class FlowExecutor {
             return RuntimeResult.success(outputs, null);
         }
         if (result.diagnostics().isEmpty()) {
-            return RuntimeResult.failure(new restudio.resync.flow.runtime.RuntimeFailure(
-                Diagnostic.builder("RUNTIME.HANDLER_FAILURE", restudio.resync.flow.diagnostic.DiagnosticSeverity.ERROR,
-                    restudio.resync.flow.diagnostic.DiagnosticPhase.ENVIRONMENT, "execution")
+            return RuntimeResult.failure(new RuntimeFailure(
+                Diagnostic.builder("RUNTIME.HANDLER_FAILURE", DiagnosticSeverity.ERROR,
+                    DiagnosticPhase.ENVIRONMENT, "execution")
                     .messageKey(new ContractRef<>(new OwnerId("resync"), new CapabilityId("runtime-handler-failure")))
                     .message("Compiled Function execution failed")
                     .remediation("Inspect the compiled Function diagnostics")
                     .correlationId(UUID.randomUUID()).build(), false));
         }
-        return RuntimeResult.failure(new restudio.resync.flow.runtime.RuntimeFailure(
+        return RuntimeResult.failure(new RuntimeFailure(
             result.diagnostics().getFirst().diagnostic(), false));
     }
 
@@ -1724,7 +1868,7 @@ public class FlowExecutor {
                 null,
                 null,
                 null,
-                restudio.resync.flow.runtime.RuntimeExecutionContext.NO_DEADLINE,
+                RuntimeExecutionContext.NO_DEADLINE,
                 node
         );
         context.setDeferredOutputDispatcher(outputPin -> dispatchDeferredOutput(runtime, startNodeId, outputPin, player, event, steps));
@@ -1827,9 +1971,10 @@ public class FlowExecutor {
             } else {
                 result = findNextAndExecute(runtime, startNodeId, "flow", player, event, steps);
             }
-            return result;
+            return settleContext(context, result);
         } catch (Exception e) {
-            return CompletableFuture.failedFuture(handlerFailure(e, startNodeId, node.getType(), "HANDLER_EXECUTION_FAILED", "executing"));
+            return settleContext(context, CompletableFuture.failedFuture(
+                handlerFailure(e, startNodeId, node.getType(), "HANDLER_EXECUTION_FAILED", "executing")));
         }
     }
 
@@ -1916,10 +2061,21 @@ public class FlowExecutor {
     }
 
     private CompletableFuture<Void> pendingOperations(FlowContext context) {
-        return pendingOperations(context, new HashSet<>());
+        return pendingOperations(context, new HashSet<>(), null);
     }
 
-    private CompletableFuture<Void> pendingOperations(FlowContext context, Set<CompletableFuture<Void>> observed) {
+    private CompletableFuture<Void> settleContext(FlowContext context, CompletableFuture<Void> execution) {
+        return execution.handle((ignored, executionFailure) -> pendingOperations(context)
+            .handle((pending, pendingFailure) -> {
+                Throwable failure = executionFailure != null ? executionFailure : pendingFailure;
+                if (failure != null) {
+                    throw new CompletionException(unwrapCompletionFailure(failure));
+                }
+                return (Void) null;
+            })).thenCompose(result -> result);
+    }
+
+    private CompletableFuture<Void> pendingOperations(FlowContext context, Set<CompletableFuture<Void>> observed, Throwable firstFailure) {
         if (context == null) {
             return CompletableFuture.completedFuture(null);
         }
@@ -1927,9 +2083,10 @@ public class FlowExecutor {
             .filter(observed::add)
             .toArray(CompletableFuture[]::new);
         if (pending.length == 0) {
-            return CompletableFuture.completedFuture(null);
+            return firstFailure == null ? CompletableFuture.completedFuture(null) : CompletableFuture.failedFuture(firstFailure);
         }
-        return CompletableFuture.allOf(pending).thenCompose(ignored -> pendingOperations(context, observed));
+        return CompletableFuture.allOf(pending).handle((ignored, failure) -> firstFailure != null ? firstFailure : failure)
+            .thenCompose(failure -> pendingOperations(context, observed, failure));
     }
 
     private CompletableFuture<Void> pendingBeforeContinuationOperations(FlowContext context) {
@@ -1955,22 +2112,23 @@ public class FlowExecutor {
             return CompletableFuture.completedFuture(null);
         }
 
-        CompletableFuture<Void> completion = new CompletableFuture<>();
+        FlowTask operation = new FlowTask();
+        CompletableFuture<Void> completion = operation.completion();
         Runnable continuation = () -> {
-            if (completion.isDone()) {
+            if (!operation.start()) {
                 return;
             }
             try {
                 executeTriggeredOutputs(runtime, currentNodeId, List.of(outputPin), player, event, steps)
                     .whenComplete((ignored, failure) -> {
                         if (failure == null) {
-                            completion.complete(null);
+                            operation.finish(null);
                         } else {
-                            completion.completeExceptionally(unwrapCompletionFailure(failure));
+                            operation.finish(unwrapCompletionFailure(failure));
                         }
                     });
             } catch (Exception ex) {
-                completion.completeExceptionally(ex);
+                operation.finish(ex);
             }
         };
 
@@ -1985,8 +2143,7 @@ public class FlowExecutor {
                 completion.completeExceptionally(exception);
                 return completion;
             }
-            registerPendingTask(taskId, graphId(runtime), task, completion);
-            completion.whenComplete((ignored, failure) -> finishPendingTask(taskId, failure));
+            trackTask(taskId, graphId(runtime), task, operation);
         }
         return completion;
     }
@@ -2005,17 +2162,18 @@ public class FlowExecutor {
             return invokeExecutionAction(action);
         }
 
-        CompletableFuture<Void> completion = new CompletableFuture<>();
+        FlowTask operation = new FlowTask();
+        CompletableFuture<Void> completion = operation.completion();
         String taskId = "thread_policy_" + UUID.randomUUID();
         Runnable scheduledAction = () -> {
-            if (completion.isDone()) {
+            if (!operation.start()) {
                 return;
             }
             invokeExecutionAction(action).whenComplete((ignored, failure) -> {
                 if (failure == null) {
-                    completion.complete(null);
+                    operation.finish(null);
                 } else {
-                    completion.completeExceptionally(unwrapCompletionFailure(failure));
+                    operation.finish(unwrapCompletionFailure(failure));
                 }
             });
         };
@@ -2028,8 +2186,7 @@ public class FlowExecutor {
             completion.completeExceptionally(exception);
             return completion;
         }
-        registerPendingTask(taskId, graphId(runtime), task, completion);
-        completion.whenComplete((ignored, failure) -> finishPendingTask(taskId, failure));
+        trackTask(taskId, graphId(runtime), task, operation);
         return completion;
     }
 
@@ -2958,17 +3115,21 @@ public class FlowExecutor {
         if (ticks <= 0) {
             return CompletableFuture.completedFuture(null);
         }
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        FlowTask operation = new FlowTask();
+        CompletableFuture<Void> future = operation.completion();
         String taskId = "loop_delay_" + UUID.randomUUID();
         BukkitTask task;
         try {
-            task = Bukkit.getScheduler().runTaskLater(ReSync.getInstance(), () -> future.complete(null), ticks);
+            task = Bukkit.getScheduler().runTaskLater(ReSync.getInstance(), () -> {
+                if (operation.start()) {
+                    operation.finish(null);
+                }
+            }, ticks);
         } catch (RuntimeException exception) {
             future.completeExceptionally(exception);
             return future;
         }
-        registerPendingTask(taskId, graphId(runtime), task, future);
-        future.whenComplete((result, failure) -> finishPendingTask(taskId, failure));
+        trackTask(taskId, graphId(runtime), task, operation);
         return future;
     }
 
@@ -3304,7 +3465,7 @@ public class FlowExecutor {
         String previousPin = runtime.getTriggeredOutputPin();
         runtime.setTriggeredOutputPin(null);
         FlowContext context = new FlowContext(runtime, player, event, ignored -> {}, this, null, null, null, null,
-            restudio.resync.flow.runtime.RuntimeExecutionContext.NO_DEADLINE, sourceNode);
+            RuntimeExecutionContext.NO_DEADLINE, sourceNode);
         try {
             handler.execute(context, sourceNode);
             context.finishSynchronousCapture();
@@ -3312,7 +3473,8 @@ public class FlowExecutor {
             runtime.consumeTriggeredOutput();
             return pendingOperations(context);
         } catch (Exception e) {
-            return CompletableFuture.failedFuture(handlerFailure(e, nodeId, sourceNode.getType(), "DATA_EVALUATION_FAILED", "evaluating"));
+            return settleContext(context, CompletableFuture.failedFuture(
+                handlerFailure(e, nodeId, sourceNode.getType(), "DATA_EVALUATION_FAILED", "evaluating")));
         } finally {
             runtime.setTriggeredOutputPin(previousPin);
         }
@@ -3438,24 +3600,24 @@ public class FlowExecutor {
                 }
                 try {
                     Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                        if (completion.isDone()) {
+                        if (!pending.operation.start()) {
                             return;
                         }
                         try {
                             CompletableFuture<Void> actionCompletion = action.get();
                             if (actionCompletion == null) {
-                                completion.completeExceptionally(new IllegalStateException("Wall-clock task returned no completion future"));
+                                pending.operation.finish(new IllegalStateException("Wall-clock task returned no completion future"));
                                 return;
                             }
                             actionCompletion.whenComplete((result, failure) -> {
                                 if (failure != null) {
-                                    completion.completeExceptionally(unwrapCompletionFailure(failure));
+                                    pending.operation.finish(unwrapCompletionFailure(failure));
                                 } else {
-                                    completion.complete(null);
+                                    pending.operation.finish(null);
                                 }
                             });
-                        } catch (RuntimeException exception) {
-                            completion.completeExceptionally(exception);
+                        } catch (Throwable exception) {
+                            pending.operation.finish(exception);
                         }
                     });
                 } catch (RuntimeException exception) {
@@ -3486,20 +3648,101 @@ public class FlowExecutor {
 
     public void registerPendingTask(String taskId, String graphId, String runtimeOwner, BukkitTask task, CompletableFuture<Void> completion,
                                     long createdAt, long nextFireAt, boolean recurring) {
-        if (taskId == null || taskId.isBlank() || task == null) {
+        registerPendingTask(taskId, graphId, runtimeOwner, task, completion, createdAt, nextFireAt, recurring, null);
+    }
+
+    public CompletableFuture<Void> runOnMain(Plugin plugin, Runnable action) {
+        Objects.requireNonNull(action, "Main Thread Action Is Required");
+        return runOnMain(plugin, false, cancelled -> {
+            action.run();
+            return CompletableFuture.completedFuture(null);
+        });
+    }
+
+    public CompletableFuture<Void> runOnMain(Plugin plugin, boolean defer,
+            Function<BooleanSupplier, CompletionStage<Void>> action) {
+        Objects.requireNonNull(plugin, "Main Thread Plugin Is Required");
+        Objects.requireNonNull(action, "Main Thread Action Is Required");
+        CompletableFuture<Void> admitted = withLegacyAdmission(true, () -> {
+            FlowTask operation = new FlowTask();
+            Runnable callback = () -> {
+                if (!operation.start()) {
+                    return;
+                }
+                try {
+                    synchronized (admissionMonitor) {
+                        if (admissionFenceDepth > 0 || !plugin.isEnabled()) {
+                            throw new IllegalStateException("Main Thread Admission Is Closed");
+                        }
+                    }
+                    CompletionStage<Void> physical = Objects.requireNonNull(action.apply(operation::isCancelled),
+                        "Main Thread Physical Completion Is Required");
+                    physical.whenComplete((ignored, failure) -> operation.finish(failure));
+                } catch (Throwable thrown) {
+                    operation.finish(thrown);
+                }
+            };
+            synchronized (admissionMonitor) {
+                if (admissionFenceDepth > 0 || !plugin.isEnabled()) {
+                    operation.finish(new IllegalStateException("Main Thread Admission Is Closed"));
+                } else if (!defer && Bukkit.isPrimaryThread()) {
+                    callback.run();
+                } else {
+                    try {
+                        String taskId = "main_callback_" + UUID.randomUUID();
+                        BukkitTask task = Bukkit.getScheduler().runTask(plugin, callback);
+                        trackTask(taskId, "", task, operation);
+                    } catch (Throwable failure) {
+                        operation.finish(failure);
+                    }
+                }
+            }
+            return operation.completion();
+        });
+        return admitted.copy();
+    }
+
+    void trackTask(String taskId, String graphId, BukkitTask task, FlowTask operation) {
+        registerPendingTask(taskId, graphId, "flow_runtime", task, operation.completion(), System.currentTimeMillis(), -1L, false, operation);
+    }
+
+    void trackOperation(String taskId, String graphId, CompletableFuture<Void> completion, Runnable cancelAction) {
+        Objects.requireNonNull(completion, "Flow Operation Completion Is Required");
+        Objects.requireNonNull(cancelAction, "Flow Operation Cancellation Is Required");
+        boolean rejected;
+        synchronized (admissionMonitor) {
+            rejected = admissionFenceDepth > 0 || wallClockScheduler.isShutdown();
+            if (!rejected) {
+                registerPendingTask(taskId, graphId, "flow_operation", null, completion,
+                    System.currentTimeMillis(), -1L, false, null, cancelAction);
+            }
+        }
+        if (rejected) {
+            cancelAction.run();
+        }
+    }
+
+    private void registerPendingTask(String taskId, String graphId, String runtimeOwner, BukkitTask task, CompletableFuture<Void> completion,
+                                     long createdAt, long nextFireAt, boolean recurring, FlowTask operation) {
+        registerPendingTask(taskId, graphId, runtimeOwner, task, completion, createdAt, nextFireAt, recurring, operation, null);
+    }
+
+    private void registerPendingTask(String taskId, String graphId, String runtimeOwner, BukkitTask task, CompletableFuture<Void> completion,
+                                     long createdAt, long nextFireAt, boolean recurring, FlowTask operation, Runnable cancelAction) {
+        if (taskId == null || taskId.isBlank() || task == null && (completion == null || cancelAction == null)) {
             throw new IllegalArgumentException("Tracked task ID and Bukkit task are required");
         }
         terminalTasks.remove(taskId);
         PendingTask previous = pendingTasks.get(taskId);
         long stableCreatedAt = previous != null ? previous.createdAt() : createdAt;
         PendingTask replacement = new PendingTask(graphId != null ? graphId : "", runtimeOwner != null ? runtimeOwner : "flow_runtime", task,
-            completion, stableCreatedAt, nextFireAt, recurring, previous != null ? previous.lastFailure() : "");
+            completion, stableCreatedAt, nextFireAt, recurring, previous != null ? previous.lastFailure() : "", operation, cancelAction);
         previous = pendingTasks.put(taskId, replacement);
-        if (previous != null && !previous.task().isCancelled()) {
-            previous.task().cancel();
+        if (previous != null && (previous.task() != task || previous.completion() != completion || previous.cancelAction() != cancelAction)) {
+            cancelTask(previous);
         }
-        if (previous != null && previous.completion() != null && !previous.completion().isDone()) {
-            previous.completion().cancel(false);
+        if (completion != null) {
+            completion.whenComplete((ignored, failure) -> finishPendingTask(taskId, replacement, failure));
         }
     }
 
@@ -3513,8 +3756,31 @@ public class FlowExecutor {
     }
 
     public void finishPendingTask(String taskId, Throwable failure) {
-        if (failure != null) recordScheduledTaskFailure(taskId, unwrapCompletionFailure(failure));
-        unregisterPendingTask(taskId);
+        finishPendingTask(taskId, null, failure);
+    }
+
+    private void finishPendingTask(String taskId, PendingTask expected, Throwable failure) {
+        if (taskId == null) {
+            return;
+        }
+        AtomicReference<PendingTask> finished = new AtomicReference<>();
+        pendingTasks.computeIfPresent(taskId, (ignored, current) -> {
+            if (expected != null && (current.task() != expected.task() || current.completion() != expected.completion()
+                || current.cancelAction() != expected.cancelAction())) {
+                return current;
+            }
+            Throwable cause = failure == null ? null : unwrapCompletionFailure(failure);
+            String message = cause != null && cause.getMessage() != null ? cause.getMessage() : current.lastFailure();
+            finished.set(new PendingTask(current.graphId(), current.runtimeOwner(), current.task(), current.completion(),
+                current.createdAt(), current.nextFireAt(), current.recurring(), message, current.operation(), current.cancelAction()));
+            return null;
+        });
+        PendingTask removed = finished.get();
+        if (removed != null) {
+            TaskCancellationStatus status = removed.completion() != null && removed.completion().isCancelled()
+                ? TaskCancellationStatus.CANCELLED : TaskCancellationStatus.FINISHED;
+            rememberTerminalTask(taskId, removed, status);
+        }
     }
 
     public boolean cancelPendingTask(String taskId) {
@@ -3539,12 +3805,7 @@ public class FlowExecutor {
                 ? TaskCancellationStatus.ALREADY_CANCELLED
                 : TaskCancellationStatus.FINISHED;
         }
-        if (!pending.task().isCancelled()) {
-            pending.task().cancel();
-        }
-        if (pending.completion() != null && !pending.completion().isDone()) {
-            pending.completion().cancel(false);
-        }
+        cancelTask(pending);
         rememberTerminalTask(taskId, pending, TaskCancellationStatus.CANCELLED);
         return TaskCancellationStatus.CANCELLED;
     }
@@ -3552,21 +3813,30 @@ public class FlowExecutor {
     public void cancelPendingTasks() {
         for (Map.Entry<String, PendingTask> entry : pendingTasks.entrySet()) {
             PendingTask pending = entry.getValue();
-            if (!pending.task().isCancelled()) {
-                pending.task().cancel();
+            if (pendingTasks.remove(entry.getKey(), pending)) {
+                cancelTask(pending);
+                rememberTerminalTask(entry.getKey(), pending, TaskCancellationStatus.CANCELLED);
             }
-            if (pending.completion() != null && !pending.completion().isDone()) {
-                pending.completion().cancel(false);
-            }
-            rememberTerminalTask(entry.getKey(), pending, TaskCancellationStatus.CANCELLED);
         }
-        pendingTasks.clear();
         for (Map.Entry<String, WallClockTask> entry : wallClockTasks.entrySet()) {
             WallClockTask pending = entry.getValue();
             if (wallClockTasks.remove(entry.getKey(), pending)) {
                 pending.cancel();
                 rememberTerminalWallClockTask(entry.getKey(), pending, ScheduledTaskState.CANCELLED, "");
             }
+        }
+    }
+
+    private void cancelTask(PendingTask pending) {
+        if (pending.task() != null && !pending.task().isCancelled()) {
+            pending.task().cancel();
+        }
+        if (pending.cancelAction() != null) {
+            pending.cancelAction().run();
+        } else if (pending.operation() != null) {
+            pending.operation().cancel();
+        } else if (pending.completion() != null && !pending.completion().isDone()) {
+            pending.completion().cancel(false);
         }
     }
 
@@ -3621,7 +3891,7 @@ public class FlowExecutor {
             return;
         }
         pendingTasks.computeIfPresent(taskId, (ignored, pending) -> new PendingTask(pending.graphId(), pending.runtimeOwner(), pending.task(),
-            pending.completion(), pending.createdAt(), nextFireAt, pending.recurring(), pending.lastFailure()));
+            pending.completion(), pending.createdAt(), nextFireAt, pending.recurring(), pending.lastFailure(), pending.operation(), pending.cancelAction()));
     }
 
     public void recordScheduledTaskFailure(String taskId, Throwable failure) {
@@ -3630,7 +3900,7 @@ public class FlowExecutor {
         }
         String message = failure.getMessage() != null && !failure.getMessage().isBlank() ? failure.getMessage() : failure.getClass().getSimpleName();
         pendingTasks.computeIfPresent(taskId, (ignored, pending) -> new PendingTask(pending.graphId(), pending.runtimeOwner(), pending.task(),
-            pending.completion(), pending.createdAt(), pending.nextFireAt(), pending.recurring(), message));
+            pending.completion(), pending.createdAt(), pending.nextFireAt(), pending.recurring(), message, pending.operation(), pending.cancelAction()));
         WallClockTask wallClockTask = wallClockTasks.get(taskId);
         if (wallClockTask != null) {
             wallClockTask.lastFailure = message;
@@ -3770,6 +4040,44 @@ public class FlowExecutor {
     private String graphId(FlowRuntime runtime) {
         FlowGraph graph = runtime != null ? runtime.getGraph() : null;
         return graph != null && graph.getId() != null ? graph.getId() : "";
+    }
+
+    public String findStartNode(GraphDocument graph) {
+        if (graph == null || graph.nodes().isEmpty()) {
+            return null;
+        }
+        List<GraphNode> candidates = graph.nodes().stream().filter(node -> {
+            NodeDefinition definition = typedDefinition(node);
+            return graph.connections().stream().filter(connection -> connection.target().nodeId().equals(node.instanceId()))
+                .noneMatch(connection -> FlowRuntime.inputPinMatches(definition, connection.target().pinId().value(), "flow")
+                    || FlowRuntime.inputPinMatches(definition, connection.target().pinId().value(), "next"));
+        }).sorted(Comparator.comparing(node -> node.instanceId().canonicalText(), String.CASE_INSENSITIVE_ORDER)).toList();
+        for (GraphNode node : candidates) {
+            NodeDefinition definition = typedDefinition(node);
+            if (definition != null && definition.isTrigger() || isFunctionStartType(node.definition().canonicalText())) {
+                return node.instanceId().canonicalText();
+            }
+        }
+        for (GraphNode node : candidates) {
+            NodeDefinition definition = typedDefinition(node);
+            if (definition != null && definition.getInputs().stream().anyMatch(pin -> pin.getType() == NodeDefinition.PinType.FLOW)
+                || graph.connections().stream().filter(connection -> connection.source().nodeId().equals(node.instanceId()))
+                    .anyMatch(connection -> {
+                        String pin = connection.source().pinId().value();
+                        return FlowRuntime.outputPinMatches(definition, pin, "flow") || FlowRuntime.outputPinMatches(definition, pin, "next")
+                            || FlowRuntime.outputPinMatches(definition, pin, "loop") || FlowRuntime.outputPinMatches(definition, pin, "done")
+                            || FlowRuntime.outputPinMatches(definition, pin, "true") || FlowRuntime.outputPinMatches(definition, pin, "false")
+                            || pin.startsWith("branch_");
+                    })) {
+                return node.instanceId().canonicalText();
+            }
+        }
+        return candidates.isEmpty() ? graph.nodes().stream().map(node -> node.instanceId().canonicalText())
+            .sorted(String.CASE_INSENSITIVE_ORDER).findFirst().orElse(null) : candidates.getFirst().instanceId().canonicalText();
+    }
+
+    private NodeDefinition typedDefinition(GraphNode node) {
+        return nodeDefinitionRegistry == null ? null : nodeDefinitionRegistry.get(node.definition().canonicalText());
     }
 
     public String findStartNode(FlowGraph graph) {

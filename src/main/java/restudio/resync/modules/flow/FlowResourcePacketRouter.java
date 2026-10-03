@@ -1667,6 +1667,11 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public void completePostCommitRecovery(String id, UUID mutationId, long revision, boolean deleted) {
+                storage.completePostCommitRecovery(type, id, mutationId, revision, deleted);
+            }
+
+            @Override
             public JsonObject duplicate(JsonObject value, String targetId) {
                 JsonObject copy = value.deepCopy();
                 copy.addProperty("id", targetId);

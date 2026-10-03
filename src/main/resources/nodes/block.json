@@ -2,7 +2,7 @@
   {
     "id": "block_properties",
     "displayName": "Block Properties",
-    "description": "Read typed properties from a target block.",
+    "description": "Reads one block property. Populates only the output for that property.",
     "domain": "block",
     "family": "block_properties",
     "lifecycle": "active",
@@ -150,7 +150,7 @@
         "pinType": "DATA",
         "dataType": "block",
         "direction": "input",
-        "description": "Block selected for this operation."
+        "description": "Block or supported block-state snapshot to inspect."
       },
       {
         "id": "action",
@@ -159,7 +159,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Action to apply to the selected target.",
+        "description": "Get reads the selected property. Has checks whether its value is present.",
         "widget": "DROPDOWN",
         "options": [
           "get",
@@ -174,7 +174,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Property name used for this operation.",
+        "description": "Block property to read.",
         "widget": "SEARCHABLE_LIST",
         "options": [
           "type",
@@ -222,7 +222,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the has value produced by this operation.",
+        "description": "True when Has finds a non-null property value. False values and zero are still present.",
         "visibleWhen": {
           "action": "has"
         }
@@ -234,7 +234,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "direction": "output",
-        "description": "Returns the type value produced by this operation.",
+        "description": "Minecraft material name of the block.",
         "visibleWhen": {
           "action": "get",
           "property": "type"
@@ -247,7 +247,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the data value produced by this operation.",
+        "description": "Serialized Minecraft block-data text containing material and state properties.",
         "visibleWhen": {
           "action": "get",
           "property": "data"
@@ -260,7 +260,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the light level value produced by this operation.",
+        "description": "Combined light level at the block, from 0 through 15.",
         "visibleWhen": {
           "action": "get",
           "property": "light_level"
@@ -273,7 +273,7 @@
         "pinType": "DATA",
         "dataType": "biome",
         "direction": "output",
-        "description": "Returns the biome value produced by this operation.",
+        "description": "Minecraft biome at the block's coordinates.",
         "visibleWhen": {
           "action": "get",
           "property": "biome"
@@ -286,7 +286,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the temperature value produced by this operation.",
+        "description": "Biome temperature value at the block's coordinates.",
         "visibleWhen": {
           "action": "get",
           "property": "temperature"
@@ -299,7 +299,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the humidity value produced by this operation.",
+        "description": "Biome humidity value at the block's coordinates.",
         "visibleWhen": {
           "action": "get",
           "property": "humidity"
@@ -312,7 +312,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the is solid value produced by this operation.",
+        "description": "Whether the block material is classified as solid.",
         "visibleWhen": {
           "action": "get",
           "property": "is_solid"
@@ -325,7 +325,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the is liquid value produced by this operation.",
+        "description": "True for Water or Lava materials.",
         "visibleWhen": {
           "action": "get",
           "property": "is_liquid"
@@ -338,7 +338,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the is air value produced by this operation.",
+        "description": "True for an Air material.",
         "visibleWhen": {
           "action": "get",
           "property": "is_air"
@@ -351,7 +351,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "output",
-        "description": "Returns the location value produced by this operation.",
+        "description": "World location of the block's integer coordinates.",
         "visibleWhen": {
           "action": "get",
           "property": "location"
@@ -364,7 +364,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "output",
-        "description": "Returns the world value produced by this operation.",
+        "description": "Loaded world containing the block.",
         "visibleWhen": {
           "action": "get",
           "property": "world"
@@ -377,7 +377,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the x value produced by this operation.",
+        "description": "Whole-block X coordinate.",
         "visibleWhen": {
           "action": "get",
           "property": "x"
@@ -390,7 +390,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the y value produced by this operation.",
+        "description": "Whole-block Y coordinate.",
         "visibleWhen": {
           "action": "get",
           "property": "y"
@@ -403,7 +403,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the z value produced by this operation.",
+        "description": "Whole-block Z coordinate.",
         "visibleWhen": {
           "action": "get",
           "property": "z"
@@ -416,7 +416,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the break naturally value produced by this operation.",
+        "description": "Action that breaks the block using normal drop behavior.",
         "visibleWhen": {
           "action": "get",
           "property": "break_naturally"
@@ -429,7 +429,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the state value produced by this operation.",
+        "description": "Serialized Minecraft block-state text.",
         "visibleWhen": {
           "action": "get",
           "property": "state"
@@ -442,7 +442,7 @@
         "pinType": "DATA",
         "dataType": "list<itemstack>",
         "direction": "output",
-        "description": "Returns the container items value produced by this operation.",
+        "description": "Contents of a container block in inventory slot order.",
         "visibleWhen": {
           "action": "get",
           "property": "container_items"
@@ -960,7 +960,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Minecraft material name of the block."
       },
       {
         "id": "success",
@@ -969,7 +969,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -1096,7 +1096,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Serialized Minecraft block-data text containing material and state properties."
       },
       {
         "id": "success",
@@ -1105,7 +1105,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -1232,7 +1232,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Combined light level at the block, from 0 through 15."
       },
       {
         "id": "success",
@@ -1241,7 +1241,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -1388,7 +1388,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Minecraft biome at the block's coordinates."
       },
       {
         "id": "success",
@@ -1397,7 +1397,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -1524,7 +1524,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Biome temperature value at the block's coordinates."
       },
       {
         "id": "success",
@@ -1533,7 +1533,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -1660,7 +1660,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Biome humidity value at the block's coordinates."
       },
       {
         "id": "success",
@@ -1669,7 +1669,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -1796,7 +1796,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Whether the block material is classified as solid."
       },
       {
         "id": "success",
@@ -1805,7 +1805,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -1932,7 +1932,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "True for Water or Lava materials."
       },
       {
         "id": "success",
@@ -1941,7 +1941,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -2068,7 +2068,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "True for an Air material."
       },
       {
         "id": "success",
@@ -2077,7 +2077,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -2207,7 +2207,7 @@
         "pinType": "FLOW",
         "dataType": "execution",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Action that breaks the block using normal drop behavior."
       },
       {
         "id": "success",
@@ -2216,7 +2216,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -2343,7 +2343,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "World location of the block's integer coordinates."
       },
       {
         "id": "success",
@@ -2352,7 +2352,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -2479,7 +2479,7 @@
         "pinType": "DATA",
         "dataType": "world",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Loaded world containing the block."
       },
       {
         "id": "success",
@@ -2488,7 +2488,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -2615,7 +2615,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Whole-block X coordinate."
       },
       {
         "id": "success",
@@ -2624,7 +2624,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -2751,7 +2751,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Whole-block Y coordinate."
       },
       {
         "id": "success",
@@ -2760,7 +2760,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",
@@ -2887,7 +2887,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Value read from the selected property."
+        "description": "Whole-block Z coordinate."
       },
       {
         "id": "success",
@@ -2896,7 +2896,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Operation success"
+        "description": "Reports completion of a supported writing or execution action. Get uses Value."
       },
       {
         "id": "has",

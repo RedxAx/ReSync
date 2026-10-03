@@ -3,6 +3,7 @@ package restudio.resync.flow.runtime;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.identity.PinId;
+import restudio.resync.flow.graph.FunctionBinding;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -13,6 +14,24 @@ import java.util.UUID;
 
 public interface RuntimeLeaseInput {
     List<BindingRequirement> bindings();
+
+    default List<FunctionBinding> functionBindings() {
+        return List.of();
+    }
+
+    default RuntimeScope scope() {
+        return null;
+    }
+
+    default RuntimeLeaseInput withFunctionBindings(List<FunctionBinding> functions) {
+        return new Default(bindings(), planFingerprint(), authority(), principal(), catalogGeneration(), catalogHash(),
+            mutationId(), invocationId(), requestedDeadlineMillis(), functions, scope());
+    }
+
+    default RuntimeLeaseInput withScope(RuntimeScope scope) {
+        return new Default(bindings(), planFingerprint(), authority(), principal(), catalogGeneration(), catalogHash(),
+            mutationId(), invocationId(), requestedDeadlineMillis(), functionBindings(), scope);
+    }
 
     default ContentHash planFingerprint() {
         return null;
@@ -198,8 +217,16 @@ public interface RuntimeLeaseInput {
         ContentHash catalogHash,
         String mutationId,
         CorrelationId invocationId,
-        long requestedDeadlineMillis
+        long requestedDeadlineMillis,
+        List<FunctionBinding> functionBindings,
+        RuntimeScope scope
     ) implements RuntimeLeaseInput {
+        public Default(List<BindingRequirement> bindings, ContentHash planFingerprint, RuntimeAuthority authority,
+                       RuntimePrincipal principal, long catalogGeneration, ContentHash catalogHash, String mutationId,
+                       CorrelationId invocationId, long requestedDeadlineMillis) {
+            this(bindings, planFingerprint, authority, principal, catalogGeneration, catalogHash, mutationId,
+                invocationId, requestedDeadlineMillis, List.of(), null);
+        }
         public Default(List<BindingRequirement> bindings, ContentHash planFingerprint, RuntimeAuthority authority) {
             this(bindings, planFingerprint, authority, null, -1, null, null, CorrelationId.random(),
                 RuntimeExecutionContext.NO_DEADLINE);
@@ -214,6 +241,7 @@ public interface RuntimeLeaseInput {
 
         public Default {
             bindings = List.copyOf(Objects.requireNonNull(bindings, "Lease Bindings Are Required"));
+            functionBindings = List.copyOf(Objects.requireNonNull(functionBindings, "Lease Function Bindings Are Required"));
             authority = Objects.requireNonNull(authority, "Runtime Authority Is Required");
             invocationId = Objects.requireNonNull(invocationId, "Invocation ID Is Required");
             if (requestedDeadlineMillis < 0) {

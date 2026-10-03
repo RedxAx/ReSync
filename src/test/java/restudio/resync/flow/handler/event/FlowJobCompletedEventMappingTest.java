@@ -29,7 +29,10 @@ class FlowJobCompletedEventMappingTest {
 
         Map<String, Object> variables = extractor.apply(new FlowJobCompletedEvent(snapshot));
 
-        assertEquals(definition.getOutputMappings().size(), variables.size());
+        for (NodeDefinition.PinMapping mapping : definition.getOutputMappings()) {
+            assertNotNull(variables.get(mapping.target()));
+            assertEquals(variables.get(mapping.target()), variables.get(mapping.source()));
+        }
         assertInstanceOf(FlowJobReference.class, variables.get("event.job"));
         assertEquals("job-17", variables.get("event.job_id"));
         assertEquals("compile", variables.get("event.job_kind"));

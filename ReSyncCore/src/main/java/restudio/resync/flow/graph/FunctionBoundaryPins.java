@@ -38,21 +38,26 @@ public final class FunctionBoundaryPins {
                                                    FunctionSignature signature, GraphNode node) {
         LinkedHashMap<PinId, EffectivePin> pins = new LinkedHashMap<>();
         owned.descriptor().pins().forEach(pin -> pins.put(pin.id(), EffectivePin.from(pin)));
+        if (signature != null) {
+            BoundaryRole role = role(owned);
+            if (role == BoundaryRole.INPUTS) {
+                signature.inputs().forEach(parameter -> add(pins, parameter, INPUT_PREFIX,
+                    CatalogNodeDescriptor.Direction.OUTPUT));
+            } else if (role == BoundaryRole.OUTPUTS) {
+                signature.outputs().forEach(parameter -> add(pins, parameter, OUTPUT_PREFIX,
+                    CatalogNodeDescriptor.Direction.INPUT));
+            }
+        }
         if (node != null) {
-            StringTemplatePins.derive(node, owned.descriptor()).forEach((id, type) ->
+            Map<PinId, TypeExpr> inputs = new LinkedHashMap<>();
+            pins.forEach((id, pin) -> {
+                if (pin.direction() == CatalogNodeDescriptor.Direction.INPUT) {
+                    inputs.put(id, pin.type());
+                }
+            });
+            StringTemplatePins.derive(node, inputs, pins.keySet()).forEach((id, type) ->
                 pins.putIfAbsent(id, new EffectivePin(id, CatalogNodeDescriptor.Direction.INPUT, type, null,
                     CatalogNodeDescriptor.RepeatableIntent.disabled())));
-        }
-        if (signature == null) {
-            return Collections.unmodifiableMap(new LinkedHashMap<>(pins));
-        }
-        BoundaryRole role = role(owned);
-        if (role == BoundaryRole.INPUTS) {
-            signature.inputs().forEach(parameter -> add(pins, parameter, INPUT_PREFIX,
-                CatalogNodeDescriptor.Direction.OUTPUT));
-        } else if (role == BoundaryRole.OUTPUTS) {
-            signature.outputs().forEach(parameter -> add(pins, parameter, OUTPUT_PREFIX,
-                CatalogNodeDescriptor.Direction.INPUT));
         }
         return Collections.unmodifiableMap(new LinkedHashMap<>(pins));
     }
@@ -118,7 +123,22 @@ public final class FunctionBoundaryPins {
         };
     }
 
-    enum BoundaryRole {
+    public static BoundaryRole role(Map<?, ?> metadata, String operation) {
+        BoundaryRole role = declaredRole(metadata);
+        if (role == null && metadata.get("handlerConfig") instanceof Map<?, ?> config) {
+            role = declaredRole(config);
+        }
+        if (role != null) {
+            return role;
+        }
+        return switch (operation) {
+            case "function_start" -> BoundaryRole.INPUTS;
+            case "function_end" -> BoundaryRole.OUTPUTS;
+            default -> null;
+        };
+    }
+
+    public enum BoundaryRole {
         INPUTS,
         OUTPUTS
     }

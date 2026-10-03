@@ -1,6 +1,8 @@
 package restudio.resync.velocity;
 
 import restudio.resync.network.NetworkRoute;
+import restudio.resync.network.NetworkRoutingGroup;
+import restudio.resync.network.NetworkRoutingStrategy;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,6 +10,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -60,9 +64,22 @@ public final class VelocityNetworkConfigLoader {
             NetworkRoute route = new NetworkRoute(properties.getProperty(prefix + "node-id", ""), routeName, properties.getProperty(prefix + "address", ""), integer(properties, prefix + "port", 0));
             routes.put(route.routeName(), route);
         }
+        List<NetworkRoutingGroup> groups = new ArrayList<>();
+        for (String groupId : values(properties.getProperty("routing.groups", ""))) {
+            String prefix = "routing.group." + groupId + ".";
+            List<String> nodeIds = List.copyOf(values(properties.getProperty(prefix + "nodes", "")));
+            Map<String, Integer> weights = new LinkedHashMap<>();
+            for (String nodeId : values(properties.getProperty(prefix + "weights", ""))) {
+                weights.put(nodeId, integer(properties, prefix + "weight." + nodeId, 0));
+            }
+            groups.add(new NetworkRoutingGroup(groupId, properties.getProperty(prefix + "name", groupId),
+                    NetworkRoutingStrategy.valueOf(properties.getProperty(prefix + "strategy", "ORDERED")), nodeIds, weights,
+                    properties.getProperty(prefix + "fallback", ""), values(properties.getProperty(prefix + "forced-hosts", "")),
+                    properties.getProperty(prefix + "permission", "")));
+        }
         String databaseValue = properties.getProperty("hub.database", "network/network.db").trim();
         Path database = path(root, databaseValue.isBlank() ? "network/network.db" : databaseValue);
-        return new VelocityNetworkConfig(booleanValue(properties, "network.enabled", false), properties.getProperty("network.id", ""), properties.getProperty("network.node-id", ""), properties.getProperty("network.display-name", "Proxy"), properties.getProperty("hub.bind-host", "127.0.0.1"), integer(properties, "hub.port", 12442), database, integer(properties, "hub.maximum-frame-bytes", 1_048_576), integer(properties, "hub.maximum-payload-bytes", 524_288), longValue(properties, "hub.heartbeat-timeout-millis", 15_000), longValue(properties, "snapshot.retention-millis", 2_592_000_000L), integer(properties, "snapshot.retention-per-player-family", 20), tls, nodes, routes, properties.getProperty("maintenance-route", ""), root);
+        return new VelocityNetworkConfig(booleanValue(properties, "network.enabled", false), properties.getProperty("network.id", ""), properties.getProperty("network.node-id", ""), properties.getProperty("network.display-name", "Proxy"), properties.getProperty("hub.bind-host", "127.0.0.1"), integer(properties, "hub.port", 12442), database, integer(properties, "hub.maximum-frame-bytes", 1_048_576), integer(properties, "hub.maximum-payload-bytes", 524_288), longValue(properties, "hub.heartbeat-timeout-millis", 15_000), longValue(properties, "snapshot.retention-millis", 2_592_000_000L), integer(properties, "snapshot.retention-per-player-family", 20), tls, nodes, routes, properties.getProperty("maintenance-route", ""), groups, root);
     }
 
     private static Set<String> values(String value) {

@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
@@ -126,6 +127,78 @@ public final class CompiledTriggerExecution {
 
     private record SourceAuthority(FlowStorage storage, ServerId serverId) {}
 
+    public Optional<CoreGraphStorageBoundary.Decoded> source(String type, String id) {
+        SourceAuthority owner = Objects.requireNonNull(sourceAuthority, "Authoritative Core trigger source is not configured");
+        if (!List.of("flow", "command").contains(type)) {
+            throw new IllegalArgumentException("A Flow Or Command Source Is Required");
+        }
+        return owner.storage().getCoreGraph(type, id).map(source -> {
+            GraphDocument document = Objects.requireNonNull(source.graphDocument(), "Typed Flow Source Is Required");
+            ServerResourceLocator expected = new ServerResourceLocator(owner.serverId(),
+                ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of(type)), id);
+            if (!expected.equals(document.resource()) || document.revision() != source.envelope().assetRevision()) {
+                throw new IllegalStateException("The Typed Flow Source Does Not Match Its Committed Identity");
+            }
+            return source;
+        });
+    }
+
+    public String findStartNode(CoreGraphStorageBoundary.Decoded source) {
+        return executor.findStartNode(Objects.requireNonNull(source.graphDocument(), "Typed Flow Source Is Required"));
+    }
+
+    public boolean requiresSynchronousEventWindow(CoreGraphStorageBoundary.Decoded source) {
+        if (planRepository != null) {
+            return requiresSynchronousEventWindow(identityEnvelope(source));
+        }
+        return source.graphDocument().nodes().stream().map(node -> node.definition().canonicalText())
+            .anyMatch(LiveEventScope::requiresWindow);
+    }
+
+    public void prepareSource(CoreGraphStorageBoundary.Decoded source) {
+        prepare(identityEnvelope(source));
+    }
+
+    public CompletableFuture<Void> executeSource(CoreGraphStorageBoundary.Decoded source, String startNodeId,
+                                                  Player player, Event event, Map<String, Object> variables,
+                                                  RuntimePrincipal principal, CorrelationId invocationId,
+                                                  long deadlineMillis) {
+        return execute(identityEnvelope(source), startNodeId, player, event, variables, principal, invocationId,
+            deadlineMillis, null, source.graphDocument());
+    }
+
+    public CompletionStage<CompiledCoreFlowExecutionBridge.ObservedExecution> executeSourceObserved(
+            CoreGraphStorageBoundary.Decoded source, String startNodeId, Player player, Event event,
+            Map<String, Object> variables, RuntimePrincipal principal, CorrelationId invocationId, long deadlineMillis) {
+        CompiledCoreFlowExecutionBridge.ExecutionObservation observation = observeInvocation(invocationId);
+        try {
+            executeSource(source, startNodeId, player, event, variables, principal, invocationId, deadlineMillis)
+                .whenComplete((ignored, failure) -> observation.finishWithoutExecution(failure));
+        } catch (RuntimeException | Error failure) {
+            observation.finishWithoutExecution(failure);
+        }
+        return observation.completion();
+    }
+
+    public CompletableFuture<Void> executeSourceDeferred(CoreGraphStorageBoundary.Decoded source, String startNodeId,
+                                                          Player player, CompiledRuntimeContextAdapter.Result snapshot,
+                                                          CorrelationId invocationId) {
+        return execute(identityEnvelope(source), startNodeId, player, null, Map.of(), null, invocationId,
+            RuntimeExecutionContext.NO_DEADLINE, Objects.requireNonNull(snapshot, "Event snapshot is required"),
+            source.graphDocument());
+    }
+
+    private static FlowGraph identityEnvelope(CoreGraphStorageBoundary.Decoded source) {
+        GraphDocument document = Objects.requireNonNull(source.graphDocument(), "Typed Flow Source Is Required");
+        FlowGraph graph = new FlowGraph(document.resource().id(), new LinkedHashMap<>(), new ArrayList<>(), new ArrayList<>());
+        graph.setResourceType(document.resource().resourceType().value());
+        graph.setResourceRevision(source.envelope().assetRevision());
+        graph.setResourceHash(source.envelope().assetHash().canonicalText());
+        graph.setResourceMutationId(source.envelope().assetMutationId());
+        graph.setEnabled(source.envelope().assetActivationState() == ResourceActivationState.ACTIVE);
+        return graph;
+    }
+
     public boolean requiresSynchronousEventWindow(FlowGraph graph) {
         if (planRepository != null && graph != null && sourceAuthority != null) {
             Boolean prepared = synchronousTraits.get(traitKey(graph));
@@ -196,6 +269,23 @@ public final class CompiledTriggerExecution {
         }
     }
 
+    public CompiledCoreFlowExecutionBridge.ExecutionObservation observeInvocation(CorrelationId invocationId) {
+        return bridge.observeInvocation(invocationId);
+    }
+
+    public CompletionStage<CompiledCoreFlowExecutionBridge.ObservedExecution> executeObserved(FlowGraph graph,
+            String startNodeId, Player player, Event event, Map<String, Object> eventVariables,
+            RuntimePrincipal principal, CorrelationId invocationId, long deadlineMillis) {
+        CompiledCoreFlowExecutionBridge.ExecutionObservation observation = observeInvocation(invocationId);
+        try {
+            execute(graph, startNodeId, player, event, eventVariables, principal, invocationId, deadlineMillis)
+                .whenComplete((ignored, failure) -> observation.finishWithoutExecution(failure));
+        } catch (RuntimeException | Error failure) {
+            observation.finishWithoutExecution(failure);
+        }
+        return observation.completion();
+    }
+
     public CompiledRuntimeContextAdapter.Result snapshotEvent(Player player, Event event, Map<String, Object> variables) {
         SourceAuthority owner = Objects.requireNonNull(sourceAuthority, "Authoritative Core trigger source is not configured");
         return CompiledRuntimeContextAdapter.adapt(owner.serverId(), player, event, variables);
@@ -211,6 +301,14 @@ public final class CompiledTriggerExecution {
                                             Map<String, Object> eventVariables, RuntimePrincipal requestedPrincipal,
                                             CorrelationId invocationId, long requestedDeadlineMillis,
                                             CompiledRuntimeContextAdapter.Result preparedContext) {
+        return execute(graph, startNodeId, player, event, eventVariables, requestedPrincipal, invocationId,
+            requestedDeadlineMillis, preparedContext, null);
+    }
+
+    private CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event,
+                                            Map<String, Object> eventVariables, RuntimePrincipal requestedPrincipal,
+                                            CorrelationId invocationId, long requestedDeadlineMillis,
+                                            CompiledRuntimeContextAdapter.Result preparedContext, GraphDocument expectedSource) {
         Objects.requireNonNull(invocationId, "Invocation ID Is Required");
         long started = TemporaryLifecycleDiagnostics.start();
         Map<String, Object> identity = TemporaryLifecycleDiagnostics.recordsNormal()
@@ -235,10 +333,18 @@ public final class CompiledTriggerExecution {
             if (planRepository != null) {
                 ServerResourceLocator resource = new ServerResourceLocator(sourceOwner.serverId(),
                     ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of(graph.getResourceType())), graph.getId());
-                ServerCompiledPlanRepository.ResidentExecution template = planRepository
-                    .residentExecution(resource, graph.getResourceRevision())
-                    .or(() -> planRepository.residentExecution(resource))
-                    .orElseThrow(() -> new IllegalStateException("The admitted resident trigger execution template is unavailable"));
+                Optional<ServerCompiledPlanRepository.ResidentExecution> admitted = planRepository.residentExecution(resource,
+                    graph.getResourceRevision());
+                if (admitted.isEmpty()) {
+                    sourceDocument = planRepository.residentExecution(resource)
+                        .map(ServerCompiledPlanRepository.ResidentExecution::graph).orElse(null);
+                    if (sourceDocument != null && TemporaryLifecycleDiagnostics.recordsNormal()) {
+                        identity = TemporaryLifecycleDiagnostics.with(sourceIdentity(identity, sourceDocument),
+                            "requestedRevision", graph.getResourceRevision(), "currentSourceRevision", sourceDocument.revision());
+                    }
+                    throw new IllegalStateException("The exact resident trigger revision is unavailable");
+                }
+                ServerCompiledPlanRepository.ResidentExecution template = admitted.orElseThrow();
                 document = template.graph();
                 functionSource = template.functionSource();
                 envelopeHash = template.envelopeChecksum().canonicalText();
@@ -254,6 +360,10 @@ public final class CompiledTriggerExecution {
                 metadata = null;
             }
             sourceDocument = document;
+            if (expectedSource != null && (document != expectedSource
+                && !document.checksum().equals(expectedSource.checksum()))) {
+                throw new IllegalStateException("The Selected Typed Source Is No Longer Current");
+            }
             if (TemporaryLifecycleDiagnostics.recordsNormal()) {
                 identity = sourceIdentity(identity, document);
             }
@@ -396,16 +506,12 @@ public final class CompiledTriggerExecution {
                 CompiledCoreFlowExecutionBridge.authorityHash(),
                 compiledMetadata.catalogBinding().catalogChecksum(),
                 compiledMetadata.catalogBinding().bindingManifestHash());
-            CompletableFuture<Void> future = executor.withLiveEventScope(runtimeContext, invocationId, event, () -> executor.executeCompiled(
-                graph,
-                startNodeId,
-                runtimeContext,
-                mappingContext,
-                compiledMetadata,
-                authority,
-                bridge,
-                invocationId,
-                requestedDeadlineMillis));
+            GraphDocument admittedSource = sourceDocument;
+            CompletableFuture<Void> future = executor.withLiveEventScope(runtimeContext, invocationId, event, () -> expectedSource == null
+                ? executor.executeCompiled(graph, startNodeId, runtimeContext, mappingContext, compiledMetadata,
+                    authority, bridge, invocationId, requestedDeadlineMillis)
+                : executor.executeCompiledSource(admittedSource, graph, startNodeId, runtimeContext, mappingContext,
+                    compiledMetadata, authority, bridge, invocationId, requestedDeadlineMillis));
             progress("trigger_executor_admitted", started, identity, "outcome", "admitted");
             return terminal(future, graph, sourceDocument, compiledMetadata, startNodeId, invocationId, started, identity, true);
         } catch (RuntimeException failure) {
@@ -710,12 +816,16 @@ public final class CompiledTriggerExecution {
         evidence.put("resourceType", graph == null ? "" : value(graph.getResourceType()));
         evidence.put("resourceId", graph == null ? "" : value(graph.getId()));
         evidence.put("startNodeInstanceId", value(startNodeId));
+        if (graph != null) {
+            evidence.put("requestedRevision", graph.getResourceRevision());
+        }
         SourceAuthority owner = sourceAuthority;
         if (owner != null) {
             evidence.put("serverId", owner.serverId().canonicalText());
         }
         if (document != null) {
             evidence.put("typedResource", document.resource().canonicalText());
+            evidence.put("currentSourceRevision", document.revision());
             evidence.put("catalogGeneration", document.catalogBinding().generation());
             evidence.put("catalogChecksum", document.catalogBinding().catalogChecksum().canonicalText());
             evidence.put("bindingManifestHash", document.catalogBinding().bindingManifestHash().canonicalText());
@@ -744,6 +854,11 @@ public final class CompiledTriggerExecution {
                 .ifPresent(definition -> builder.nodeId(definition.id()));
         } else if (owner != null) {
             builder.serverId(owner.serverId());
+            if (graph != null && graph.getId() != null && !graph.getId().isBlank()
+                && List.of("flow", "function", "command").contains(graph.getResourceType())) {
+                builder.resource(new ServerResourceLocator(owner.serverId(), ContractRef.of(OwnerId.of("restudio.resync"),
+                    ResourceTypeId.of(graph.getResourceType())), graph.getId()));
+            }
         }
         return builder.build();
     }

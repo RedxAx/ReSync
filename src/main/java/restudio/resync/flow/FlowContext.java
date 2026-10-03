@@ -15,6 +15,7 @@ import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.runtime.CompiledRuntimeContext;
 import restudio.resync.flow.runtime.RuntimePrincipal;
 import restudio.resync.flow.runtime.RuntimeExecutionContext;
+import restudio.resync.flow.runtime.RuntimeCancellationToken;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -49,6 +50,7 @@ public class FlowContext {
     private final CompiledRuntimeContext compiledRuntimeContext;
     private final long requestedDeadlineMillis;
     private final FlowNode currentNode;
+    private final RuntimeCancellationToken cancellationToken;
     private Function<String, CompletableFuture<Void>> deferredOutputDispatcher;
     private final AtomicLong operationCounter = new AtomicLong(0);
     private final AtomicBoolean deferredOutputTriggered = new AtomicBoolean();
@@ -86,6 +88,14 @@ public class FlowContext {
                        FlowExecutor executor, RuntimePrincipal runtimePrincipal, CorrelationId invocationId,
                        String invocationKey, CompiledRuntimeContext compiledRuntimeContext, long requestedDeadlineMillis,
                        FlowNode currentNode) {
+        this(runtime, player, event, deferredOutputConsumer, executor, runtimePrincipal, invocationId, invocationKey,
+            compiledRuntimeContext, requestedDeadlineMillis, currentNode, null);
+    }
+
+    public FlowContext(FlowRuntime runtime, Player player, Event event, Consumer<String> deferredOutputConsumer,
+                       FlowExecutor executor, RuntimePrincipal runtimePrincipal, CorrelationId invocationId,
+                       String invocationKey, CompiledRuntimeContext compiledRuntimeContext, long requestedDeadlineMillis,
+                       FlowNode currentNode, RuntimeCancellationToken cancellationToken) {
         this.runtime = runtime;
         this.player = player;
         this.event = event;
@@ -96,6 +106,7 @@ public class FlowContext {
         this.invocationKey = invocationKey;
         this.compiledRuntimeContext = compiledRuntimeContext;
         this.currentNode = currentNode;
+        this.cancellationToken = cancellationToken;
         if (requestedDeadlineMillis < 0) {
             throw new IllegalArgumentException("Requested Deadline Cannot Be Negative");
         }
@@ -303,6 +314,38 @@ public class FlowContext {
         asyncOperations.put(taskId, future);
     }
 
+    public CompletableFuture<Void> trackOperation(CompletableFuture<Void> operation) {
+        if (operation == null) {
+            throw new IllegalArgumentException("Flow operation is required");
+        }
+        trackAsyncOperation(nextOperationId("owned"), operation);
+        return operation;
+    }
+
+    public CompletableFuture<Void> trackOperation(CompletableFuture<Void> operation, Runnable cancelAction) {
+        if (operation == null || cancelAction == null) {
+            throw new IllegalArgumentException("Flow operation and cancellation action are required");
+        }
+        String taskId = nextOperationId("owned");
+        trackAsyncOperation(taskId, operation);
+        AtomicBoolean cancelled = new AtomicBoolean();
+        Runnable cancel = () -> {
+            if (!operation.isDone() && cancelled.compareAndSet(false, true)) {
+                cancelAction.run();
+            }
+        };
+        if (executor != null) {
+            FlowGraph graph = runtime != null ? runtime.getGraph() : null;
+            executor.trackOperation(taskId, graph != null ? graph.getId() : "", operation, cancel);
+        }
+        bindCancellation(operation, cancel);
+        return operation;
+    }
+
+    public boolean isExecutionCancelled() {
+        return cancellationToken != null && cancellationToken.isCancelled();
+    }
+
     public void haltContinuation() {
         continuationHalted = true;
     }
@@ -403,11 +446,13 @@ public class FlowContext {
 
     public CompletableFuture<Void> runAsync(Runnable runnable) {
         if (runnable == null) throw new IllegalArgumentException("Async Flow action is required");
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        FlowTask operation = new FlowTask();
+        CompletableFuture<Void> future = operation.completion();
         String taskId = nextOperationId("async");
         trackAsyncOperation(taskId, future);
         try {
-            Bukkit.getScheduler().runTaskAsynchronously(ReSync.getInstance(), () -> complete(future, runnable));
+            BukkitTask task = Bukkit.getScheduler().runTaskAsynchronously(ReSync.getInstance(), () -> complete(operation, runnable));
+            trackScheduledTask(taskId, task, operation);
         } catch (RuntimeException exception) {
             future.completeExceptionally(exception);
             throw exception;
@@ -417,11 +462,13 @@ public class FlowContext {
 
     public CompletableFuture<Void> runSync(Runnable runnable) {
         if (runnable == null) throw new IllegalArgumentException("Synchronous Flow action is required");
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        FlowTask operation = new FlowTask();
+        CompletableFuture<Void> future = operation.completion();
         String taskId = nextOperationId("sync");
         trackAsyncOperation(taskId, future);
         try {
-            Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> complete(future, runnable));
+            BukkitTask task = Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> complete(operation, runnable));
+            trackScheduledTask(taskId, task, operation);
         } catch (RuntimeException exception) {
             future.completeExceptionally(exception);
             throw exception;
@@ -431,12 +478,14 @@ public class FlowContext {
 
     public CompletableFuture<Void> runSyncBeforeContinuation(Runnable runnable) {
         if (runnable == null) throw new IllegalArgumentException("Synchronous Flow action is required");
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        FlowTask operation = new FlowTask();
+        CompletableFuture<Void> future = operation.completion();
         String taskId = nextOperationId("sync_continue");
         trackAsyncOperation(taskId, future);
         trackBeforeContinuationOperation(taskId, future);
         try {
-            Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> complete(future, runnable));
+            BukkitTask task = Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> complete(operation, runnable));
+            trackScheduledTask(taskId, task, operation);
         } catch (RuntimeException exception) {
             future.completeExceptionally(exception);
             throw exception;
@@ -446,12 +495,14 @@ public class FlowContext {
 
     public CompletableFuture<Void> runAsyncBeforeContinuation(Runnable runnable) {
         if (runnable == null) throw new IllegalArgumentException("Async Flow action is required");
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        FlowTask operation = new FlowTask();
+        CompletableFuture<Void> future = operation.completion();
         String taskId = nextOperationId("async_continue");
         trackAsyncOperation(taskId, future);
         trackBeforeContinuationOperation(taskId, future);
         try {
-            Bukkit.getScheduler().runTaskAsynchronously(ReSync.getInstance(), () -> complete(future, runnable));
+            BukkitTask task = Bukkit.getScheduler().runTaskAsynchronously(ReSync.getInstance(), () -> complete(operation, runnable));
+            trackScheduledTask(taskId, task, operation);
         } catch (RuntimeException exception) {
             future.completeExceptionally(exception);
             throw exception;
@@ -459,12 +510,15 @@ public class FlowContext {
         return future;
     }
 
-    private void complete(CompletableFuture<Void> future, Runnable runnable) {
+    private void complete(FlowTask operation, Runnable runnable) {
+        if (!operation.start()) {
+            return;
+        }
         try {
             runnable.run();
-            future.complete(null);
-        } catch (Exception exception) {
-            future.completeExceptionally(exception);
+            operation.finish(null);
+        } catch (Throwable exception) {
+            operation.finish(exception);
         }
     }
 
@@ -491,6 +545,7 @@ public class FlowContext {
         FlowGraph graph = runtime != null ? runtime.getGraph() : null;
         try {
             executor.scheduleWallClockTask(taskId, graph != null ? graph.getId() : "", delayMillis, runnable, future);
+            bindCancellation(future, () -> executor.cancelPendingTask(taskId));
         } catch (RuntimeException exception) {
             future.completeExceptionally(exception);
             throw exception;
@@ -501,7 +556,8 @@ public class FlowContext {
     private CompletableFuture<Void> runLater(Runnable runnable, long delayTicks, boolean beforeContinuation) {
         if (runnable == null) throw new IllegalArgumentException("Delayed Flow action is required");
         if (delayTicks < 0L) throw new IllegalArgumentException("Flow delay ticks must be non-negative");
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        FlowTask operation = new FlowTask();
+        CompletableFuture<Void> future = operation.completion();
         String taskId = nextOperationId(beforeContinuation ? "later_continue" : "later");
         trackAsyncOperation(taskId, future);
         if (beforeContinuation) {
@@ -509,24 +565,38 @@ public class FlowContext {
         }
         BukkitTask task;
         try {
-            task = Bukkit.getScheduler().runTaskLater(ReSync.getInstance(), () -> {
-                try {
-                    runnable.run();
-                    future.complete(null);
-                } catch (Exception e) {
-                    future.completeExceptionally(e);
-                }
-            }, delayTicks);
+            task = Bukkit.getScheduler().runTaskLater(ReSync.getInstance(), () -> complete(operation, runnable), delayTicks);
         } catch (RuntimeException exception) {
             future.completeExceptionally(exception);
             throw exception;
         }
-        if (executor != null) {
-            FlowGraph graph = runtime.getGraph();
-            executor.registerPendingTask(taskId, graph != null ? graph.getId() : "", task, future);
-            future.whenComplete((result, failure) -> executor.finishPendingTask(taskId, failure));
-        }
+        trackScheduledTask(taskId, task, operation);
         return future;
+    }
+
+    private void trackScheduledTask(String taskId, BukkitTask task, FlowTask operation) {
+        if (executor != null) {
+            FlowGraph graph = runtime != null ? runtime.getGraph() : null;
+            executor.trackTask(taskId, graph != null ? graph.getId() : "", task, operation);
+        }
+        bindCancellation(operation.completion(), () -> {
+            if (executor != null) {
+                executor.cancelPendingTask(taskId);
+            } else {
+                task.cancel();
+                operation.cancel();
+            }
+        });
+    }
+
+    private void bindCancellation(CompletableFuture<Void> completion, Runnable cancel) {
+        if (cancellationToken != null) {
+            RuntimeCancellationToken.Registration registration = cancellationToken.onCancel(cancel);
+            completion.whenComplete((ignored, failure) -> registration.close());
+            if (cancellationToken.isCancelled()) {
+                cancel.run();
+            }
+        }
     }
 
     public boolean cancelScheduledTask(String taskId) {
@@ -555,7 +625,7 @@ public class FlowContext {
 
     public FlowContext createSubContext(Map<String, Object> variables) {
         FlowContext child = new FlowContext(runtime, player, event, deferredOutputConsumer, executor, runtimePrincipal,
-            invocationId, invocationKey, compiledRuntimeContext, requestedDeadlineMillis, currentNode);
+            invocationId, invocationKey, compiledRuntimeContext, requestedDeadlineMillis, currentNode, cancellationToken);
         child.deferredOutputDispatcher = deferredOutputDispatcher;
         if (variables != null) {
             child.getLocalVariables().putAll(variables);

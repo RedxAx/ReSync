@@ -2,7 +2,7 @@
   {
     "id": "give_item",
     "displayName": "Give Item",
-    "description": "Performs the Give Item operation for a player.",
+    "description": "Creates a stack of the selected material and adds the complete amount to a player's inventory. Amount must fit the material's stack limit and sufficient storage space must be available.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -43,7 +43,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -52,7 +52,7 @@
         "name": "material",
         "pinType": "DATA",
         "dataType": "material",
-        "description": "Provides the Material value used by this operation.",
+        "description": "Minecraft material for the new stack, such as STONE.",
         "direction": "input"
       },
       {
@@ -61,7 +61,7 @@
         "name": "amount",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Amount value used by this operation.",
+        "description": "Whole number of items, from 1 through the material's maximum stack size.",
         "direction": "input"
       }
     ],
@@ -115,7 +115,7 @@
   {
     "id": "player.player_message",
     "displayName": "Player Message",
-    "description": "Performs the Player Message operation for a player.",
+    "description": "Sends formatted text privately to one player. Empty or whitespace-only messages fail.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -155,7 +155,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -164,7 +164,7 @@
         "name": "text",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Text value used by this operation.",
+        "description": "Message text parsed with the server's supported formatting.",
         "direction": "input"
       }
     ],
@@ -210,7 +210,7 @@
   {
     "id": "player.player_kick",
     "displayName": "Player Kick",
-    "description": "Performs the Player Kick operation for a player.",
+    "description": "Disconnects a player from the server with the selected formatted reason.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -250,7 +250,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -259,7 +259,7 @@
         "name": "reason",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Reason value used by this operation.",
+        "description": "Formatted disconnect reason shown to the player.",
         "direction": "input"
       }
     ],
@@ -305,7 +305,7 @@
   {
     "id": "player.player_teleport",
     "displayName": "Player Teleport",
-    "description": "Performs the Player Teleport operation for a player.",
+    "description": "Teleports a player to a world location. If Location is omitted, X, Y, and Z use the player's current world and omitted coordinates keep their current values.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -345,7 +345,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -354,7 +354,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this operation.",
+        "description": "World location for the selected teleport or movement action.",
         "direction": "input"
       },
       {
@@ -363,7 +363,7 @@
         "name": "x",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the X value used by this operation.",
+        "description": "Destination X coordinate in blocks. The simple teleport action keeps the current coordinate when omitted.",
         "direction": "input"
       },
       {
@@ -372,7 +372,7 @@
         "name": "y",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Y value used by this operation.",
+        "description": "Destination Y coordinate in blocks. The simple teleport action keeps the current coordinate when omitted.",
         "direction": "input"
       },
       {
@@ -381,7 +381,7 @@
         "name": "z",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Z value used by this operation.",
+        "description": "Destination Z coordinate in blocks. The simple teleport action keeps the current coordinate when omitted.",
         "direction": "input"
       }
     ],
@@ -442,7 +442,7 @@
   {
     "id": "player.player_set_walking_speed",
     "displayName": "Player Set Walking Speed",
-    "description": "Performs the Player Set Walking Speed operation for a player.",
+    "description": "Changes a player's walking-speed setting from -1 through 1. The normal default is 0.2.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -484,7 +484,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -493,7 +493,7 @@
         "name": "speed",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Speed value used by this operation.",
+        "description": "Walking-speed setting from -1 through 1. Defaults to 0.2.",
         "direction": "input"
       }
     ],
@@ -539,7 +539,7 @@
   {
     "id": "player.player_set_flying_speed",
     "displayName": "Player Set Flying Speed",
-    "description": "Performs the Player Set Flying Speed operation for a player.",
+    "description": "Changes a player's flying-speed setting from -1 through 1. The normal default is 0.05.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -581,7 +581,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -590,7 +590,7 @@
         "name": "speed",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Speed value used by this operation.",
+        "description": "Flying-speed setting from -1 through 1. Defaults to 0.05.",
         "direction": "input"
       }
     ],
@@ -636,7 +636,7 @@
   {
     "id": "player.player_execute_command",
     "displayName": "Player Execute Command",
-    "description": "Performs the Player Execute Command operation for a player.",
+    "description": "Dispatches a command as a player. A leading slash is optional. As Op temporarily grants operator status for dispatch and restores the prior status afterward.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -677,7 +677,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -686,7 +686,7 @@
         "name": "command",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Command value used by this operation.",
+        "description": "Command label and arguments to dispatch as the player. A leading slash is optional.",
         "direction": "input"
       },
       {
@@ -695,7 +695,7 @@
         "name": "as_op",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the As Op value used by this operation.",
+        "description": "True temporarily grants operator status during command dispatch and restores the prior status afterward.",
         "direction": "input"
       }
     ],
@@ -760,7 +760,7 @@
   {
     "id": "player.player_chat",
     "displayName": "Player Chat",
-    "description": "Performs the Player Chat operation for a player.",
+    "description": "Sends a message through a player's normal chat path. Chat listeners and formatting can affect it.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -800,7 +800,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -855,7 +855,7 @@
   {
     "id": "player.player_say",
     "displayName": "Player Say",
-    "description": "Performs the Player Say operation for a player.",
+    "description": "Runs the say command through the selected player's command path, using that player's permissions.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -895,7 +895,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -950,7 +950,7 @@
   {
     "id": "player.player_send_resourcepack",
     "displayName": "Player Send Resourcepack",
-    "description": "Performs the Player Send Resourcepack operation for a player.",
+    "description": "Asks a player's client to download and apply a resource pack from an HTTP or HTTPS URL. This continues after the request is sent, before the client finishes downloading.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -991,7 +991,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -1000,7 +1000,7 @@
         "name": "url",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the URL value used by this operation.",
+        "description": "HTTP or HTTPS download URL of the resource pack.",
         "direction": "input"
       }
     ],
@@ -1046,7 +1046,7 @@
   {
     "id": "player.player_show_bossbar",
     "displayName": "Player Show Bossbar",
-    "description": "Performs the Player Show Bossbar operation for a player.",
+    "description": "Creates a boss bar for one player and returns its ID for later updates or removal. Progress must be from 0 through 1.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -1087,7 +1087,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -1105,7 +1105,7 @@
         "name": "progress",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Progress value used by this operation.",
+        "description": "Boss-bar progress from 0 through 1. Zero is empty and one is full.",
         "direction": "input"
       },
       {
@@ -1143,7 +1143,7 @@
         "name": "bossbar_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Returns the Bossbar ID value produced by this operation.",
+        "description": "New boss-bar ID to use with Update Bossbar or Hide Bossbar.",
         "direction": "output"
       }
     ],
@@ -1198,7 +1198,7 @@
   {
     "id": "player.player_hide_bossbar",
     "displayName": "Player Hide Bossbar",
-    "description": "Performs the Player Hide Bossbar operation for a player.",
+    "description": "Removes a boss bar created by these player nodes. The ID must exist and the bar must be shown to the selected player.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -1239,7 +1239,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -1248,7 +1248,7 @@
         "name": "bossbar_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Bossbar ID value used by this operation.",
+        "description": "ID returned by Show Bossbar for a bar shown to this player.",
         "direction": "input"
       }
     ],
@@ -1294,7 +1294,7 @@
   {
     "id": "player.player_update_bossbar",
     "displayName": "Player Update Bossbar",
-    "description": "Performs the Player Update Bossbar operation for a player.",
+    "description": "Changes a created boss bar's title, progress, or both. Omitted values stay unchanged and Progress must be from 0 through 1.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -1335,7 +1335,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -1344,7 +1344,7 @@
         "name": "bossbar_id",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Bossbar ID value used by this operation.",
+        "description": "ID returned by Show Bossbar for a bar shown to this player.",
         "direction": "input"
       },
       {
@@ -1353,7 +1353,7 @@
         "name": "new_title",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the New Title value used by this operation.",
+        "description": "Replacement boss-bar title. Omit to keep the current title.",
         "direction": "input"
       },
       {
@@ -1362,7 +1362,7 @@
         "name": "new_progress",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the New Progress value used by this operation.",
+        "description": "Replacement boss-bar progress from 0 through 1. Omit to keep the current progress.",
         "direction": "input"
       }
     ],
@@ -1418,7 +1418,7 @@
   {
     "id": "player.player_state",
     "displayName": "Player State",
-    "description": "Performs the Player State operation for a player.",
+    "description": "Reads or changes one player state, such as hunger, health, game mode, flight, or experience. The selected property determines the input, units, and supported action.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -1458,7 +1458,7 @@
         "name": "property",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Property value used by this operation.",
+        "description": "Player state property to read or change.",
         "direction": "input",
         "widget": "SEARCHABLE_LIST",
         "options": [
@@ -1494,7 +1494,7 @@
         "name": "action",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Action value used by this operation.",
+        "description": "Operation to perform for the selected player state property.",
         "direction": "input",
         "widget": "DROPDOWN",
         "options": [
@@ -1509,7 +1509,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -1518,7 +1518,7 @@
         "name": "enabled",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the Enabled value used by this operation.",
+        "description": "True or false for the selected Boolean state change.",
         "direction": "input",
         "visibleWhen": {
           "action": "set",
@@ -1544,7 +1544,7 @@
         "name": "value",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the value used by this operation.",
+        "description": "Number for the selected state property, using that property's units.",
         "direction": "input",
         "visibleWhen": {
           "action": "set",
@@ -1557,7 +1557,7 @@
         "name": "compass_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Compass Location value used by this operation.",
+        "description": "World location to which the player's compass should point.",
         "direction": "input",
         "visibleWhen": {
           "action": "set",
@@ -1583,7 +1583,7 @@
         "name": "points",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Points value used by this operation.",
+        "description": "Experience-point amount for the selected experience action.",
         "direction": "input",
         "visibleWhen": {
           "action": "set",
@@ -1616,7 +1616,7 @@
         "name": "sprint",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Sprint value produced by this operation.",
+        "description": "Whether the player is currently sprinting.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1629,7 +1629,7 @@
         "name": "sneak",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Sneak value produced by this operation.",
+        "description": "Whether the player is currently sneaking.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1642,7 +1642,7 @@
         "name": "fly",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Fly value produced by this operation.",
+        "description": "Whether the player is currently flying.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1655,7 +1655,7 @@
         "name": "vanish",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Vanish value produced by this operation.",
+        "description": "Visibility state reported by the selected player property.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1668,7 +1668,7 @@
         "name": "glowing",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Glowing value produced by this operation.",
+        "description": "Whether the player has the glowing outline effect.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1681,7 +1681,7 @@
         "name": "invulnerable",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Invulnerable value produced by this operation.",
+        "description": "Whether invulnerability is enabled for the player.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1694,7 +1694,7 @@
         "name": "gamemode",
         "pinType": "DATA",
         "dataType": "gamemode",
-        "description": "Returns the Gamemode value produced by this operation.",
+        "description": "Current game mode, such as SURVIVAL or CREATIVE.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1707,7 +1707,7 @@
         "name": "food_level",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Food Level value produced by this operation.",
+        "description": "Hunger level from 0 through 20.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1720,7 +1720,7 @@
         "name": "saturation",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Saturation value produced by this operation.",
+        "description": "Stored food saturation used before hunger decreases.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1733,7 +1733,7 @@
         "name": "exhaustion",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Exhaustion value produced by this operation.",
+        "description": "Accumulated food exhaustion from player activity.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1746,7 +1746,7 @@
         "name": "health",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Health value produced by this operation.",
+        "description": "Current health in health points. Two points equal one heart.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1759,7 +1759,7 @@
         "name": "max_health",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Max Health value produced by this operation.",
+        "description": "Effective maximum health in health points, including attribute modifiers.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1785,7 +1785,7 @@
         "name": "walk_speed",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Walk Speed value produced by this operation.",
+        "description": "Walking-speed setting from -1 through 1. The normal default is 0.2.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1798,7 +1798,7 @@
         "name": "fly_speed",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Fly Speed value produced by this operation.",
+        "description": "Flying-speed setting from -1 through 1. The normal default is 0.05.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1811,7 +1811,7 @@
         "name": "fire_ticks",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Fire Ticks value produced by this operation.",
+        "description": "Remaining burning time in server ticks.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1837,7 +1837,7 @@
         "name": "no_damage_ticks",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the No Damage Ticks value produced by this operation.",
+        "description": "Remaining damage-immunity time in server ticks.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1876,7 +1876,7 @@
         "name": "compass_target",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Returns the Compass Target value produced by this operation.",
+        "description": "World location toward which the player's compass points.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -1902,7 +1902,7 @@
         "name": "total_exp",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Total Exp value produced by this operation.",
+        "description": "Total accumulated experience points.",
         "direction": "output",
         "visibleWhen": {
           "action": "get",
@@ -2096,7 +2096,7 @@
   {
     "id": "player.player_movement",
     "displayName": "Player Movement",
-    "description": "Performs the Player Movement operation for a player.",
+    "description": "Changes player movement, position, rotation, or velocity using the selected mode. Freeze stores current walk and fly speeds so Unfreeze can restore them.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -2154,7 +2154,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -2163,7 +2163,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Provides the Location value used by this operation.",
+        "description": "World location for the selected teleport or movement action.",
         "direction": "input",
         "visibleWhen": {
           "mode": "teleport"
@@ -2175,7 +2175,7 @@
         "name": "x",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the X value used by this operation.",
+        "description": "Destination X coordinate in blocks. The simple teleport action keeps the current coordinate when omitted.",
         "direction": "input",
         "visibleWhen": {
           "mode": "teleport"
@@ -2187,7 +2187,7 @@
         "name": "y",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Y value used by this operation.",
+        "description": "Destination Y coordinate in blocks. The simple teleport action keeps the current coordinate when omitted.",
         "direction": "input",
         "visibleWhen": {
           "mode": "teleport"
@@ -2199,7 +2199,7 @@
         "name": "z",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Z value used by this operation.",
+        "description": "Destination Z coordinate in blocks. The simple teleport action keeps the current coordinate when omitted.",
         "direction": "input",
         "visibleWhen": {
           "mode": "teleport"
@@ -2211,7 +2211,7 @@
         "name": "yaw",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Yaw value used by this operation.",
+        "description": "Horizontal rotation in degrees.",
         "direction": "input",
         "visibleWhen": {
           "mode": "teleport,spin,set_rotation"
@@ -2223,7 +2223,7 @@
         "name": "pitch",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Pitch value used by this operation.",
+        "description": "Vertical rotation in degrees for movement, or sound pitch for Send Sound.",
         "direction": "input",
         "visibleWhen": {
           "mode": "teleport,spin,set_rotation"
@@ -2235,7 +2235,7 @@
         "name": "reset_velocity",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the Reset Velocity value used by this operation.",
+        "description": "True clears existing motion when applying the selected movement action.",
         "direction": "input",
         "widget": "TOGGLE",
         "defaultValue": false,
@@ -2249,7 +2249,7 @@
         "name": "vx",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Vx value used by this operation.",
+        "description": "Velocity along X in blocks per server tick.",
         "direction": "input",
         "visibleWhen": {
           "mode": "launch"
@@ -2261,7 +2261,7 @@
         "name": "vy",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Vy value used by this operation.",
+        "description": "Velocity along Y in blocks per server tick.",
         "direction": "input",
         "visibleWhen": {
           "mode": "launch"
@@ -2273,7 +2273,7 @@
         "name": "vz",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Vz value used by this operation.",
+        "description": "Velocity along Z in blocks per server tick.",
         "direction": "input",
         "visibleWhen": {
           "mode": "launch"
@@ -2285,7 +2285,7 @@
         "name": "strength",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Strength value used by this operation.",
+        "description": "Magnitude applied to the selected push direction.",
         "direction": "input",
         "widget": "NUMBER",
         "defaultValue": 1.0,
@@ -2303,7 +2303,7 @@
         "name": "direction_vector",
         "pinType": "DATA",
         "dataType": "vector",
-        "description": "Provides the Direction Vector value used by this operation.",
+        "description": "Direction vector used by the selected movement action.",
         "direction": "input",
         "visibleWhen": {
           "mode": "push"
@@ -2426,7 +2426,7 @@
   {
     "id": "player.player_potion",
     "displayName": "Player Potion",
-    "description": "Performs the Player Potion operation for a player.",
+    "description": "Adds, removes, checks, or clears potion effects on a player. Duration uses server ticks and amplifier 0 means effect level I.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -2482,7 +2482,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -2491,7 +2491,7 @@
         "name": "effect_type",
         "pinType": "DATA",
         "dataType": "potion_effect",
-        "description": "Provides the Effect Type value used by this operation.",
+        "description": "Minecraft potion effect to add, remove, or check.",
         "direction": "input",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:potion_effect"
@@ -2502,7 +2502,7 @@
         "name": "duration_ticks",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Duration Ticks value used by this operation.",
+        "description": "Potion duration in server ticks, normally 20 ticks per second.",
         "direction": "input"
       },
       {
@@ -2511,7 +2511,7 @@
         "name": "amplifier",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Amplifier value used by this operation.",
+        "description": "Potion strength starting at 0 for level I, 1 for level II, and so on.",
         "direction": "input"
       }
     ],
@@ -2540,7 +2540,7 @@
         "name": "has_effect",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Has Effect value produced by this operation.",
+        "description": "True if the player has the selected potion effect.",
         "direction": "output"
       },
       {
@@ -2549,7 +2549,7 @@
         "name": "effect_amplifier",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Effect Amplifier value produced by this operation.",
+        "description": "Current potion strength, starting at 0 for level I.",
         "direction": "output"
       }
     ],
@@ -2614,7 +2614,7 @@
   {
     "id": "player.player_advancement",
     "displayName": "Player Advancement",
-    "description": "Performs the Player Advancement operation for a player.",
+    "description": "Awards, revokes, or checks a player advancement or one selected criterion. The advancement key must exist on the server.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -2670,7 +2670,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -2679,7 +2679,7 @@
         "name": "advancement_key",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Advancement Key value used by this operation.",
+        "description": "Minecraft advancement key present on the server.",
         "direction": "input",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:advancement"
@@ -2690,7 +2690,7 @@
         "name": "criterion",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Criterion value used by this operation.",
+        "description": "Criterion within the advancement. Omit when applying the action to the whole advancement.",
         "direction": "input",
         "defaultValue": "impossible"
       }
@@ -2720,7 +2720,7 @@
         "name": "has_advancement",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Has Advancement value produced by this operation.",
+        "description": "True if the selected advancement or criterion is complete.",
         "direction": "output"
       }
     ],
@@ -2775,7 +2775,7 @@
   {
     "id": "player.player_cooldown",
     "displayName": "Player Cooldown",
-    "description": "Performs the Player Cooldown operation for a player.",
+    "description": "Sets, removes, or checks a player's cooldown for a Minecraft material. Durations and remaining time use server ticks.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -2831,7 +2831,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -2849,7 +2849,7 @@
         "name": "ticks",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Ticks value used by this operation.",
+        "description": "Material cooldown duration in server ticks. Zero clears the cooldown.",
         "direction": "input"
       }
     ],
@@ -2878,7 +2878,7 @@
         "name": "has_cooldown",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Has Cooldown value produced by this operation.",
+        "description": "True if the selected material has an active cooldown.",
         "direction": "output"
       },
       {
@@ -2887,7 +2887,7 @@
         "name": "remaining_ticks",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Remaining Ticks value produced by this operation.",
+        "description": "Remaining material cooldown in server ticks.",
         "direction": "output"
       }
     ],
@@ -2947,7 +2947,7 @@
   {
     "id": "player.player_send_message",
     "displayName": "Player Send Message",
-    "description": "Performs the Player Send Message operation for a player.",
+    "description": "Sends formatted text privately to one player. Empty or whitespace-only messages fail.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -2988,7 +2988,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -2997,7 +2997,7 @@
         "name": "text",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Text value used by this operation.",
+        "description": "Message text parsed with the server's supported formatting.",
         "direction": "input"
       }
     ],
@@ -3043,7 +3043,7 @@
   {
     "id": "player.player_send_action_bar",
     "displayName": "Player Send Action Bar",
-    "description": "Performs the Player Send Action Bar operation for a player.",
+    "description": "Displays formatted text in the player's action bar above the hotbar.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -3084,7 +3084,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -3093,7 +3093,7 @@
         "name": "text",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Text value used by this operation.",
+        "description": "Message text parsed with the server's supported formatting.",
         "direction": "input"
       }
     ],
@@ -3139,7 +3139,7 @@
   {
     "id": "player.player_send_title",
     "displayName": "Player Send Title",
-    "description": "Performs the Player Send Title operation for a player.",
+    "description": "Displays a formatted title and subtitle to one player. At least one of the two must contain text.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -3180,7 +3180,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -3249,7 +3249,7 @@
   {
     "id": "player.player_send_sound",
     "displayName": "Player Send Sound",
-    "description": "Performs the Player Send Sound operation for a player.",
+    "description": "Plays one selected sound at the player's location for that player only. Volume ranges from 0 through 16 and Pitch from 0 through 2.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -3290,7 +3290,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -3299,7 +3299,7 @@
         "name": "sound",
         "pinType": "DATA",
         "dataType": "sound",
-        "description": "Provides the Sound value used by this operation.",
+        "description": "Minecraft sound name to play only for this player.",
         "direction": "input",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:sound"
@@ -3310,7 +3310,7 @@
         "name": "volume",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Volume value used by this operation.",
+        "description": "Sound volume from 0 through 16. Defaults to 1.",
         "direction": "input",
         "widget": "NUMBER",
         "defaultValue": 1.0,
@@ -3325,7 +3325,7 @@
         "name": "pitch",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Pitch value used by this operation.",
+        "description": "Sound pitch from 0 through 2. Defaults to 1.",
         "direction": "input",
         "widget": "NUMBER",
         "defaultValue": 1.0,
@@ -3387,7 +3387,7 @@
   {
     "id": "player.player_send_book",
     "displayName": "Player Send Book",
-    "description": "Performs the Player Send Book operation for a player.",
+    "description": "Opens a written book on the player's client. Book must be a Written Book item stack.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -3428,7 +3428,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -3437,7 +3437,7 @@
         "name": "book",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Book value used by this operation.",
+        "description": "Written Book item stack to open on the player's client.",
         "direction": "input"
       }
     ],
@@ -3483,7 +3483,7 @@
   {
     "id": "player.player_send_sign",
     "displayName": "Player Send Sign",
-    "description": "Performs the Player Send Sign operation for a player.",
+    "description": "Opens the sign editor for a sign block at the player's current position. Fails when that block is not a sign.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -3524,7 +3524,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       }
     ],
@@ -3565,7 +3565,7 @@
   {
     "id": "player.player_send_raw_json",
     "displayName": "Player Send Raw Json",
-    "description": "Performs the Player Send Raw Json operation for a player.",
+    "description": "Deserializes Minecraft text-component JSON and sends the resulting message to a player. Invalid or empty component JSON fails.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -3607,7 +3607,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -3616,7 +3616,7 @@
         "name": "json",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the JSON value used by this operation.",
+        "description": "Valid Minecraft text-component JSON to display as a chat message.",
         "direction": "input"
       }
     ],
@@ -3662,7 +3662,7 @@
   {
     "id": "player.player_give_item",
     "displayName": "Player Give Item",
-    "description": "Performs the Player Give Item operation for a player.",
+    "description": "Adds a copy of an item stack to a player's inventory. The complete stack must fit. The input item is preserved.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -3703,7 +3703,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -3712,7 +3712,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -3758,7 +3758,7 @@
   {
     "id": "player.player_give_item_stack",
     "displayName": "Give Item Stack",
-    "description": "Performs the Give Item Stack operation for a player.",
+    "description": "Copies an item and chooses its amount from Item Amount, Max Stack, Custom, or Random. An optional forced stack size sets its maximum-stack component before the complete stack is added.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -3800,7 +3800,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -3809,7 +3809,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       },
       {
@@ -3849,7 +3849,7 @@
         "name": "min_size",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Min Size value used by this operation.",
+        "description": "Inclusive minimum stack amount for Random size mode.",
         "direction": "input",
         "widget": "NUMBER",
         "defaultValue": 1,
@@ -3887,7 +3887,7 @@
         "name": "forced_stack_size",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Forced Stack Size value used by this operation.",
+        "description": "Maximum stack size from 1 through 99 when Force Stack Size is enabled.",
         "direction": "input",
         "widget": "NUMBER",
         "defaultValue": 64,
@@ -3912,7 +3912,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       },
       {
@@ -3921,7 +3921,7 @@
         "name": "amount",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Amount value produced by this operation.",
+        "description": "Number of items given by Give Item Stack.",
         "direction": "output"
       },
       {
@@ -3930,7 +3930,7 @@
         "name": "max_stack_size",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Max Stack Size value produced by this operation.",
+        "description": "Maximum stack size of the item after the optional component override.",
         "direction": "output"
       }
     ],
@@ -4010,7 +4010,7 @@
   {
     "id": "player.player_take_item",
     "displayName": "Player Take Item",
-    "description": "Performs the Player Take Item operation for a player.",
+    "description": "Removes the requested count of items similar to the selected stack from a player's storage inventory. Matching includes metadata and ignores the template amount.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4051,7 +4051,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4060,7 +4060,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       },
       {
@@ -4120,7 +4120,7 @@
   {
     "id": "player.player_set_item",
     "displayName": "Player Set Item",
-    "description": "Performs the Player Set Item operation for a player.",
+    "description": "Replaces one player inventory slot with a copy of the selected item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4161,7 +4161,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4170,7 +4170,7 @@
         "name": "slot",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Slot value used by this operation.",
+        "description": "Player inventory slot index, starting at 0. Must be within the inventory size.",
         "direction": "input"
       },
       {
@@ -4179,7 +4179,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -4230,7 +4230,7 @@
   {
     "id": "player.player_clear_slot",
     "displayName": "Player Clear Slot",
-    "description": "Performs the Player Clear Slot operation for a player.",
+    "description": "Clears one player inventory slot.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4271,7 +4271,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4280,7 +4280,7 @@
         "name": "slot",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Slot value used by this operation.",
+        "description": "Player inventory slot index, starting at 0. Must be within the inventory size.",
         "direction": "input"
       }
     ],
@@ -4326,7 +4326,7 @@
   {
     "id": "player.player_swap_items",
     "displayName": "Player Swap Items",
-    "description": "Performs the Player Swap Items operation for a player.",
+    "description": "Swaps the contents of two player inventory slots.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4367,7 +4367,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4376,7 +4376,7 @@
         "name": "slot1",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Slot1 value used by this operation.",
+        "description": "First player inventory slot index to swap.",
         "direction": "input"
       },
       {
@@ -4385,7 +4385,7 @@
         "name": "slot2",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Slot2 value used by this operation.",
+        "description": "Second player inventory slot index to swap.",
         "direction": "input"
       }
     ],
@@ -4436,7 +4436,7 @@
   {
     "id": "player.player_set_helmet",
     "displayName": "Player Set Helmet",
-    "description": "Performs the Player Set Helmet operation for a player.",
+    "description": "Replaces the player's helmet with a copy of the selected item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4477,7 +4477,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4486,7 +4486,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -4532,7 +4532,7 @@
   {
     "id": "player.player_set_chestplate",
     "displayName": "Player Set Chestplate",
-    "description": "Performs the Player Set Chestplate operation for a player.",
+    "description": "Replaces the player's chestplate with a copy of the selected item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4573,7 +4573,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4582,7 +4582,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -4628,7 +4628,7 @@
   {
     "id": "player.player_set_leggings",
     "displayName": "Player Set Leggings",
-    "description": "Performs the Player Set Leggings operation for a player.",
+    "description": "Replaces the player's leggings with a copy of the selected item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4669,7 +4669,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4678,7 +4678,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -4724,7 +4724,7 @@
   {
     "id": "player.player_set_boots",
     "displayName": "Player Set Boots",
-    "description": "Performs the Player Set Boots operation for a player.",
+    "description": "Replaces the player's boots with a copy of the selected item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4765,7 +4765,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4774,7 +4774,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -4820,7 +4820,7 @@
   {
     "id": "player.player_set_mainhand",
     "displayName": "Player Set Mainhand",
-    "description": "Performs the Player Set Mainhand operation for a player.",
+    "description": "Replaces the item in the player's selected main-hand slot with a copy of the selected item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4861,7 +4861,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4870,7 +4870,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -4916,7 +4916,7 @@
   {
     "id": "player.player_set_offhand",
     "displayName": "Player Set Offhand",
-    "description": "Performs the Player Set Offhand operation for a player.",
+    "description": "Replaces the player's offhand item with a copy of the selected item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -4957,7 +4957,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -4966,7 +4966,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -5012,7 +5012,7 @@
   {
     "id": "player.player_set_inventory_title",
     "displayName": "Player Set Inventory Title",
-    "description": "Performs the Player Set Inventory Title operation for a player.",
+    "description": "Changes the title displayed by the player's currently open inventory view.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -5054,7 +5054,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -5109,7 +5109,7 @@
   {
     "id": "player.player_set_armor_color",
     "displayName": "Player Set Armor Color",
-    "description": "Performs the Player Set Armor Color operation for a player.",
+    "description": "Changes a leather armor item's color using Red, Green, and Blue values from 0 through 255.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -5151,7 +5151,7 @@
         "name": "target",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player affected by this operation.",
+        "description": "Player who receives the action.",
         "direction": "input"
       },
       {
@@ -5160,7 +5160,7 @@
         "name": "slot",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Slot value used by this operation.",
+        "description": "Player inventory slot index, starting at 0. Must be within the inventory size.",
         "direction": "input",
         "widget": "DROPDOWN",
         "options": [
@@ -5177,7 +5177,7 @@
         "name": "red",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Red value used by this operation.",
+        "description": "Red channel of the leather armor color, from 0 through 255.",
         "direction": "input"
       },
       {
@@ -5186,7 +5186,7 @@
         "name": "green",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Green value used by this operation.",
+        "description": "Green channel of the leather armor color, from 0 through 255.",
         "direction": "input"
       },
       {
@@ -5195,7 +5195,7 @@
         "name": "blue",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Blue value used by this operation.",
+        "description": "Blue channel of the leather armor color, from 0 through 255.",
         "direction": "input"
       }
     ],
@@ -5256,7 +5256,7 @@
   {
     "id": "player.player_repair_item",
     "displayName": "Player Repair Item",
-    "description": "Performs the Player Repair Item operation for a player.",
+    "description": "Resets a damageable item's damage to zero. Fails if the item does not support durability.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -5297,7 +5297,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -5317,7 +5317,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       }
     ],
@@ -5352,7 +5352,7 @@
   {
     "id": "player.player_enchant_item",
     "displayName": "Player Enchant Item",
-    "description": "Performs the Player Enchant Item operation for a player.",
+    "description": "Adds or replaces a selected enchantment on an item at level 1 through 255. Allows levels beyond the normal enchantment maximum.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -5393,7 +5393,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       },
       {
@@ -5402,7 +5402,7 @@
         "name": "enchantment",
         "pinType": "DATA",
         "dataType": "enchantment",
-        "description": "Provides the Enchantment value used by this operation.",
+        "description": "Minecraft enchantment to add or remove.",
         "direction": "input"
       },
       {
@@ -5411,7 +5411,7 @@
         "name": "level",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Level value used by this operation.",
+        "description": "Enchantment level from 1 through 255. May exceed the normal enchantment maximum.",
         "direction": "input"
       }
     ],
@@ -5431,7 +5431,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       }
     ],
@@ -5476,7 +5476,7 @@
   {
     "id": "player.player_unenchant_item",
     "displayName": "Player Unenchant Item",
-    "description": "Performs the Player Unenchant Item operation for a player.",
+    "description": "Removes one selected enchantment from an item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -5517,7 +5517,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       },
       {
@@ -5526,7 +5526,7 @@
         "name": "enchantment",
         "pinType": "DATA",
         "dataType": "enchantment",
-        "description": "Provides the Enchantment value used by this operation.",
+        "description": "Minecraft enchantment to add or remove.",
         "direction": "input"
       }
     ],
@@ -5546,7 +5546,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       }
     ],
@@ -5586,7 +5586,7 @@
   {
     "id": "player.player_clear_enchants",
     "displayName": "Player Clear Enchants",
-    "description": "Performs the Player Clear Enchants operation for a player.",
+    "description": "Removes every enchantment from an item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -5627,7 +5627,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       }
     ],
@@ -5647,7 +5647,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       }
     ],
@@ -5682,7 +5682,7 @@
   {
     "id": "player.player_set_item_name",
     "displayName": "Player Set Item Name",
-    "description": "Performs the Player Set Item Name operation for a player.",
+    "description": "Sets a formatted custom display name on an item.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -5724,7 +5724,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       },
       {
@@ -5733,7 +5733,7 @@
         "name": "name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Name value used by this operation.",
+        "description": "Formatted custom display name to assign to the item.",
         "direction": "input"
       }
     ],
@@ -5753,7 +5753,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       }
     ],
@@ -5793,7 +5793,7 @@
   {
     "id": "player.player_set_item_lore",
     "displayName": "Player Set Item Lore",
-    "description": "Performs the Player Set Item Lore operation for a player.",
+    "description": "Replaces an item's lore with the selected formatted lines, in order.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -5835,7 +5835,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       },
       {
@@ -5844,7 +5844,7 @@
         "name": "lore",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Lore value used by this operation.",
+        "description": "Replacement lore text parsed into formatted lines.",
         "direction": "input"
       }
     ],
@@ -5864,7 +5864,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       }
     ],
@@ -5904,7 +5904,7 @@
   {
     "id": "player.player_set_item_flags",
     "displayName": "Player Set Item Flags",
-    "description": "Performs the Player Set Item Flags operation for a player.",
+    "description": "Replaces an item's flags with the selected flags, such as hiding enchantment or attribute details. Empty text removes every flag.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -5946,7 +5946,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       },
       {
@@ -5955,7 +5955,7 @@
         "name": "flags",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Flags value used by this operation.",
+        "description": "Minecraft item flag names that replace existing flags. Empty text clears the flags.",
         "direction": "input"
       }
     ],
@@ -5975,7 +5975,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       }
     ],
@@ -6015,7 +6015,7 @@
   {
     "id": "player.player_set_item_custom_model",
     "displayName": "Player Set Item Custom Model",
-    "description": "Performs the Player Set Item Custom Model operation for a player.",
+    "description": "Sets an item's non-negative custom model data number.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -6058,7 +6058,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       },
       {
@@ -6067,7 +6067,7 @@
         "name": "model_data",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Provides the Model Data value used by this operation.",
+        "description": "Non-negative custom model data number.",
         "direction": "input"
       }
     ],
@@ -6087,7 +6087,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       }
     ],
@@ -6127,7 +6127,7 @@
   {
     "id": "player.player_set_item_unbreakable",
     "displayName": "Player Set Item Unbreakable",
-    "description": "Performs the Player Set Item Unbreakable operation for a player.",
+    "description": "Sets whether an item is unbreakable without changing its current damage.",
     "domain": "player",
     "family": "actions",
     "lifecycle": "active",
@@ -6169,7 +6169,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Provides the Item value used by this operation.",
+        "description": "Item stack used by the selected action. Inventory and equipment replacements copy this value.",
         "direction": "input"
       },
       {
@@ -6178,7 +6178,7 @@
         "name": "unbreakable",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Provides the Unbreakable value used by this operation.",
+        "description": "True makes the item unbreakable. False restores normal durability loss.",
         "direction": "input"
       }
     ],
@@ -6198,7 +6198,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this operation.",
+        "description": "Changed or generated item stack produced by the action.",
         "direction": "output"
       }
     ],
@@ -6279,7 +6279,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "direction": "input",
-        "description": "Selects the player whose information is returned."
+        "description": "Player who receives the action."
       }
     ],
     "outputs": [
@@ -6299,7 +6299,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the player's name."
+        "description": "Player account name."
       },
       {
         "id": "uuid",
@@ -6308,7 +6308,7 @@
         "pinType": "DATA",
         "dataType": "uuid",
         "direction": "output",
-        "description": "Returns the player's UUID."
+        "description": "Unique player account identifier."
       },
       {
         "id": "health",
@@ -6317,7 +6317,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the player's current health."
+        "description": "Current health in health points. Two points equal one heart."
       },
       {
         "id": "location",
@@ -6326,7 +6326,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "output",
-        "description": "Returns the player's current location."
+        "description": "Current world position, yaw, and pitch of the player."
       },
       {
         "id": "is_op",
@@ -6335,7 +6335,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Reports whether the player is an operator."
+        "description": "Whether the player has server operator status."
       }
     ],
     "legacyIds": [
@@ -6436,7 +6436,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "direction": "input",
-        "description": "Selects the player whose experience level is returned."
+        "description": "Player who receives the action."
       }
     ],
     "outputs": [
@@ -6537,7 +6537,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "direction": "input",
-        "description": "Selects the player whose next-level experience is returned."
+        "description": "Player who receives the action."
       }
     ],
     "outputs": [
@@ -6638,7 +6638,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "direction": "input",
-        "description": "Selects the player whose total experience is returned."
+        "description": "Player who receives the action."
       }
     ],
     "outputs": [
@@ -6658,7 +6658,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the player's total accumulated experience."
+        "description": "Total accumulated experience points."
       }
     ],
     "legacyIds": [
@@ -6738,7 +6738,7 @@
         "pinType": "DATA",
         "dataType": "player",
         "direction": "input",
-        "description": "Selects the player who receives the particle effect."
+        "description": "Player who receives the action."
       },
       {
         "id": "particle",

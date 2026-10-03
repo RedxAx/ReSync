@@ -2,7 +2,7 @@
   {
     "id": "block_set",
     "displayName": "Block Set",
-    "description": "Run the block set operation against a block.",
+    "description": "Replaces the block at Location with the selected material, using its default block state.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -76,7 +76,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "material",
@@ -85,7 +85,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "direction": "input",
-        "description": "Provides the material value used by this operation.",
+        "description": "Minecraft material to place, such as STONE. Invalid material names fail.",
         "defaultValue": "STONE"
       }
     ],
@@ -104,7 +104,7 @@
   {
     "id": "block_replace",
     "displayName": "Block Replace",
-    "description": "Run the block replace operation against a block.",
+    "description": "Replaces the block at Location if it matches Old Type. An empty Old Type allows any material. A different existing material is left unchanged.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -183,7 +183,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "old_type",
@@ -192,7 +192,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "direction": "input",
-        "description": "Provides the old type value used by this operation.",
+        "description": "Material to replace. Empty text matches any existing material.",
         "defaultValue": ""
       },
       {
@@ -202,7 +202,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "direction": "input",
-        "description": "Provides the new type value used by this operation.",
+        "description": "New Minecraft material for each matching block.",
         "defaultValue": "STONE"
       }
     ],
@@ -221,7 +221,7 @@
   {
     "id": "block_fill",
     "displayName": "Block Fill",
-    "description": "Run the block fill operation against a block.",
+    "description": "Fills the inclusive box between two locations with one material. Both corners must be in the same world and the box may contain at most 1000000 blocks.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -300,7 +300,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the min location value used by this operation."
+        "description": "First corner of an inclusive block box. Both corners must be in the same world."
       },
       {
         "id": "max_location",
@@ -309,7 +309,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the max location value used by this operation."
+        "description": "Opposite corner of the inclusive block box. Corner order is normalized automatically."
       },
       {
         "id": "material",
@@ -318,7 +318,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "direction": "input",
-        "description": "Provides the material value used by this operation.",
+        "description": "Minecraft material to place, such as STONE. Invalid material names fail.",
         "defaultValue": "STONE"
       }
     ],
@@ -337,7 +337,7 @@
   {
     "id": "block_replace_area",
     "displayName": "Block Replace Area",
-    "description": "Run the block replace area operation against a block.",
+    "description": "Replaces matching blocks in the inclusive box between two locations. An empty Old Type allows any material. Both corners must share a world. The box can contain at most 1000000 blocks.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -421,7 +421,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the min location value used by this operation."
+        "description": "First corner of an inclusive block box. Both corners must be in the same world."
       },
       {
         "id": "max_location",
@@ -430,7 +430,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the max location value used by this operation."
+        "description": "Opposite corner of the inclusive block box. Corner order is normalized automatically."
       },
       {
         "id": "old_type",
@@ -439,7 +439,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "direction": "input",
-        "description": "Provides the old type value used by this operation.",
+        "description": "Material to replace. Empty text matches any existing material.",
         "defaultValue": ""
       },
       {
@@ -449,7 +449,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "direction": "input",
-        "description": "Provides the new type value used by this operation.",
+        "description": "New Minecraft material for each matching block.",
         "defaultValue": "STONE"
       }
     ],
@@ -468,7 +468,7 @@
   {
     "id": "block_break_naturally",
     "displayName": "Block Break Naturally",
-    "description": "Run the block break naturally operation against a block.",
+    "description": "Breaks the selected block using its normal drop behavior.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -537,7 +537,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       }
     ],
     "outputs": [
@@ -555,7 +555,7 @@
   {
     "id": "block_drop_item",
     "displayName": "Block Drop Item",
-    "description": "Run the block drop item operation against a block.",
+    "description": "Creates one dropped item of the selected material at Location.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -629,7 +629,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "item",
@@ -638,7 +638,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the item value used by this operation.",
+        "description": "Minecraft material name for the single dropped item.",
         "defaultValue": "STONE"
       }
     ],
@@ -657,7 +657,7 @@
   {
     "id": "block_update",
     "displayName": "Block Update",
-    "description": "Run the block update operation against a block.",
+    "description": "Forces the current block state to update and applies block physics.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -726,7 +726,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       }
     ],
     "outputs": [
@@ -744,7 +744,7 @@
   {
     "id": "block_set_biome",
     "displayName": "Block Set Biome",
-    "description": "Run the block set biome operation against a block.",
+    "description": "Changes the biome at the selected world location to a Minecraft biome.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -818,7 +818,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "biome",
@@ -827,7 +827,7 @@
         "pinType": "DATA",
         "dataType": "biome",
         "direction": "input",
-        "description": "Provides the biome value used by this operation.",
+        "description": "Minecraft biome to apply at Location.",
         "defaultValue": "PLAINS"
       }
     ],
@@ -846,7 +846,7 @@
   {
     "id": "block_set_type",
     "displayName": "Block Set Type",
-    "description": "Run the block set type operation against a block.",
+    "description": "Replaces the selected block material, using its default block state.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -920,7 +920,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "material",
@@ -929,7 +929,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "direction": "input",
-        "description": "Provides the material value used by this operation.",
+        "description": "Minecraft material to place, such as STONE. Invalid material names fail.",
         "defaultValue": "STONE"
       }
     ],
@@ -948,7 +948,7 @@
   {
     "id": "block_set_data",
     "displayName": "Block Set Data",
-    "description": "Run the block set data operation against a block.",
+    "description": "Changes supported block-state fields from a map, such as facing, waterlogged, powered, lit, open, age, level, or rotation. Invalid or unsupported fields fail.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -1022,7 +1022,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "data",
@@ -1031,7 +1031,7 @@
         "pinType": "DATA",
         "dataType": "map<any,any>",
         "direction": "input",
-        "description": "Provides the data value used by this operation."
+        "description": "Map of supported block-state field names to values. All entries must be valid for the target block."
       }
     ],
     "outputs": [
@@ -1049,7 +1049,7 @@
   {
     "id": "block_set_age",
     "displayName": "Block Set Age",
-    "description": "Run the block set age operation against a block.",
+    "description": "Sets a crop age, sapling stage, leaf distance, or farmland moisture. The value must fall within the range supported by that block.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -1123,7 +1123,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "age",
@@ -1132,7 +1132,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the age value used by this operation.",
+        "description": "Growth value for the block: crop age, sapling stage, leaf distance, or farmland moisture.",
         "defaultValue": 0,
         "constraints": {
           "min": 0
@@ -1154,7 +1154,7 @@
   {
     "id": "block_set_level",
     "displayName": "Block Set Level",
-    "description": "Run the block set level operation against a block.",
+    "description": "Sets a fluid level, cake bite count, or slab position. Slab level 0 is Bottom and 1 is Top. Other blocks accept their supported range.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -1228,7 +1228,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "level",
@@ -1237,7 +1237,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the level value used by this operation.",
+        "description": "Fluid level, cake bite count, or slab position. Slabs accept 0 for Bottom and 1 for Top.",
         "defaultValue": 0,
         "constraints": {
           "min": 0
@@ -1259,7 +1259,7 @@
   {
     "id": "block_set_rotation",
     "displayName": "Block Set Rotation",
-    "description": "Run the block set rotation operation against a block.",
+    "description": "Changes the rotation or facing of a block that supports orientation. The selected face must be allowed by that block.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -1333,7 +1333,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "rotation",
@@ -1342,7 +1342,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the rotation value used by this operation.",
+        "description": "Minecraft block face used as the block's rotation or facing, such as NORTH.",
         "defaultValue": "NORTH"
       }
     ],
@@ -1361,7 +1361,7 @@
   {
     "id": "block_set_face",
     "displayName": "Block Set Face",
-    "description": "Run the block set face operation against a block.",
+    "description": "Changes a directional block's facing. Unsupported block kinds or faces fail.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -1435,7 +1435,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "face",
@@ -1444,7 +1444,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the face value used by this operation.",
+        "description": "Facing direction supported by the target block.",
         "defaultValue": "NORTH"
       }
     ],
@@ -1463,7 +1463,7 @@
   {
     "id": "block_set_powered",
     "displayName": "Block Set Powered",
-    "description": "Run the block set powered operation against a block.",
+    "description": "Enables or disables the powered state of a block that supports it.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -1537,7 +1537,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "powered",
@@ -1546,7 +1546,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the powered value used by this operation.",
+        "description": "True powers the block. False turns its powered state off.",
         "defaultValue": false
       }
     ],
@@ -1565,7 +1565,7 @@
   {
     "id": "block_set_lit",
     "displayName": "Block Set Lit",
-    "description": "Run the block set lit operation against a block.",
+    "description": "Enables or disables the lit state of a block that supports it.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -1639,7 +1639,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "lit",
@@ -1648,7 +1648,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the lit value used by this operation.",
+        "description": "True lights the block. False turns its lit state off.",
         "defaultValue": false
       }
     ],
@@ -1667,7 +1667,7 @@
   {
     "id": "block_interact",
     "displayName": "Block Interact",
-    "description": "Run the block interact operation against a block.",
+    "description": "Reports that generic block interaction requires a player, hand, face, and interaction policy. This incomplete interaction request fails instead of simulating a click.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "deprecated",
@@ -1738,7 +1738,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       }
     ],
     "outputs": [
@@ -1756,7 +1756,7 @@
   {
     "id": "block_break_particles",
     "displayName": "Block Break Particles",
-    "description": "Run the block break particles operation against a block.",
+    "description": "Spawns ten block-breaking particles using the selected material at Location. The block itself is unchanged.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -1830,7 +1830,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "type",
@@ -1839,7 +1839,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "direction": "input",
-        "description": "Provides the type value used by this operation.",
+        "description": "Minecraft block material that supplies the particle appearance. Defaults to STONE.",
         "defaultValue": "STONE"
       }
     ],
@@ -1858,7 +1858,7 @@
   {
     "id": "block_play_sound",
     "displayName": "Block Play Sound",
-    "description": "Run the block play sound operation against a block.",
+    "description": "Plays a selected sound in the world at Location. Volume ranges from 0 through 16 and Pitch from 0 through 2.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -1942,7 +1942,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "type",
@@ -1951,7 +1951,7 @@
         "pinType": "DATA",
         "dataType": "sound",
         "direction": "input",
-        "description": "Provides the type value used by this operation.",
+        "description": "Minecraft sound name to play. Defaults to BLOCK_STONE_PLACE.",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:sound",
         "defaultValue": "BLOCK_STONE_PLACE"
@@ -1963,7 +1963,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the volume value used by this operation.",
+        "description": "Sound volume from 0 through 16. Defaults to 1.",
         "defaultValue": 1,
         "constraints": {
           "min": 0,
@@ -1977,7 +1977,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the pitch value used by this operation.",
+        "description": "Sound pitch from 0 through 2. Defaults to 1.",
         "defaultValue": 1,
         "constraints": {
           "min": 0,
@@ -2000,7 +2000,7 @@
   {
     "id": "block_physics",
     "displayName": "Block Physics",
-    "description": "Run the block physics operation against a block.",
+    "description": "Forces the selected block state to update and applies its physics.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -2069,7 +2069,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       }
     ],
     "outputs": [
@@ -2087,7 +2087,7 @@
   {
     "id": "block_explode",
     "displayName": "Block Explode",
-    "description": "Run the block explode operation against a block.",
+    "description": "Creates a world explosion at Location with power from 0 through 100. Fire and Break Blocks control fire creation and block damage.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -2171,7 +2171,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "power",
@@ -2180,7 +2180,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the power value used by this operation.",
+        "description": "Explosion power from 0 through 100. Defaults to 4.",
         "defaultValue": 4,
         "constraints": {
           "min": 0,
@@ -2194,7 +2194,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the fire value used by this operation.",
+        "description": "True allows the explosion to create fire. Defaults to false.",
         "defaultValue": false
       },
       {
@@ -2204,7 +2204,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "input",
-        "description": "Provides the break blocks value used by this operation.",
+        "description": "True allows the explosion to damage blocks. Defaults to true.",
         "defaultValue": true
       }
     ],
@@ -2223,7 +2223,7 @@
   {
     "id": "block_raytrace",
     "displayName": "Block Raytrace",
-    "description": "Run the block raytrace operation against a block.",
+    "description": "Traces a normalized direction from a world location to find the first block hit, up to 1024 blocks away. A miss returns no block or location and Distance -1.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -2315,7 +2315,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the start location value used by this operation."
+        "description": "World location from which the block ray begins."
       },
       {
         "id": "direction_vector",
@@ -2324,7 +2324,7 @@
         "pinType": "DATA",
         "dataType": "vector",
         "direction": "input",
-        "description": "Provides the direction vector value used by this operation."
+        "description": "Finite, non-zero ray direction. Its length is normalized before tracing."
       },
       {
         "id": "max_distance",
@@ -2333,7 +2333,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the max distance value used by this operation.",
+        "description": "Ray length from 0 through 1024 blocks. Defaults to 50.",
         "defaultValue": 50,
         "constraints": {
           "min": 0,
@@ -2358,7 +2358,7 @@
         "pinType": "DATA",
         "dataType": "block",
         "direction": "output",
-        "description": "Returns the hit block value produced by this operation."
+        "description": "First block hit by the ray, or no value when the ray misses."
       },
       {
         "id": "hit_location",
@@ -2367,7 +2367,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "output",
-        "description": "Returns the hit location value produced by this operation."
+        "description": "Exact world position of the ray hit, or no value when the ray misses."
       },
       {
         "id": "distance",
@@ -2376,14 +2376,14 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "output",
-        "description": "Returns the distance value produced by this operation."
+        "description": "Distance from the ray start to the hit in blocks. Returns -1 on a miss."
       }
     ]
   },
   {
     "id": "block_offset",
     "displayName": "Block Offset",
-    "description": "Run the block offset operation against a block.",
+    "description": "Returns the block at a whole-block X, Y, and Z offset from the selected block. Does not modify either block.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -2470,7 +2470,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       },
       {
         "id": "offset_x",
@@ -2479,7 +2479,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the offset x value used by this operation.",
+        "description": "Whole-block offset along the X axis. Defaults to 0.",
         "defaultValue": 0
       },
       {
@@ -2489,7 +2489,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the offset y value used by this operation.",
+        "description": "Whole-block offset along the Y axis. Defaults to 0.",
         "defaultValue": 0
       },
       {
@@ -2499,7 +2499,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "direction": "input",
-        "description": "Provides the offset z value used by this operation.",
+        "description": "Whole-block offset along the Z axis. Defaults to 0.",
         "defaultValue": 0
       }
     ],
@@ -2520,14 +2520,14 @@
         "pinType": "DATA",
         "dataType": "block",
         "direction": "output",
-        "description": "Returns the block value produced by this operation."
+        "description": "Block at the requested whole-block offset."
       }
     ]
   },
   {
     "id": "block_sign_text",
     "displayName": "Block Sign Text",
-    "description": "Run the block sign text operation against a block.",
+    "description": "Replaces all four text lines on a sign and saves its state. Empty lines clear the corresponding text.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -2616,7 +2616,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       },
       {
         "id": "line1",
@@ -2625,7 +2625,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the line1 value used by this operation.",
+        "description": "First sign line. Empty text clears it.",
         "defaultValue": ""
       },
       {
@@ -2635,7 +2635,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the line2 value used by this operation.",
+        "description": "Second sign line. Empty text clears it.",
         "defaultValue": ""
       },
       {
@@ -2645,7 +2645,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the line3 value used by this operation.",
+        "description": "Third sign line. Empty text clears it.",
         "defaultValue": ""
       },
       {
@@ -2655,7 +2655,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the line4 value used by this operation.",
+        "description": "Fourth sign line. Empty text clears it.",
         "defaultValue": ""
       }
     ],
@@ -2674,7 +2674,7 @@
   {
     "id": "block_container_get",
     "displayName": "Block Container Get",
-    "description": "Run the block container get operation against a block.",
+    "description": "Reads the contents of a container block in slot order, preserving empty slots.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -2749,7 +2749,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       }
     ],
     "outputs": [
@@ -2769,14 +2769,14 @@
         "pinType": "DATA",
         "dataType": "list<itemstack>",
         "direction": "output",
-        "description": "Returns the items list value produced by this operation."
+        "description": "Container contents in slot order, including empty slots."
       }
     ]
   },
   {
     "id": "block_container_set",
     "displayName": "Block Container Set",
-    "description": "Run the block container set operation against a block.",
+    "description": "Replaces a container block's contents with a slot-ordered item list. The list may not exceed the inventory size.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -2850,7 +2850,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       },
       {
         "id": "items_list",
@@ -2859,7 +2859,7 @@
         "pinType": "DATA",
         "dataType": "list<itemstack>",
         "direction": "input",
-        "description": "Provides the items list value used by this operation."
+        "description": "Replacement item stacks in slot order. Empty entries represent empty slots."
       }
     ],
     "outputs": [
@@ -2877,7 +2877,7 @@
   {
     "id": "block_container_add",
     "displayName": "Block Container Add",
-    "description": "Run the block container add operation against a block.",
+    "description": "Adds a copied item stack to a container. Fails before adding when there is insufficient space for the complete stack.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -2951,7 +2951,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       },
       {
         "id": "item",
@@ -2960,7 +2960,7 @@
         "pinType": "DATA",
         "dataType": "itemstack",
         "direction": "input",
-        "description": "Provides the item value used by this operation."
+        "description": "Non-empty stack to copy into the container. The complete amount must fit."
       }
     ],
     "outputs": [
@@ -2978,7 +2978,7 @@
   {
     "id": "block_spawn_falling",
     "displayName": "Block Spawn Falling",
-    "description": "Run the block spawn falling operation against a block.",
+    "description": "Spawns a falling-block entity of the selected material at Location and returns the new entity.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -3057,7 +3057,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       },
       {
         "id": "material_type",
@@ -3066,7 +3066,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the material type value used by this operation.",
+        "description": "Minecraft block material used for the falling-block entity.",
         "defaultValue": "STONE"
       }
     ],
@@ -3087,14 +3087,14 @@
         "pinType": "DATA",
         "dataType": "entity",
         "direction": "output",
-        "description": "Returns the falling block entity value produced by this operation."
+        "description": "Newly spawned falling-block entity."
       }
     ]
   },
   {
     "id": "block_break_naturally_drops",
     "displayName": "Block Break Naturally Drops",
-    "description": "Run the block break naturally drops operation against a block.",
+    "description": "Calculates the selected block's drops for an optional tool, removes the block, and returns the item stacks. The returned drops are not spawned into the world.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -3173,7 +3173,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       },
       {
         "id": "tool_item",
@@ -3182,7 +3182,7 @@
         "pinType": "DATA",
         "dataType": "itemstack",
         "direction": "input",
-        "description": "Provides the tool item value used by this operation."
+        "description": "Optional tool whose material and enchantments are used when calculating drops."
       }
     ],
     "outputs": [
@@ -3202,14 +3202,14 @@
         "pinType": "DATA",
         "dataType": "list<itemstack>",
         "direction": "output",
-        "description": "Returns the dropped items list value produced by this operation."
+        "description": "Calculated drop stacks. These items have not been spawned into the world."
       }
     ]
   },
   {
     "id": "block_break_instantly",
     "displayName": "Block Break Instantly",
-    "description": "Run the block break instantly operation against a block.",
+    "description": "Replaces the selected block with Air without creating normal drops.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -3278,7 +3278,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       }
     ],
     "outputs": [
@@ -3296,7 +3296,7 @@
   {
     "id": "block_get_drops",
     "displayName": "Block Get Drops",
-    "description": "Run the block get drops operation against a block.",
+    "description": "Calculates the item drops for the selected block and optional tool without breaking or changing the block.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -3373,7 +3373,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       },
       {
         "id": "tool_item",
@@ -3382,7 +3382,7 @@
         "pinType": "DATA",
         "dataType": "itemstack",
         "direction": "input",
-        "description": "Provides the tool item value used by this operation."
+        "description": "Optional tool whose material and enchantments are used when calculating drops."
       }
     ],
     "outputs": [
@@ -3402,14 +3402,14 @@
         "pinType": "DATA",
         "dataType": "list<itemstack>",
         "direction": "output",
-        "description": "Returns the dropped items list value produced by this operation."
+        "description": "Calculated drop stacks. These items have not been spawned into the world."
       }
     ]
   },
   {
     "id": "block_get_state",
     "displayName": "Block Get State",
-    "description": "Run the block get state operation against a block.",
+    "description": "Reads the selected block's serialized material and block-state properties as text.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -3484,7 +3484,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       }
     ],
     "outputs": [
@@ -3504,14 +3504,14 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the state data value produced by this operation."
+        "description": "Serialized Minecraft block-data string for the selected block."
       }
     ]
   },
   {
     "id": "block_set_state",
     "displayName": "Block Set State",
-    "description": "Run the block set state operation against a block.",
+    "description": "Replaces the selected block state from a Minecraft block-data string, such as minecraft:oak_stairs[facing=north]. Invalid state text fails.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -3585,7 +3585,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       },
       {
         "id": "state_data",
@@ -3594,7 +3594,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "input",
-        "description": "Provides the state data value used by this operation."
+        "description": "Minecraft block-data string containing a material and optional state properties."
       }
     ],
     "outputs": [
@@ -3612,7 +3612,7 @@
   {
     "id": "block_get",
     "displayName": "Block Get",
-    "description": "Run the block get operation against a block.",
+    "description": "Reads the selected block's material name and serialized block-state properties.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -3692,7 +3692,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       }
     ],
     "outputs": [
@@ -3712,7 +3712,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the type value produced by this operation."
+        "description": "Minecraft material name of the selected block."
       },
       {
         "id": "data",
@@ -3721,14 +3721,14 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the data value produced by this operation."
+        "description": "Minecraft block-data text containing the material and its state properties."
       }
     ]
   },
   {
     "id": "block_get_type",
     "displayName": "Block Get Type",
-    "description": "Run the block get type operation against a block.",
+    "description": "Reads the selected block's Minecraft material name.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -3803,7 +3803,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       }
     ],
     "outputs": [
@@ -3823,14 +3823,14 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the type value produced by this operation."
+        "description": "Minecraft material name of the selected block."
       }
     ]
   },
   {
     "id": "block_get_data",
     "displayName": "Block Get Data",
-    "description": "Run the block get data operation against a block.",
+    "description": "Reads the selected block's serialized Minecraft block-data string.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -3905,7 +3905,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the location value used by this operation."
+        "description": "World location of the block or effect. Fractional coordinates select the containing block."
       }
     ],
     "outputs": [
@@ -3925,14 +3925,14 @@
         "pinType": "DATA",
         "dataType": "string",
         "direction": "output",
-        "description": "Returns the data value produced by this operation."
+        "description": "Minecraft block-data text containing the material and its state properties."
       }
     ]
   },
   {
     "id": "block_is_solid",
     "displayName": "Block Is Solid",
-    "description": "Run the block is solid operation against a block.",
+    "description": "Checks whether the selected block's material is classified as solid.",
     "domain": "block",
     "family": "block_action",
     "lifecycle": "active",
@@ -4007,7 +4007,7 @@
         "pinType": "DATA",
         "dataType": "location",
         "direction": "input",
-        "description": "Provides the block location value used by this operation."
+        "description": "World location of the target block."
       }
     ],
     "outputs": [
@@ -4027,7 +4027,7 @@
         "pinType": "DATA",
         "dataType": "boolean",
         "direction": "output",
-        "description": "Returns the is solid value produced by this operation."
+        "description": "True if the selected block material is classified as solid."
       }
     ]
   }

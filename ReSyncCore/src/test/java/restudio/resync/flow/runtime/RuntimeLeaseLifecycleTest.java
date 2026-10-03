@@ -350,6 +350,72 @@ class RuntimeLeaseLifecycleTest {
     }
 
     @Test
+    void cancellationSettlesTheResultWhilePhysicalWorkStillFencesDrain() throws Exception {
+        RuntimeBindingRegistry registry = RuntimeTestSupport.registry();
+        ContractRef<ProviderId> provider = provider("physical-cancellation");
+        RuntimeOperationDescriptor operation = operation("physical-cancellation", RuntimeSemantics.Cancellation.COOPERATIVE,
+            RuntimeSemantics.UnloadPolicy.DRAIN, RuntimeSemantics.Retry.NEVER, RuntimeSemantics.Idempotency.INTRINSIC, 0);
+        CompletableFuture<RuntimeResult> pending = new CompletableFuture<>();
+        RuntimeBinding binding = RuntimeBinding.available(operation, provider, "1.0.0", ignored -> pending);
+        registry.activate(providerDescriptor(provider), List.of(binding));
+        RuntimePlanLease lease = registry.acquire(RuntimeTestSupport.input(requirement(operation, binding)));
+        RuntimeCancellationToken token = new RuntimeCancellationToken();
+        CompletableFuture<RuntimeResult> execution = lease.execute(new RuntimeInvocation(
+            operation.key(), Map.of(), "physical-cancellation", token)).toCompletableFuture();
+
+        token.cancel();
+        assertEquals(RuntimeResult.Status.CANCELLED, execution.get(2, TimeUnit.SECONDS).status());
+        lease.close();
+        CompletableFuture<Void> drained = lease.executionDrainSignal().toCompletableFuture();
+        assertFalse(drained.isDone());
+        assertFalse(lease.isReleased());
+        assertFalse(pending.isDone());
+
+        pending.complete(RuntimeResult.success(value("string", "late")));
+        drained.get(2, TimeUnit.SECONDS);
+        assertTrue(lease.isReleased());
+        assertEquals(RuntimeResult.Status.CANCELLED, execution.join().status());
+    }
+
+    @Test
+    void rejectedPrincipalSetupReleasesItsPhysicalAdmission() {
+        RuntimeSecurityBoundary security = new RuntimeSecurityBoundary() {
+            @Override
+            public boolean authorize(RuntimeAuthority authority, ContractRef<CapabilityId> capability) {
+                return true;
+            }
+
+            @Override
+            public boolean confirm(RuntimeAuthority authority, RuntimeBindingKey binding, RuntimeSemantics.Confirmation confirmation) {
+                return true;
+            }
+
+            @Override
+            public boolean requiresTrustedPrincipal() {
+                return true;
+            }
+        };
+        RuntimeBindingRegistry registry = RuntimeTestSupport.registry(RuntimeTestSupport.enforcingExecutionBoundary(), security);
+        ContractRef<ProviderId> provider = provider("missing-principal");
+        RuntimeOperationDescriptor operation = operation("missing-principal", RuntimeSemantics.Cancellation.COOPERATIVE,
+            RuntimeSemantics.UnloadPolicy.DRAIN, RuntimeSemantics.Retry.NEVER, RuntimeSemantics.Idempotency.INTRINSIC, 0);
+        AtomicBoolean called = new AtomicBoolean();
+        RuntimeBinding binding = RuntimeBinding.available(operation, provider, "1.0.0", ignored -> {
+            called.set(true);
+            return CompletableFuture.completedFuture(RuntimeResult.success(value("string", "unexpected")));
+        });
+        registry.activate(providerDescriptor(provider), List.of(binding));
+        RuntimePlanLease lease = registry.acquire(RuntimeTestSupport.input(requirement(operation, binding)));
+
+        assertThrows(IllegalStateException.class, () -> lease.execute(operation.key(), Map.of(), "missing-principal"));
+        lease.close();
+
+        assertFalse(called.get());
+        assertTrue(lease.isReleased());
+        assertTrue(lease.executionDrainSignal().toCompletableFuture().isDone());
+    }
+
+    @Test
     void cancellationTokenProducesTheDeclaredCancellationResult() throws Exception {
         RuntimeBindingRegistry registry = RuntimeTestSupport.registry();
         ContractRef<ProviderId> provider = provider("cancellation-token");

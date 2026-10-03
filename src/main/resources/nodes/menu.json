@@ -568,7 +568,7 @@
         "direction": "input",
         "dataType": "player",
         "optional": true,
-        "description": "Selects the player who should see the menu; uses the current Flow player when omitted."
+        "description": "Selects the player who should see the menu. The current Flow player is used when omitted."
       },
       {
         "id": "menu_id",
@@ -669,7 +669,7 @@
         "direction": "input",
         "dataType": "player",
         "optional": true,
-        "description": "Selects the player whose open menu should refresh; uses the current Flow player when omitted."
+        "description": "Selects the player whose open menu should refresh. The current Flow player is used when omitted."
       },
       {
         "id": "menu_id",
@@ -770,7 +770,7 @@
         "direction": "input",
         "dataType": "player",
         "optional": true,
-        "description": "Selects the player whose active menu should close; uses the current Flow player when omitted."
+        "description": "Selects the player whose active menu should close. The current Flow player is used when omitted."
       }
     ],
     "outputs": [
@@ -2587,7 +2587,7 @@
         "constraints": {
           "min": 0
         },
-        "description": "Sets the delay between updates in server ticks; zero disables periodic updates."
+        "description": "Sets the delay between updates in server ticks. Zero disables periodic updates."
       },
       {
         "id": "flow_id",
@@ -2702,7 +2702,7 @@
         "direction": "input",
         "dataType": "player",
         "optional": true,
-        "description": "Selects the player whose active menu should be read; uses the current Flow player when omitted."
+        "description": "Selects the player whose active menu should be read. The current Flow player is used when omitted."
       }
     ],
     "outputs": [

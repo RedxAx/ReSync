@@ -11,6 +11,12 @@ import restudio.resync.flow.identity.ConnectionId;
 import restudio.resync.flow.identity.NodeInstanceId;
 import restudio.resync.flow.identity.OwnerId;
 import restudio.resync.flow.identity.PinId;
+import restudio.resync.flow.identity.FunctionParameterId;
+import restudio.resync.flow.function.FunctionDiagnostic;
+import restudio.resync.flow.function.FunctionInputMap;
+import restudio.resync.flow.function.FunctionOutputMap;
+import restudio.resync.flow.function.FunctionResult;
+import restudio.resync.flow.function.FunctionSignature;
 import restudio.resync.flow.catalog.CatalogRuntimeActivation;
 import restudio.resync.flow.runtime.RuntimeAuthority;
 import restudio.resync.flow.runtime.RuntimeBinding;
@@ -29,7 +35,9 @@ import restudio.resync.flow.runtime.RuntimeResult;
 import restudio.resync.flow.runtime.RuntimeFailure;
 import restudio.resync.flow.runtime.RuntimePrincipal;
 import restudio.resync.flow.runtime.RuntimeExecutionContext;
+import restudio.resync.flow.runtime.RuntimeDeadline;
 import restudio.resync.flow.runtime.RuntimeOperationDescriptor;
+import restudio.resync.flow.runtime.RuntimeScope;
 import restudio.resync.flow.type.ConversionGraph;
 import restudio.resync.flow.type.TypeExpr;
 import restudio.resync.flow.type.TypeReference;
@@ -153,12 +161,13 @@ public final class CompiledExecutionRunner {
         Objects.requireNonNull(plan, "Compiled Execution Plan Is Required");
         CatalogRuntimeActivation.ActivationRecord activation = activeActivation();
         RuntimeRegistrySnapshot runtimeSnapshot = activation == null ? null : activation.runtime();
+        RuntimeRegistrySnapshot preparationRuntime = runtimeSnapshot == null ? registry.snapshot() : runtimeSnapshot;
         validateActivationPlan(plan, activation);
         List<CompiledExecutionStep> ordered = topologicalOrder(plan);
         List<CompiledExecutionStep> scoped = executionScope(plan, ordered, startNodeId);
-        Map<GraphEndpoint, List<RoutedConnection>> routes = conversionBindings(plan, scoped, activation, runtimeSnapshot);
-        List<RuntimeLeaseInput.BindingRequirement> requirements = requirements(plan, scoped, runtimeSnapshot, routes);
-        Map<NodeInstanceId, TemplateBinding> templates = templateBindings(scoped, requirements);
+        Map<GraphEndpoint, List<RoutedConnection>> routes = conversionBindings(plan, scoped, activation, preparationRuntime);
+        List<RuntimeLeaseInput.BindingRequirement> requirements = requirements(plan, scoped, preparationRuntime, routes);
+        Map<NodeInstanceId, TemplateBinding> templates = templateBindings(plan, scoped, requirements);
         templatePreparations.incrementAndGet();
         LinkedHashMap<NodeInstanceId, CompiledExecutionStep> indexed = new LinkedHashMap<>();
         scoped.forEach(step -> indexed.put(step.nodeId(), step));
@@ -168,7 +177,7 @@ public final class CompiledExecutionRunner {
             .filter(step -> !loopOwnership.bodyOwned(step.nodeId())).toList();
         return new ExecutionTemplate(plan, startNodeId, scoped, routes, templates, executionInputs(scoped),
             invocationStarts(plan, scoped, startNodeId), requirements, runtimeSnapshot, stepsByNode, loopOwnership,
-            rootSteps);
+            rootSteps, planBudget(scoped, preparationRuntime, routes));
     }
 
     public CompletionStage<ExecutionResult> execute(ExecutionTemplate template,
@@ -177,6 +186,29 @@ public final class CompiledExecutionRunner {
                                                     CompiledRuntimeContext runtimeContext,
                                                     CorrelationId invocationId,
                                                     long requestedDeadlineMillis) {
+        return executeObserved(template, injectedInputs, cancellationToken, runtimeContext, invocationId,
+            requestedDeadlineMillis).result();
+    }
+
+    public ExecutionHandle executeObserved(ExecutionTemplate template, Map<GraphEndpoint, TypedValue> injectedInputs,
+                                            RuntimeCancellationToken cancellationToken, CompiledRuntimeContext runtimeContext,
+                                            CorrelationId invocationId, long requestedDeadlineMillis) {
+        return executeObserved(template, injectedInputs, cancellationToken, runtimeContext, invocationId, requestedDeadlineMillis, null);
+    }
+
+    public FunctionExecutionHandle executeFunctionObserved(ExecutionTemplate template, FunctionSignature signature,
+            FunctionInputMap inputs, RuntimeCancellationToken cancellationToken, CompiledRuntimeContext runtimeContext,
+            CorrelationId invocationId, long requestedDeadlineMillis) {
+        FunctionState function = new FunctionState(template, signature, inputs);
+        ExecutionHandle handle = executeObserved(template, Map.of(), cancellationToken, runtimeContext, invocationId,
+            requestedDeadlineMillis, function);
+        CompletionStage<FunctionResult> result = handle.result().thenApply(function::result);
+        return new FunctionExecutionHandle(result, handle.physicalCompletion());
+    }
+
+    private ExecutionHandle executeObserved(ExecutionTemplate template, Map<GraphEndpoint, TypedValue> injectedInputs,
+            RuntimeCancellationToken cancellationToken, CompiledRuntimeContext runtimeContext,
+            CorrelationId invocationId, long requestedDeadlineMillis, FunctionState function) {
         Objects.requireNonNull(template, "Compiled Execution Template Is Required");
         Objects.requireNonNull(injectedInputs, "Injected Inputs Are Required");
         Objects.requireNonNull(cancellationToken, "Cancellation Token Is Required");
@@ -189,13 +221,15 @@ public final class CompiledExecutionRunner {
         RuntimePlanLease lease = null;
         try {
             long computedDeadline = requestedDeadlineMillis == RuntimeExecutionContext.NO_DEADLINE
-                ? planDeadline(template.scoped, runtimeSnapshot, cancellationToken, template.routes)
+                ? planDeadline(template, cancellationToken)
                 : requestedDeadlineMillis;
             RuntimePrincipal principal = runtimeContext == null || runtimeContext.principal() == null
                 ? defaultPrincipal : runtimeContext.principal();
             RuntimeLeaseInput leaseInput = RuntimeLeaseInput.plan(
                 template.requirements, plan.planHash(), authority, principal,
-                plan.catalogBinding().generation(), plan.catalogBinding().catalogChecksum(), null, invocationId, computedDeadline);
+                plan.catalogBinding().generation(), plan.catalogBinding().catalogChecksum(), null, invocationId, computedDeadline)
+                .withFunctionBindings(plan.functionBindings()).withScope(new RuntimeScope(function == null ? null : function.signature,
+                    function == null ? FunctionInputMap.empty() : function.inputs, plan.localDefaults()));
             lease = runtimeSnapshot == null
                 ? registry.acquire(leaseInput)
                 : registry.acquire(leaseInput, runtimeSnapshot);
@@ -209,7 +243,7 @@ public final class CompiledExecutionRunner {
             RuntimePlanLease executionLease = lease;
             ExecutionFrame rootFrame = new ExecutionFrame(results, routedInputs, activatedExecutionInputs, outputs);
             ExecutionMachine machine = new ExecutionMachine(template, executionLease, cancellationToken, runtimeContext,
-                invocationId, computedDeadline);
+                invocationId, computedDeadline, function);
             CompletableFuture<ExecutionResult> execution = machine.execute(rootFrame);
             execution.whenComplete((ignored, failure) -> {
                 try {
@@ -218,13 +252,35 @@ public final class CompiledExecutionRunner {
                     activeInvocations.decrementAndGet();
                 }
             });
-            return execution;
+            return new ExecutionHandle(execution.minimalCompletionStage(), executionLease.physicalCompletion());
         } catch (Throwable failure) {
             if (lease != null) {
-                lease.close();
-                activeInvocations.decrementAndGet();
+                try {
+                    lease.close();
+                } catch (Throwable closeFailure) {
+                    if (closeFailure != failure) {
+                        failure.addSuppressed(closeFailure);
+                    }
+                } finally {
+                    activeInvocations.decrementAndGet();
+                }
             }
-            return CompletableFuture.failedFuture(failure);
+            CompletionStage<Void> physical = lease == null ? CompletableFuture.completedFuture(null) : lease.physicalCompletion();
+            return new ExecutionHandle(CompletableFuture.failedFuture(failure), physical);
+        }
+    }
+
+    public record ExecutionHandle(CompletionStage<ExecutionResult> result, CompletionStage<Void> physicalCompletion) {
+        public ExecutionHandle {
+            Objects.requireNonNull(result, "Execution Result Is Required");
+            Objects.requireNonNull(physicalCompletion, "Physical Completion Is Required");
+        }
+    }
+
+    public record FunctionExecutionHandle(CompletionStage<FunctionResult> result, CompletionStage<Void> physicalCompletion) {
+        public FunctionExecutionHandle {
+            Objects.requireNonNull(result, "Function Result Is Required");
+            Objects.requireNonNull(physicalCompletion, "Function Physical Completion Is Required");
         }
     }
 
@@ -236,7 +292,7 @@ public final class CompiledExecutionRunner {
         return templatePreparations.get();
     }
 
-    private static Map<NodeInstanceId, TemplateBinding> templateBindings(List<CompiledExecutionStep> steps,
+    private static Map<NodeInstanceId, TemplateBinding> templateBindings(CompiledExecutionPlan plan, List<CompiledExecutionStep> steps,
                                                                           List<RuntimeLeaseInput.BindingRequirement> requirements) {
         Map<RuntimeBindingKey, Set<PinId>> declared = new HashMap<>();
         requirements.forEach(requirement -> declared.put(requirement.binding(), Set.copyOf(requirement.inputPins())));
@@ -250,7 +306,10 @@ public final class CompiledExecutionRunner {
             Set<PinId> dynamic = new LinkedHashSet<>(step.inputBindings().keySet());
             dynamic.removeAll(staticPins);
             Map<PinId, StringTemplatePins.Template> templates = new LinkedHashMap<>();
-            for (PinId pin : staticPins) {
+            Set<PinId> templatePins = new LinkedHashSet<>(staticPins);
+            step.inputBindings().keySet().stream().filter(pin -> functionPinType(plan, step, pin,
+                RuntimeOperationDescriptor.Direction.INPUT) != null).forEach(templatePins::add);
+            for (PinId pin : templatePins) {
                 TypedValue value = step.inputBindings().get(pin);
                 if (value != null && StringTemplatePins.STRING.equals(value.type())
                     && value.state() == TypedValue.State.VALUE && value.value() instanceof String text
@@ -274,15 +333,18 @@ public final class CompiledExecutionRunner {
             templates = Map.copyOf(templates);
         }
 
-        private void render(Map<PinId, TypedValue> inputs) {
+        private void render(Map<PinId, TypedValue> inputs, Set<PinId> routed) {
             Map<String, Object> values = new HashMap<>();
             for (PinId pin : dynamic) {
-                TypedValue value = inputs.remove(pin);
+                TypedValue value = inputs.get(pin);
                 if (value != null && value.hasValue()) {
                     values.put(pin.canonicalText(), value.value());
                 }
             }
             templates.forEach((pin, template) -> {
+                if (routed.contains(pin)) {
+                    return;
+                }
                 TypedValue original = inputs.get(pin);
                 if (original != null && original.state() == TypedValue.State.VALUE && original.value() instanceof String) {
                     inputs.put(pin, new TypedValue(original.type(), TypedValue.State.VALUE, original.variantId(),
@@ -305,6 +367,8 @@ public final class CompiledExecutionRunner {
         private final Map<NodeInstanceId, CompiledExecutionStep> stepsByNode;
         private final LoopOwnership loopOwnership;
         private final List<CompiledExecutionStep> rootSteps;
+        private final Map<NodeInstanceId, FunctionBoundaryPins.BoundaryRole> functionBoundaries;
+        private final long executionBudgetMillis;
 
         private ExecutionTemplate(CompiledExecutionPlan plan, NodeInstanceId startNodeId,
                                   List<CompiledExecutionStep> scoped,
@@ -316,7 +380,8 @@ public final class CompiledExecutionRunner {
                                   RuntimeRegistrySnapshot runtimeSnapshot,
                                   Map<NodeInstanceId, CompiledExecutionStep> stepsByNode,
                                   LoopOwnership loopOwnership,
-                                  List<CompiledExecutionStep> rootSteps) {
+                                  List<CompiledExecutionStep> rootSteps,
+                                  long executionBudgetMillis) {
             this.plan = plan;
             this.startNodeId = startNodeId;
             this.scoped = scoped;
@@ -329,6 +394,20 @@ public final class CompiledExecutionRunner {
             this.stepsByNode = stepsByNode;
             this.loopOwnership = loopOwnership;
             this.rootSteps = rootSteps;
+            Map<NodeInstanceId, FunctionBoundaryPins.BoundaryRole> boundaries = new LinkedHashMap<>();
+            for (CompiledExecutionStep step : scoped) {
+                if (step.resolvedBinding() == null || !step.definition().owner().equals(step.handler().operation().owner())
+                    || !step.definition().owner().equals(step.handler().capability().owner())) {
+                    continue;
+                }
+                FunctionBoundaryPins.BoundaryRole role = FunctionBoundaryPins.role(step.resolvedBinding().unknown(),
+                    step.handler().operation().id().canonicalText());
+                if (role != null) {
+                    boundaries.put(step.nodeId(), role);
+                }
+            }
+            this.functionBoundaries = Map.copyOf(boundaries);
+            this.executionBudgetMillis = executionBudgetMillis;
         }
 
         public CompiledExecutionPlan plan() {
@@ -340,26 +419,36 @@ public final class CompiledExecutionRunner {
         }
     }
 
-    private long planDeadline(List<CompiledExecutionStep> steps, RuntimeRegistrySnapshot runtimeSnapshot,
-                              RuntimeCancellationToken cancellationToken, Map<GraphEndpoint, List<RoutedConnection>> routes) {
-        long deadline = cancellationToken.deadlineMillis();
-        long now = System.currentTimeMillis();
+    private long planBudget(List<CompiledExecutionStep> steps, RuntimeRegistrySnapshot runtimeSnapshot,
+                            Map<GraphEndpoint, List<RoutedConnection>> routes) {
+        long budget = 0;
         for (CompiledExecutionStep step : steps) {
             RuntimeBindingKey key = new RuntimeBindingKey(step.handler().capability(), step.handler().operation());
             RuntimeBinding binding = runtimeSnapshot == null
                 ? registry.resolve(key)
                 : runtimeSnapshot.binding(key).orElseThrow(() -> new IllegalStateException(
                     "Compiled Plan Runtime Binding Is Missing From The Active Activation: " + key.canonical()));
-            deadline = Math.min(deadline, binding.descriptor().semantics().executionDeadlineMillis(now));
+            budget = minimumBudget(budget, binding.descriptor().semantics().executionBudgetMillis());
         }
         for (List<RoutedConnection> outgoing : routes.values()) {
             for (RoutedConnection route : outgoing) {
                 for (ConversionBinding conversion : route.conversions()) {
-                    deadline = Math.min(deadline, conversion.binding().descriptor().semantics().executionDeadlineMillis(now));
+                    budget = minimumBudget(budget, conversion.binding().descriptor().semantics().executionBudgetMillis());
                 }
             }
         }
-        return deadline;
+        return budget;
+    }
+
+    private static long minimumBudget(long current, long candidate) {
+        return current == 0 ? candidate : candidate == 0 ? current : Math.min(current, candidate);
+    }
+
+    private static long planDeadline(ExecutionTemplate template, RuntimeCancellationToken cancellationToken) {
+        long deadline = template.executionBudgetMillis == 0
+            ? RuntimeExecutionContext.NO_DEADLINE
+            : RuntimeDeadline.deadlineMillisExact(System.currentTimeMillis(), template.executionBudgetMillis);
+        return Math.min(deadline, cancellationToken.deadlineMillis());
     }
 
     private static Map<NodeInstanceId, Set<PinId>> executionInputs(List<CompiledExecutionStep> steps) {
@@ -404,6 +493,7 @@ public final class CompiledExecutionRunner {
         private final CompiledRuntimeContext runtimeContext;
         private final CorrelationId invocationId;
         private final long deadlineMillis;
+        private final FunctionState function;
         private final Map<GraphEndpoint, List<RoutedConnection>> routes;
         private final Map<NodeInstanceId, TemplateBinding> templateBindings;
         private final Map<NodeInstanceId, Set<PinId>> executionInputs;
@@ -417,13 +507,14 @@ public final class CompiledExecutionRunner {
 
         private ExecutionMachine(ExecutionTemplate template, RuntimePlanLease lease,
                                  RuntimeCancellationToken cancellationToken, CompiledRuntimeContext runtimeContext,
-                                 CorrelationId invocationId, long deadlineMillis) {
+                                 CorrelationId invocationId, long deadlineMillis, FunctionState function) {
             this.plan = template.plan;
             this.lease = lease;
             this.cancellationToken = cancellationToken;
             this.runtimeContext = runtimeContext;
             this.invocationId = invocationId;
             this.deadlineMillis = deadlineMillis;
+            this.function = function;
             this.routes = template.routes;
             this.templateBindings = template.templates;
             this.executionInputs = template.executionInputs;
@@ -483,10 +574,15 @@ public final class CompiledExecutionRunner {
 
         private void invoke(CompiledExecutionStep step, ExecutionFrame frame, FramePath path, Consumer<FlowOutcome> finished) {
             Map<PinId, TypedValue> inputs = new LinkedHashMap<>(step.inputBindings());
-            inputs.putAll(frame.routedInputs.getOrDefault(step.nodeId(), Map.of()));
+            Map<PinId, TypedValue> routed = frame.routedInputs.getOrDefault(step.nodeId(), Map.of());
+            inputs.putAll(routed);
             TemplateBinding binding = templateBindings.get(step.nodeId());
             if (binding != null) {
-                binding.render(inputs);
+                binding.render(inputs, routed.keySet());
+            }
+            Map<PinId, TypedValue> functionInputs = function == null ? Map.of() : new LinkedHashMap<>(inputs);
+            if (binding != null) {
+                binding.dynamic().forEach(inputs::remove);
             }
             RuntimeBindingKey key = new RuntimeBindingKey(step.handler().capability(), step.handler().operation());
             RuntimeInvocation invocation = new RuntimeInvocation(key, inputs, childId(invocationId, step, path), cancellationToken)
@@ -513,7 +609,11 @@ public final class CompiledExecutionRunner {
                     runLoop(step, sequence, 0, frame, path, finished);
                     return;
                 }
-                routeOutputs(step, outputValues(step, result), result.branch(), frame, path, finished);
+                Map<PinId, TypedValue> outputs = outputValues(step, result);
+                if (function != null) {
+                    outputs = function.complete(step, functionInputs, outputs);
+                }
+                routeOutputs(step, outputs, result.branch(), frame, path, finished);
             }));
         }
 
@@ -849,6 +949,130 @@ public final class CompiledExecutionRunner {
         }
     }
 
+    private static final class FunctionState {
+        private final FunctionSignature signature;
+        private final FunctionInputMap inputs;
+        private final Map<NodeInstanceId, FunctionBoundaryPins.BoundaryRole> boundaries;
+        private FunctionOutputMap outputs;
+
+        private FunctionState(ExecutionTemplate template, FunctionSignature signature, FunctionInputMap inputs) {
+            this.signature = Objects.requireNonNull(signature, "Function Signature Is Required");
+            Objects.requireNonNull(template, "Function Execution Template Is Required");
+            if (!signature.equals(template.plan.functionSignature())
+                || !signature.function().resource().equals(template.plan.graph())
+                || signature.revision().value() != template.plan.graphRevision()
+                || template.functionBoundaries.get(template.startNodeId) != FunctionBoundaryPins.BoundaryRole.INPUTS) {
+                throw new IllegalArgumentException("Function Signature And Entry Must Match The Admitted Plan");
+            }
+            Objects.requireNonNull(inputs, "Function Inputs Are Required").require(signature);
+            Map<FunctionParameterId, TypedValue> values = new LinkedHashMap<>(inputs.values());
+            signature.inputs().forEach(parameter -> {
+                if (!values.containsKey(parameter.id())) {
+                    values.put(parameter.id(), parameter.defaultValue() == null
+                        ? TypedValue.absent(parameter.type()) : parameter.defaultValue());
+                }
+            });
+            this.inputs = new FunctionInputMap(values).require(signature);
+            this.boundaries = template.functionBoundaries;
+        }
+
+        private Map<PinId, TypedValue> complete(CompiledExecutionStep step, Map<PinId, TypedValue> supplied,
+                                               Map<PinId, TypedValue> returned) {
+            FunctionBoundaryPins.BoundaryRole role = boundaries.get(step.nodeId());
+            if (role == FunctionBoundaryPins.BoundaryRole.INPUTS) {
+                Map<PinId, TypedValue> values = new LinkedHashMap<>(returned);
+                signature.inputs().forEach(parameter -> values.put(PinId.of("function-output-" + parameter.id().canonicalText()),
+                    inputs.value(parameter.id())));
+                return values;
+            }
+            if (role == FunctionBoundaryPins.BoundaryRole.OUTPUTS) {
+                if (outputs != null) {
+                    throw new IllegalStateException("Function Returned More Than Once");
+                }
+                Map<FunctionParameterId, TypedValue> values = new LinkedHashMap<>();
+                signature.outputs().forEach(parameter -> {
+                    TypedValue value = supplied.get(PinId.of("function-input-" + parameter.id().canonicalText()));
+                    if (value != null) {
+                        values.put(parameter.id(), value);
+                    }
+                });
+                accept(new FunctionOutputMap(values));
+            } else if (step.resolvedBinding() != null
+                && step.resolvedBinding().unknown().get("handlerConfig") instanceof Map<?, ?> config) {
+                if ("function_output".equals(config.get("operation"))) {
+                    TypedValue parameter = supplied.get(PinId.of("parameter_id"));
+                    if (parameter == null || parameter.state() != TypedValue.State.VALUE || !(parameter.value() instanceof String id)) {
+                        throw new IllegalArgumentException("Typed Function Return Requires A Declared Parameter Identity");
+                    }
+                    FunctionParameterId identity = FunctionParameterId.parseCanonicalText(id);
+                    TypeExpr type = signature.outputs().stream().filter(value -> value.id().equals(identity)).findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Function Return Parameter Is Not Declared")).type();
+                    accept(new FunctionOutputMap(Map.of(identity, returnedValue(type, supplied.get(PinId.of("value"))))));
+                } else if ("return_value".equals(config.get("operation"))) {
+                    TypedValue value = supplied.get(PinId.of("value"));
+                    Map<FunctionParameterId, TypedValue> values = new LinkedHashMap<>();
+                    if (signature.outputs().size() == 1) {
+                        var parameter = signature.outputs().getFirst();
+                        values.put(parameter.id(), returnedValue(parameter.type(), value));
+                    } else if (signature.outputs().isEmpty()) {
+                        if (value != null && value.state() == TypedValue.State.VALUE) {
+                            throw new IllegalArgumentException("Function Return Contains An Undeclared Value");
+                        }
+                    } else if (value != null && value.value() instanceof Map<?, ?> map) {
+                        for (Map.Entry<?, ?> entry : map.entrySet()) {
+                            if (!(entry.getKey() instanceof String id)) {
+                                throw new IllegalArgumentException("Function Return Keys Must Be Parameter Identities");
+                            }
+                            FunctionParameterId identity = FunctionParameterId.parseCanonicalText(id);
+                            TypeExpr type = signature.outputs().stream().filter(parameter -> parameter.id().equals(identity)).findFirst()
+                                .orElseThrow(() -> new IllegalArgumentException("Function Return Parameter Is Not Declared")).type();
+                            values.put(identity, entry.getValue() == null ? TypedValue.nullValue(type) : TypedValue.value(type, entry.getValue()));
+                        }
+                    }
+                    accept(new FunctionOutputMap(values));
+                }
+            }
+            return returned;
+        }
+
+        private static TypedValue returnedValue(TypeExpr type, TypedValue value) {
+            if (value == null || value.state() == TypedValue.State.ABSENT) {
+                return TypedValue.absent(type);
+            }
+            if (value.state() == TypedValue.State.NULL) {
+                return TypedValue.nullValue(type);
+            }
+            return type.equals(value.type()) ? value : TypedValue.value(type, value.value());
+        }
+
+        private void accept(FunctionOutputMap output) {
+            if (outputs != null) {
+                throw new IllegalStateException("Function Returned More Than Once");
+            }
+            List<FunctionDiagnostic> diagnostics = output.validate(signature);
+            if (!diagnostics.isEmpty()) {
+                throw new IllegalArgumentException(diagnostics.getFirst().message());
+            }
+            outputs = output;
+        }
+
+        private FunctionResult result(ExecutionResult execution) {
+            int steps = Math.min(256, execution.nodeResults().size());
+            if (execution.status() != Status.SUCCESS) {
+                FunctionDiagnostic diagnostic = FunctionDiagnostic.error(execution.status() == Status.CANCELLED
+                    ? "FUNCTION.CANCELLED" : "FUNCTION.EXECUTION_FAILURE", "function-execution",
+                    execution.failure().diagnostic().message(), null);
+                return execution.status() == Status.CANCELLED ? FunctionResult.cancelled(signature, diagnostic, steps)
+                    : FunctionResult.failure(signature, List.of(diagnostic), steps);
+            }
+            if (outputs == null) {
+                return FunctionResult.failure(signature, List.of(FunctionDiagnostic.error("FUNCTION.EXECUTION_FAILURE",
+                    "function-return", "Function Completed Without Returning Its Declared Outputs", null)), steps);
+            }
+            return FunctionResult.success(signature, outputs, steps);
+        }
+    }
+
     private record LoopSequence(BigInteger count, List<?> elements) {
         private static LoopSequence count(BigInteger count) {
             return new LoopSequence(count, null);
@@ -1087,7 +1311,9 @@ public final class CompiledExecutionRunner {
             RuntimeLeaseInput.BindingRequirement requirement = new RuntimeLeaseInput.BindingRequirement(key, fingerprint,
                 binding.descriptor().pins().stream()
                     .filter(pin -> pin.direction() == RuntimeOperationDescriptor.Direction.INPUT)
-                    .map(RuntimeOperationDescriptor.Pin::id).toList(), List.copyOf(step.outputBindings().keySet()));
+                    .map(RuntimeOperationDescriptor.Pin::id).toList(), binding.descriptor().pins().stream()
+                    .filter(pin -> pin.direction() == RuntimeOperationDescriptor.Direction.OUTPUT)
+                    .map(RuntimeOperationDescriptor.Pin::id).toList());
             RuntimeLeaseInput.BindingRequirement previous = requirements.putIfAbsent(key, requirement);
             if (previous != null && !previous.equals(requirement)) {
                 throw new IllegalStateException("Compiled Plan Runtime Pin Bindings Disagree: " + key.canonical());
@@ -1151,9 +1377,17 @@ public final class CompiledExecutionRunner {
             if (!bindings.containsKey(connection.source().nodeId()) || !bindings.containsKey(connection.target().nodeId())) {
                 continue;
             }
-            TypeExpr source = pinType(bindings.get(connection.source().nodeId()), connection.source().pinId(), RuntimeOperationDescriptor.Direction.OUTPUT);
-            TypeExpr target = targetPinType(bindings.get(connection.target().nodeId()),
-                stepsByNode.get(connection.target().nodeId()), connection.target().pinId());
+            TypeExpr source = functionPinType(plan, stepsByNode.get(connection.source().nodeId()), connection.source().pinId(),
+                RuntimeOperationDescriptor.Direction.OUTPUT);
+            if (source == null) {
+                source = pinType(bindings.get(connection.source().nodeId()), connection.source().pinId(), RuntimeOperationDescriptor.Direction.OUTPUT);
+            }
+            TypeExpr target = functionPinType(plan, stepsByNode.get(connection.target().nodeId()), connection.target().pinId(),
+                RuntimeOperationDescriptor.Direction.INPUT);
+            if (target == null) {
+                target = targetPinType(plan, bindings.get(connection.target().nodeId()),
+                    stepsByNode.get(connection.target().nodeId()), connection.target().pinId());
+            }
             ConversionRoute route = declared.get(connection.connectionId());
             List<ConversionBinding> resolved = new ArrayList<>();
             if (GraphValidator.directlyAssignable(source, target)) {
@@ -1187,12 +1421,33 @@ public final class CompiledExecutionRunner {
         return Map.copyOf(routes);
     }
 
+    private static TypeExpr functionPinType(CompiledExecutionPlan plan, CompiledExecutionStep step, PinId pin,
+                                            RuntimeOperationDescriptor.Direction direction) {
+        FunctionSignature signature = plan.functionSignature();
+        if (signature == null || step.resolvedBinding() == null
+            || !step.definition().owner().equals(step.handler().operation().owner())
+            || !step.definition().owner().equals(step.handler().capability().owner())) {
+            return null;
+        }
+        FunctionBoundaryPins.BoundaryRole role = FunctionBoundaryPins.role(step.resolvedBinding().unknown(),
+            step.handler().operation().id().canonicalText());
+        if (role == FunctionBoundaryPins.BoundaryRole.INPUTS && direction == RuntimeOperationDescriptor.Direction.OUTPUT) {
+            return signature.inputs().stream().filter(parameter -> pin.canonicalText().equals("function-output-" + parameter.id().canonicalText()))
+                .map(parameter -> parameter.type()).findFirst().orElse(null);
+        }
+        if (role == FunctionBoundaryPins.BoundaryRole.OUTPUTS && direction == RuntimeOperationDescriptor.Direction.INPUT) {
+            return signature.outputs().stream().filter(parameter -> pin.canonicalText().equals("function-input-" + parameter.id().canonicalText()))
+                .map(parameter -> parameter.type()).findFirst().orElse(null);
+        }
+        return null;
+    }
+
     private static TypeExpr pinType(RuntimeBinding binding, PinId id, RuntimeOperationDescriptor.Direction direction) {
         return binding.descriptor().pins().stream().filter(pin -> pin.id().equals(id) && pin.direction() == direction)
             .findFirst().orElseThrow(() -> new IllegalStateException("Compiled Connection Pin Is Missing")).type();
     }
 
-    private static TypeExpr targetPinType(RuntimeBinding binding, CompiledExecutionStep step, PinId id) {
+    private static TypeExpr targetPinType(CompiledExecutionPlan plan, RuntimeBinding binding, CompiledExecutionStep step, PinId id) {
         RuntimeOperationDescriptor.Pin declared = binding.descriptor().pins().stream()
             .filter(pin -> pin.id().equals(id) && pin.direction() == RuntimeOperationDescriptor.Direction.INPUT)
             .findFirst().orElse(null);
@@ -1201,11 +1456,11 @@ public final class CompiledExecutionRunner {
         }
         TypedValue dynamic = step.inputBindings().get(id);
         if (dynamic == null || !StringTemplatePins.STRING.equals(dynamic.type())
-            || binding.descriptor().pins().stream().noneMatch(pin -> pin.direction() == RuntimeOperationDescriptor.Direction.INPUT
-                && StringTemplatePins.STRING.equals(pin.type())
-                && step.inputBindings().get(pin.id()) != null
-                && step.inputBindings().get(pin.id()).value() instanceof String text
-                && StringTemplatePins.names(text).contains(id.canonicalText()))) {
+            || step.inputBindings().entrySet().stream().noneMatch(entry -> StringTemplatePins.STRING.equals(entry.getValue().type())
+                && (binding.descriptor().pins().stream().anyMatch(pin -> pin.id().equals(entry.getKey())
+                    && pin.direction() == RuntimeOperationDescriptor.Direction.INPUT && StringTemplatePins.STRING.equals(pin.type()))
+                    || StringTemplatePins.STRING.equals(functionPinType(plan, step, entry.getKey(), RuntimeOperationDescriptor.Direction.INPUT)))
+                && entry.getValue().value() instanceof String text && StringTemplatePins.names(text).contains(id.canonicalText()))) {
             throw new IllegalStateException("Compiled Connection Pin Is Missing");
         }
         return StringTemplatePins.STRING;
@@ -1246,11 +1501,15 @@ public final class CompiledExecutionRunner {
         if (!knownNodes.contains(startNodeId)) {
             throw new IllegalArgumentException("Compiled Execution Plan Start Node Is Unknown: " + startNodeId.canonicalText());
         }
+        CompiledExecutionStep start = ordered.stream().filter(step -> step.nodeId().equals(startNodeId)).findFirst().orElseThrow();
         List<GraphConnection> incoming = plan.connections().stream()
             .filter(connection -> connection.target().nodeId().equals(startNodeId))
-            .toList();
+            .filter(connection -> {
+                TypedValue input = start.inputBindings().get(connection.target().pinId());
+                return input != null && EXECUTION_TYPE.equals(input.type());
+            }).toList();
         if (!incoming.isEmpty()) {
-            throw new IllegalArgumentException("Compiled Execution Plan Start Node Has Incoming Dependencies: " + startNodeId.canonicalText());
+            throw new IllegalArgumentException("Compiled Execution Plan Start Node Has Incoming Execution Dependencies: " + startNodeId.canonicalText());
         }
         Map<NodeInstanceId, List<NodeInstanceId>> outgoing = new HashMap<>();
         plan.connections().forEach(connection -> outgoing.computeIfAbsent(connection.source().nodeId(), ignored -> new ArrayList<>())

@@ -13,10 +13,13 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowRuntimeExecutionBoundaryTest {
@@ -56,6 +59,23 @@ class FlowRuntimeExecutionBoundaryTest {
     }
 
     @Test
+    void cancellationNeverCompletesTheHandlersPhysicalStage() throws Exception {
+        FlowRuntimeExecutionBoundary boundary = new FlowRuntimeExecutionBoundary(Runnable::run, Runnable::run, () -> true);
+        RuntimeExecutionContext context = context(RuntimeSemantics.ThreadMode.CURRENT);
+        RuntimeInvocation invocation = invocation(context);
+        CompletableFuture<RuntimeResult> physical = new CompletableFuture<>();
+        CompletableFuture<RuntimeResult> execution = boundary.execute(context, invocation, ignored -> physical).toCompletableFuture();
+
+        invocation.cancellationToken().cancel();
+        invocation.cancellationToken().cancelled().toCompletableFuture().get(2, TimeUnit.SECONDS);
+
+        assertFalse(physical.isDone());
+        assertFalse(execution.isDone());
+        physical.complete(RuntimeResult.success());
+        assertEquals(RuntimeResult.Status.SUCCESS, execution.get(2, TimeUnit.SECONDS).status());
+    }
+
+    @Test
     void aQueuedCancelledInvocationNeverReachesItsHandler() {
         AtomicBoolean primary = new AtomicBoolean(false);
         ArrayDeque<Runnable> queue = new ArrayDeque<>();
@@ -68,6 +88,7 @@ class FlowRuntimeExecutionBoundaryTest {
             return CompletableFuture.completedFuture(RuntimeResult.success());
         });
         invocation.cancellationToken().cancel();
+        assertThrows(ExecutionException.class, () -> result.toCompletableFuture().get(2, TimeUnit.SECONDS));
         primary.set(true);
         queue.removeFirst().run();
         assertTrue(result.toCompletableFuture().isCompletedExceptionally());

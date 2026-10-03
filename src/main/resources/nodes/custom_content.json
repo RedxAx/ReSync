@@ -91,7 +91,7 @@
       {"id": "allowed_worlds", "displayName": "Allowed Worlds", "name": "allowed_worlds", "dataType": "string", "description": "Lists worlds where this content may run."},
       {"id": "denied_worlds", "displayName": "Denied Worlds", "name": "denied_worlds", "dataType": "string", "description": "Lists worlds where this content must not run."},
       {"id": "chance_percent", "displayName": "Chance Percent", "name": "chance_percent", "dataType": "number", "widget": "NUMBER", "defaultValue": 100, "description": "Sets the percentage chance that a matching event runs."},
-      {"id": "max_activations_per_tick", "displayName": "Max Activations Per Tick", "name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "description": "Limits activations per server tick; zero means no configured limit."}
+      {"id": "max_activations_per_tick", "displayName": "Max Activations Per Tick", "name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "description": "Limits activations per server tick. Zero means no configured limit."}
     ],
     "outputs": [
       {"id": "use", "displayName": "Use", "name": "use", "pinType": "FLOW", "dataType": "execution", "description": "Runs when the item is used."},
@@ -201,7 +201,7 @@
       {"id": "allowed_worlds", "displayName": "Allowed Worlds", "name": "allowed_worlds", "dataType": "string", "description": "Lists worlds where this content may run."},
       {"id": "denied_worlds", "displayName": "Denied Worlds", "name": "denied_worlds", "dataType": "string", "description": "Lists worlds where this content must not run."},
       {"id": "chance_percent", "displayName": "Chance Percent", "name": "chance_percent", "dataType": "number", "widget": "NUMBER", "defaultValue": 100, "description": "Sets the percentage chance that a matching event runs."},
-      {"id": "max_activations_per_tick", "displayName": "Max Activations Per Tick", "name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "description": "Limits activations per server tick; zero means no configured limit."}
+      {"id": "max_activations_per_tick", "displayName": "Max Activations Per Tick", "name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "description": "Limits activations per server tick. Zero means no configured limit."}
     ],
     "outputs": [
       {"id": "equip", "displayName": "Equip", "name": "equip", "pinType": "FLOW", "dataType": "execution", "description": "Runs when the armor is equipped."},
@@ -309,7 +309,7 @@
       {"id": "allowed_worlds", "displayName": "Allowed Worlds", "name": "allowed_worlds", "dataType": "string", "description": "Lists worlds where this content may run."},
       {"id": "denied_worlds", "displayName": "Denied Worlds", "name": "denied_worlds", "dataType": "string", "description": "Lists worlds where this content must not run."},
       {"id": "chance_percent", "displayName": "Chance Percent", "name": "chance_percent", "dataType": "number", "widget": "NUMBER", "defaultValue": 100, "description": "Sets the percentage chance that a matching event runs."},
-      {"id": "max_activations_per_tick", "displayName": "Max Activations Per Tick", "name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "description": "Limits activations per server tick; zero means no configured limit."}
+      {"id": "max_activations_per_tick", "displayName": "Max Activations Per Tick", "name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "description": "Limits activations per server tick. Zero means no configured limit."}
     ],
     "outputs": [
       {"id": "place", "displayName": "Place", "name": "place", "pinType": "FLOW", "dataType": "execution", "description": "Runs when the block is placed."},
@@ -415,7 +415,7 @@
       {"id": "allowed_worlds", "displayName": "Allowed Worlds", "name": "allowed_worlds", "dataType": "string", "description": "Lists worlds where this content may run."},
       {"id": "denied_worlds", "displayName": "Denied Worlds", "name": "denied_worlds", "dataType": "string", "description": "Lists worlds where this content must not run."},
       {"id": "chance_percent", "displayName": "Chance Percent", "name": "chance_percent", "dataType": "number", "widget": "NUMBER", "defaultValue": 100, "description": "Sets the percentage chance that a matching event runs."},
-      {"id": "max_activations_per_tick", "displayName": "Max Activations Per Tick", "name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "description": "Limits activations per server tick; zero means no configured limit."}
+      {"id": "max_activations_per_tick", "displayName": "Max Activations Per Tick", "name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "description": "Limits activations per server tick. Zero means no configured limit."}
     ],
     "outputs": [
       {"id": "fire", "displayName": "Fire", "name": "fire", "pinType": "FLOW", "dataType": "execution", "description": "Runs when the projectile is fired."},

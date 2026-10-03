@@ -19,6 +19,7 @@ import java.util.function.BiConsumer;
 
 public class RandomHandler implements NodeHandler {
     private static final Random RANDOM = new Random();
+    private static final int MAX_HEX_LENGTH = 65_536;
     private final ConcurrentHashMap<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public RandomHandler() {
@@ -27,14 +28,14 @@ public class RandomHandler implements NodeHandler {
             Integer max = ctx.getInputValue(node, "max", Integer.class, 10);
             int lower = Math.min(min, max);
             int upper = Math.max(min, max);
-            int value = lower + RANDOM.nextInt(upper - lower + 1);
+            int value = (int) RANDOM.nextLong(lower, (long) upper + 1);
             ctx.setOutput(node, "number", value);
         });
 
         operations.put("random_double", (ctx, node) -> {
             Double min = ctx.getInputValue(node, "min", Double.class, 0.0);
             Double max = ctx.getInputValue(node, "max", Double.class, 1.0);
-            double value = min + RANDOM.nextDouble() * (max - min);
+            double value = randomDouble(min, max);
             ctx.setOutput(node, "number", value);
         });
 
@@ -76,7 +77,10 @@ public class RandomHandler implements NodeHandler {
 
         operations.put("random_hex", (ctx, node) -> {
             Integer length = ctx.getInputValue(node, "length", Integer.class, 8);
-            StringBuilder hex = new StringBuilder();
+            if (length < 0 || length > MAX_HEX_LENGTH) {
+                throw new IllegalArgumentException("Hex length must be between 0 and 65536");
+            }
+            StringBuilder hex = new StringBuilder(length);
             for (int i = 0; i < length; i++) {
                 hex.append(Integer.toHexString(RANDOM.nextInt(16)));
             }
@@ -86,16 +90,16 @@ public class RandomHandler implements NodeHandler {
         operations.put("random_number", (ctx, node) -> {
             Integer min = ctx.getInputValue(node, "min", Integer.class, 0);
             Integer max = ctx.getInputValue(node, "max", Integer.class, 100);
-            int result = min + (int) (Math.random() * (max - min + 1));
+            int lower = Math.min(min, max);
+            int upper = Math.max(min, max);
+            int result = (int) RANDOM.nextLong(lower, (long) upper + 1);
             ctx.setOutput(node, "result", result);
         });
 
         operations.put("random_item", (ctx, node) -> {
             Object itemsObj = ctx.getInputValue(node, "items", Object.class, null);
-            if (itemsObj instanceof List<?> list && !list.isEmpty()) {
-                int index = (int) (Math.random() * list.size());
-                ctx.setOutput(node, "result", list.get(index));
-            }
+            Object result = itemsObj instanceof List<?> list && !list.isEmpty() ? list.get(RANDOM.nextInt(list.size())) : null;
+            ctx.setOutput(node, "result", result);
         });
 
         operations.put("random_player", (ctx, node) -> {
@@ -106,16 +110,22 @@ public class RandomHandler implements NodeHandler {
             } else {
                 players = new ArrayList<>(Bukkit.getOnlinePlayers());
             }
-            if (!players.isEmpty()) {
-                int index = (int) (Math.random() * players.size());
-                ctx.setOutput(node, "player", players.get(index));
-            }
+            ctx.setOutput(node, "player", players.isEmpty() ? null : players.get(RANDOM.nextInt(players.size())));
         });
 
         operations.put("random_color", (ctx, node) -> {
             ctx.setOutput(node, "color", Color.fromRGB(RANDOM.nextInt(256), RANDOM.nextInt(256), RANDOM.nextInt(256)));
         });
 
+    }
+
+    private double randomDouble(double min, double max) {
+        if (!Double.isFinite(min) || !Double.isFinite(max)) {
+            throw new IllegalArgumentException("Random bounds must be finite");
+        }
+        double sample = RANDOM.nextDouble();
+        double value = (1.0 - sample) * min + sample * max;
+        return Math.clamp(value, Math.min(min, max), Math.max(min, max));
     }
 
     public void registerTo(HandlerRegistry registry) {

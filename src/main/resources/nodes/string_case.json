@@ -2,7 +2,7 @@
   {
     "id": "string_slugify",
     "displayName": "Slugify",
-    "description": "Convert text to a lowercase URL slug. Missing or null text uses empty text; only ASCII letters, digits, whitespace, and hyphens remain, whitespace becomes hyphens, and repeated hyphens collapse. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "description": "Convert text to a lowercase URL slug without using the server locale. Missing or null input uses empty text. Keep ASCII letters, digits, whitespace, and hyphens. Whitespace becomes hyphens and repeated hyphens collapse. Inputs or results over 65536 characters fail before output.",
     "domain": "core",
     "family": "string",
     "lifecycle": "active",
@@ -18,16 +18,16 @@
     "handler": "GenericStringHandler",
     "handlerConfig": {"operation": "slugify"},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text. Values longer than 65536 characters fail before output."}
     ],
     "outputs": [
-      {"id": "slug", "displayName": "Slug", "name": "slug", "pinType": "DATA", "dataType": "string", "description": "Returns the lowercase slug with punctuation removed, whitespace and repeated hyphens normalized, and leading or trailing hyphens removed; results longer than 65536 characters fail before output."}
+      {"id": "slug", "displayName": "Slug", "name": "slug", "pinType": "DATA", "dataType": "string", "description": "Returns the lowercase slug with punctuation removed, whitespace and repeated hyphens normalized, and leading or trailing hyphens removed. Results longer than 65536 characters fail before output."}
     ]
   },
   {
     "id": "string_camel_case",
     "displayName": "Camel Case",
-    "description": "Convert text to lower camel case. Missing or null text uses empty text; punctuation becomes word separators, the first word is lowercase, and later words start uppercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "description": "Convert text to lower camel case with locale-independent casing. Missing or null input uses empty text. Word separators include punctuation. The first word is lowercase and later words start uppercase. Inputs or results over 65536 characters fail before output.",
     "domain": "core",
     "family": "string",
     "lifecycle": "active",
@@ -43,16 +43,16 @@
     "handler": "GenericStringHandler",
     "handlerConfig": {"operation": "camel_case"},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text. Values longer than 65536 characters fail before output."}
     ],
     "outputs": [
-      {"id": "camel_case", "displayName": "Camel Case", "name": "camel_case", "pinType": "DATA", "dataType": "string", "description": "Returns lower camel case with punctuation treated as word separators and no separators between words; results longer than 65536 characters fail before output."}
+      {"id": "camel_case", "displayName": "Camel Case", "name": "camel_case", "pinType": "DATA", "dataType": "string", "description": "Returns lower camel case with punctuation treated as word separators and no separators between words. Results longer than 65536 characters fail before output."}
     ]
   },
   {
     "id": "string_pascal_case",
     "displayName": "Pascal Case",
-    "description": "Convert text to Pascal case. Missing or null text uses empty text; punctuation becomes word separators, and every word starts uppercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "description": "Convert text to Pascal case with locale-independent casing. Missing or null input uses empty text. Word separators include punctuation and each word starts uppercase. Inputs or results over 65536 characters fail before output.",
     "domain": "core",
     "family": "string",
     "lifecycle": "active",
@@ -68,16 +68,16 @@
     "handler": "GenericStringHandler",
     "handlerConfig": {"operation": "pascal_case"},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text. Values longer than 65536 characters fail before output."}
     ],
     "outputs": [
-      {"id": "pascal_case", "displayName": "Pascal Case", "name": "pascal_case", "pinType": "DATA", "dataType": "string", "description": "Returns Pascal case with punctuation treated as word separators and no separators between words; results longer than 65536 characters fail before output."}
+      {"id": "pascal_case", "displayName": "Pascal Case", "name": "pascal_case", "pinType": "DATA", "dataType": "string", "description": "Returns Pascal case with punctuation treated as word separators and no separators between words. Results longer than 65536 characters fail before output."}
     ]
   },
   {
     "id": "string_snake_case",
     "displayName": "Snake Case",
-    "description": "Convert text to snake case. Missing or null text uses empty text; punctuation and camel-case boundaries become separators, separator runs become one underscore, and output is lowercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "description": "Convert text to snake case with locale-independent casing. Missing or null input uses empty text. Use punctuation and camel-case boundaries as separators. Separator runs become one underscore and text becomes lowercase. Inputs or results over 65536 characters fail before output.",
     "domain": "core",
     "family": "string",
     "lifecycle": "active",
@@ -93,16 +93,16 @@
     "handler": "GenericStringHandler",
     "handlerConfig": {"operation": "snake_case"},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text. Values longer than 65536 characters fail before output."}
     ],
     "outputs": [
-      {"id": "snake_case", "displayName": "Snake Case", "name": "snake_case", "pinType": "DATA", "dataType": "string", "description": "Returns lowercase words joined by underscores, with punctuation and camel-case boundaries treated as separators; results longer than 65536 characters fail before output."}
+      {"id": "snake_case", "displayName": "Snake Case", "name": "snake_case", "pinType": "DATA", "dataType": "string", "description": "Returns lowercase words joined by underscores, with punctuation and camel-case boundaries treated as separators. Results longer than 65536 characters fail before output."}
     ]
   },
   {
     "id": "string_kebab_case",
     "displayName": "Kebab Case",
-    "description": "Convert text to kebab case. Missing or null text uses empty text; punctuation and camel-case boundaries become separators, separator runs become one hyphen, and output is lowercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "description": "Convert text to kebab case with locale-independent casing. Missing or null input uses empty text. Use punctuation and camel-case boundaries as separators. Separator runs become one hyphen and text becomes lowercase. Inputs or results over 65536 characters fail before output.",
     "domain": "core",
     "family": "string",
     "lifecycle": "active",
@@ -118,10 +118,10 @@
     "handler": "GenericStringHandler",
     "handlerConfig": {"operation": "kebab_case"},
     "inputs": [
-      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text. Values longer than 65536 characters fail before output."}
     ],
     "outputs": [
-      {"id": "kebab_case", "displayName": "Kebab Case", "name": "kebab_case", "pinType": "DATA", "dataType": "string", "description": "Returns lowercase words joined by hyphens, with punctuation and camel-case boundaries treated as separators; results longer than 65536 characters fail before output."}
+      {"id": "kebab_case", "displayName": "Kebab Case", "name": "kebab_case", "pinType": "DATA", "dataType": "string", "description": "Returns lowercase words joined by hyphens, with punctuation and camel-case boundaries treated as separators. Results longer than 65536 characters fail before output."}
     ]
   },
   {
@@ -143,16 +143,16 @@
     "handler": "GenericStringHandler",
     "handlerConfig": {"operation": "template"},
     "inputs": [
-      {"id": "template", "displayName": "Template", "name": "template", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Template text to return. Missing or null input uses empty text; placeholders are not interpolated; values longer than 65536 characters fail before output."}
+      {"id": "template", "displayName": "Template", "name": "template", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Template text to return. Missing or null input uses empty text. Placeholders are not interpolated. Values longer than 65536 characters fail before output."}
     ],
     "outputs": [
-      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns the template input unchanged without variable interpolation; results longer than 65536 characters fail before output."}
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns the template input unchanged without variable interpolation. Results longer than 65536 characters fail before output."}
     ]
   },
   {
     "id": "string_capitalize",
     "displayName": "Capitalize",
-    "description": "Capitalize whitespace-delimited words. Missing/null value uses empty text; whitespace runs collapse to single spaces and edges trim, each word starts uppercase, and remaining characters are lowercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "description": "Capitalize words with locale-independent casing. Missing or null input uses empty text. Trim edges and collapse whitespace to single spaces. Each word starts uppercase and remaining characters are lowercase. Inputs or results over 65536 characters fail before output.",
     "domain": "core",
     "family": "string",
     "lifecycle": "active",
@@ -168,10 +168,10 @@
     "handler": "GenericStringHandler",
     "handlerConfig": {"operation": "capitalize"},
     "inputs": [
-      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to capitalize. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to capitalize. Missing or null input uses empty text. Values longer than 65536 characters fail before output."}
     ],
     "outputs": [
-      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns words joined by single spaces with each word's first character uppercase and remaining characters lowercase; results longer than 65536 characters fail before output."}
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns words joined by single spaces with each word's first character uppercase and remaining characters lowercase. Results longer than 65536 characters fail before output."}
     ]
   }
 ]

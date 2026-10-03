@@ -2,7 +2,7 @@
   {
     "id": "to_string",
     "displayName": "To String",
-    "description": "Convert the supplied value with the registered To String conversion.",
+    "description": "Converts a value to text. A missing or null value becomes empty text. Maps and lists use their text representation, not JSON.",
     "domain": "core",
     "family": "conversion",
     "lifecycle": "active",
@@ -35,7 +35,7 @@
         "name": "value",
         "pinType": "DATA",
         "dataType": "any",
-        "description": "Provides the Value value to convert.",
+        "description": "Value whose text representation is returned.",
         "direction": "input"
       }
     ],
@@ -46,7 +46,7 @@
         "name": "string",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Returns the String value produced by this conversion.",
+        "description": "Text representation of Value, or empty text when absent.",
         "direction": "output"
       }
     ],
@@ -71,7 +71,7 @@
   {
     "id": "to_number",
     "displayName": "To Number",
-    "description": "Convert the supplied value with the registered To Number conversion.",
+    "description": "Converts a number or numeric text to a decimal number. Unsupported values, missing values, and text that cannot be parsed return zero.",
     "domain": "core",
     "family": "conversion",
     "lifecycle": "active",
@@ -105,7 +105,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "0",
-        "description": "Provides numeric text to convert.",
+        "description": "Number or numeric text, such as 12.5.",
         "direction": "input"
       }
     ],
@@ -116,7 +116,7 @@
         "name": "number",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Number value produced by this conversion.",
+        "description": "Converted decimal value, or zero when the input cannot be converted.",
         "direction": "output"
       }
     ],
@@ -141,7 +141,7 @@
   {
     "id": "to_boolean",
     "displayName": "To Boolean",
-    "description": "Convert the supplied value with the registered To Boolean conversion.",
+    "description": "Converts true, yes, or 1 text to true, ignoring case and surrounding spaces. Non-zero numbers are true. Other text and missing values are false.",
     "domain": "core",
     "family": "conversion",
     "lifecycle": "active",
@@ -175,7 +175,7 @@
         "pinType": "DATA",
         "dataType": "any",
         "defaultValue": false,
-        "description": "Provides the Value value to convert.",
+        "description": "Boolean, number, or text to interpret as true or false.",
         "direction": "input"
       }
     ],
@@ -186,7 +186,7 @@
         "name": "boolean",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Boolean value produced by this conversion.",
+        "description": "True for a true Boolean, a non-zero number, or true, yes, or 1 text. False otherwise.",
         "direction": "output"
       }
     ],
@@ -211,7 +211,7 @@
   {
     "id": "to_player",
     "displayName": "To Player",
-    "description": "Convert the supplied value with the registered To Player conversion.",
+    "description": "Resolves an online player from a Player value, UUID, UUID text, or exact account name. Returns no value when no online player matches.",
     "domain": "core",
     "family": "conversion",
     "lifecycle": "active",
@@ -245,7 +245,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "",
-        "description": "Provides the Uuid Or Name value to convert.",
+        "description": "Player value, UUID, UUID text, or exact online account name.",
         "direction": "input"
       }
     ],
@@ -256,7 +256,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Returns the Player value produced by this conversion.",
+        "description": "Resolved online player, or no value when no match exists.",
         "direction": "output"
       }
     ],
@@ -281,7 +281,7 @@
   {
     "id": "to_location",
     "displayName": "To Location",
-    "description": "Convert the supplied value with the registered To Location conversion.",
+    "description": "Creates a world location from X, Y, and Z. An empty world name uses the server's first loaded world. An unknown name returns no location.",
     "domain": "core",
     "family": "conversion",
     "lifecycle": "active",
@@ -315,7 +315,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "defaultValue": 0,
-        "description": "Provides the X value to convert.",
+        "description": "X coordinate in blocks. Defaults to 0.",
         "direction": "input"
       },
       {
@@ -325,7 +325,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "defaultValue": 0,
-        "description": "Provides the Y value to convert.",
+        "description": "Y coordinate in blocks. Defaults to 0.",
         "direction": "input"
       },
       {
@@ -335,7 +335,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "defaultValue": 0,
-        "description": "Provides the Z value to convert.",
+        "description": "Z coordinate in blocks. Defaults to 0.",
         "direction": "input"
       },
       {
@@ -345,7 +345,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "",
-        "description": "Provides the World value to convert.",
+        "description": "Loaded world name. Empty text selects the first loaded world.",
         "direction": "input"
       }
     ],
@@ -356,7 +356,7 @@
         "name": "location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Returns the Location value produced by this conversion.",
+        "description": "Location in the selected loaded world, or no value when that world is unavailable.",
         "direction": "output"
       }
     ],
@@ -396,7 +396,7 @@
   {
     "id": "to_item",
     "displayName": "To Item",
-    "description": "Convert the supplied value with the registered To Item conversion.",
+    "description": "Creates an item stack from a Minecraft material name and amount. An unknown material name falls back to Stone.",
     "domain": "core",
     "family": "conversion",
     "lifecycle": "active",
@@ -430,7 +430,7 @@
         "pinType": "DATA",
         "dataType": "string",
         "defaultValue": "STONE",
-        "description": "Provides the Material value to convert.",
+        "description": "Minecraft material name, such as STONE. An unknown name uses STONE.",
         "direction": "input"
       },
       {
@@ -440,7 +440,7 @@
         "pinType": "DATA",
         "dataType": "number",
         "defaultValue": 1,
-        "description": "Provides the Amount value to convert.",
+        "description": "Amount assigned to the new item stack. Defaults to 1.",
         "direction": "input"
       }
     ],
@@ -451,7 +451,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value produced by this conversion.",
+        "description": "New item stack using the selected material or Stone fallback.",
         "direction": "output"
       }
     ],
@@ -481,7 +481,7 @@
   {
     "id": "to_list",
     "displayName": "To List",
-    "description": "Convert the supplied value with the registered To List conversion.",
+    "description": "Creates a new list from a collection, array, comma-separated text, or one value. A missing value returns an empty list. Adding or removing entries does not change the input collection.",
     "domain": "core",
     "family": "conversion",
     "lifecycle": "active",
@@ -514,7 +514,7 @@
         "name": "value_or_separator",
         "pinType": "DATA",
         "dataType": "any",
-        "description": "Provides the Value Or Separator value to convert.",
+        "description": "Collection, array, comma-separated text, or one value. Text splits on commas.",
         "direction": "input"
       }
     ],
@@ -525,7 +525,7 @@
         "name": "list",
         "pinType": "DATA",
         "dataType": "list<any>",
-        "description": "Returns the List value produced by this conversion.",
+        "description": "New mutable list of the converted values. Array and collection elements keep their original values.",
         "direction": "output"
       }
     ],

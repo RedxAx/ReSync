@@ -17,6 +17,9 @@ import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowFunctionInUseException;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.CoreGraphStorageBoundary;
+import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.protocol.ResourceActivationState;
 import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.handler.event.FlowEventRegistry;
@@ -39,6 +42,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -478,13 +482,8 @@ public class FlowBlueprintPacketHandler {
         if (triggerRegistry == null) {
             return;
         }
-        for (String type : List.of(ReSyncResourceCatalog.FLOW, ReSyncResourceCatalog.FUNCTION, ReSyncResourceCatalog.COMMAND)) {
-            for (String graphId : storage.listGraphIds(type)) {
-                FlowGraph graph = storage.getGraph(type, graphId);
-                if (graph != null && graph.getId() != null && !graph.getId().isBlank() && graph.getNodes() != null) {
-                    updateEventBindings(graph);
-                }
-            }
+        for (String graphId : storage.listGraphIds(ReSyncResourceCatalog.FLOW)) {
+            refreshEventBinding(graphId);
         }
     }
 
@@ -492,18 +491,46 @@ public class FlowBlueprintPacketHandler {
         if (type == null || flowId == null || flowId.isBlank() || triggerRegistry == null) {
             return;
         }
-        if (deleted) {
-            if (ReSyncResourceCatalog.FLOW.equals(type)) {
-                triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, List.of());
-            }
-            if (globalTriggers != null) {
-                globalTriggers.refreshBindings();
-            }
+        if (ReSyncResourceCatalog.FUNCTION.equals(type)) {
             return;
         }
-        FlowGraph graph = storage.getGraph(type, flowId);
+        if (ReSyncResourceCatalog.FLOW.equals(type)) {
+            if (deleted) {
+                triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, List.of());
+            } else {
+                refreshEventBinding(flowId);
+            }
+        }
+        if (globalTriggers != null) {
+            globalTriggers.refreshBindings();
+        }
+    }
+
+    private void refreshEventBinding(String flowId) {
+        var core = storage.hasCoreGraphAuthority() ? storage.getCoreGraph(ReSyncResourceCatalog.FLOW, flowId) : Optional.<CoreGraphStorageBoundary.Decoded>empty();
+        if (core.isPresent()) {
+            var source = core.orElseThrow();
+            GraphDocument graph = source.graphDocument();
+            if (graph == null) {
+                throw new IllegalStateException("A Flow Requires A Typed Graph Document");
+            }
+            Set<String> contexts = new HashSet<>();
+            if (source.envelope().assetActivationState() == ResourceActivationState.ACTIVE) {
+                for (var node : graph.nodes()) {
+                    NodeDefinition definition = definitionRegistry.get(node.definition().owner().canonicalText(), node.definition().localId());
+                    String context = definition != null ? FlowEventRegistry.bindingContext(definition)
+                        : "restudio.resync".equals(node.definition().owner().canonicalText()) ? mapEventContext(node.definition().localId()) : null;
+                    if (context != null) {
+                        contexts.add(context);
+                    }
+                }
+            }
+            replaceEventBindings(flowId, contexts);
+            return;
+        }
+        FlowGraph graph = storage.getGraph(ReSyncResourceCatalog.FLOW, flowId);
         if (graph != null) {
-            updateGraphBindings(graph);
+            updateEventBindings(graph);
         }
     }
 
@@ -553,11 +580,12 @@ public class FlowBlueprintPacketHandler {
                 contexts.add(context);
             }
         }
-        List<TriggerBinding> bindings = new ArrayList<>();
-        String flowId = graph.getId();
-        for (String context : contexts) {
-            bindings.add(new TriggerBinding(flowId + ':' + context, flowId, TriggerType.EVENT, context));
-        }
+        replaceEventBindings(graph.getId(), contexts);
+    }
+
+    private void replaceEventBindings(String flowId, Set<String> contexts) {
+        List<TriggerBinding> bindings = contexts.stream().sorted()
+            .map(context -> new TriggerBinding(flowId + ':' + context, flowId, TriggerType.EVENT, context)).toList();
         triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, bindings);
     }
 

@@ -2,7 +2,7 @@
   {
     "id": "player_count_item",
     "displayName": "Player Count Item",
-    "description": "Reads Player Count Item from a player.",
+    "description": "Counts items in a player's storage inventory. An item stack matches material and metadata. A material value or name matches all stacks of that material. Adds the amounts in matching stacks.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -34,7 +34,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       },
       {
@@ -43,7 +43,7 @@
         "name": "material_or_item",
         "pinType": "DATA",
         "dataType": "any",
-        "description": "Provides the Material Or Item value used by this query.",
+        "description": "Item stack, material value, or material name to count. A stack matches material and metadata. A material value or name matches material alone.",
         "direction": "input"
       }
     ],
@@ -54,7 +54,7 @@
         "name": "count",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Count value read from the player.",
+        "description": "Total number of matching items across storage stacks.",
         "direction": "output"
       }
     ]
@@ -62,7 +62,7 @@
   {
     "id": "player_get_first_empty_slot",
     "displayName": "Player First Empty Slot",
-    "description": "Reads Player First Empty Slot from a player.",
+    "description": "Finds the first empty slot in a player's inventory. Returns -1 when no slot is empty.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -96,7 +96,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -107,7 +107,7 @@
         "name": "slot_index",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Slot Index value read from the player.",
+        "description": "First empty slot index, starting at 0, or -1 when the inventory is full.",
         "direction": "output"
       }
     ]
@@ -115,7 +115,7 @@
   {
     "id": "player_get_all_items",
     "displayName": "Player Get All Items",
-    "description": "Reads Player Get All Items from a player.",
+    "description": "Returns copies of non-empty item stacks in the player's storage inventory. Empty slots, armor, and offhand are excluded.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -148,7 +148,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -159,7 +159,7 @@
         "name": "items_list",
         "pinType": "DATA",
         "dataType": "list<item>",
-        "description": "Returns the Items List value read from the player.",
+        "description": "Copied non-empty storage stacks in inventory order. Empty slots are omitted.",
         "direction": "output"
       }
     ]
@@ -167,7 +167,7 @@
   {
     "id": "player_get_hotbar_items",
     "displayName": "Player Get Hotbar Items",
-    "description": "Reads Player Get Hotbar Items from a player.",
+    "description": "Returns nine copied hotbar stacks in slot order, from 0 through 8. Empty slots contain Air.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -200,7 +200,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -211,7 +211,7 @@
         "name": "items_list",
         "pinType": "DATA",
         "dataType": "list<item>",
-        "description": "Returns the Items List value read from the player.",
+        "description": "Nine copied stacks in hotbar order, with Air in empty slots.",
         "direction": "output"
       }
     ]
@@ -219,7 +219,7 @@
   {
     "id": "player_get_armor_items",
     "displayName": "Player Get Armor Items",
-    "description": "Reads Player Get Armor Items from a player.",
+    "description": "Reads the player's helmet, chestplate, leggings, and boots separately. Empty equipment slots have no item.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -252,7 +252,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -263,7 +263,7 @@
         "name": "helmet",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Helmet value read from the player.",
+        "description": "Item equipped in the helmet slot, or no value when empty.",
         "direction": "output"
       },
       {
@@ -272,7 +272,7 @@
         "name": "chestplate",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Chestplate value read from the player.",
+        "description": "Item equipped in the chestplate slot, or no value when empty.",
         "direction": "output"
       },
       {
@@ -281,7 +281,7 @@
         "name": "leggings",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Leggings value read from the player.",
+        "description": "Item equipped in the leggings slot, or no value when empty.",
         "direction": "output"
       },
       {
@@ -290,7 +290,7 @@
         "name": "boots",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Boots value read from the player.",
+        "description": "Item equipped in the boots slot, or no value when empty.",
         "direction": "output"
       }
     ]
@@ -298,7 +298,7 @@
   {
     "id": "player_get_inventory_size",
     "displayName": "Player Get Inventory Size",
-    "description": "Reads Player Get Inventory Size from a player.",
+    "description": "Returns the number of slots exposed by the player inventory, including its equipment slots.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -331,7 +331,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -342,7 +342,7 @@
         "name": "size",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Size value read from the player.",
+        "description": "Number of slots exposed by the player inventory.",
         "direction": "output"
       }
     ]
@@ -350,7 +350,7 @@
   {
     "id": "player_get_mainhand_item",
     "displayName": "Player Get Mainhand Item",
-    "description": "Reads Player Get Mainhand Item from a player.",
+    "description": "Reads the item stack currently held in the player's selected main-hand slot.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -383,7 +383,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -394,7 +394,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value read from the player.",
+        "description": "Stack held in the selected main-hand slot.",
         "direction": "output"
       }
     ]
@@ -402,7 +402,7 @@
   {
     "id": "player_get_offhand_item",
     "displayName": "Player Get Offhand Item",
-    "description": "Reads Player Get Offhand Item from a player.",
+    "description": "Reads the item stack currently held in the player's offhand.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -435,7 +435,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -446,7 +446,7 @@
         "name": "item",
         "pinType": "DATA",
         "dataType": "itemstack",
-        "description": "Returns the Item value read from the player.",
+        "description": "Stack held in the offhand slot.",
         "direction": "output"
       }
     ]
@@ -454,7 +454,7 @@
   {
     "id": "player_is_on_ground",
     "displayName": "Player Is On Ground",
-    "description": "Reads Player Is On Ground from a player.",
+    "description": "Checks the server's current on-ground flag for a player.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -487,7 +487,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -498,7 +498,7 @@
         "name": "on_ground",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the On Ground value read from the player.",
+        "description": "True if the server currently reports the player on the ground.",
         "direction": "output"
       }
     ]
@@ -506,7 +506,7 @@
   {
     "id": "player_is_sleeping",
     "displayName": "Player Is Sleeping",
-    "description": "Reads Player Is Sleeping from a player.",
+    "description": "Checks whether a player is currently sleeping in a bed.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -538,7 +538,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -549,7 +549,7 @@
         "name": "is_sleeping",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Is Sleeping value read from the player.",
+        "description": "True if the player is currently sleeping.",
         "direction": "output"
       }
     ]
@@ -557,7 +557,7 @@
   {
     "id": "player_get_bed_location",
     "displayName": "Player Get Bed Location",
-    "description": "Reads Player Get Bed Location from a player.",
+    "description": "Reads the player's saved bed spawn location. Returns no value when no bed spawn is set.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -590,7 +590,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -601,7 +601,7 @@
         "name": "bed_location",
         "pinType": "DATA",
         "dataType": "location",
-        "description": "Returns the Bed Location value read from the player.",
+        "description": "Saved bed spawn location, or no value when unset.",
         "direction": "output"
       }
     ]
@@ -609,7 +609,7 @@
   {
     "id": "player_get_last_damage",
     "displayName": "Player Get Last Damage",
-    "description": "Reads Player Get Last Damage from a player.",
+    "description": "Reads the cause and attacker from the player's last damage occurrence. The attacker is absent for environmental damage, and both outputs are absent when no damage is recorded.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -642,7 +642,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -653,7 +653,7 @@
         "name": "damage_cause",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Returns the Damage Cause value read from the player.",
+        "description": "Named cause of the last damage occurrence, or no value when none exists.",
         "direction": "output"
       },
       {
@@ -662,7 +662,7 @@
         "name": "damage_source",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Returns the Damage Source value read from the player.",
+        "description": "Entity that caused the last damage. Absent for environmental damage or when no damage is recorded.",
         "direction": "output"
       }
     ]
@@ -670,7 +670,7 @@
   {
     "id": "player_get_killer",
     "displayName": "Player Get Killer",
-    "description": "Reads Player Get Killer from a player.",
+    "description": "Returns the player credited with this player's last death. Returns no value when no player is credited.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -702,7 +702,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -713,7 +713,7 @@
         "name": "killer",
         "pinType": "DATA",
         "dataType": "entity",
-        "description": "Returns the Killer value read from the player.",
+        "description": "Player credited with the death, or no value when there is no credited player.",
         "direction": "output"
       }
     ]
@@ -721,7 +721,7 @@
   {
     "id": "player_get_ping",
     "displayName": "Player Get Ping",
-    "description": "Reads Player Get Ping from a player.",
+    "description": "Returns the player's server-reported connection latency in milliseconds.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -753,7 +753,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -764,7 +764,7 @@
         "name": "ping_ms",
         "pinType": "DATA",
         "dataType": "number",
-        "description": "Returns the Ping Ms value read from the player.",
+        "description": "Connection latency in milliseconds.",
         "direction": "output"
       }
     ]
@@ -772,7 +772,7 @@
   {
     "id": "player_get_lore",
     "displayName": "Player Get Lore",
-    "description": "Reads Player Get Lore from a player.",
+    "description": "Reads lore from the item in the player's main hand or offhand as plain text lines. Returns an empty list when the item has no lore.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -804,7 +804,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       },
       {
@@ -813,7 +813,7 @@
         "name": "hand",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Provides the Hand value used by this query.",
+        "description": "Hand whose item lore is read: main or off. Defaults to main.",
         "direction": "input",
         "widget": "DROPDOWN",
         "options": [
@@ -830,7 +830,7 @@
         "name": "lore_lines_list",
         "pinType": "DATA",
         "dataType": "list<string>",
-        "description": "Returns the Lore Lines List value read from the player.",
+        "description": "Plain text lore lines in display order. Empty when the item has no lore.",
         "direction": "output"
       }
     ]
@@ -838,7 +838,7 @@
   {
     "id": "player_get_display_name",
     "displayName": "Player Get Display Name",
-    "description": "Reads Player Get Display Name from a player.",
+    "description": "Reads the player's display name, which may differ from their account name.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -871,7 +871,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -882,7 +882,7 @@
         "name": "display_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Returns the Display Name value read from the player.",
+        "description": "Current player display name.",
         "direction": "output"
       }
     ]
@@ -890,7 +890,7 @@
   {
     "id": "player_get_player_list_name",
     "displayName": "Player Get Player List Name",
-    "description": "Reads Player Get Player List Name from a player.",
+    "description": "Reads the name shown for this player in the tab list.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -923,7 +923,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -934,7 +934,7 @@
         "name": "list_name",
         "pinType": "DATA",
         "dataType": "string",
-        "description": "Returns the List Name value read from the player.",
+        "description": "Current name shown in the tab list.",
         "direction": "output"
       }
     ]
@@ -942,7 +942,7 @@
   {
     "id": "player_is_op",
     "displayName": "Player Is OP",
-    "description": "Reads Player Is OP from a player.",
+    "description": "Checks whether the player has server operator status.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -974,7 +974,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -985,7 +985,7 @@
         "name": "is_op",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Is Op value read from the player.",
+        "description": "True if the player is a server operator.",
         "direction": "output"
       }
     ]
@@ -993,7 +993,7 @@
   {
     "id": "player_get_allowed_flight",
     "displayName": "Player Get Allowed Flight",
-    "description": "Reads Player Get Allowed Flight from a player.",
+    "description": "Checks whether the player is permitted to fly. This does not indicate whether they are currently flying.",
     "domain": "player",
     "family": "queries",
     "lifecycle": "active",
@@ -1026,7 +1026,7 @@
         "name": "player",
         "pinType": "DATA",
         "dataType": "player",
-        "description": "Selects the player used by this query.",
+        "description": "Online player to inspect. Uses the Flow's current player when this input is omitted.",
         "direction": "input"
       }
     ],
@@ -1037,7 +1037,7 @@
         "name": "can_fly",
         "pinType": "DATA",
         "dataType": "boolean",
-        "description": "Returns the Can Fly value read from the player.",
+        "description": "True if flight is allowed, regardless of whether the player is currently flying.",
         "direction": "output"
       }
     ]

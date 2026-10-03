@@ -29,7 +29,7 @@
   {
     "id": "world_get_by_name",
     "displayName": "World Get By Name",
-    "description": "Find a loaded world by its name.",
+    "description": "Finds a currently loaded World by name. Returns no value when the world is not loaded. This does not load or import a world.",
     "domain": "world",
     "family": "world_lookup",
     "lifecycle": "active",
@@ -54,7 +54,7 @@
   {
     "id": "world_get_all",
     "displayName": "World Get All",
-    "description": "Return every currently loaded world.",
+    "description": "Returns all World objects currently loaded by the server. Worlds that are registered but unloaded are excluded.",
     "domain": "world",
     "family": "world_lookup",
     "lifecycle": "active",

@@ -21,32 +21,32 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 final class VelocityRouteRegistry {
     private final ProxyServer proxyServer;
     private final NodeState nodeState;
-    private final Map<String, NetworkRoute> routes = new ConcurrentHashMap<>();
-    private final Set<String> managedRoutes = ConcurrentHashMap.newKeySet();
-    private long revision;
-    private String fingerprint = "";
-    private volatile String maintenanceRoute;
-    private volatile List<NetworkRoutingGroup> routingGroups = List.of();
+    private final Set<String> managedRoutes = new LinkedHashSet<>();
+    private volatile RoutingState state;
 
     VelocityRouteRegistry(ProxyServer proxyServer, NodeState nodeState, Map<String, NetworkRoute> initialRoutes, String maintenanceRoute) {
         this.proxyServer = proxyServer;
         this.nodeState = nodeState;
-        this.routes.putAll(initialRoutes);
+        this.state = RoutingState.compile(0, "", initialRoutes, maintenanceRoute, List.of());
         this.managedRoutes.addAll(initialRoutes.keySet());
-        this.maintenanceRoute = maintenanceRoute;
+    }
+
+    VelocityRouteRegistry(ProxyServer proxyServer, NodeState nodeState, NetworkRouteSet initial) {
+        this(proxyServer, nodeState, initial.routes().stream().collect(Collectors.toMap(NetworkRoute::routeName, route -> route)), initial.maintenanceRoute());
+        this.state = RoutingState.compile(0, "", state.routes(), initial.maintenanceRoute(), initial.routingGroups());
     }
 
     NetworkRoute route(String routeName) {
-        return routes.get(routeName == null ? "" : routeName.toLowerCase(Locale.ROOT));
+        return state.routes().get(routeName == null ? "" : routeName.toLowerCase(Locale.ROOT));
     }
 
     Map<String, NetworkRoute> routes() {
-        return Map.copyOf(routes);
+        return state.routes();
     }
 
     boolean contains(String routeName) {
@@ -54,72 +54,80 @@ final class VelocityRouteRegistry {
     }
 
     boolean containsNode(String nodeId) {
-        return routes.values().stream().anyMatch(route -> route.nodeId().equals(nodeId));
+        return state.byNode().containsKey(nodeId);
     }
 
     boolean accepts(String routeName) {
         NetworkRoute route = route(routeName);
+        return accepts(route);
+    }
+
+    private boolean accepts(NetworkRoute route) {
         return route == null || nodeState.status(route.nodeId()) == NetworkNodeStatus.ONLINE && (!nodeState.managed(route.nodeId()) || nodeState.connected(route.nodeId()));
     }
 
     RegisteredServer serverForNode(String nodeId) {
-        return routes.values().stream().filter(route -> route.nodeId().equals(nodeId)).map(NetworkRoute::routeName).map(proxyServer::getServer).flatMap(Optional::stream).findFirst().orElse(null);
+        NetworkRoute route = state.byNode().get(nodeId);
+        return route == null ? null : proxyServer.getServer(route.routeName()).orElse(null);
     }
 
     RoutingDecision initialDestination(Player player, String originalRoute) {
-        if (player == null || originalRoute == null || originalRoute.isBlank() || routingGroups.isEmpty()) {
+        RoutingState current = state;
+        if (player == null || originalRoute == null || originalRoute.isBlank() || current.groups().isEmpty()) {
             return new RoutingDecision(false, null);
         }
-        NetworkRoute original = route(originalRoute);
+        NetworkRoute original = current.routes().get(originalRoute.toLowerCase(Locale.ROOT));
         if (original == null) {
             return new RoutingDecision(false, null);
         }
         String virtualHost = player.getVirtualHost().map(address -> address.getHostString().toLowerCase(Locale.ROOT)).orElse("");
-        NetworkRoutingGroup group = virtualHost.isBlank() ? null : routingGroups.stream().filter(candidate -> candidate.forcedHosts().contains(virtualHost)).findFirst().orElse(null);
+        NetworkRoutingGroup group = current.byHost().get(virtualHost);
         if (group == null) {
-            group = routingGroups.stream().filter(candidate -> candidate.forcedHosts().isEmpty() && candidate.nodeIds().contains(original.nodeId())).findFirst().orElse(null);
+            group = current.primaryGroups().get(original.nodeId());
         }
         if (group == null) {
-            group = routingGroups.stream().filter(candidate -> candidate.nodeIds().contains(original.nodeId())).findFirst().orElse(null);
+            group = current.memberGroups().get(original.nodeId());
         }
         boolean matched = group != null;
-        Map<String, NetworkRoute> routesByNode = routesByNode();
         Set<String> visited = new LinkedHashSet<>();
         while (group != null && visited.add(group.id())) {
             if (group.permission().isBlank() || player.hasPermission(group.permission())) {
-                List<NetworkRoutingCandidate> candidates = group.nodeIds().stream().map(routesByNode::get).filter(Objects::nonNull).map(this::candidate).toList();
+                List<NetworkRoutingCandidate> candidates = group.nodeIds().stream().map(current.byNode()::get).filter(Objects::nonNull).map(this::candidate).toList();
                 RegisteredServer selected = NetworkRouteSelector.select(player.getUniqueId(), group, candidates).map(NetworkRoutingCandidate::routeName).flatMap(proxyServer::getServer).orElse(null);
                 if (selected != null) {
                     return new RoutingDecision(true, selected);
                 }
             }
             String fallbackId = group.fallbackGroupId();
-            group = fallbackId.isBlank() ? null : routingGroups.stream().filter(candidate -> candidate.id().equals(fallbackId)).findFirst().orElse(null);
+            group = fallbackId.isBlank() ? null : current.groups().get(fallbackId);
         }
         return new RoutingDecision(matched, null);
     }
 
     RegisteredServer maintenanceDestination(String sourceRoute) {
-        String configuredRoute = maintenanceRoute;
-        if (!configuredRoute.isBlank() && !configuredRoute.equalsIgnoreCase(sourceRoute) && accepts(configuredRoute) && contains(configuredRoute)) {
+        RoutingState current = state;
+        String configuredRoute = current.maintenanceRoute();
+        if (!configuredRoute.isBlank() && !configuredRoute.equalsIgnoreCase(sourceRoute) && accepts(current.routes().get(configuredRoute)) && current.routes().containsKey(configuredRoute)) {
             RegisteredServer configured = proxyServer.getServer(configuredRoute).orElse(null);
             if (configured != null) {
                 return configured;
             }
         }
-        return routes.keySet().stream().filter(candidate -> !candidate.equalsIgnoreCase(sourceRoute) && accepts(candidate)).sorted(String.CASE_INSENSITIVE_ORDER).map(proxyServer::getServer).flatMap(Optional::stream).findFirst().orElse(null);
+        return current.routes().keySet().stream().filter(candidate -> !candidate.equalsIgnoreCase(sourceRoute) && accepts(current.routes().get(candidate))).sorted(String.CASE_INSENSITIVE_ORDER).map(proxyServer::getServer).flatMap(Optional::stream).findFirst().orElse(null);
     }
 
     synchronized void reconcile(NetworkRouteSet desired, String desiredFingerprint, Runnable reloadNodes, Runnable appendAudit) {
-        if (desired.revision() < revision || desired.revision() == revision && !fingerprint.isBlank() && !fingerprint.equals(desiredFingerprint)) {
+        RoutingState current = state;
+        if (desired.revision() < current.revision() || desired.revision() == current.revision() && !current.fingerprint().isBlank() && !current.fingerprint().equals(desiredFingerprint)) {
             throw new IllegalStateException("Network Route Revision Is Stale");
         }
-        if (desired.revision() == revision && fingerprint.equals(desiredFingerprint)) {
+        if (desired.revision() == current.revision() && current.fingerprint().equals(desiredFingerprint)) {
             return;
         }
         reloadNodes.run();
         Map<String, NetworkRoute> desiredByName = new LinkedHashMap<>();
         desired.routes().forEach(route -> desiredByName.put(route.routeName(), route));
+        RoutingState next = RoutingState.compile(desired.revision(), desiredFingerprint, desiredByName, desired.maintenanceRoute(), desired.routingGroups());
         validate(desired.routes(), desiredByName);
         Map<String, ServerInfo> previous = new LinkedHashMap<>();
         managedRoutes.forEach(routeName -> proxyServer.getServer(routeName).ifPresent(server -> previous.put(routeName, server.getServerInfo())));
@@ -143,12 +151,7 @@ final class VelocityRouteRegistry {
         }
         managedRoutes.clear();
         managedRoutes.addAll(desiredByName.keySet());
-        routes.clear();
-        routes.putAll(desiredByName);
-        maintenanceRoute = desired.maintenanceRoute();
-        routingGroups = desired.routingGroups();
-        revision = desired.revision();
-        fingerprint = desiredFingerprint;
+        state = next;
     }
 
     private void validate(List<NetworkRoute> desiredRoutes, Map<String, NetworkRoute> desiredByName) {
@@ -195,13 +198,30 @@ final class VelocityRouteRegistry {
         int players = server == null ? metrics == null ? 0 : metrics.players() : server.getPlayersConnected().size();
         int capacity = metrics == null ? 0 : metrics.capacity();
         boolean capacityAvailable = capacity < 1 || players < capacity;
-        return new NetworkRoutingCandidate(route.nodeId(), route.routeName(), players, capacity, server != null && capacityAvailable && accepts(route.routeName()));
+        return new NetworkRoutingCandidate(route.nodeId(), route.routeName(), players, capacity, server != null && capacityAvailable && accepts(route));
     }
 
-    private Map<String, NetworkRoute> routesByNode() {
-        Map<String, NetworkRoute> byNode = new LinkedHashMap<>();
-        routes.values().forEach(route -> byNode.put(route.nodeId(), route));
-        return byNode;
+    private record RoutingState(long revision, String fingerprint, Map<String, NetworkRoute> routes, Map<String, NetworkRoute> byNode,
+                                String maintenanceRoute, Map<String, NetworkRoutingGroup> groups, Map<String, NetworkRoutingGroup> byHost,
+                                Map<String, NetworkRoutingGroup> primaryGroups, Map<String, NetworkRoutingGroup> memberGroups) {
+        private static RoutingState compile(long revision, String fingerprint, Map<String, NetworkRoute> routes, String maintenanceRoute, List<NetworkRoutingGroup> routingGroups) {
+            Map<String, NetworkRoute> byNode = new LinkedHashMap<>();
+            routes.values().forEach(route -> byNode.put(route.nodeId(), route));
+            Map<String, NetworkRoutingGroup> groups = new LinkedHashMap<>();
+            Map<String, NetworkRoutingGroup> byHost = new LinkedHashMap<>();
+            Map<String, NetworkRoutingGroup> primaryGroups = new LinkedHashMap<>();
+            Map<String, NetworkRoutingGroup> memberGroups = new LinkedHashMap<>();
+            for (NetworkRoutingGroup group : routingGroups) {
+                groups.put(group.id(), group);
+                group.forcedHosts().forEach(host -> byHost.put(host, group));
+                for (String nodeId : group.nodeIds()) {
+                    memberGroups.putIfAbsent(nodeId, group);
+                    if (group.forcedHosts().isEmpty()) primaryGroups.putIfAbsent(nodeId, group);
+                }
+            }
+            return new RoutingState(revision, fingerprint, Map.copyOf(routes), Map.copyOf(byNode), maintenanceRoute == null ? "" : maintenanceRoute,
+                    Map.copyOf(groups), Map.copyOf(byHost), Map.copyOf(primaryGroups), Map.copyOf(memberGroups));
+        }
     }
 
     private boolean sameEndpoint(ServerInfo existing, NetworkRoute desired) {

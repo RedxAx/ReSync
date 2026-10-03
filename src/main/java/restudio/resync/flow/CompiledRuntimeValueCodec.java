@@ -15,6 +15,7 @@ import org.bukkit.util.Vector;
 import restudio.flow.data.FlowBlock;
 import restudio.flow.data.FlowEntityRef;
 import restudio.flow.data.FlowItem;
+import restudio.flow.data.FlowNpcHandle;
 import restudio.flow.data.FlowOperationResult;
 import restudio.flow.data.FlowResourceReference;
 import restudio.flow.data.FlowWorldRef;
@@ -85,6 +86,7 @@ public final class CompiledRuntimeValueCodec {
         if (value instanceof Vector) return named("vector");
         if (value instanceof ItemStack || value instanceof FlowItem) return named("item");
         if (value instanceof PlayerInventory) return named("inventory");
+        if (value instanceof FlowNpcHandle) return named("npc_handle");
         return null;
     }
 
@@ -186,7 +188,7 @@ public final class CompiledRuntimeValueCodec {
         }
 
         private Object scalar(String id, Object raw, int depth) {
-            if (List.of("player", "living_entity", "entity", "world", "block", "location", "vector", "item", "itemstack", "inventory").contains(id)) {
+            if (List.of("player", "living_entity", "entity", "world", "block", "location", "vector", "item", "itemstack", "inventory", "npc_handle").contains(id)) {
                 return encoding ? encodeHost(id, raw) : decodeHost(id, raw);
             }
             return portable(raw, depth);
@@ -281,6 +283,7 @@ public final class CompiledRuntimeValueCodec {
                     case "vector" -> vector(raw);
                     case "item", "itemstack" -> item(raw);
                     case "inventory" -> inventory(raw);
+                    case "npc_handle" -> npc(raw);
                     default -> throw invalid("Unsupported Host Type");
                 };
             }
@@ -302,6 +305,7 @@ public final class CompiledRuntimeValueCodec {
                 case "vector" -> Set.of("x", "y", "z");
                 case "item", "itemstack" -> Set.of("format", "data", "material", "amount");
                 case "inventory" -> Set.of("kind", "serverId", "worldId", "world", "holderKind", "holderId", "inventoryType");
+                case "npc_handle" -> Set.of("kind", "serverId", "worldId", "world", "definitionId", "entityUuid", "packetBacked", "active", "x", "y", "z", "yaw", "pitch");
                 default -> throw invalid("Unsupported Host Type");
             };
             if (!value.keySet().equals(fields)) throw invalid("Reference Fields Do Not Match The Declared Type");
@@ -319,6 +323,7 @@ public final class CompiledRuntimeValueCodec {
                 case "block" -> resolveBlock(value, world);
                 case "location" -> new Location(world, number(value, "x"), number(value, "y"), number(value, "z"), angle(value, "yaw"), angle(value, "pitch"));
                 case "inventory" -> resolveInventory(value, world);
+                case "npc_handle" -> resolveNpc(value, world);
                 default -> throw invalid("Unsupported Host Type");
             };
         }
@@ -456,6 +461,46 @@ public final class CompiledRuntimeValueCodec {
             return inventory;
         }
 
+        private Object npc(Object raw) {
+            if (!(raw instanceof FlowNpcHandle handle)) throw invalid("NPC Handle Requires A Typed Snapshot");
+            World world = Bukkit.getWorld(text(handle.world()));
+            if (world == null) throw invalid("NPC World Is No Longer Available");
+            Map<String, Object> value = identity(world);
+            value.put("kind", "npc_handle");
+            value.put("definitionId", handle.definitionId());
+            value.put("entityUuid", handle.entityUuid());
+            value.put("packetBacked", handle.packetBacked());
+            value.put("active", handle.active());
+            value.put("x", decimal(handle.x()));
+            value.put("y", decimal(handle.y()));
+            value.put("z", decimal(handle.z()));
+            value.put("yaw", decimal(handle.yaw()));
+            value.put("pitch", decimal(handle.pitch()));
+            resolveNpc(value, world);
+            return value;
+        }
+
+        private FlowNpcHandle resolveNpc(Map<?, ?> value, World world) {
+            if (!(value.get("packetBacked") instanceof Boolean packetBacked)
+                || !(value.get("active") instanceof Boolean active) || !(value.get("entityUuid") instanceof String entityUuid)) {
+                throw invalid("NPC Handle Fields Have Invalid Types");
+            }
+            String definitionId = text(value.get("definitionId"));
+            if (packetBacked) {
+                if (!entityUuid.isEmpty()) throw invalid("Packet NPC Handle Cannot Have An Entity UUID");
+            } else {
+                UUID entityId = uuid(entityUuid);
+                if (active) {
+                    Entity entity = Bukkit.getEntity(entityId);
+                    if (entity == null || entity.isDead() || !world.getUID().equals(entity.getWorld().getUID())) {
+                        throw invalid("NPC Entity Is No Longer Available In This World");
+                    }
+                }
+            }
+            return new FlowNpcHandle(definitionId, entityUuid, packetBacked, active, world.getName(),
+                number(value, "x"), number(value, "y"), number(value, "z"), angle(value, "yaw"), angle(value, "pitch"));
+        }
+
         private Object item(Map<?, ?> value) {
             if (!"paper-item-v1".equals(value.get("format"))) throw invalid("Item Snapshot Format Is Unsupported");
             String data = text(value.get("data"));
@@ -554,7 +599,7 @@ public final class CompiledRuntimeValueCodec {
 
     private static boolean hostNamed(TypeExpr type) {
         return type instanceof TypeExpr.Named named && builtin(named)
-            && List.of("player", "living_entity", "entity", "world", "block", "location", "vector", "item", "itemstack", "inventory")
+            && List.of("player", "living_entity", "entity", "world", "block", "location", "vector", "item", "itemstack", "inventory", "npc_handle")
                 .contains(named.reference().localId());
     }
 

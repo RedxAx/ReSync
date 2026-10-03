@@ -5,6 +5,8 @@ import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.type.TypeReference;
+import restudio.resync.flow.function.FunctionSignature;
+import restudio.resync.flow.type.TypedValue;
 
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -27,6 +29,8 @@ public final class CompiledExecutionPlan {
     private final List<ProviderLease> providerLeases;
     private final ContentHash planHash;
     private final OpaqueData unknown;
+    private final FunctionSignature functionSignature;
+    private final Map<String, TypedValue> localDefaults;
 
     public CompiledExecutionPlan(UUID planId, ServerResourceLocator graph, long graphRevision, CatalogBinding catalogBinding,
                                  ContentHash graphHash, List<CompiledExecutionStep> steps, List<GraphConnection> connections,
@@ -38,6 +42,24 @@ public final class CompiledExecutionPlan {
                                  ContentHash graphHash, List<CompiledExecutionStep> steps, List<GraphConnection> connections,
                                  List<ConversionRoute> conversionRoutes, List<StructuralRoute> structuralRoutes,
                                  List<FunctionBinding> functionBindings, List<ProviderLease> providerLeases, OpaqueData unknown) {
+        this(planId, graph, graphRevision, catalogBinding, graphHash, steps, connections, conversionRoutes,
+            structuralRoutes, functionBindings, providerLeases, unknown, null);
+    }
+
+    CompiledExecutionPlan(UUID planId, ServerResourceLocator graph, long graphRevision, CatalogBinding catalogBinding,
+                          ContentHash graphHash, List<CompiledExecutionStep> steps, List<GraphConnection> connections,
+                          List<ConversionRoute> conversionRoutes, List<StructuralRoute> structuralRoutes,
+                          List<FunctionBinding> functionBindings, List<ProviderLease> providerLeases, OpaqueData unknown,
+                          FunctionSignature functionSignature) {
+        this(planId, graph, graphRevision, catalogBinding, graphHash, steps, connections, conversionRoutes,
+            structuralRoutes, functionBindings, providerLeases, unknown, functionSignature, Map.of());
+    }
+
+    CompiledExecutionPlan(UUID planId, ServerResourceLocator graph, long graphRevision, CatalogBinding catalogBinding,
+                          ContentHash graphHash, List<CompiledExecutionStep> steps, List<GraphConnection> connections,
+                          List<ConversionRoute> conversionRoutes, List<StructuralRoute> structuralRoutes,
+                          List<FunctionBinding> functionBindings, List<ProviderLease> providerLeases, OpaqueData unknown,
+                          FunctionSignature functionSignature, Map<String, TypedValue> localDefaults) {
         this.planId = Objects.requireNonNull(planId, "planId");
         this.graph = Objects.requireNonNull(graph, "graph");
         if (graphRevision < 0) {
@@ -53,6 +75,12 @@ public final class CompiledExecutionPlan {
         this.functionBindings = List.copyOf(functionBindings != null ? functionBindings : List.of());
         this.providerLeases = List.copyOf(providerLeases != null ? providerLeases : List.of());
         this.unknown = unknown != null ? unknown : OpaqueData.empty();
+        if (functionSignature != null && (!functionSignature.function().resource().equals(graph)
+            || functionSignature.revision().value() != graphRevision)) {
+            throw new IllegalArgumentException("Function Signature Must Match The Compiled Plan Resource And Revision");
+        }
+        this.functionSignature = functionSignature;
+        this.localDefaults = Map.copyOf(Objects.requireNonNull(localDefaults, "Admitted Local Defaults Are Required"));
         this.planHash = new ContentHash(CanonicalJson.sha256(CanonicalJson.PLAN_HASH_DOMAIN, canonicalValueWithoutHash()));
     }
 
@@ -126,6 +154,14 @@ public final class CompiledExecutionPlan {
 
     public OpaqueData unknown() {
         return unknown;
+    }
+
+    public FunctionSignature functionSignature() {
+        return functionSignature;
+    }
+
+    public Map<String, TypedValue> localDefaults() {
+        return localDefaults;
     }
 
     Map<String, Object> canonicalValue() {

@@ -19,6 +19,8 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.ScoreboardManager;
 import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.api.OptionCatalogCapture;
 import restudio.resync.api.OptionCatalogProvider;
@@ -26,6 +28,7 @@ import restudio.resync.api.OptionCatalogQuery;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.ItemAttributeSchemaService;
+import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.flow.data.FlowTypeRef;
 
@@ -112,6 +115,7 @@ public final class BuiltinOptionCatalogService {
         catalog("potion_effect", false),
         catalog("sound", true),
         catalog("statistic", true),
+        catalog("scoreboard_objective", true),
         catalog("text_decoration", false),
         catalog("trim_material", true),
         catalog("trim_pattern", true),
@@ -208,6 +212,9 @@ public final class BuiltinOptionCatalogService {
 
     private OptionCatalogProvider provider(CatalogDefinition definition) {
         return new OptionCatalogProvider() {
+            private volatile ResidentCatalog base;
+            private volatile ResidentCatalog raycast;
+
             @Override
             public String sourceId() {
                 return definition.sourceId();
@@ -230,17 +237,32 @@ public final class BuiltinOptionCatalogService {
 
             @Override
             public Set<String> contextKeys() {
-                return definition.key().equals("custom_content_asset")
-                    ? Set.of("$nodeType", "provider", "content_type") : Set.of();
+                return switch (definition.key()) {
+                    case "custom_content_asset" -> Set.of("$nodeType", "provider", "content_type");
+                    case "block" -> Set.of("$nodeType");
+                    default -> Set.of();
+                };
             }
 
             @Override
             public CaptureAffinity captureAffinity() {
-                return CaptureAffinity.SERVER_MAIN;
+                return captureAffinity(null);
+            }
+
+            @Override
+            public CaptureAffinity captureAffinity(OptionCatalogQuery query) {
+                return immutableCatalog(definition.key()) && prepared(query) != null
+                    ? CaptureAffinity.CALLER : CaptureAffinity.SERVER_MAIN;
             }
 
             @Override
             public OptionCatalogCapture capture(OptionCatalogQuery query) {
+                if (definition.key().equals("scoreboard_objective")) {
+                    return objectives().capture();
+                }
+                if (immutableCatalog(definition.key())) {
+                    return resident(query).capture();
+                }
                 if (definition.key().equals("custom_content_asset")) {
                     CustomContentService service = customContentService.get();
                     String provider = customContentProvider(query);
@@ -289,6 +311,12 @@ public final class BuiltinOptionCatalogService {
 
             @Override
             public String revision() {
+                if (definition.key().equals("scoreboard_objective")) {
+                    return objectives().capture().revision();
+                }
+                if (immutableCatalog(definition.key())) {
+                    return resident(null).capture().revision();
+                }
                 List<String> values = definition.key().equals("custom_content_recipe_item")
                     ? customContentRecipeItemValuesForProjection() : values();
                 return sourceId() + ":" + Bukkit.getVersion() + ":" + values.size() + ":" + values.hashCode();
@@ -296,6 +324,9 @@ public final class BuiltinOptionCatalogService {
 
             @Override
             public String revision(OptionCatalogQuery query) {
+                if (immutableCatalog(definition.key())) {
+                    return resident(query).capture().revision();
+                }
                 if (!definition.key().equals("custom_content_asset")) {
                     return revision();
                 }
@@ -305,16 +336,25 @@ public final class BuiltinOptionCatalogService {
 
             @Override
             public List<String> values() {
-                return resolve(definition.key());
+                if (definition.key().equals("scoreboard_objective")) {
+                    return objectives().values();
+                }
+                return immutableCatalog(definition.key()) ? resident(null).values() : resolve(definition.key());
             }
 
             @Override
             public List<String> values(OptionCatalogQuery query) {
+                if (immutableCatalog(definition.key())) {
+                    return resident(query).values();
+                }
                 return definition.key().equals("custom_content_asset") ? customContentAssets(query) : values();
             }
 
             @Override
             public String status(OptionCatalogQuery query) {
+                if (definition.key().equals("scoreboard_objective")) {
+                    return objectives().capture().status();
+                }
                 if (!definition.key().equals("custom_content_asset")) {
                     return "available";
                 }
@@ -332,6 +372,9 @@ public final class BuiltinOptionCatalogService {
 
             @Override
             public String diagnostic(OptionCatalogQuery query) {
+                if (definition.key().equals("scoreboard_objective")) {
+                    return objectives().capture().diagnostic();
+                }
                 if (!definition.key().equals("custom_content_asset")) {
                     return "";
                 }
@@ -350,6 +393,12 @@ public final class BuiltinOptionCatalogService {
 
             @Override
             public List<OptionCatalogItem> items() {
+                if (definition.key().equals("scoreboard_objective")) {
+                    return objectives().capture().items();
+                }
+                if (immutableCatalog(definition.key())) {
+                    return resident(null).capture().items();
+                }
                 if (definition.key().equals("custom_content_recipe_item")) {
                     CustomContentService service = customContentService.get();
                     return service != null ? service.recipeItemCatalogForProjection() : List.of();
@@ -359,6 +408,12 @@ public final class BuiltinOptionCatalogService {
 
             @Override
             public List<OptionCatalogItem> items(OptionCatalogQuery query) {
+                if (definition.key().equals("scoreboard_objective")) {
+                    return objectives().capture().items();
+                }
+                if (immutableCatalog(definition.key())) {
+                    return resident(query).capture().items();
+                }
                 if (definition.key().equals("custom_content_recipe_item")) {
                     return items();
                 }
@@ -370,7 +425,74 @@ public final class BuiltinOptionCatalogService {
                 }
                 return richItems(definition, values(query));
             }
+
+            private boolean raycast(OptionCatalogQuery query) {
+                return definition.key().equals("block") && query != null
+                    && "ability_raycast".equals(query.text("$nodeType"));
+            }
+
+            private synchronized ResidentCatalog objectives() {
+                if (!Bukkit.isPrimaryThread()) {
+                    throw new IllegalStateException("Scoreboard objectives must be captured on the server main thread");
+                }
+                ScoreboardManager manager = Bukkit.getScoreboardManager();
+                if (manager == null) {
+                    if (base == null || !"unavailable".equals(base.capture().status())) {
+                        base = new ResidentCatalog(new OptionCatalogCapture(sourceId() + ":unavailable", List.of(),
+                            "unavailable", "The main scoreboard is unavailable"), List.of());
+                    }
+                    return base;
+                }
+                List<String> names = manager.getMainScoreboard().getObjectives().stream().map(Objective::getName).sorted().toList();
+                if (base == null || !"available".equals(base.capture().status()) || !base.values().equals(names)) {
+                    String revision = sourceId() + ":" + CanonicalJson.sha256("scoreboard-objective-options", names);
+                    base = new ResidentCatalog(new OptionCatalogCapture(revision, richItems(definition, names), "available", ""), names);
+                }
+                return base;
+            }
+
+            private ResidentCatalog prepared(OptionCatalogQuery query) {
+                return raycast(query) ? raycast : base;
+            }
+
+            private ResidentCatalog resident(OptionCatalogQuery query) {
+                ResidentCatalog current = prepared(query);
+                return current != null ? current : prepare(query);
+            }
+
+            private synchronized ResidentCatalog prepare(OptionCatalogQuery query) {
+                if (base == null) {
+                    base = admit(richItems(definition, resolve(definition.key())));
+                }
+                if (!raycast(query)) {
+                    return base;
+                }
+                if (raycast == null) {
+                    List<OptionCatalogItem> items = new ArrayList<>();
+                    items.add(new OptionCatalogItem("any", "Any Block", "Accept Any Block", "", "Minecraft",
+                        Map.of("source", sourceId(), "catalog", definition.key(), "available", true)));
+                    items.addAll(base.capture().items());
+                    raycast = admit(items);
+                }
+                return raycast;
+            }
+
+            private ResidentCatalog admit(List<OptionCatalogItem> items) {
+                List<String> values = items.stream().map(OptionCatalogItem::value).toList();
+                String revision = sourceId() + ":" + Bukkit.getVersion() + ":" + values.size() + ":" + values.hashCode();
+                return new ResidentCatalog(new OptionCatalogCapture(revision, items, "available", ""), values);
+            }
         };
+    }
+
+    private static boolean immutableCatalog(String key) {
+        return switch (key) {
+            case "material", "block", "difficulty", "display_slot", "entity_type", "gamemode", "text_decoration" -> true;
+            default -> false;
+        };
+    }
+
+    private record ResidentCatalog(OptionCatalogCapture capture, List<String> values) {
     }
 
     private List<String> customContentAssets(OptionCatalogQuery query) {
@@ -715,7 +837,7 @@ public final class BuiltinOptionCatalogService {
     private List<String> blocks() {
         List<String> values = new ArrayList<>();
         for (Material material : Material.values()) {
-            if (material.isBlock()) {
+            if (!material.isLegacy() && material.isBlock()) {
                 values.add(material.name().toLowerCase(Locale.ROOT));
             }
         }

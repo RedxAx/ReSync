@@ -2,7 +2,7 @@
   {
     "id": "random_int",
     "displayName": "Random Integer",
-    "description": "Choose an integer uniformly between the inclusive minimum and maximum values.",
+    "description": "Chooses an integer uniformly between two inclusive 32-bit integer bounds. Reversed bounds are normalized, and equal bounds return that value.",
     "domain": "core",
     "family": "random",
     "lifecycle": "active",
@@ -269,7 +269,7 @@
   {
     "id": "random_hex",
     "displayName": "Random Hex",
-    "description": "Generate a hexadecimal string with the requested number of random digits.",
+    "description": "Generates hexadecimal text with the given number of random digits. Length accepts 0 through 65536. Zero returns empty text. Other lengths fail.",
     "domain": "core",
     "family": "random",
     "lifecycle": "active",
@@ -296,7 +296,7 @@
     },
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts hexadecimal generation."},
-      {"id": "length", "displayName": "Length", "name": "length", "dataType": "number", "defaultValue": 8, "constraints": {"min": 0, "max": 256, "step": 1}, "description": "Whole number of hexadecimal digits to generate."}
+      {"id": "length", "displayName": "Length", "name": "length", "dataType": "number", "defaultValue": 8, "constraints": {"min": 0, "max": 256, "step": 1}, "description": "Whole number of hexadecimal digits from 0 through 65536. Zero returns empty text."}
     ],
     "outputs": [
       {"id": "hex", "displayName": "Hex", "name": "hex", "dataType": "string", "description": "Generated lowercase hexadecimal string."},
@@ -306,7 +306,7 @@
   {
     "id": "random_number",
     "displayName": "Random Number",
-    "description": "Choose an integer using the inclusive minimum and maximum bounds.",
+    "description": "Chooses an integer between two inclusive 32-bit integer bounds. Reversed bounds are normalized, and equal bounds return that value.",
     "domain": "core",
     "family": "random",
     "lifecycle": "active",
@@ -382,7 +382,7 @@
   {
     "id": "random_player",
     "displayName": "Random Player",
-    "description": "Select a random online player from a world or from the complete online player set.",
+    "description": "Chooses a random online player from one world or the complete online player set. Returns no player when the selected set is empty.",
     "domain": "core",
     "family": "random",
     "lifecycle": "active",
@@ -412,7 +412,7 @@
       {"id": "world", "displayName": "World", "name": "world", "dataType": "world", "optional": true, "description": "Optional world whose online players should be sampled. Leave blank to use all online players."}
     ],
     "outputs": [
-      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Randomly selected online player, or no value when no eligible player exists."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Selected online player, or no value when none is available."},
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after player selection."}
     ]
   },

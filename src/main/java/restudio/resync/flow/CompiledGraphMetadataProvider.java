@@ -870,9 +870,11 @@ public final class CompiledGraphMetadataProvider {
         String identity = code + "\u0000" + (graph == null ? "" : graph.resource().canonicalText()) + "\u0000"
             + (nodeId == null ? "" : nodeId.canonicalText()) + "\u0000" + (pinId == null ? "" : pinId.canonicalText())
             + "\u0000" + reason;
+        Map<String, Object> details = new LinkedHashMap<>(evidence);
+        details.put("reason", reason);
         var builder = Diagnostic.builder(code, DiagnosticSeverity.ERROR, phase(code), stage(code))
             .messageKey(ContractRef.of(OwnerId.of("resync"), CapabilityId.of(messageKey(code))))
-            .evidence(evidence)
+            .evidence(details)
             .correlationId(UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8)));
         if (graph != null) {
             builder.resource(graph.resource()).catalogGeneration(graph.catalogBinding().generation());
@@ -892,6 +894,7 @@ public final class CompiledGraphMetadataProvider {
     public static Diagnostic diagnostic(String code, FlowGraph graph, String nodeId, String reason, Map<String, ?> evidence) {
         String identity = code + "\u0000" + (graph == null || graph.getId() == null ? "" : graph.getId()) + "\u0000" + value(nodeId) + "\u0000" + reason;
         Map<String, Object> details = new LinkedHashMap<>(evidence);
+        details.put("reason", reason);
         if (nodeId != null) {
             details.put("nodeInstanceId", nodeId);
         }

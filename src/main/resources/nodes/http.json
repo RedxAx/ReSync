@@ -2,7 +2,7 @@
   {
     "id": "http_get",
     "displayName": "HTTP GET",
-    "description": "Send an HTTP GET request through the trusted server flow boundary. The URL, headers, and timeout are validated by the handler, and the response and stable failure state are exposed together.",
+    "description": "Sends HTTP GET and returns status, body, and headers. Flow runs for 2xx responses. Failed runs for other statuses or request errors. Bodies are limited to 4 MiB. A new request fails with HTTP_BUSY while 16 requests are active.",
     "domain": "core",
     "family": "http",
     "lifecycle": "active",
@@ -43,19 +43,19 @@
       {"id": "timeout_ms", "displayName": "Timeout Milliseconds", "name": "timeout_ms", "direction": "input", "dataType": "number", "defaultValue": 10000, "constraints": {"min": 100, "max": 120000}, "description": "Request timeout from 100 through 120000 milliseconds."}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the request completes, including an HTTP status failure."},
-      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when URL, timeout, transport, or response handling fails."},
-      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "Returns status code, response body, headers, and transport success state."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues only when the server returns an HTTP status from 200 through 299."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues for a non-2xx HTTP status or an invalid URL, timeout, transport error, body-size limit, or full concurrency limit."},
+      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "HTTP status code, body text, headers, and a success flag for a 2xx status. A request error returns an error response."},
       {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<http_response>", "description": "Reports the response on a 2xx status or a stable HTTP failure."},
       {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the request receives a 2xx response."},
-      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing URL, method, timeout, or transport failure."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable failure code for invalid input, HTTP status, timeout, transport, or size limits. HTTP_BUSY means the 16-request concurrency limit is occupied."},
       {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable HTTP result or failure explanation."}
     ]
   },
   {
     "id": "http_post",
     "displayName": "HTTP POST",
-    "description": "Send an HTTP POST request with a JSON body through the trusted server flow boundary. URL, headers, body, and timeout are handled by the HTTP capability and reported as a structured Result.",
+    "description": "Sends HTTP POST with an optional JSON body. Returns status, body, and headers. Flow runs for 2xx responses. Failed runs for other statuses or errors. Bodies are limited to 4 MiB. A new request fails with HTTP_BUSY while 16 requests are active.",
     "domain": "core",
     "family": "http",
     "lifecycle": "active",
@@ -93,24 +93,24 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the POST request when execution reaches this node."},
       {"id": "url", "displayName": "URL", "name": "url", "direction": "input", "dataType": "string", "description": "HTTP or HTTPS URL with a host. Other schemes and hostless URLs are rejected."},
-      {"id": "body", "displayName": "Body", "name": "body", "direction": "input", "dataType": "map<any,any>", "optional": true, "description": "Optional JSON-compatible object serialized as the request body."},
+      {"id": "body", "displayName": "Body", "name": "body", "direction": "input", "dataType": "map<any,any>", "optional": true, "description": "JSON-compatible request body. Its serialized size must not exceed 4 MiB."},
       {"id": "headers", "displayName": "Headers", "name": "headers", "direction": "input", "dataType": "map<string,string>", "optional": true, "description": "Optional request headers. Header names and values are sent as text."},
       {"id": "timeout_ms", "displayName": "Timeout Milliseconds", "name": "timeout_ms", "direction": "input", "dataType": "number", "defaultValue": 10000, "constraints": {"min": 100, "max": 120000}, "description": "Request timeout from 100 through 120000 milliseconds."}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the request completes, including an HTTP status failure."},
-      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when URL, timeout, transport, or response handling fails."},
-      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "Returns status code, response body, headers, and transport success state."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues only when the server returns an HTTP status from 200 through 299."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues for a non-2xx HTTP status or an invalid URL, timeout, transport error, body-size limit, or full concurrency limit."},
+      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "HTTP status code, body text, headers, and a success flag for a 2xx status. A request error returns an error response."},
       {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<http_response>", "description": "Reports the response on a 2xx status or a stable HTTP failure."},
       {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the request receives a 2xx response."},
-      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing URL, method, timeout, or transport failure."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable failure code for invalid input, HTTP status, timeout, transport, or size limits. HTTP_BUSY means the 16-request concurrency limit is occupied."},
       {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable HTTP result or failure explanation."}
     ]
   },
   {
     "id": "http_put",
     "displayName": "HTTP PUT",
-    "description": "Send an HTTP PUT request with a JSON body through the trusted server flow boundary. The capability validates the target and returns structured response and failure information.",
+    "description": "Sends HTTP PUT with an optional JSON body. Returns status, body, and headers. Flow runs for 2xx responses. Failed runs for other statuses or errors. Bodies are limited to 4 MiB. A new request fails with HTTP_BUSY while 16 requests are active.",
     "domain": "core",
     "family": "http",
     "lifecycle": "active",
@@ -148,24 +148,24 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the PUT request when execution reaches this node."},
       {"id": "url", "displayName": "URL", "name": "url", "direction": "input", "dataType": "string", "description": "HTTP or HTTPS URL with a host. Other schemes and hostless URLs are rejected."},
-      {"id": "body", "displayName": "Body", "name": "body", "direction": "input", "dataType": "map<any,any>", "optional": true, "description": "Optional JSON-compatible object serialized as the request body."},
+      {"id": "body", "displayName": "Body", "name": "body", "direction": "input", "dataType": "map<any,any>", "optional": true, "description": "JSON-compatible request body. Its serialized size must not exceed 4 MiB."},
       {"id": "headers", "displayName": "Headers", "name": "headers", "direction": "input", "dataType": "map<string,string>", "optional": true, "description": "Optional request headers. Header names and values are sent as text."},
       {"id": "timeout_ms", "displayName": "Timeout Milliseconds", "name": "timeout_ms", "direction": "input", "dataType": "number", "defaultValue": 10000, "constraints": {"min": 100, "max": 120000}, "description": "Request timeout from 100 through 120000 milliseconds."}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the request completes, including an HTTP status failure."},
-      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when URL, timeout, transport, or response handling fails."},
-      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "Returns status code, response body, headers, and transport success state."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues only when the server returns an HTTP status from 200 through 299."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues for a non-2xx HTTP status or an invalid URL, timeout, transport error, body-size limit, or full concurrency limit."},
+      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "HTTP status code, body text, headers, and a success flag for a 2xx status. A request error returns an error response."},
       {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<http_response>", "description": "Reports the response on a 2xx status or a stable HTTP failure."},
       {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the request receives a 2xx response."},
-      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing URL, method, timeout, or transport failure."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable failure code for invalid input, HTTP status, timeout, transport, or size limits. HTTP_BUSY means the 16-request concurrency limit is occupied."},
       {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable HTTP result or failure explanation."}
     ]
   },
   {
     "id": "http_delete",
     "displayName": "HTTP DELETE",
-    "description": "Send an HTTP DELETE request through the trusted server flow boundary. The target and timeout are validated before the request, and the response is returned with an auditable structured Result.",
+    "description": "Sends HTTP DELETE without a request body. Returns status, body, and headers. Flow runs for 2xx responses. Failed runs for other statuses or errors. Bodies are limited to 4 MiB. A new request fails with HTTP_BUSY while 16 requests are active.",
     "domain": "core",
     "family": "http",
     "lifecycle": "active",
@@ -209,19 +209,19 @@
       {"id": "timeout_ms", "displayName": "Timeout Milliseconds", "name": "timeout_ms", "direction": "input", "dataType": "number", "defaultValue": 10000, "constraints": {"min": 100, "max": 120000}, "description": "Request timeout from 100 through 120000 milliseconds."}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the request completes, including an HTTP status failure."},
-      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when URL, timeout, transport, or response handling fails."},
-      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "Returns status code, response body, headers, and transport success state."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues only when the server returns an HTTP status from 200 through 299."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues for a non-2xx HTTP status or an invalid URL, timeout, transport error, body-size limit, or full concurrency limit."},
+      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "HTTP status code, body text, headers, and a success flag for a 2xx status. A request error returns an error response."},
       {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<http_response>", "description": "Reports the response on a 2xx status or a stable HTTP failure."},
       {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the request receives a 2xx response."},
-      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing URL, method, timeout, or transport failure."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable failure code for invalid input, HTTP status, timeout, transport, or size limits. HTTP_BUSY means the 16-request concurrency limit is occupied."},
       {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable HTTP result or failure explanation."}
     ]
   },
   {
     "id": "http_patch",
     "displayName": "HTTP PATCH",
-    "description": "Send an HTTP PATCH request with a JSON body through the trusted server flow boundary. The capability validates the target and reports response status and failure details as typed outputs.",
+    "description": "Sends HTTP PATCH with an optional JSON body. Returns status, body, and headers. Flow runs for 2xx responses. Failed runs for other statuses or errors. Bodies are limited to 4 MiB. A new request fails with HTTP_BUSY while 16 requests are active.",
     "domain": "core",
     "family": "http",
     "lifecycle": "active",
@@ -259,24 +259,24 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the PATCH request when execution reaches this node."},
       {"id": "url", "displayName": "URL", "name": "url", "direction": "input", "dataType": "string", "description": "HTTP or HTTPS URL with a host. Other schemes and hostless URLs are rejected."},
-      {"id": "body", "displayName": "Body", "name": "body", "direction": "input", "dataType": "map<any,any>", "optional": true, "description": "Optional JSON-compatible object serialized as the request body."},
+      {"id": "body", "displayName": "Body", "name": "body", "direction": "input", "dataType": "map<any,any>", "optional": true, "description": "JSON-compatible request body. Its serialized size must not exceed 4 MiB."},
       {"id": "headers", "displayName": "Headers", "name": "headers", "direction": "input", "dataType": "map<string,string>", "optional": true, "description": "Optional request headers. Header names and values are sent as text."},
       {"id": "timeout_ms", "displayName": "Timeout Milliseconds", "name": "timeout_ms", "direction": "input", "dataType": "number", "defaultValue": 10000, "constraints": {"min": 100, "max": 120000}, "description": "Request timeout from 100 through 120000 milliseconds."}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the request completes, including an HTTP status failure."},
-      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when URL, timeout, transport, or response handling fails."},
-      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "Returns status code, response body, headers, and transport success state."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues only when the server returns an HTTP status from 200 through 299."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues for a non-2xx HTTP status or an invalid URL, timeout, transport error, body-size limit, or full concurrency limit."},
+      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "HTTP status code, body text, headers, and a success flag for a 2xx status. A request error returns an error response."},
       {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<http_response>", "description": "Reports the response on a 2xx status or a stable HTTP failure."},
       {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the request receives a 2xx response."},
-      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing URL, method, timeout, or transport failure."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable failure code for invalid input, HTTP status, timeout, transport, or size limits. HTTP_BUSY means the 16-request concurrency limit is occupied."},
       {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable HTTP result or failure explanation."}
     ]
   },
   {
     "id": "http_request",
     "displayName": "HTTP Request",
-    "description": "Send a configurable HTTP request using one of the supported GET, POST, PUT, PATCH, or DELETE methods. Query parameters, headers, timeout, response, and stable failure state remain visible to the graph.",
+    "description": "Sends GET, POST, PUT, PATCH, or DELETE with headers and query parameters. POST, PUT, and PATCH accept JSON bodies. Flow runs for 2xx responses. Failed runs otherwise. Bodies are limited to 4 MiB. New requests fail with HTTP_BUSY while 16 are active.",
     "domain": "core",
     "family": "http",
     "lifecycle": "active",
@@ -315,20 +315,20 @@
     },
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the request when execution reaches this node."},
-      {"id": "method", "displayName": "Method", "name": "method", "direction": "input", "dataType": "string", "widget": "DROPDOWN", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"], "defaultValue": "GET", "description": "HTTP method accepted by the request capability."},
+      {"id": "method", "displayName": "Method", "name": "method", "direction": "input", "dataType": "string", "widget": "DROPDOWN", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"], "defaultValue": "GET", "description": "HTTP method: GET, POST, PUT, PATCH, or DELETE. Defaults to GET."},
       {"id": "url", "displayName": "URL", "name": "url", "direction": "input", "dataType": "string", "description": "HTTP or HTTPS URL with a host. Other schemes and hostless URLs are rejected."},
-      {"id": "body", "displayName": "Body", "name": "body", "direction": "input", "dataType": "map<any,any>", "optional": true, "description": "Optional JSON-compatible object serialized for methods that accept a body."},
+      {"id": "body", "displayName": "Body", "name": "body", "direction": "input", "dataType": "map<any,any>", "optional": true, "description": "JSON-compatible request body. Its serialized size must not exceed 4 MiB."},
       {"id": "headers", "displayName": "Headers", "name": "headers", "direction": "input", "dataType": "map<string,string>", "optional": true, "description": "Optional request headers. Header names and values are sent as text."},
       {"id": "query_params", "displayName": "Query Parameters", "name": "query_params", "direction": "input", "dataType": "map<string,string>", "optional": true, "description": "Optional string query parameters encoded onto the URL."},
       {"id": "timeout_ms", "displayName": "Timeout Milliseconds", "name": "timeout_ms", "direction": "input", "dataType": "number", "defaultValue": 10000, "constraints": {"min": 100, "max": 120000}, "description": "Request timeout from 100 through 120000 milliseconds."}
     ],
     "outputs": [
-      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the request completes, including an HTTP status failure."},
-      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when URL, method, timeout, transport, or response handling fails."},
-      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "Returns status code, response body, headers, and transport success state."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues only when the server returns an HTTP status from 200 through 299."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues for a non-2xx HTTP status or an invalid URL, timeout, transport error, body-size limit, or full concurrency limit."},
+      {"id": "response", "displayName": "Response", "name": "response", "direction": "output", "dataType": "http_response", "description": "HTTP status code, body text, headers, and a success flag for a 2xx status. A request error returns an error response."},
       {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<http_response>", "description": "Reports the response on a 2xx status or a stable HTTP failure."},
       {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the request receives a 2xx response."},
-      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing URL, method, timeout, or transport failure."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable failure code for invalid input, HTTP status, timeout, transport, or size limits. HTTP_BUSY means the 16-request concurrency limit is occupied."},
       {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable HTTP result or failure explanation."}
     ]
   },
@@ -562,7 +562,7 @@
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the response body has been checked."},
       {"id": "json", "displayName": "JSON", "name": "json", "direction": "output", "dataType": "any", "description": "Parsed JSON value, or an empty object when the body is blank or invalid."},
-      {"id": "valid", "displayName": "Valid", "name": "valid", "direction": "output", "dataType": "boolean", "description": "True when the response body is blank or parses as JSON; false for malformed JSON."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "direction": "output", "dataType": "boolean", "description": "True when the response body is blank or parses as JSON. False for malformed JSON."},
       {"id": "error", "displayName": "Error", "name": "error", "direction": "output", "dataType": "string", "description": "Parser failure message, or empty text when the body is valid."}
     ]
   },

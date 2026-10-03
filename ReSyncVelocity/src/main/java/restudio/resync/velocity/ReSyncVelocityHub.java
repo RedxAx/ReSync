@@ -155,7 +155,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
             public NetworkNodeMetrics metrics(String nodeId) {
                 return latestMetrics.get(nodeId);
             }
-        }, config.routes(), config.maintenanceRoute());
+        }, config.routeSet());
         this.events = new NetworkEventDeliveryService(store, config.networkId(), EVENT_DELIVERY_BATCH, new NetworkEventDeliveryService.DeliveryTarget() {
             @Override
             public Set<String> nodes() {

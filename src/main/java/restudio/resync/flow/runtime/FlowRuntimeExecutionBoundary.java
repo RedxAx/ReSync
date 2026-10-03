@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 
 public final class FlowRuntimeExecutionBoundary implements RuntimeExecutionBoundary {
@@ -73,7 +74,19 @@ public final class FlowRuntimeExecutionBoundary implements RuntimeExecutionBound
             throw new IllegalStateException("Runtime Execution Boundary Is Unavailable For " + context.thread().wireValue());
         }
         CompletableFuture<RuntimeResult> result = new CompletableFuture<>();
-        Runnable task = () -> invoke(context, invocation, handler, result);
+        AtomicBoolean claimed = new AtomicBoolean();
+        RuntimeCancellationToken.Registration cancellation = invocation.cancellationToken().onCancel(() -> {
+            if (claimed.compareAndSet(false, true)) {
+                result.completeExceptionally(new RuntimeOperationCancelledException());
+            }
+        });
+        result.whenComplete((ignored, failure) -> cancellation.close());
+        Runnable task = () -> {
+            if (claimed.compareAndSet(false, true)) {
+                cancellation.close();
+                invoke(context, invocation, handler, result);
+            }
+        };
         switch (context.thread()) {
             case MAIN -> {
                 if (primaryThread.getAsBoolean()) {
@@ -128,11 +141,6 @@ public final class FlowRuntimeExecutionBoundary implements RuntimeExecutionBound
             if (stage == null) {
                 throw new IllegalStateException("Runtime Operation Handler Returned No Completion Stage");
             }
-            invocation.cancellationToken().cancelled().thenRun(() -> {
-                if (stage instanceof CompletableFuture<?> future && !future.isDone()) {
-                    future.completeExceptionally(new RuntimeOperationCancelledException());
-                }
-            });
             stage.whenComplete((value, failure) -> {
                 if (failure != null) {
                     result.completeExceptionally(failure);

@@ -6,6 +6,7 @@ import restudio.resync.flow.catalog.CatalogSnapshot;
 import restudio.resync.flow.function.FunctionParameterContract;
 import restudio.resync.flow.function.FunctionSourceDocument;
 import restudio.resync.flow.graph.CompiledExecutionPlan;
+import restudio.resync.flow.graph.CompiledExecutionStep;
 import restudio.resync.flow.graph.CompiledExecutionRunner;
 import restudio.resync.flow.identity.NodeInstanceId;
 import restudio.resync.flow.graph.CompiledPlanAuthority;
@@ -17,11 +18,14 @@ import restudio.resync.flow.graph.FunctionParameter;
 import restudio.resync.flow.graph.GraphCompilationException;
 import restudio.resync.flow.graph.GraphCompiler;
 import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.graph.FunctionBoundaryPins;
 import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.protocol.ResourceActivationState;
 import restudio.resync.flow.runtime.RuntimeBindingManifest;
+import restudio.resync.flow.type.TypeExpr;
+import restudio.resync.flow.type.TypeReference;
 import restudio.resync.server.CoreGraphResourceAuthority;
 import restudio.resync.server.TemporaryLifecycleDiagnostics;
 
@@ -330,7 +334,7 @@ public final class ServerCompiledPlanRepository implements CompiledPlanAuthority
                 .filter(this::admitted)
                 .map(plan -> new ResidentSource(plan.source().graph(), plan.source().functionSource(), plan.key(),
                     plan.source().stamp().envelopeChecksum(), plan.source().stamp().payloadChecksum(),
-                    plan.source().stamp().mutationId(), plan.source().stamp().activationState()));
+                    plan.source().stamp().mutationId(), plan.source().stamp().activationState(), plan.functionEntry()));
         }
     }
 
@@ -393,10 +397,23 @@ public final class ServerCompiledPlanRepository implements CompiledPlanAuthority
         }
         CompiledGraphMetadataProvider.Result metadata = prepareMetadata(rootEntry.source());
         return new ResidentPlan(rootEntry.key(), rootEntry.plan(), resolution.closure(), resolution.stamps(), rootEntry.source(),
-            rootEntry.source().functionSource() == null ? prepareTemplates(rootEntry.plan()) : Map.of(),
+            prepareTemplates(rootEntry.plan()),
             rootEntry.plan().steps().stream().map(step -> step.nodeId()).collect(Collectors.toUnmodifiableSet()),
             metadata, synchronousEventWindow(rootEntry.plan()) || resolution.closure().values().stream()
-                .anyMatch(function -> synchronousEventWindow(function.plan())));
+                .anyMatch(function -> synchronousEventWindow(function.plan())), functionEntry(rootEntry.plan()));
+    }
+
+    private static NodeInstanceId functionEntry(CompiledExecutionPlan plan) {
+        if (plan.functionSignature() == null) {
+            return null;
+        }
+        List<NodeInstanceId> entries = plan.steps().stream().filter(step -> step.resolvedBinding() != null
+                && step.definition().owner().equals(step.handler().operation().owner())
+                && step.definition().owner().equals(step.handler().capability().owner())
+                && FunctionBoundaryPins.role(step.resolvedBinding().unknown(), step.handler().operation().id().canonicalText())
+                    == FunctionBoundaryPins.BoundaryRole.INPUTS)
+            .map(step -> step.nodeId()).toList();
+        return entries.size() == 1 ? entries.getFirst() : null;
     }
 
     private boolean admitted(ResidentPlan plan) {
@@ -428,10 +445,20 @@ public final class ServerCompiledPlanRepository implements CompiledPlanAuthority
         }
         try {
             LinkedHashMap<NodeInstanceId, CompiledExecutionRunner.ExecutionTemplate> templates = new LinkedHashMap<>();
-            Set<NodeInstanceId> incoming = plan.connections().stream().map(connection -> connection.target().nodeId())
-                .collect(Collectors.toSet());
+            NodeInstanceId functionStart = functionEntry(plan);
+            if ("function".equals(plan.graph().resourceType().value()) && functionStart == null) {
+                return Map.of();
+            }
+            Map<NodeInstanceId, CompiledExecutionStep> steps = plan.steps().stream()
+                .collect(Collectors.toMap(CompiledExecutionStep::nodeId, Function.identity()));
+            TypeExpr execution = TypeExpr.named(TypeReference.of("builtin", "execution"));
+            Set<NodeInstanceId> incoming = plan.connections().stream().filter(connection -> {
+                CompiledExecutionStep target = steps.get(connection.target().nodeId());
+                var input = target == null ? null : target.inputBindings().get(connection.target().pinId());
+                return input != null && execution.equals(input.type());
+            }).map(connection -> connection.target().nodeId()).collect(Collectors.toSet());
             for (var step : plan.steps()) {
-                if (!incoming.contains(step.nodeId())) {
+                if (functionStart == null ? !incoming.contains(step.nodeId()) : functionStart.equals(step.nodeId())) {
                     templates.put(step.nodeId(), Objects.requireNonNull(factory.compile(plan, step.nodeId()),
                         "Resident Execution Template Is Required"));
                 }
@@ -894,7 +921,8 @@ public final class ServerCompiledPlanRepository implements CompiledPlanAuthority
                                 Map<ServerResourceLocator, SourceStamp> stamps, LoadedSource source,
                                 Map<NodeInstanceId, CompiledExecutionRunner.ExecutionTemplate> templates,
                                 Set<NodeInstanceId> entries,
-                                CompiledGraphMetadataProvider.Result metadata, boolean synchronousEventWindow) {
+                                CompiledGraphMetadataProvider.Result metadata, boolean synchronousEventWindow,
+                                NodeInstanceId functionEntry) {
         private ResidentPlan {
             key = Objects.requireNonNull(key, "Resident Compiled Plan Key Is Required");
             plan = Objects.requireNonNull(plan, "Resident Compiled Plan Is Required");
@@ -933,7 +961,7 @@ public final class ServerCompiledPlanRepository implements CompiledPlanAuthority
 
     public record ResidentSource(GraphDocument graph, FunctionSourceDocument functionSource, CompiledPlanCacheKey key,
                                  ContentHash envelopeChecksum, ContentHash payloadChecksum, UUID mutationId,
-                                 ResourceActivationState activationState) {
+                                 ResourceActivationState activationState, NodeInstanceId entryNodeId) {
         public ResidentSource {
             graph = Objects.requireNonNull(graph, "Resident Graph Source Is Required");
             key = Objects.requireNonNull(key, "Resident Graph Key Is Required");

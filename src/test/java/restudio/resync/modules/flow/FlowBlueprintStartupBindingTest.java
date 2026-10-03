@@ -14,6 +14,25 @@ import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.FlowExecutor;
+import restudio.resync.flow.catalog.CatalogVersion;
+import restudio.resync.flow.function.FunctionLocator;
+import restudio.resync.flow.function.FunctionRevision;
+import restudio.resync.flow.function.FunctionSignature;
+import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.graph.FunctionBinding;
+import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.graph.GraphNode;
+import restudio.resync.flow.graph.OpaqueData;
+import restudio.resync.flow.identity.CatalogBinding;
+import restudio.resync.flow.identity.ContentHash;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.NodeId;
+import restudio.resync.flow.identity.NodeInstanceId;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.flow.protocol.ResourceActivationState;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.TypeAdapterRegistry;
@@ -36,6 +55,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -341,17 +362,57 @@ class FlowBlueprintStartupBindingTest {
         assertEquals(1, triggers.getBindings(TriggerType.SYSTEM).size());
     }
 
+    @Test
+    void typedEventBindingsAndFunctionNotificationsDoNotProjectStaticCallsToLegacyGraphs() {
+        MockBukkit.mock();
+        ServerId server = ServerId.of(UUID.randomUUID());
+        FlowStorage storage = flowStorage(tempDir, server);
+        OwnerId owner = OwnerId.of("restudio.resync");
+        ServerResourceLocator child = new ServerResourceLocator(server, ContractRef.of(owner, ResourceTypeId.of("function")), "child");
+        FunctionBinding call = new FunctionBinding(child, 1, List.of(), List.of());
+        ContentHash hash = ContentHash.of("1".repeat(64));
+        CatalogBinding catalog = new CatalogBinding(1, hash, hash);
+        ServerResourceLocator flow = new ServerResourceLocator(server, ContractRef.of(owner, ResourceTypeId.of("flow")), "typed-event");
+        GraphNode event = new GraphNode(NodeInstanceId.of(UUID.randomUUID()), ContractRef.of(owner, NodeId.of("event.block.break")), 1, Map.of());
+        GraphDocument graph = new GraphDocument(new CatalogVersion(1, 0), flow, 1, catalog, Set.of(), List.of(event), List.of(), List.of(call), OpaqueData.empty());
+        storage.saveCoreGraph(graph, ResourceActivationState.ACTIVE, UUID.randomUUID(), 0);
+        ServerResourceLocator function = new ServerResourceLocator(server, child.type(), "parent");
+        GraphDocument body = new GraphDocument(new CatalogVersion(1, 0), function, 1, catalog, Set.of(), List.of(), List.of(), List.of(call), OpaqueData.empty());
+        FunctionSignature signature = new FunctionSignature(FunctionLocator.of(function), FunctionRevision.of(1), List.of(), List.of());
+        storage.saveCoreGraph(new FunctionSourceDocument(signature, body), ResourceActivationState.ACTIVE, UUID.randomUUID(), 0);
+        assertThrows(IllegalStateException.class, () -> storage.getGraph("flow", "typed-event"));
+        assertThrows(IllegalStateException.class, () -> storage.getGraph("function", "parent"));
+        TriggerRegistry triggers = new TriggerRegistry(tempDir.resolve("triggers.json").toFile());
+        triggers.setBindings(List.of(new TriggerBinding("system", "typed-event", TriggerType.SYSTEM, "server_start")));
+        FlowBlueprintPacketHandler handler = new FlowBlueprintPacketHandler(storage, triggers, null, new NodeDefinitionRegistry(false), null,
+            null, AuthorityEpoch.fixed(1L), false);
+
+        handler.refreshAllGraphBindings();
+        handler.refreshGraphBinding("function", "parent", false);
+        assertEquals(1, triggers.getBindings(TriggerType.EVENT).size());
+        assertEquals("block_break", triggers.getBindings(TriggerType.EVENT).getFirst().getContext());
+        GraphDocument inactive = new GraphDocument(new CatalogVersion(1, 0), flow, 2, catalog, Set.of(), List.of(event), List.of(), List.of(call), OpaqueData.empty());
+        storage.saveCoreGraph(inactive, ResourceActivationState.INACTIVE, UUID.randomUUID(), 1);
+        handler.refreshGraphBinding("flow", "typed-event", false);
+        assertTrue(triggers.getBindings(TriggerType.EVENT).isEmpty());
+        assertEquals(1, triggers.getBindings(TriggerType.SYSTEM).size());
+    }
+
     private FlowStorage flowStorage(JavaPlugin plugin) {
         return flowStorage(plugin.getDataFolder().toPath().toAbsolutePath().normalize());
     }
 
     private FlowStorage flowStorage(Path scope) {
+        return flowStorage(scope, null);
+    }
+
+    private FlowStorage flowStorage(Path scope, ServerId serverId) {
         AssetPersistenceGate assetsGate = new AssetPersistenceGate(scope);
         try {
             AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(scope.resolve("assets"), new Gson());
             assetsGates.add(assetsGate);
             coordinators.add(coordinator);
-            return new FlowStorage(scope.toFile(), LegacyRuntimeActivationGate.runtime(scope), assetsGate, coordinator);
+            return new FlowStorage(scope.toFile(), LegacyRuntimeActivationGate.runtime(scope), assetsGate, serverId, coordinator);
         } catch (IOException exception) {
             assetsGate.quiesce();
             throw new IllegalStateException("Failed to open flow blueprint test persistence", exception);

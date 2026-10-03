@@ -1,7 +1,6 @@
 package restudio.resync.flow;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowConnection;
@@ -111,6 +110,12 @@ public final class TypedCommandGraphAdapter {
             }
         });
 
+        return indexBindings(candidates, rejections);
+    }
+
+    public static Snapshot indexBindings(Collection<CommandBinding> admitted, Collection<Rejection> failures) {
+        List<CommandBinding> candidates = admitted == null ? List.of() : List.copyOf(admitted);
+        List<Rejection> rejections = new ArrayList<>(failures == null ? List.of() : failures);
         Map<String, List<CommandBinding>> byLabel = new LinkedHashMap<>();
         for (CommandBinding binding : candidates.stream().filter(CommandBinding::enabled).toList()) {
             for (String label : binding.labels()) {
@@ -160,23 +165,58 @@ public final class TypedCommandGraphAdapter {
             nodeValues.putAll(node.getInputValues());
         }
 
-        String command = textFromSources(graph, nodeValues, COMMAND_FIELDS, false);
+        return read(graphId, commandEntry.getKey(), graph.isEnabled(), headerValues(graph), nodeValues);
+    }
+
+    public static CommandBinding read(GraphDocument document, boolean enabled) {
+        Objects.requireNonNull(document, "Core command document is required");
+        if (!"command".equals(document.resource().resourceType().value())) {
+            throw invalid("COMMAND_GRAPH_INVALID", "The graph resource type is not command");
+        }
+        CompiledGraphMaterializer.Result validated = new CompiledGraphMaterializer().materialize(document);
+        if (validated.document() == null) {
+            throw invalid("COMMAND_GRAPH_INVALID", validated.diagnostics().isEmpty() ? "Core command graph is invalid"
+                : validated.diagnostics().getFirst().message());
+        }
+        List<GraphNode> starts = document.nodes().stream()
+            .filter(node -> CommandGraphContract.isAnyStart(node.definition())).toList();
+        if (starts.size() != 1) {
+            throw invalid("COMMAND_GRAPH_INVALID", "A typed command graph requires exactly one command start node");
+        }
+        GraphNode start = starts.getFirst();
+        Map<String, Object> nodeValues = new LinkedHashMap<>();
+        start.inspector().forEach((pin, value) -> materialize(nodeValues, pin.value(), value.value()));
+        start.inspectorFields().forEach((field, value) -> materialize(nodeValues, field.value(), value));
+        start.values().forEach((pin, value) -> materialize(nodeValues, pin.value(), value.value()));
+        CommandGraphMetadata metadata = CommandGraphMetadata.from(document);
+        Map<String, Object> graphValues = headerAliases(document.unknown().fields());
+        graphValues.putIfAbsent("commandLabel", metadata.commandLabel());
+        graphValues.putIfAbsent("structured", metadata.structured());
+        graphValues.putIfAbsent("commandPaths", metadata.commandPaths());
+        return read(document.resource().id(), start.instanceId().canonicalText(), enabled, graphValues, nodeValues);
+    }
+
+    private static CommandBinding read(String graphId, String nodeId, boolean enabled,
+                                       Map<String, Object> graphValues, Map<String, Object> nodeValues) {
+        graphValues = headerAliases(graphValues);
+        nodeValues = headerAliases(nodeValues);
+        String command = textFromSources(graphValues, nodeValues, COMMAND_FIELDS, false);
         if (command == null || command.isBlank()) {
             command = graphId;
         }
-        List<String> aliases = listFromSources(graph, nodeValues, ALIAS_FIELDS);
-        Object pathsValue = valueFromSources(graph, nodeValues, PATH_FIELDS);
+        List<String> aliases = listFromSources(graphValues, nodeValues, ALIAS_FIELDS);
+        Object pathsValue = valueFromSources(graphValues, nodeValues, PATH_FIELDS);
         List<String> subcommands = parseSubcommands(pathsValue);
         List<List<String>> commandPaths = parsePaths(pathsValue);
-        Boolean structuredValue = booleanFromSources(graph, nodeValues, "structured");
+        Boolean structuredValue = booleanFromSources(graphValues, nodeValues, "structured");
         boolean structured = structuredValue != null && structuredValue;
-        String permission = textFromSources(graph, nodeValues, List.of("permission"), true);
-        String permissionMessage = textFromSources(graph, nodeValues, List.of("permissionMessage"), true);
-        String description = textFromSources(graph, nodeValues, List.of("description", "commandDescription"), true);
-        String usage = textFromSources(graph, nodeValues, List.of("usage", "commandUsage"), true);
-        Map<String, Object> metadata = metadata(graph, nodeValues);
-        return new CommandBinding(graphId, commandEntry.getKey(), command, aliases, subcommands, commandPaths,
-            structured, graph.isEnabled(), permission, permissionMessage, description, usage, metadata);
+        String permission = textFromSources(graphValues, nodeValues, List.of("permission"), true);
+        String permissionMessage = textFromSources(graphValues, nodeValues, List.of("permissionMessage"), true);
+        String description = textFromSources(graphValues, nodeValues, List.of("description", "commandDescription"), true);
+        String usage = textFromSources(graphValues, nodeValues, List.of("usage", "commandUsage"), true);
+        Map<String, Object> metadata = metadata(graphValues, nodeValues);
+        return new CommandBinding(graphId, nodeId, command, aliases, subcommands, commandPaths,
+            structured, enabled, permission, permissionMessage, description, usage, metadata);
     }
 
     public static FlowGraph materialize(GraphDocument document, boolean enabled, String mutationId) {
@@ -314,9 +354,9 @@ public final class TypedCommandGraphAdapter {
         return "builtin".equals(owner) ? local : owner + ':' + local;
     }
 
-    private static Map<String, Object> metadata(FlowGraph graph, Map<String, Object> nodeValues) {
+    private static Map<String, Object> metadata(Map<String, Object> graphValues, Map<String, Object> nodeValues) {
         Map<String, Object> metadata = new LinkedHashMap<>();
-        Object graphMetadata = opaqueValue(graph, "metadata");
+        Object graphMetadata = graphValues.get("metadata");
         if (graphMetadata instanceof Map<?, ?> values) {
             values.forEach((key, value) -> {
                 if (key != null && value != null) {
@@ -325,7 +365,7 @@ public final class TypedCommandGraphAdapter {
             });
         }
         for (String key : List.of("permission", "permissionMessage", "description", "usage", "aliases", "commandPaths", "structured")) {
-            Object value = valueFromSources(graph, nodeValues, List.of(key));
+            Object value = valueFromSources(graphValues, nodeValues, List.of(key));
             if (value != null) {
                 metadata.putIfAbsent(key, value);
             }
@@ -333,10 +373,10 @@ public final class TypedCommandGraphAdapter {
         return metadata;
     }
 
-    private static String textFromSources(FlowGraph graph, Map<String, Object> nodeValues, List<String> keys, boolean optional) {
+    private static String textFromSources(Map<String, Object> graphValues, Map<String, Object> nodeValues, List<String> keys, boolean optional) {
         List<String> values = new ArrayList<>();
         for (String key : keys) {
-            Object graphValue = opaqueValue(graph, key);
+            Object graphValue = graphValues.get(key);
             if (graphValue != null) {
                 values.add(requireString(graphValue, key, optional));
             }
@@ -357,11 +397,11 @@ public final class TypedCommandGraphAdapter {
         return selected;
     }
 
-    private static Object valueFromSources(FlowGraph graph, Map<String, Object> nodeValues, List<String> keys) {
+    private static Object valueFromSources(Map<String, Object> graphValues, Map<String, Object> nodeValues, List<String> keys) {
         Object selected = null;
         boolean selectedSet = false;
         for (String key : keys) {
-            Object graphValue = opaqueValue(graph, key);
+            Object graphValue = graphValues.get(key);
             if (graphValue != null) {
                 if (selectedSet && !Objects.equals(selected, graphValue)) {
                     throw invalid("COMMAND_GRAPH_AMBIGUOUS", "Command metadata fields disagree for " + keys);
@@ -381,8 +421,8 @@ public final class TypedCommandGraphAdapter {
         return selected;
     }
 
-    private static Boolean booleanFromSources(FlowGraph graph, Map<String, Object> nodeValues, String key) {
-        Object value = valueFromSources(graph, nodeValues, List.of(key));
+    private static Boolean booleanFromSources(Map<String, Object> graphValues, Map<String, Object> nodeValues, String key) {
+        Object value = valueFromSources(graphValues, nodeValues, List.of(key));
         if (value == null) {
             return null;
         }
@@ -392,8 +432,8 @@ public final class TypedCommandGraphAdapter {
         return booleanValue;
     }
 
-    private static List<String> listFromSources(FlowGraph graph, Map<String, Object> nodeValues, List<String> keys) {
-        Object value = valueFromSources(graph, nodeValues, keys);
+    private static List<String> listFromSources(Map<String, Object> graphValues, Map<String, Object> nodeValues, List<String> keys) {
+        Object value = valueFromSources(graphValues, nodeValues, keys);
         if (value == null) {
             return List.of();
         }
@@ -478,13 +518,35 @@ public final class TypedCommandGraphAdapter {
         return List.copyOf(tokens);
     }
 
-    private static Object opaqueValue(FlowGraph graph, String key) {
-        JsonElement value = graph.getOpaqueProperties().get(key);
-        if (value != null && !value.isJsonNull()) {
-            return GSON.fromJson(value, Object.class);
+    private static Map<String, Object> headerAliases(Map<String, Object> source) {
+        Map<String, Object> values = new LinkedHashMap<>(source);
+        Map<String, String> aliases = Map.of("command_label", "commandLabel", "command_paths", "commandPaths",
+            "command_aliases", "commandAliases", "permission_message", "permissionMessage",
+            "command_description", "commandDescription", "command_usage", "commandUsage",
+            "allowed_subcommands", "allowedSubcommands");
+        aliases.forEach((alias, field) -> {
+            if (values.containsKey(alias)) {
+                Object value = values.get(alias);
+                if (values.containsKey(field) && !Objects.equals(values.get(field), value)) {
+                    throw invalid("COMMAND_GRAPH_AMBIGUOUS", "Command metadata fields disagree for " + field);
+                }
+                values.put(field, value);
+            }
+        });
+        return values;
+    }
+
+    private static Map<String, Object> headerValues(FlowGraph graph) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        if (graph.getContentProperties() != null) {
+            values.putAll(graph.getContentProperties());
         }
-        Map<String, Object> contentProperties = graph.getContentProperties();
-        return contentProperties != null ? contentProperties.get(key) : null;
+        graph.getOpaqueProperties().forEach((key, value) -> {
+            if (value != null && !value.isJsonNull()) {
+                values.put(key, GSON.fromJson(value, Object.class));
+            }
+        });
+        return values;
     }
 
     private static boolean isCommandNode(String type) {

@@ -36,17 +36,17 @@ public class GenericMathHandler implements NodeHandler {
         operations.put("add", (ctx, node) -> {
             double a = finiteScalar(ctx, node, "a", 0.0, "Add input a");
             double b = finiteScalar(ctx, node, "b", 0.0, "Add input b");
-            ctx.setOutput(node, "result", a + b);
+            ctx.setOutput(node, "result", finiteResult(a + b, "Add result"));
         });
         operations.put("subtract", (ctx, node) -> {
             double a = finiteScalar(ctx, node, "a", 0.0, "Subtract input a");
             double b = finiteScalar(ctx, node, "b", 0.0, "Subtract input b");
-            ctx.setOutput(node, "result", a - b);
+            ctx.setOutput(node, "result", finiteResult(a - b, "Subtract result"));
         });
         operations.put("multiply", (ctx, node) -> {
             double a = finiteScalar(ctx, node, "a", 0.0, "Multiply input a");
             double b = finiteScalar(ctx, node, "b", 0.0, "Multiply input b");
-            ctx.setOutput(node, "result", a * b);
+            ctx.setOutput(node, "result", finiteResult(a * b, "Multiply result"));
         });
         operations.put("divide", (ctx, node) -> {
             double a = finiteScalar(ctx, node, "a", 0.0, "Divide input a");
@@ -85,8 +85,7 @@ public class GenericMathHandler implements NodeHandler {
         operations.put("round", (ctx, node) -> {
             double value = finiteScalar(ctx, node, "value", 0.0, "Round input");
             Integer decimalPlaces = ctx.getInputValue(node, "decimal_places", Integer.class, 0);
-            double factor = Math.pow(10.0, Math.clamp(decimalPlaces, -15, 15));
-            ctx.setOutput(node, "rounded", Math.round(value * factor) / factor);
+            ctx.setOutput(node, "rounded", roundFinite(value, decimalPlaces));
         });
         operations.put("min", (ctx, node) -> {
             List<?> values = ctx.getInputValue(node, "values_list", List.class, List.of());
@@ -103,9 +102,9 @@ public class GenericMathHandler implements NodeHandler {
             ctx.setOutput(node, "clamped", Math.max(min, Math.min(max, value)));
         });
         operations.put("random", (ctx, node) -> {
-            Double min = ctx.getInputValue(node, "min", Double.class, 0.0);
-            Double max = ctx.getInputValue(node, "max", Double.class, 1.0);
-            ctx.setOutput(node, "result", min + Math.random() * (max - min));
+            double min = finiteScalar(ctx, node, "min", 0.0, "Random minimum");
+            double max = finiteScalar(ctx, node, "max", 1.0, "Random maximum");
+            ctx.setOutput(node, "result", interpolate(min, max, RANDOM.nextDouble()));
         });
         operations.put("negate", (ctx, node) -> {
             double value = finiteScalar(ctx, node, "value", 0.0, "Negate input");
@@ -119,15 +118,15 @@ public class GenericMathHandler implements NodeHandler {
             double y2 = finiteScalar(ctx, node, "y2", 0.0, "Distance input y2");
             double z2 = finiteScalar(ctx, node, "z2", 0.0, "Distance input z2");
             double dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
-            ctx.setOutput(node, "result", Math.sqrt(dx * dx + dy * dy + dz * dz));
+            ctx.setOutput(node, "result", finiteResult(Math.hypot(Math.hypot(dx, dy), dz), "Distance result"));
         });
     }
 
     private void registerAdvancedOperations() {
         operations.put("random_range", (ctx, node) -> {
-            Double min = ctx.getInputValue(node, "min", Double.class, 0.0);
-            Double max = ctx.getInputValue(node, "max", Double.class, 1.0);
-            ctx.setOutput(node, "result", min + RANDOM.nextDouble() * (max - min));
+            double min = finiteScalar(ctx, node, "min", 0.0, "Random minimum");
+            double max = finiteScalar(ctx, node, "max", 1.0, "Random maximum");
+            ctx.setOutput(node, "result", interpolate(min, max, RANDOM.nextDouble()));
         });
         operations.put("random_chance", (ctx, node) -> {
             Double chancePercent = ctx.getInputValue(node, "chance_percent", Double.class, 50.0);
@@ -143,17 +142,37 @@ public class GenericMathHandler implements NodeHandler {
         });
         operations.put("random_choice_weighted", (ctx, node) -> {
             List<?> itemsList = ctx.getInputValue(node, "items_list", List.class, null);
-            List<Double> weightsList = ctx.getInputValue(node, "weights_list", List.class, null);
+            List<?> weightsList = ctx.getInputValue(node, "weights_list", List.class, null);
             Object chosenItem = null;
-            if (itemsList != null && !itemsList.isEmpty() && weightsList != null && weightsList.size() == itemsList.size()) {
-                double totalWeight = weightsList.stream().mapToDouble(d -> d).sum();
-                double randomWeight = RANDOM.nextDouble() * totalWeight;
-                double currentWeight = 0.0;
-                for (int i = 0; i < itemsList.size(); i++) {
-                    currentWeight += weightsList.get(i);
-                    if (randomWeight <= currentWeight) {
-                        chosenItem = itemsList.get(i);
-                        break;
+            if (itemsList != null && !itemsList.isEmpty() && weightsList != null) {
+                if (weightsList.size() != itemsList.size()) {
+                    throw new IllegalArgumentException("Each item requires one weight");
+                }
+                double[] weights = new double[weightsList.size()];
+                double maximum = 0.0;
+                for (int i = 0; i < weights.length; i++) {
+                    Object value = weightsList.get(i);
+                    if (!(value instanceof Number number) || !Double.isFinite(number.doubleValue()) || number.doubleValue() < 0) {
+                        throw new IllegalArgumentException("Weights must be finite non-negative numbers");
+                    }
+                    weights[i] = number.doubleValue();
+                    maximum = Math.max(maximum, weights[i]);
+                }
+                if (maximum > 0) {
+                    double total = 0.0;
+                    for (int i = 0; i < weights.length; i++) {
+                        weights[i] /= maximum;
+                        total += weights[i];
+                    }
+                    double sample = RANDOM.nextDouble() * total;
+                    for (int i = 0; i < weights.length; i++) {
+                        if (weights[i] > 0) {
+                            chosenItem = itemsList.get(i);
+                            sample -= weights[i];
+                            if (sample < 0) {
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -163,12 +182,12 @@ public class GenericMathHandler implements NodeHandler {
             double a = finiteScalar(ctx, node, "a", 0.0, "Lerp input a");
             double b = finiteScalar(ctx, node, "b", 0.0, "Lerp input b");
             double t = finiteScalar(ctx, node, "t", 0.5, "Lerp input t");
-            ctx.setOutput(node, "result", a + (b - a) * Math.max(0.0, Math.min(1.0, t)));
+            ctx.setOutput(node, "result", interpolate(a, b, Math.clamp(t, 0.0, 1.0)));
         });
         operations.put("hypotenuse", (ctx, node) -> {
             double a = finiteScalar(ctx, node, "a", 0.0, "Hypotenuse input a");
             double b = finiteScalar(ctx, node, "b", 0.0, "Hypotenuse input b");
-            ctx.setOutput(node, "hypotenuse", Math.hypot(a, b));
+            ctx.setOutput(node, "hypotenuse", finiteResult(Math.hypot(a, b), "Hypotenuse result"));
         });
         operations.put("log", (ctx, node) -> {
             double value = finiteScalar(ctx, node, "value", 1.0, "Log input");
@@ -198,20 +217,19 @@ public class GenericMathHandler implements NodeHandler {
             ctx.setOutput(node, "sign", Math.signum(value));
         });
         operations.put("min_list", (ctx, node) -> {
-            List<Double> valuesList = ctx.getInputValue(node, "values_list", List.class, null);
-            double min = valuesList != null && !valuesList.isEmpty() ? valuesList.stream().mapToDouble(d -> d).min().orElse(0.0) : 0.0;
+            List<?> valuesList = ctx.getInputValue(node, "values_list", List.class, null);
+            double min = finiteListExtremum(valuesList, true, "Minimum");
             ctx.setOutput(node, "min", min);
         });
         operations.put("max_list", (ctx, node) -> {
-            List<Double> valuesList = ctx.getInputValue(node, "values_list", List.class, null);
-            double max = valuesList != null && !valuesList.isEmpty() ? valuesList.stream().mapToDouble(d -> d).max().orElse(0.0) : 0.0;
+            List<?> valuesList = ctx.getInputValue(node, "values_list", List.class, null);
+            double max = finiteListExtremum(valuesList, false, "Maximum");
             ctx.setOutput(node, "max", max);
         });
         operations.put("round_decimal", (ctx, node) -> {
             double value = finiteScalar(ctx, node, "value", 0.0, "Round decimal input");
             Integer decimalPlaces = ctx.getInputValue(node, "decimal_places", Integer.class, 0);
-            double factor = Math.pow(10, Math.clamp(decimalPlaces, -15, 15));
-            ctx.setOutput(node, "rounded", finiteResult(Math.round(value * factor) / factor, "Round decimal result"));
+            ctx.setOutput(node, "rounded", roundFinite(value, decimalPlaces));
         });
     }
 
@@ -403,6 +421,17 @@ public class GenericMathHandler implements NodeHandler {
             throw new IllegalArgumentException(label + " must be finite");
         }
         return value;
+    }
+
+    private double roundFinite(double value, int places) {
+        double factor = Math.pow(10.0, Math.clamp(places, -15, 15));
+        double scaled = value * factor;
+        return Math.abs(scaled) >= 0x1.0p52 ? value : finiteResult(Math.round(scaled) / factor, "Round result");
+    }
+
+    private double interpolate(double first, double second, double fraction) {
+        double result = (1.0 - fraction) * first + fraction * second;
+        return Math.clamp(result, Math.min(first, second), Math.max(first, second));
     }
 
     private double finiteResult(double value, String label) {

@@ -29,7 +29,7 @@
   {
     "id": "color_from_hex",
     "displayName": "Color From Hex",
-    "description": "Parse a 3-digit or 6-digit hexadecimal RGB color. A leading # is accepted; invalid hexadecimal text or any other length fails before output.",
+    "description": "Parse a 3-digit or 6-digit hexadecimal RGB color. A leading # is accepted. Invalid hexadecimal text or any other length fails before output.",
     "domain": "core",
     "family": "color",
     "lifecycle": "active",
@@ -45,7 +45,7 @@
     "handler": "ColorHandler",
     "handlerConfig": {"operation": "color_from_hex"},
     "inputs": [
-      {"id": "hex_string", "displayName": "Hex String", "name": "hex_string", "pinType": "DATA", "dataType": "string", "widget": "COLOR", "defaultValue": "#FFFFFF", "description": "Three-digit or six-digit hexadecimal RGB text, optionally prefixed with #. Missing or null input uses #FFFFFF; invalid text or any other length fails before output."}
+      {"id": "hex_string", "displayName": "Hex String", "name": "hex_string", "pinType": "DATA", "dataType": "string", "widget": "COLOR", "defaultValue": "#FFFFFF", "description": "Three-digit or six-digit hexadecimal RGB text, optionally prefixed with #. Missing or null input uses #FFFFFF. Invalid text or any other length fails before output."}
     ],
     "outputs": [
       {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the parsed RGB color."}
@@ -131,7 +131,7 @@
   {
     "id": "color_brighten",
     "displayName": "Brighten Color",
-    "description": "Brighten an RGB color by a finite normalized amount. Missing or null color uses white, missing or null amount uses 0.2, and the amount is clamped to 0 through 1. Non-finite amounts fail before output; channel results are truncated and capped at 255.",
+    "description": "Brighten an RGB color by a finite normalized amount. Missing or null color uses white, missing or null amount uses 0.2, and the amount is clamped to 0 through 1. Non-finite amounts fail before output. Channel results are truncated and capped at 255.",
     "domain": "core",
     "family": "color",
     "lifecycle": "active",
@@ -148,7 +148,7 @@
     "handlerConfig": {"operation": "color_brighten"},
     "inputs": [
       {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "RGB color to brighten. Missing or null input uses white."},
-      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "dataType": "number", "defaultValue": 0.2, "constraints": {"min": 0, "max": 1}, "description": "Finite normalized brightening amount from 0 through 1. Missing or null input uses 0.2; values are clamped, non-finite values fail before output, and channel results are truncated."}
+      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "dataType": "number", "defaultValue": 0.2, "constraints": {"min": 0, "max": 1}, "description": "Finite normalized brightening amount from 0 through 1. Missing or null input uses 0.2. Values are clamped, non-finite values fail before output, and channel results are truncated."}
     ],
     "outputs": [
       {"id": "brightened_color", "displayName": "Brightened Color", "name": "brightened_color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the brightened color with channels capped at 255."}
@@ -157,7 +157,7 @@
   {
     "id": "color_darken",
     "displayName": "Darken Color",
-    "description": "Darken an RGB color by a finite normalized amount. Missing or null color uses white, missing or null amount uses 0.2, and the amount is clamped to 0 through 1. Non-finite amounts fail before output; channel results are truncated and floored at 0.",
+    "description": "Darken an RGB color by a finite normalized amount. Missing or null color uses white, missing or null amount uses 0.2, and the amount is clamped to 0 through 1. Non-finite amounts fail before output. Channel results are truncated and floored at 0.",
     "domain": "core",
     "family": "color",
     "lifecycle": "active",
@@ -174,7 +174,7 @@
     "handlerConfig": {"operation": "color_darken"},
     "inputs": [
       {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "RGB color to darken. Missing or null input uses white."},
-      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "dataType": "number", "defaultValue": 0.2, "constraints": {"min": 0, "max": 1}, "description": "Finite normalized darkening amount from 0 through 1. Missing or null input uses 0.2; values are clamped, non-finite values fail before output, and channel results are truncated."}
+      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "dataType": "number", "defaultValue": 0.2, "constraints": {"min": 0, "max": 1}, "description": "Finite normalized darkening amount from 0 through 1. Missing or null input uses 0.2. Values are clamped, non-finite values fail before output, and channel results are truncated."}
     ],
     "outputs": [
       {"id": "darkened_color", "displayName": "Darkened Color", "name": "darkened_color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the darkened color with channels floored at 0."}
@@ -183,7 +183,7 @@
   {
     "id": "color_blend",
     "displayName": "Blend Colors",
-    "description": "Blend two RGB colors by interpolating each channel with a finite ratio. Missing or null color1 uses white, color2 uses black, and missing or null ratio uses 0.5; ratio is clamped to 0 through 1, channels are truncated, and non-finite ratios fail before output.",
+    "description": "Blend two RGB colors by interpolating each channel with a finite ratio. Missing or null color1 uses white, color2 uses black, and missing or null ratio uses 0.5. Ratio is clamped to 0 through 1, channels are truncated, and non-finite ratios fail before output.",
     "domain": "core",
     "family": "color",
     "lifecycle": "active",
@@ -201,7 +201,7 @@
     "inputs": [
       {"id": "color1", "displayName": "Color 1", "name": "color1", "pinType": "DATA", "dataType": "rgb_color", "description": "First RGB color to interpolate from. Missing or null input uses white."},
       {"id": "color2", "displayName": "Color 2", "name": "color2", "pinType": "DATA", "dataType": "rgb_color", "description": "Second RGB color to interpolate toward. Missing or null input uses black."},
-      {"id": "ratio", "displayName": "Ratio", "name": "ratio", "pinType": "DATA", "dataType": "number", "defaultValue": 0.5, "constraints": {"min": 0, "max": 1}, "description": "Finite interpolation ratio from 0 through 1. Missing or null input uses 0.5; values are clamped, non-finite values fail before output, and channel results are truncated."}
+      {"id": "ratio", "displayName": "Ratio", "name": "ratio", "pinType": "DATA", "dataType": "number", "defaultValue": 0.5, "constraints": {"min": 0, "max": 1}, "description": "Finite interpolation ratio from 0 through 1. Missing or null input uses 0.5. Values are clamped, non-finite values fail before output, and channel results are truncated."}
     ],
     "outputs": [
       {"id": "mixed_color", "displayName": "Mixed Color", "name": "mixed_color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the color produced by channel-by-channel interpolation."}

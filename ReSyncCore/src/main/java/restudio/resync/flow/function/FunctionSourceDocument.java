@@ -14,6 +14,7 @@ public final class FunctionSourceDocument {
     private final FunctionSignature signature;
     private final GraphDocument graph;
     private final OpaqueData unknown;
+    private volatile ContentHash checksum;
 
     public FunctionSourceDocument(FunctionSignature signature, GraphDocument graph, OpaqueData unknown) {
         this.signature = Objects.requireNonNull(signature, "Function Source Signature Is Required");
@@ -48,6 +49,23 @@ public final class FunctionSourceDocument {
     }
 
     public ContentHash checksum() {
+        ContentHash resident = checksum;
+        return resident != null ? resident : computeChecksum();
+    }
+
+    boolean stable() {
+        return checksum != null;
+    }
+
+    synchronized void retainChecksum(ContentHash admitted) {
+        Objects.requireNonNull(admitted, "Admitted Function Source Checksum Is Required");
+        if (checksum != null && !checksum.equals(admitted)) {
+            throw new IllegalArgumentException("Admitted Function Source Checksum Cannot Change");
+        }
+        checksum = admitted;
+    }
+
+    private ContentHash computeChecksum() {
         return new ContentHash(CanonicalJson.sha256("function-source", canonicalValue()));
     }
 

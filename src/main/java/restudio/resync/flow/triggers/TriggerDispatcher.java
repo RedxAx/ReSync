@@ -7,13 +7,19 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.EventExecutor;
-import restudio.flow.data.FlowGraph;
-import restudio.flow.data.FlowNode;
+import restudio.resync.flow.CoreGraphStorageBoundary;
+import restudio.resync.flow.graph.GraphNode;
+import restudio.resync.flow.identity.PinId;
+import restudio.resync.flow.protocol.ResourceActivationState;
+import restudio.resync.flow.runtime.RuntimeExecutionContext;
 import restudio.resync.Log;
 import restudio.resync.flow.CompiledTriggerExecution;
 import restudio.resync.flow.CompiledRuntimeContextAdapter;
+import restudio.resync.flow.CompiledCoreFlowExecutionBridge;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.automation.AutomationReferences;
@@ -26,6 +32,8 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CancellationException;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -38,9 +46,10 @@ public class TriggerDispatcher implements Listener {
     private final Map<String, TriggerEntry> entriesByLookup = new ConcurrentHashMap<>();
     private final Map<ContractRef<NodeId>, TriggerEntry> entriesByDefinition = new ConcurrentHashMap<>();
     private final Set<TriggerEntry> entries = ConcurrentHashMap.newKeySet();
-    private final Map<String, FlowGraph> graphSnapshots = new ConcurrentHashMap<>();
+    private final Map<String, CoreGraphStorageBoundary.Decoded> graphSnapshots = new ConcurrentHashMap<>();
     private volatile CompiledTriggerExecution compiledExecution;
     private boolean definitionAdmissionOpen = true;
+    private final Map<Event, EventObservation> eventObservations = Collections.synchronizedMap(new IdentityHashMap<>());
 
     private static final Map<String, String> LEGACY_EVENT_ALIASES = Map.ofEntries(
             Map.entry("chat", "async_chat"),
@@ -88,6 +97,27 @@ public class TriggerDispatcher implements Listener {
 
     public CompiledTriggerExecution getCompiledExecution() {
         return compiledExecution;
+    }
+
+    public List<Map<String, Object>> describeBindings() {
+        return entries.stream().sorted(Comparator.comparing(entry -> entry.eventType)).map(entry -> Map.<String, Object>of(
+            "eventType", entry.eventType, "nodeType", entry.nodeType, "eventClass", entry.eventClass.getName(),
+            "priority", entry.priority.name(), "ignoreCancelled", entry.ignoreCancelled,
+            "bindings", Map.copyOf(entry.triggerMap))).toList();
+    }
+
+    public EventObservation observeEvent(Event event) {
+        if (!Bukkit.isPrimaryThread()) {
+            throw new IllegalStateException("Event Observation Requires The Server Thread");
+        }
+        EventObservation observation = new EventObservation(Objects.requireNonNull(event, "Observed Event Is Required"));
+        synchronized (eventObservations) {
+            if (eventObservations.containsKey(event)) {
+                throw new IllegalStateException("The Event Already Has An Observer");
+            }
+            eventObservations.put(event, observation);
+        }
+        return observation;
     }
 
     public synchronized void shutdown() {
@@ -201,11 +231,19 @@ public class TriggerDispatcher implements Listener {
         boolean measured = event instanceof BlockBreakEvent && !entry.triggerMap.isEmpty();
         try {
             CompletableFuture<Void> completion = dispatchEvent(entry, event);
+            EventObservation observation = eventObservations.get(event);
+            if (observation != null) {
+                observation.dispatch(entry, completion);
+            }
             if (measured) {
                 completion.whenComplete((ignored, failure) -> TemporaryLifecycleDiagnostics.recordTiming(
                     TemporaryLifecycleDiagnostics.ExecutionPhase.EVENT_COMPLETION, System.nanoTime() - started));
             }
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | Error failure) {
+            EventObservation observation = eventObservations.get(event);
+            if (observation != null) {
+                observation.dispatch(entry, CompletableFuture.failedFuture(failure));
+            }
             if (measured) {
                 TemporaryLifecycleDiagnostics.recordTiming(TemporaryLifecycleDiagnostics.ExecutionPhase.EVENT_COMPLETION,
                     System.nanoTime() - started);
@@ -220,6 +258,9 @@ public class TriggerDispatcher implements Listener {
     }
 
     private CompletableFuture<Void> dispatchEvent(TriggerEntry entry, Event event) {
+        if (event instanceof PlayerInteractEvent interaction && interaction.getHand() == EquipmentSlot.OFF_HAND) {
+            return CompletableFuture.completedFuture(null);
+        }
         Map<String, Object> customVars;
         Player player;
         try {
@@ -232,8 +273,16 @@ public class TriggerDispatcher implements Listener {
                 player = playerFromEventVariables(customVars);
             }
         } catch (RuntimeException failure) {
+            EventObservation observation = eventObservations.get(event);
+            if (observation != null && entry.triggerMap.isEmpty()) {
+                observation.reject(entry, "", "", CorrelationId.random(), "TRIGGER.CONTEXT_REJECTED", "event-extraction-failed");
+            }
             for (Map.Entry<String, String> trigger : entry.triggerMap.entrySet()) {
                 CorrelationId invocationId = CorrelationId.random();
+                if (observation != null) {
+                    observation.reject(entry, trigger.getKey(), trigger.getValue(), invocationId,
+                        "TRIGGER.CONTEXT_REJECTED", "event-extraction-failed");
+                }
                 long started = TemporaryLifecycleDiagnostics.start();
                 Map<String, Object> ingress = ingressIdentity(entry, trigger, invocationId);
                 TemporaryLifecycleDiagnostics.event("trigger_ingress", started, ingress);
@@ -250,6 +299,7 @@ public class TriggerDispatcher implements Listener {
         List<CompletableFuture<Void>> completions = new ArrayList<>();
         CompiledRuntimeContextAdapter.Result eventSnapshot = null;
         for (Map.Entry<String, String> trigger : entry.triggerMap.entrySet()) {
+            CompiledCoreFlowExecutionBridge.ExecutionObservation invocationObservation = null;
             CorrelationId invocationId = CorrelationId.random();
             long started = TemporaryLifecycleDiagnostics.start();
             Map<String, Object> ingress = ingressIdentity(entry, trigger, invocationId);
@@ -258,8 +308,10 @@ public class TriggerDispatcher implements Listener {
             String failureCode = "TRIGGER.GRAPH_UNAVAILABLE";
             String failureReason = "graph-resolution-failed";
             try {
-                FlowGraph graph = graphSnapshots.get(trigger.getKey());
-                if (graph == null || !graph.isEnabled()) {
+                CoreGraphStorageBoundary.Decoded graph = graphSnapshots.get(trigger.getKey());
+                if (graph == null || graph.envelope().assetActivationState() != ResourceActivationState.ACTIVE) {
+                    rejectObservation(event, entry, trigger, invocationId, "TRIGGER.GRAPH_UNAVAILABLE",
+                        graph == null ? "graph-unavailable" : "graph-disabled");
                     TemporaryLifecycleDiagnostics.event("trigger_ingress", started, ingress);
                     TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, ingress, "rejected",
                         "TRIGGER.GRAPH_UNAVAILABLE", graph == null ? "graph-unavailable" : "graph-disabled");
@@ -277,8 +329,8 @@ public class TriggerDispatcher implements Listener {
                 ingressEmitted = true;
 
                 Map<String, Object> identity = TemporaryLifecycleDiagnostics.with(ingress,
-                    "revision", graph.getResourceRevision(),
-                    "startNodeId", trigger.getValue(), "graphHash", graph.getResourceHash(), "outcome", "matched");
+                    "revision", graph.envelope().assetRevision(),
+                    "startNodeId", trigger.getValue(), "graphHash", graph.envelope().assetHash().canonicalText(), "outcome", "matched");
                 terminalIdentity = identity;
                 TemporaryLifecycleDiagnostics.event("trigger_binding_selected", started,
                     TemporaryLifecycleDiagnostics.with(identity, "outcome", "selected"));
@@ -303,13 +355,25 @@ public class TriggerDispatcher implements Listener {
                 }
                 CompiledTriggerExecution execution = compiledExecution;
                 if (execution != null) {
+                    EventObservation eventObservation = eventObservations.get(event);
+                    boolean synchronousWindow = execution.requiresSynchronousEventWindow(graph);
+                    if (eventObservation != null || !synchronousWindow) {
+                        invocationObservation = execution.observeInvocation(invocationId);
+                        if (eventObservation != null) {
+                            eventObservation.invocation(entry, graph, trigger.getValue(), invocationObservation);
+                        }
+                    }
                     failureCode = "TRIGGER.EXECUTOR_REJECTED";
                     failureReason = "synchronous-rejection";
-                    if (execution.requiresSynchronousEventWindow(graph)) {
+                    if (synchronousWindow) {
                         eventSnapshot = null;
                         long phaseStarted = System.nanoTime();
-                        CompletableFuture<Void> future = execution.execute(graph, trigger.getValue(), player, event, eventVars,
-                            null, invocationId);
+                        CompletableFuture<Void> future = execution.executeSource(graph, trigger.getValue(), player, event, eventVars,
+                            null, invocationId, RuntimeExecutionContext.NO_DEADLINE);
+                        if (invocationObservation != null) {
+                            CompiledCoreFlowExecutionBridge.ExecutionObservation ownedObservation = invocationObservation;
+                            future.whenComplete((ignored, failure) -> ownedObservation.finishWithoutExecution(failure));
+                        }
                         completions.add(future);
                         TemporaryLifecycleDiagnostics.synchronousCancellationPrefix(System.nanoTime() - phaseStarted);
                         execution.observe(future, invocationId, "event:" + trigger.getKey());
@@ -318,16 +382,21 @@ public class TriggerDispatcher implements Listener {
                             eventSnapshot = execution.snapshotEvent(player, event, eventVars);
                         }
                         deferred.add(new DeferredInvocation(execution, graph, trigger.getValue(), player,
-                            eventSnapshot, invocationId, "event:" + trigger.getKey()));
+                            eventSnapshot, invocationId, "event:" + trigger.getKey(), invocationObservation));
                     }
                 } else {
+                    rejectObservation(event, entry, trigger, invocationId, "TRIGGER.EXECUTOR_UNAVAILABLE", "compiled-executor-unavailable");
                     TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, identity, "rejected",
                         "TRIGGER.EXECUTOR_UNAVAILABLE", "compiled-executor-unavailable");
                     CompiledTriggerExecution.warnInvocation("event|" + trigger.getKey() + "|TRIGGER.EXECUTOR_UNAVAILABLE",
                         "Event trigger invocation rejected correlationId=" + invocationId.canonicalText()
                             + " diagnosticCode=TRIGGER.EXECUTOR_UNAVAILABLE");
                 }
-            } catch (RuntimeException failure) {
+            } catch (RuntimeException | Error failure) {
+                rejectObservation(event, entry, trigger, invocationId, failureCode, failureReason);
+                if (invocationObservation != null) {
+                    invocationObservation.finishWithoutExecution(failure);
+                }
                 if (!ingressEmitted) {
                     TemporaryLifecycleDiagnostics.event("trigger_ingress", started, ingress);
                 }
@@ -340,27 +409,38 @@ public class TriggerDispatcher implements Listener {
         }
         if (!deferred.isEmpty()) {
             TemporaryLifecycleDiagnostics.deferredBatch();
-            CompletableFuture<Void> batch = new CompletableFuture<>();
-            completions.add(batch);
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            CompletableFuture<Void> batch = executor.runOnMain(plugin, true, cancelled -> {
                 List<CompletableFuture<Void>> results = new ArrayList<>();
                 for (DeferredInvocation invocation : deferred) {
+                    if (cancelled.getAsBoolean()) {
+                        invocation.rejectObservation(new CancellationException("Deferred Event Batch Was Cancelled"));
+                        continue;
+                    }
                     try {
-                        results.add(invocation.execute());
-                    } catch (RuntimeException failure) {
+                        results.add(invocation.executePhysically());
+                    } catch (RuntimeException | Error failure) {
+                        invocation.rejectObservation(failure);
                         results.add(CompletableFuture.failedFuture(failure));
                     }
                 }
-                CompletableFuture.allOf(results.toArray(CompletableFuture[]::new)).whenComplete((ignored, failure) -> {
-                    if (failure == null) {
-                        batch.complete(null);
-                    } else {
-                        batch.completeExceptionally(failure);
-                    }
-                });
+                return CompletableFuture.allOf(results.toArray(CompletableFuture[]::new));
+            });
+            completions.add(batch);
+            batch.whenComplete((ignored, failure) -> {
+                if (failure != null) {
+                    deferred.forEach(invocation -> invocation.rejectObservation(failure));
+                }
             });
         }
         return CompletableFuture.allOf(completions.toArray(CompletableFuture[]::new));
+    }
+
+    private void rejectObservation(Event event, TriggerEntry entry, Map.Entry<String, String> trigger,
+            CorrelationId invocationId, String code, String reason) {
+        EventObservation observation = eventObservations.get(event);
+        if (observation != null) {
+            observation.reject(entry, trigger.getKey(), trigger.getValue(), invocationId, code, reason);
+        }
     }
 
     private Map<String, Object> ingressIdentity(TriggerEntry entry, Map.Entry<String, String> trigger,
@@ -372,20 +452,21 @@ public class TriggerDispatcher implements Listener {
             "startNodeId", trigger.getValue(), "outcome", "matched");
     }
 
-    private boolean matchesAutomationBinding(TriggerEntry entry, FlowGraph graph, String startNodeId, Event event) {
-        if (graph == null || startNodeId == null || event == null || graph.getNodes() == null) {
+    private boolean matchesAutomationBinding(TriggerEntry entry, CoreGraphStorageBoundary.Decoded graph, String startNodeId, Event event) {
+        if (graph == null || startNodeId == null || event == null) {
             return true;
         }
-        FlowNode node = graph.getNodes().get(startNodeId);
-        if (node == null || node.getInputValues() == null) {
-            return true;
+        GraphNode node = graph.graphDocument().nodes().stream()
+            .filter(candidate -> candidate.instanceId().canonicalText().equals(startNodeId)).findFirst().orElse(null);
+        if (node == null) {
+            return false;
         }
         Method definitionGetter = entry.cachedDefinitionId;
         if (definitionGetter != null) {
             String selected = "";
             for (String pin : List.of("variable", "timer", "schedule")) {
-                if (node.getInputValues().containsKey(pin)) {
-                    selected = AutomationReferences.id(node.getInputValues().get(pin));
+                if (node.values().containsKey(PinId.of(pin))) {
+                    selected = AutomationReferences.id(inputValue(node, pin));
                     break;
                 }
             }
@@ -395,12 +476,21 @@ public class TriggerDispatcher implements Listener {
             }
         }
         Method eventTypeGetter = entry.cachedEventType;
-        Object selectedType = "event.schedule".equals(node.getType()) ? "fired" : node.getInputValues().get("event");
+        Object selectedType = "event.schedule".equals(node.definition().id().value()) ? "fired" : inputValue(node, "event");
         if (eventTypeGetter != null && selectedType != null && !selectedType.toString().isBlank()) {
             Object actual = invoke(eventTypeGetter, event);
             return actual != null && normalizedValue(selectedType).equals(normalizedValue(actual));
         }
         return true;
+    }
+
+    private Object inputValue(GraphNode node, String pin) {
+        var input = node.values().get(PinId.of(pin));
+        if (input == null) {
+            return null;
+        }
+        var value = input.value();
+        return value.locator() == null ? value.value() : value.locator();
     }
 
     private Object invoke(Method method, Object target) {
@@ -418,8 +508,8 @@ public class TriggerDispatcher implements Listener {
     public void registerBinding(String eventType, String flowId, String startNodeId) {
         TriggerEntry entry = resolveEntry(eventType);
         if (entry != null) {
-            if (storage != null) {
-                FlowGraph graph = storage.getGraph("flow", flowId);
+            if (storage != null && storage.hasCoreGraphAuthority()) {
+                CoreGraphStorageBoundary.Decoded graph = storage.getCoreGraph("flow", flowId).orElse(null);
                 if (graph == null) {
                     graphSnapshots.remove(flowId);
                     return;
@@ -438,7 +528,7 @@ public class TriggerDispatcher implements Listener {
         if (flowId == null || flowId.isBlank()) {
             return;
         }
-        FlowGraph graph = storage.getGraph("flow", flowId);
+        CoreGraphStorageBoundary.Decoded graph = storage.getCoreGraph("flow", flowId).orElse(null);
         if (graph == null) {
             graphSnapshots.remove(flowId);
             CompiledTriggerExecution execution = compiledExecution;
@@ -455,9 +545,9 @@ public class TriggerDispatcher implements Listener {
         }
     }
 
-    private boolean prepare(String flowId, FlowGraph graph, CompiledTriggerExecution execution) {
+    private boolean prepare(String flowId, CoreGraphStorageBoundary.Decoded graph, CompiledTriggerExecution execution) {
         try {
-            execution.prepare(graph);
+            execution.prepareSource(graph);
             return true;
         } catch (RuntimeException exception) {
             Log.warn("Rejected runtime flow " + flowId + ": " + exception.getMessage(), exception);
@@ -791,18 +881,104 @@ public class TriggerDispatcher implements Listener {
         }
     }
 
-    private record DeferredInvocation(CompiledTriggerExecution execution, FlowGraph graph, String startNodeId,
+    private record DeferredInvocation(CompiledTriggerExecution execution, CoreGraphStorageBoundary.Decoded graph, String startNodeId,
                                       Player player, CompiledRuntimeContextAdapter.Result snapshot, CorrelationId invocationId,
-                                      String source) {
+                                      String source, CompiledCoreFlowExecutionBridge.ExecutionObservation observation) {
         private CompletableFuture<Void> execute() {
             long phaseStarted = System.nanoTime();
-            CompletableFuture<Void> future = execution.executeDeferred(graph, startNodeId, player, snapshot, invocationId);
+            CompletableFuture<Void> future = execution.executeSourceDeferred(graph, startNodeId, player, snapshot, invocationId);
             future.whenComplete((ignored, failure) -> {
+                if (observation != null) {
+                    observation.finishWithoutExecution(failure);
+                }
                 long completed = System.nanoTime();
                 TemporaryLifecycleDiagnostics.deferredExecution(completed - phaseStarted);
             });
             execution.observe(future, invocationId, source);
             return future;
+        }
+
+        private CompletableFuture<Void> executePhysically() {
+            CompletableFuture<Void> logical = execute();
+            return observation == null ? logical : logical.handle((ignored, failure) -> failure)
+                .thenCombine(observation.completion(), (failure, result) -> failure).thenCompose(failure -> failure == null
+                    ? CompletableFuture.<Void>completedFuture(null) : CompletableFuture.<Void>failedFuture(failure)).toCompletableFuture();
+        }
+
+        private void rejectObservation(Throwable failure) {
+            if (observation != null) {
+                observation.finishWithoutExecution(failure);
+            }
+        }
+    }
+
+    public final class EventObservation implements AutoCloseable {
+        private final Event event;
+        private final List<CompletableFuture<Map<String, Object>>> invocations = new ArrayList<>();
+        private final List<CompletableFuture<Map<String, Object>>> dispatches = new ArrayList<>();
+        private final List<Map<String, Object>> rejections = new ArrayList<>();
+        private CompletionStage<Map<String, Object>> completion;
+
+        private EventObservation(Event event) {
+            this.event = event;
+        }
+
+        private synchronized void invocation(TriggerEntry entry, CoreGraphStorageBoundary.Decoded graph, String startNodeId,
+                CompiledCoreFlowExecutionBridge.ExecutionObservation observation) {
+            Map<String, Object> selected = Map.of("eventType", entry.eventType, "resourceType", graph.envelope().resourceType(),
+                "resourceId", graph.graphDocument().resource().id(), "revision", graph.envelope().assetRevision(), "checksum", graph.envelope().assetHash().canonicalText(),
+                "startNodeId", startNodeId);
+            invocations.add(observation.completion().thenApply(result -> {
+                Map<String, Object> value = new LinkedHashMap<>(result.canonicalValue());
+                value.putAll(selected);
+                return Map.copyOf(value);
+            }).toCompletableFuture());
+        }
+
+        private synchronized void dispatch(TriggerEntry entry, CompletableFuture<Void> execution) {
+            boolean rejected = rejections.stream().anyMatch(rejection -> entry.eventType.equals(rejection.get("eventType")));
+            dispatches.add(execution.handle((ignored, failure) -> {
+                Map<String, Object> value = new LinkedHashMap<>();
+                value.put("eventType", entry.eventType);
+                value.put("status", failure == null ? rejected ? "rejected" : "complete" : "failed");
+                if (failure != null) {
+                    value.put("failure", failure.getMessage() == null ? failure.getClass().getName() : failure.getMessage());
+                }
+                return Map.copyOf(value);
+            }));
+        }
+
+        private synchronized void reject(TriggerEntry entry, String flowId, String startNodeId,
+                CorrelationId invocationId, String code, String reason) {
+            rejections.add(Map.of("eventType", entry.eventType, "resourceType", "flow", "resourceId", flowId,
+                "startNodeId", startNodeId, "invocationId", invocationId.canonicalText(), "code", code, "reason", reason));
+        }
+
+        public synchronized CompletionStage<Map<String, Object>> completion() {
+            if (completion == null) {
+                throw new IllegalStateException("The Event Observation Must Be Sealed After Dispatch");
+            }
+            return completion;
+        }
+
+        @Override
+        public synchronized void close() {
+            if (completion != null) {
+                return;
+            }
+            eventObservations.remove(event, this);
+            List<CompletableFuture<Map<String, Object>>> executions = List.copyOf(invocations);
+            List<CompletableFuture<Map<String, Object>>> observedDispatches = List.copyOf(dispatches);
+            List<Map<String, Object>> rejected = List.copyOf(rejections);
+            List<CompletableFuture<?>> pending = new ArrayList<>(executions);
+            pending.addAll(observedDispatches);
+            completion = CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).thenApply(ignored -> Map.of(
+                "invocations", executions.stream().map(CompletableFuture::join).toList(),
+                "dispatches", observedDispatches.stream().map(CompletableFuture::join).toList(),
+                "rejections", rejected,
+                "physicalComplete", executions.stream().map(CompletableFuture::join)
+                    .allMatch(execution -> Boolean.TRUE.equals(execution.get("physicalComplete")))))
+                .minimalCompletionStage();
         }
     }
 }

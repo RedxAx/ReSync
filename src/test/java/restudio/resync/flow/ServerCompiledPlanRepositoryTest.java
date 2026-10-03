@@ -93,7 +93,7 @@ class ServerCompiledPlanRepositoryTest {
     }
 
     @Test
-    void supportedEntrySharesItsResidentTemplateAndClosure() {
+    void dataDependenciesPreserveRunnableEntriesAndResidentTemplates() {
         TestAuthority authority = new TestAuthority();
         GraphDocument graph = graph(resource("flow", "connected-entry"), 1, List.of());
         authority.put(graph);
@@ -131,12 +131,14 @@ class ServerCompiledPlanRepositoryTest {
             assertSame(first.executionTemplate().orElseThrow(), second.executionTemplate().orElseThrow());
             assertSame(first.functionClosure(), second.functionClosure());
         }
-        assertEquals(Set.of(START), templates.keySet());
-        assertThrows(CompiledPlanAdmissionException.class, () -> repository.acquire(target(graph, ALTERNATE)));
+        assertEquals(Set.of(START, ALTERNATE), templates.keySet());
+        try (ServerCompiledPlanLease dependent = (ServerCompiledPlanLease) repository.acquire(target(graph, ALTERNATE))) {
+            assertSame(templates.get(ALTERNATE), dependent.executionTemplate().orElseThrow());
+        }
     }
 
     @Test
-    void functionSourcesRemainResidentWithoutGenericExecutionTemplates() {
+    void functionSourcesWithoutAnAdmittedBoundaryRemainUnavailableForExecution() {
         TestAuthority authority = new TestAuthority();
         FunctionSourceDocument function = function(resource("function", "typed-boundary"), 1, List.of());
         authority.put(function);

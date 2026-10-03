@@ -69,6 +69,45 @@ public final class CatalogCanonicalizer {
         return canonical(canonicalContributionObject(Objects.requireNonNull(contribution, "contribution")));
     }
 
+    static StartupContracts startupContracts(CatalogContribution contribution) {
+        Map<Object, InspectorDescriptor> inspectors = inspectorIndex(contribution);
+        List<Object> definitions = contribution.definitions().stream()
+            .map(value -> prepared(canonicalNodeObject(value, findInspector(value, inspectors)))).map(value -> (Object) value).toList();
+        List<Object> types = fragments(contribution.types(), CatalogCanonicalizer::canonicalTypeObject);
+        List<Object> conversions = fragments(contribution.conversions(), CatalogCanonicalizer::canonicalConversionObject);
+        List<Object> categories = fragments(contribution.categories(), CatalogCanonicalizer::canonicalCategoryObject);
+        List<Object> optionSources = fragments(contribution.optionSources(), CatalogCanonicalizer::canonicalOptionSourceObject);
+        List<Object> validators = fragments(contribution.validators(), CatalogCanonicalizer::canonicalValidationRuleObject);
+        List<Object> editors = fragments(contribution.editors(), CatalogCanonicalizer::canonicalEditorObject);
+        List<Object> previews = fragments(contribution.previews(), CatalogCanonicalizer::canonicalPreviewObject);
+        List<Object> capabilities = fragments(contribution.capabilities(), CatalogCanonicalizer::canonicalCapabilityObject);
+        Map<String, Object> projection = canonicalContributionObject(contribution, false, definitions, types, conversions,
+            categories, optionSources, validators, editors, previews, capabilities);
+        CanonicalJson.CanonicalFragment content = prepared(projection);
+        List<Object> runtimeRequirements = contribution.runtimeRequirements().stream()
+            .map(value -> prepared(owned(contribution.ownerId(), canonicalRuntimeObject(value)))).map(value -> (Object) value).toList();
+        Map<String, Object> contracts = new LinkedHashMap<>();
+        contracts.put("contribution", content);
+        contracts.put("runtimeRequirements", ordered(runtimeRequirements));
+        contracts.put("inspectors", ordered(contribution.inspectors().stream()
+            .map(value -> object("owner", value.owner().canonicalText(), "layout", canonicalInspectorLayout(value)))
+            .map(value -> (Object) value).toList()));
+        contracts.put("inspectorReferences", ordered(contribution.definitions().stream()
+            .map(value -> object("id", value.id().canonicalText(), "inspector", value.inspector() == null
+                ? null : value.inspector().canonicalText())).map(value -> (Object) value).toList()));
+        contracts.put("provenanceErrors", contribution.provenanceErrors());
+        String identity = CanonicalJson.sha256("catalog-startup-contracts.v2", contracts, CATALOG_LIMITS);
+        return new StartupContracts(identity, projection, content, runtimeRequirements);
+    }
+
+    private static <T> List<Object> fragments(List<T> values, Function<T, Object> projection) {
+        return values.stream().map(value -> prepared(projection.apply(value))).map(value -> (Object) value).toList();
+    }
+
+    record StartupContracts(String identity, Map<String, Object> projection, CanonicalJson.CanonicalFragment content,
+                            List<Object> runtimeRequirements) {
+    }
+
     public static String canonicalSnapshotContent(Collection<CatalogContribution> contributions, Set<? extends ContractRef<?>> minimumClientCapabilities) {
         return canonicalSnapshotContent(new CatalogVersion(1, 0), contributions, minimumClientCapabilities);
     }
@@ -143,6 +182,10 @@ public final class CatalogCanonicalizer {
 
     public static ContentHash checksumForCanonicalContent(String canonicalContent) {
         Object parsed = CanonicalJson.parse(CatalogIds.required(canonicalContent, "canonicalContent"), CATALOG_LIMITS);
+        return checksumForParsedContent(parsed);
+    }
+
+    static ContentHash checksumForParsedContent(Object parsed) {
         if (parsed instanceof Map<?, ?> map && map.containsKey("contentChecksum")) {
             Map<String, Object> base = new LinkedHashMap<>();
             for (Map.Entry<?, ?> entry : map.entrySet()) {
@@ -411,68 +454,19 @@ public final class CatalogCanonicalizer {
         List<Object> provenance = new ArrayList<>();
         for (CatalogContribution contribution : values) {
             OwnerId owner = contribution.ownerId();
-            Map<Object, InspectorDescriptor> inspectors = inspectorIndex(contribution);
-            List<Object> contributionDefinitions = new ArrayList<>(contribution.definitions().size());
-            for (CatalogNodeDescriptor value : contribution.definitions()) {
-                CanonicalJson.CanonicalFragment node = prepared(canonicalNodeObject(value, findInspector(value, inspectors)));
-                contributionDefinitions.add(node);
-                definitions.add(ownedPrepared(owner, node));
-            }
-            List<Object> contributionTypes = new ArrayList<>(contribution.types().size());
-            for (TypeDescriptor value : contribution.types()) {
-                CanonicalJson.CanonicalFragment type = prepared(canonicalTypeObject(value));
-                contributionTypes.add(type);
-                types.add(ownedPrepared(owner, type));
-            }
-            List<Object> contributionConversions = new ArrayList<>(contribution.conversions().size());
-            for (ConversionGraph.ConversionEdge value : contribution.conversions()) {
-                CanonicalJson.CanonicalFragment conversion = prepared(canonicalConversionObject(value));
-                contributionConversions.add(conversion);
-                conversions.add(ownedPrepared(owner, conversion));
-            }
-            List<Object> contributionCategories = new ArrayList<>(contribution.categories().size());
-            for (CatalogCategoryDescriptor value : contribution.categories()) {
-                CanonicalJson.CanonicalFragment category = prepared(canonicalCategoryObject(value));
-                contributionCategories.add(category);
-                categories.add(ownedPrepared(owner, category));
-            }
-            List<Object> contributionOptionSources = new ArrayList<>(contribution.optionSources().size());
-            for (InspectorOptionSource value : contribution.optionSources()) {
-                CanonicalJson.CanonicalFragment optionSource = prepared(canonicalOptionSourceObject(value));
-                contributionOptionSources.add(optionSource);
-                optionSources.add(ownedPrepared(owner, optionSource));
-            }
-            List<Object> contributionValidators = new ArrayList<>(contribution.validators().size());
-            for (InspectorValidationRule value : contribution.validators()) {
-                CanonicalJson.CanonicalFragment validator = prepared(canonicalValidationRuleObject(value));
-                contributionValidators.add(validator);
-                validators.add(ownedPrepared(owner, validator));
-            }
-            List<Object> contributionEditors = new ArrayList<>(contribution.editors().size());
-            for (InspectorCapability value : contribution.editors()) {
-                CanonicalJson.CanonicalFragment editor = prepared(canonicalEditorObject(value));
-                contributionEditors.add(editor);
-                editors.add(ownedPrepared(owner, editor));
-            }
-            List<Object> contributionPreviews = new ArrayList<>(contribution.previews().size());
-            for (InspectorCapability value : contribution.previews()) {
-                CanonicalJson.CanonicalFragment preview = prepared(canonicalPreviewObject(value));
-                contributionPreviews.add(preview);
-                previews.add(ownedPrepared(owner, preview));
-            }
-            List<Object> contributionCapabilities = new ArrayList<>(contribution.capabilities().size());
-            for (CatalogCapabilityDescriptor value : contribution.capabilities()) {
-                CanonicalJson.CanonicalFragment capability = prepared(canonicalCapabilityObject(value));
-                contributionCapabilities.add(capability);
-                capabilities.add(ownedPrepared(owner, capability));
-            }
-            for (RuntimeOperationDescriptor value : contribution.runtimeRequirements()) {
-                runtimeRequirements.add(prepared(owned(owner, canonicalRuntimeObject(value))));
-            }
-            provenance.add(canonicalProvenanceObject(contribution.provenance()));
-            contributionObjects.add(prepared(canonicalContributionObject(contribution, false, contributionDefinitions, contributionTypes,
-                contributionConversions, contributionCategories, contributionOptionSources, contributionValidators,
-                contributionEditors, contributionPreviews, contributionCapabilities)));
+            StartupContracts resident = contribution.startupData();
+            addOwnedProjection(definitions, owner, resident.projection(), "definitions");
+            addOwnedProjection(types, owner, resident.projection(), "types");
+            addOwnedProjection(conversions, owner, resident.projection(), "conversions");
+            addOwnedProjection(categories, owner, resident.projection(), "categories");
+            addOwnedProjection(optionSources, owner, resident.projection(), "optionSources");
+            addOwnedProjection(validators, owner, resident.projection(), "validators");
+            addOwnedProjection(editors, owner, resident.projection(), "editors");
+            addOwnedProjection(previews, owner, resident.projection(), "previews");
+            addOwnedProjection(capabilities, owner, resident.projection(), "capabilities");
+            runtimeRequirements.addAll(resident.runtimeRequirements());
+            provenance.add(resident.projection().get("provenance"));
+            contributionObjects.add(resident.content());
         }
         List<Object> diagnosticObjects = diagnostics == null ? List.of() : diagnostics.stream().filter(Objects::nonNull).map(value -> (Object) canonicalValue(value.toMap())).toList();
         return object(
@@ -493,6 +487,12 @@ public final class CatalogCanonicalizer {
             "runtimeRequirements", sorted(runtimeRequirements),
             "provenance", ordered(provenance),
             "diagnostics", ordered(diagnosticObjects));
+    }
+
+    private static void addOwnedProjection(List<Object> target, OwnerId owner, Map<String, Object> projection, String field) {
+        for (Object descriptor : (List<?>) projection.get(field)) {
+            target.add(ownedPrepared(owner, (CanonicalJson.CanonicalFragment) descriptor));
+        }
     }
 
     private static Map<String, Object> canonicalContributionObject(CatalogContribution contribution) {

@@ -14,6 +14,7 @@ import restudio.resync.flow.type.TypeReference;
 import restudio.resync.flow.type.TypedValue;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +58,40 @@ class RuntimeBindingRegistryTest {
         assertEquals(before.bindingManifestHash(), after.bindingManifestHash());
         assertEquals(firstProvider, after.binding(new RuntimeBindingKey(capability, operation)).orElseThrow().provider());
         assertTrue(after.provider(secondProvider).isEmpty());
+    }
+
+    @Test
+    void mutatedStagedMetadataIsRejectedWithoutChangingTheActiveSnapshot() {
+        RuntimeBindingRegistry registry = RuntimeTestSupport.registry();
+        ContractRef<ProviderId> installedProvider = providerRef("installed");
+        RuntimeOperationDescriptor installedOperation = operation(capability("installed-capability"), operationId("installed-operation"), "failure");
+        RuntimeBinding installed = RuntimeBinding.available(installedOperation, installedProvider, "1.0.0", completedHandler());
+        RuntimeRegistrySnapshot before = registry.activate(provider(installedProvider), List.of(installed));
+        ContractRef<ProviderId> candidateProvider = providerRef("candidate");
+        RuntimeOperationDescriptor candidateOperation = operation(capability("candidate-capability"), operationId("candidate-operation"), "failure");
+        MutableDecimal threshold = new MutableDecimal("1");
+        RuntimeBinding candidate = RuntimeBinding.available(candidateOperation, candidateProvider, "1.0.0", completedHandler(),
+            Map.of("futureExecution", Map.of("thresholds", List.of(threshold))));
+
+        try (RuntimeBindingRegistry.StagedProvider staged = registry.stage(provider(candidateProvider), List.of(candidate))) {
+            ContentHash admitted = staged.bindings().getFirst().executionFingerprint();
+            threshold.replace("2");
+            assertNotEquals(admitted, staged.bindings().getFirst().descriptor().executionFingerprint());
+
+            assertThrows(IllegalArgumentException.class, () -> registry.activate(staged));
+
+            RuntimeRegistrySnapshot after = registry.snapshot();
+            assertEquals(before.generation(), after.generation());
+            assertEquals(before.bindingManifestHash(), after.bindingManifestHash());
+            assertEquals(before.providers(), after.providers());
+            assertEquals(before.bindings(), after.bindings());
+            assertTrue(after.provider(candidateProvider).isEmpty());
+            assertTrue(after.binding(candidateOperation.key()).isEmpty());
+            try (RuntimePlanLease lease = registry.acquire(input(installedOperation.key(), installed.executionFingerprint()))) {
+                assertEquals(RuntimeResult.Status.SUCCESS,
+                    lease.execute(installedOperation.key(), Map.of(), "preserved-binding").toCompletableFuture().join().status());
+            }
+        }
     }
 
     @Test
@@ -402,6 +437,29 @@ class RuntimeBindingRegistryTest {
             Thread.sleep(10);
         }
         assertTrue(condition.getAsBoolean());
+    }
+
+    private static final class MutableDecimal extends BigDecimal {
+        private BigDecimal current;
+
+        private MutableDecimal(String value) {
+            super(value);
+            current = new BigDecimal(value);
+        }
+
+        private void replace(String value) {
+            current = new BigDecimal(value);
+        }
+
+        @Override
+        public int signum() {
+            return current == null ? super.signum() : current.signum();
+        }
+
+        @Override
+        public BigDecimal stripTrailingZeros() {
+            return current == null ? super.stripTrailingZeros() : current.stripTrailingZeros();
+        }
     }
 
     @FunctionalInterface

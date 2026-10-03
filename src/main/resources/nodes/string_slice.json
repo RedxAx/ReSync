@@ -18,9 +18,9 @@
     "handler": "GenericStringHandler",
     "handlerConfig": {"operation": "substring"},
     "inputs": [
-      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to slice. Missing or null input is treated as empty text; values longer than 65536 characters fail before output."},
-      {"id": "start", "displayName": "Start", "name": "start", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "constraints": {"min": 0, "max": 65536}, "description": "Zero-based character position where the slice starts. Missing or null input uses zero; values outside 0 through 65536 fail before output."},
-      {"id": "length", "displayName": "Length", "name": "length", "pinType": "DATA", "dataType": "number", "optional": true, "constraints": {"min": 0, "max": 65536}, "description": "Maximum number of characters to return. Omit this input to keep the remaining text; values outside 0 through 65536, including negative values, fail before output."}
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to slice. Missing or null input is treated as empty text. Values longer than 65536 characters fail before output."},
+      {"id": "start", "displayName": "Start", "name": "start", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "constraints": {"min": 0, "max": 65536}, "description": "Zero-based character position where the slice starts. Missing or null input uses zero. Values outside 0 through 65536 fail before output."},
+      {"id": "length", "displayName": "Length", "name": "length", "pinType": "DATA", "dataType": "number", "optional": true, "constraints": {"min": 0, "max": 65536}, "description": "Maximum number of characters to return. Omit this input to keep the remaining text. Values outside 0 through 65536, including negative values, fail before output."}
     ],
     "outputs": [
       {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns the selected text, limited by the value length and optional length input."}
@@ -45,8 +45,8 @@
     "handler": "GenericStringHandler",
     "handlerConfig": {"operation": "split"},
     "inputs": [
-      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to split. Missing or null input is treated as empty text; values longer than 65536 characters fail before output."},
-      {"id": "delimiter", "displayName": "Delimiter", "name": "delimiter", "pinType": "DATA", "dataType": "string", "defaultValue": ",", "constraints": {"min": 0, "max": 65536}, "description": "Literal text that separates parts. Missing or null input uses a comma; values longer than 65536 characters fail before output."}
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to split. Missing or null input is treated as empty text. Values longer than 65536 characters fail before output."},
+      {"id": "delimiter", "displayName": "Delimiter", "name": "delimiter", "pinType": "DATA", "dataType": "string", "defaultValue": ",", "constraints": {"min": 0, "max": 65536}, "description": "Literal text that separates parts. Missing or null input uses a comma. Values longer than 65536 characters fail before output."}
     ],
     "outputs": [
       {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "list<string>", "description": "Returns the parts in order after splitting with the literal delimiter, including empty parts."}

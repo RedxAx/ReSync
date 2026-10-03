@@ -1,6 +1,7 @@
 package restudio.resync.flow;
 
 import org.bukkit.entity.Player;
+import org.bukkit.entity.EntityType;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import restudio.flow.data.FlowResourceReference;
+import restudio.flow.data.FlowNpcHandle;
 import restudio.resync.flow.identity.ServerId;
 import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.identity.ContractRef;
@@ -21,6 +23,7 @@ import restudio.resync.flow.identity.ResourceTypeId;
 import restudio.resync.flow.type.TypeExpr;
 import restudio.resync.flow.type.TypeReference;
 import restudio.resync.flow.type.TypedValue;
+import restudio.resync.runtime.event.ReSyncNpcInteractEvent;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -253,6 +256,36 @@ class CompiledRuntimeContextAdapterTest {
         assertEquals(new BigDecimal("1.0"), ((Map<?, ?>) result.context().variables().get("event.vector").value()).get("x"));
         assertEquals(SERVER.canonicalText(), ((Map<?, ?>) result.context().variables().get("event.entity").value()).get("serverId"));
         assertEquals(player, CompiledRuntimeValueCodec.decode(SERVER, result.context().variables().get("event.entity")));
+    }
+
+    @Test
+    void npcHookContextRetainsEntityAndPacketHandlesAsImmutableTypedSnapshots() {
+        var world = MockBukkit.getMock().addSimpleWorld("npc-context");
+        Player player = MockBukkit.getMock().addPlayer();
+        player.teleport(new Location(world, 0, 65, 0));
+        var npc = world.spawnEntity(new Location(world, 3, 65, 2), EntityType.VILLAGER);
+        for (boolean packet : List.of(false, true)) {
+            FlowNpcHandle handle = new FlowNpcHandle("qa_npc", packet ? "" : npc.getUniqueId().toString(),
+                packet, true, world.getName(), 3, 65, 2, 90, 15);
+            Map<String, Object> variables = new LinkedHashMap<>();
+            variables.put("npcId", "qa_npc");
+            variables.put("hook", "rightClickAction");
+            variables.put("event.player", player);
+            variables.put("event.entity", packet ? null : npc);
+            variables.put("event.location", npc.getLocation());
+            variables.put("handle", handle);
+            variables.put("event.handle", handle);
+            ReSyncNpcInteractEvent event = new ReSyncNpcInteractEvent(handle, player, packet ? null : npc, npc.getLocation(), false, false);
+            CompiledRuntimeContextAdapter.Result result = CompiledRuntimeContextAdapter.adapt(SERVER, player, event, variables);
+            variables.clear();
+
+            assertTrue(result.accepted(), result.failure());
+            assertEquals(ReSyncNpcInteractEvent.class.getName(), result.context().event().type());
+            TypeExpr type = TypeExpr.named(TypeReference.of("builtin", "npc_handle"));
+            assertEquals(type, result.context().variables().get("handle").type());
+            assertEquals(handle, CompiledRuntimeValueCodec.decode(SERVER, result.context().variables().get("handle")));
+            assertEquals(handle, CompiledRuntimeValueCodec.decode(SERVER, result.context().variables().get("event.handle")));
+        }
     }
 
     @Test

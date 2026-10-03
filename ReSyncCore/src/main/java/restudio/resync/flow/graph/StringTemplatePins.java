@@ -20,14 +20,24 @@ public final class StringTemplatePins {
     }
 
     public static Map<PinId, TypeExpr> derive(GraphNode node, CatalogNodeDescriptor definition) {
-        Map<PinId, TypeExpr> pins = new LinkedHashMap<>();
+        Map<PinId, TypeExpr> inputs = new LinkedHashMap<>();
         Set<PinId> reserved = new LinkedHashSet<>();
-        definition.pins().forEach(pin -> reserved.add(pin.id()));
-        for (CatalogNodeDescriptor.Pin pin : definition.pins()) {
-            if (pin.direction() != CatalogNodeDescriptor.Direction.INPUT || !STRING.equals(pin.type())) {
+        definition.pins().forEach(pin -> {
+            reserved.add(pin.id());
+            if (pin.direction() == CatalogNodeDescriptor.Direction.INPUT) {
+                inputs.put(pin.id(), pin.type());
+            }
+        });
+        return derive(node, inputs, reserved);
+    }
+
+    public static Map<PinId, TypeExpr> derive(GraphNode node, Map<PinId, TypeExpr> inputs, Set<PinId> reserved) {
+        Map<PinId, TypeExpr> pins = new LinkedHashMap<>();
+        for (Map.Entry<PinId, TypeExpr> pin : inputs.entrySet()) {
+            if (!STRING.equals(pin.getValue())) {
                 continue;
             }
-            PinValue stored = node.values().get(pin.id());
+            PinValue stored = node.values().get(pin.getKey());
             if (stored == null || stored.value().state() != TypedValue.State.VALUE
                 || !(stored.value().value() instanceof String value)) {
                 continue;
@@ -55,15 +65,18 @@ public final class StringTemplatePins {
         List<Part> parts = new ArrayList<>();
         StringBuilder literal = new StringBuilder();
         int index = 0;
+        int escaped = 0;
         while (index < text.length()) {
             char current = text.charAt(index);
             if (current == '{' && index + 1 < text.length() && text.charAt(index + 1) == '{') {
                 literal.append('{');
+                escaped++;
                 index += 2;
                 continue;
             }
-            if (current == '}' && index + 1 < text.length() && text.charAt(index + 1) == '}') {
+            if (current == '}' && escaped > 0 && index + 1 < text.length() && text.charAt(index + 1) == '}') {
                 literal.append('}');
+                escaped--;
                 index += 2;
                 continue;
             }

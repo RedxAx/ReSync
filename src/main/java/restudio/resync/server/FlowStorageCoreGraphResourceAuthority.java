@@ -210,6 +210,30 @@ public final class FlowStorageCoreGraphResourceAuthority implements CoreGraphRes
     }
 
     @Override
+    public CoreGraphStorageBoundary.Decoded saveCatalogProjection(ServerResourceLocator resource,
+            CoreGraphStorageBoundary.Decoded candidate, UUID mutationId, long expectedRevision,
+            ContentHash payloadChecksum, CatalogProjection projection) {
+        requireResource(resource);
+        Objects.requireNonNull(candidate, "Canonical Core Graph Envelope Is Required");
+        Objects.requireNonNull(mutationId, "Core Graph Mutation ID Is Required");
+        requireRevision(expectedRevision);
+        Objects.requireNonNull(payloadChecksum, "Core Graph Payload Checksum Is Required");
+        Objects.requireNonNull(projection, "Catalog Projection Admission Is Required");
+        CoreGraphStorageBoundary.Decoded requested = canonicalDecoded(resource, candidate);
+        if (!payloadChecksum.equals(requested.envelope().assetHash())) {
+            throw new IllegalArgumentException("Core Graph Payload Checksum Does Not Match The Canonical Envelope");
+        }
+        requireSaveEnvelope(resource, requested, mutationId, expectedRevision);
+        CoreGraphMutationValidator.AdmissionProof proof = mutationValidator.admit(resource, requested);
+        CoreGraphStorageBoundary.Decoded saved = saveDecoded(resource, requested,
+            requested.envelope().assetActivationState(), mutationId, expectedRevision, proof, projection);
+        if (!requested.envelope().assetHash().equals(saved.envelope().assetHash())) {
+            throw new IllegalStateException("Core Graph Save Result Does Not Match The Canonical Envelope");
+        }
+        return saved;
+    }
+
+    @Override
     public boolean supportsAggregateCreate() {
         return true;
     }
@@ -362,8 +386,15 @@ public final class FlowStorageCoreGraphResourceAuthority implements CoreGraphRes
                                                          ResourceActivationState activationState, UUID mutationId,
                                                          long expectedRevision,
                                                          CoreGraphMutationValidator.AdmissionProof proof) {
+        return saveDecoded(resource, requested, activationState, mutationId, expectedRevision, proof, null);
+    }
+
+    private CoreGraphStorageBoundary.Decoded saveDecoded(ServerResourceLocator resource,
+            CoreGraphStorageBoundary.Decoded requested, ResourceActivationState activationState,
+            UUID mutationId, long expectedRevision, CoreGraphMutationValidator.AdmissionProof proof,
+            CatalogProjection projection) {
         Object payload = requested.payload();
-        FlowStorage.RuntimeObservation validation = validateOptions(resource, requested, proof, mutationId);
+        FlowStorage.RuntimeObservation validation = validateOptions(resource, requested, proof, mutationId, projection, expectedRevision);
         CoreGraphStorageBoundary.Decoded saved = mutationValidator.executeCurrent(proof, resource, requested, () -> {
             if (payload instanceof GraphDocument graph) {
                 return storage.saveCoreGraph(graph, activationState, mutationId, expectedRevision, validation);
@@ -396,6 +427,15 @@ public final class FlowStorageCoreGraphResourceAuthority implements CoreGraphRes
                                                             CoreGraphStorageBoundary.Decoded requested,
                                                             CoreGraphMutationValidator.AdmissionProof proof,
                                                             UUID mutationId) {
+        return validateOptions(resource, requested, proof, mutationId, null, 0L);
+    }
+
+    private FlowStorage.RuntimeObservation validateOptions(ServerResourceLocator resource,
+            CoreGraphStorageBoundary.Decoded requested, CoreGraphMutationValidator.AdmissionProof proof,
+            UUID mutationId, CatalogProjection projection, long expectedRevision) {
+        if (projection != null) {
+            projection.requireCurrent(this, resource, requested, mutationId, expectedRevision, requested.envelope().assetHash());
+        }
         FlowStorage.RuntimeObservation observation = storage.observeRuntime()
             .orElseThrow(() -> new IllegalStateException("Asset state is unavailable for Core graph validation"));
         AssetTransactionCoordinator.AssetKey key = new AssetTransactionCoordinator.AssetKey(
@@ -403,7 +443,7 @@ public final class FlowStorageCoreGraphResourceAuthority implements CoreGraphRes
         boolean replay = observation.coordinator().committedAsset(key)
             .filter(asset -> asset.state() instanceof AssetTransactionCoordinator.Live)
             .map(asset -> mutationId.toString().equals(asset.mutationId().value())).orElse(false);
-        if (!replay && optionCatalogs != null && !trustedCatalogProjection(resource, requested, mutationId)) {
+        if (!replay && projection == null && optionCatalogs != null && !trustedCatalogProjection(resource, requested, mutationId)) {
             Objects.requireNonNull(proof, "Core graph option validation requires catalog admission");
             OptionCatalogRegistry catalogs = Objects.requireNonNull(optionCatalogs.get(),
                 "Core graph option catalogs are unavailable");

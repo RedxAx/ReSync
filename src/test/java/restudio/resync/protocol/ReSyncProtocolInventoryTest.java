@@ -32,8 +32,9 @@ class ReSyncProtocolInventoryTest {
         assertEquals("generic-envelope", envelope.get("authority"));
         assertEquals("supported", envelope.get("disposition"));
         assertEquals("server-durable-when-advertised", envelope.get("resourceAuthority"));
-        assertEquals(Map.of("generation", 1, "minor", 2), envelope.get("resourceContractVersion"));
-        assertEquals(List.of("resource_activation", "resource_create_presentation"),
+        assertEquals(Map.of("generation", ReSyncProtocolContract.GENERIC_RESOURCE_CONTRACT_VERSION.generation(),
+            "minor", ReSyncProtocolContract.GENERIC_RESOURCE_CONTRACT_VERSION.minor()), envelope.get("resourceContractVersion"));
+        assertEquals(List.of("option_queries", "resource_activation", "resource_create_presentation"),
             envelope.get("resourceCapabilities"));
         assertEquals(Map.of("read", "compatibility-projection", "save", "blocked", "delete", "blocked"),
             envelope.get("legacyResourceRoutes"));

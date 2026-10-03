@@ -7,17 +7,24 @@ import restudio.resync.flow.function.FunctionLocator;
 import restudio.resync.flow.function.FunctionRevision;
 import restudio.resync.flow.function.FunctionSignature;
 import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.graph.FunctionBinding;
+import restudio.resync.flow.graph.FunctionParameter;
 import restudio.resync.flow.graph.GraphDocument;
 import restudio.resync.flow.graph.OpaqueData;
 import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.FunctionParameterId;
 import restudio.resync.flow.identity.OwnerId;
 import restudio.resync.flow.identity.ResourceTypeId;
 import restudio.resync.flow.identity.ServerId;
 import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.protocol.ResourceActivationState;
+import restudio.resync.flow.type.TypeExpr;
+import restudio.resync.flow.type.TypeReference;
+import restudio.resync.flow.type.TypedValue;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -111,6 +118,49 @@ class CoreCatalogCompatibilityRebindTest {
         assertThrows(IllegalArgumentException.class, () -> CoreCatalogCompatibilityRebind.project(source,
             new CatalogBinding(53L, new ContentHash("e".repeat(64)), new ContentHash("f".repeat(64))),
             REBIND_MUTATION));
+    }
+
+    @Test
+    void exactDependencyProjectionPreservesParametersDefaultsAndOpaqueValues() {
+        ServerResourceLocator resource = resource("flow", "parent");
+        ServerResourceLocator child = resource("function", "child");
+        TypeExpr text = TypeExpr.named(new TypeReference("builtin", "text"));
+        FunctionParameter parameter = new FunctionParameter(new FunctionParameterId(UUID.randomUUID()), "message", text,
+            "Provides the message passed to this function.", TypedValue.value(text, "default"));
+        FunctionBinding dependency = new FunctionBinding(child, 5L, List.of(parameter), List.of(),
+            OpaqueData.of(Map.of("catalogRevision", 5L, "preserve", List.of("original", true))));
+        GraphDocument graph = new GraphDocument(new CatalogVersion(1, 0), resource, 1L, SOURCE, Set.of(), List.of(),
+            List.of(), List.of(), List.of(), List.of(dependency), OpaqueData.of(Map.of("body", "unchanged")));
+        CoreGraphStorageBoundary.Decoded source = decoded(graph, "flow", SOURCE_MUTATION);
+        Map<ServerResourceLocator, Long> revisions = Map.of(child, 6L);
+        UUID mutation = CoreCatalogCompatibilityRebind.mutationId(resource, source, TARGET, revisions);
+        CoreGraphStorageBoundary.Decoded projected = CoreCatalogCompatibilityRebind.project(source, TARGET, mutation, revisions);
+        FunctionBinding pin = projected.graphDocument().functions().getFirst();
+
+        assertEquals(6L, pin.revision());
+        assertEquals(source.graphDocument().functions().getFirst().inputs(), pin.inputs());
+        assertEquals(source.graphDocument().functions().getFirst().outputs(), pin.outputs());
+        assertEquals(source.graphDocument().functions().getFirst().unknown().get("preserve"), pin.unknown().get("preserve"));
+        assertEquals("6", pin.unknown().get("catalogRevision").toString());
+        assertEquals(source.graphDocument().unknown(), projected.graphDocument().unknown());
+        assertNotEquals(CoreCatalogCompatibilityRebind.mutationId(resource, source, TARGET), mutation);
+        assertThrows(IllegalArgumentException.class, () -> CoreCatalogCompatibilityRebind.project(source, TARGET, mutation, Map.of(child, 4L)));
+        assertThrows(IllegalArgumentException.class, () -> CoreCatalogCompatibilityRebind.project(source, TARGET, mutation,
+            Map.of(resource("function", "undeclared"), 6L)));
+    }
+
+    @Test
+    void aFractionalRevisionCannotBeUsedAsCatalogEvidence() {
+        ServerResourceLocator resource = resource("flow", "parent");
+        ServerResourceLocator child = resource("function", "child");
+        FunctionBinding dependency = new FunctionBinding(child, 5L, List.of(), List.of(),
+            OpaqueData.of(Map.of("catalogRevision", new BigDecimal("5.5"))));
+        GraphDocument graph = new GraphDocument(new CatalogVersion(1, 0), resource, 1L, SOURCE, Set.of(), List.of(),
+            List.of(), List.of(), List.of(), List.of(dependency), OpaqueData.empty());
+        CoreGraphStorageBoundary.Decoded source = decoded(graph, "flow", SOURCE_MUTATION);
+
+        assertThrows(IllegalArgumentException.class, () -> CoreCatalogCompatibilityRebind.project(source, TARGET,
+            REBIND_MUTATION, Map.of(child, 6L)));
     }
 
     private static CoreGraphStorageBoundary.Decoded decoded(GraphDocument graph, String type, UUID mutationId) {

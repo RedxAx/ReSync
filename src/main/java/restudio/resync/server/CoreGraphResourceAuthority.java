@@ -74,6 +74,19 @@ public interface CoreGraphResourceAuthority {
     CoreGraphStorageBoundary.Decoded save(ServerResourceLocator resource, byte[] canonicalEnvelope,
                                           UUID mutationId, long expectedRevision, ContentHash payloadChecksum);
 
+    default CoreGraphStorageBoundary.Decoded saveCatalogProjection(ServerResourceLocator resource,
+            CoreGraphStorageBoundary.Decoded candidate, UUID mutationId, long expectedRevision,
+            ContentHash payloadChecksum, CatalogProjection projection) {
+        Objects.requireNonNull(projection, "Catalog Projection Admission Is Required")
+            .requireCurrent(this, resource, candidate, mutationId, expectedRevision, payloadChecksum);
+        return save(resource, candidate, mutationId, expectedRevision, payloadChecksum);
+    }
+
+    sealed interface CatalogProjection permits SqliteProtocolResourceMutationAuthority.CatalogProjection {
+        void requireCurrent(CoreGraphResourceAuthority authority, ServerResourceLocator resource,
+            CoreGraphStorageBoundary.Decoded candidate, UUID mutationId, long expectedRevision, ContentHash payloadChecksum);
+    }
+
     default boolean supportsAggregateCreate() {
         return false;
     }

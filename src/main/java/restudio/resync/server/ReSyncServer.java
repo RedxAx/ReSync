@@ -25,6 +25,7 @@ import restudio.resync.core.Session;
 import restudio.resync.core.SessionManager;
 import restudio.resync.customcontent.CustomBlocksPersistenceParticipant;
 import restudio.resync.customcontent.CustomContentStorage;
+import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.dialog.DialogService;
 import restudio.resync.flow.FlowExecutor;
@@ -85,6 +86,9 @@ import restudio.resync.migration.ProductionAuthorityBundlePersistenceParticipant
 import restudio.resync.migration.ProductionAuthorityTrustAnchor;
 import restudio.resync.migration.ReplacementActivationRecord;
 import restudio.resync.migration.ReSyncPersistenceCoordinator;
+import restudio.resync.migration.RebindablePersistenceParticipant;
+import restudio.resync.migration.FreshInstallInputs;
+import restudio.resync.migration.ScopedPersistenceParticipant;
 import restudio.resync.migration.PersistenceShutdownStatus;
 import restudio.resync.memory.MemoryMonitor;
 import restudio.resync.messages.MessageLogService;
@@ -93,6 +97,12 @@ import restudio.resync.modules.ChatModule;
 import restudio.resync.modules.AdvancementModule;
 import restudio.resync.modules.FlowJobModule;
 import restudio.resync.modules.FlowModule;
+import restudio.resync.qa.QaService;
+import restudio.resync.qa.ServerQaService;
+import restudio.resync.qa.QaExecutionAdapter;
+import restudio.resync.qa.QaResourceAdapter;
+import restudio.resync.qa.QaGameAdapter;
+import restudio.resync.qa.QaAdvancementAdapter;
 import restudio.resync.modules.FlowRuntimeModule;
 import restudio.resync.modules.MessageRewriteModule;
 import restudio.resync.modules.LuckPermsManagementModule;
@@ -113,6 +123,7 @@ import restudio.resync.network.paper.NetworkResourceSynchronizer;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import restudio.resync.network.paper.ReSyncNetworkAgent;
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig;
+import restudio.resync.network.paper.NetworkSettings;
 import restudio.resync.network.paper.state.NetworkPlayerStateConfig;
 import restudio.resync.network.paper.state.NetworkPlayerStateCoordinator;
 import restudio.resync.permissions.LuckPermsManagementService;
@@ -151,6 +162,7 @@ import restudio.resync.queue.RequestQueue;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.runtime.RuntimeNotificationService;
 import restudio.resync.runtime.NpcService;
+import restudio.resync.runtime.PlayerNpcRuntime;
 import restudio.resync.runtime.PlayerNpcPersistenceParticipant;
 import restudio.resync.security.ClientAuthorizer;
 import restudio.resync.security.ClientIdentity;
@@ -184,6 +196,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -247,9 +260,12 @@ public class ReSyncServer {
     private final ReSyncExtensionManager extensionManager;
     private final ReplacementRuntimeProviderAuthority replacementRuntimeProviderAuthority;
     private final LuckPermsBackendPersistenceCapability configuredLuckPermsBackendPersistence;
+    private RebindablePersistenceParticipant dormantLuckPermsJournal;
     private final PlayerTrackingManager playerTrackingManager;
     private final StructureLibrary structureLibrary;
     private SqliteProtocolResourceMutationAuthority resourceMutationAuthority;
+    private volatile FlowResourceProtocolEnvelopeHandler resourceProtocolHandler;
+    private volatile ServerQaService qaService;
     private volatile AuthoringTemplateProducer authoringTemplateProducer;
     private volatile ProviderOptionQueryService providerOptionQueryService;
     private volatile String resourceMutationAuthorityUnavailableReason = "Durable resource mutation authority is unavailable";
@@ -258,6 +274,7 @@ public class ReSyncServer {
     private volatile ManagedFlowFileCapability managedFlowFileCapability;
     private volatile ManagedFlowFilePersistenceParticipant managedFlowFilePersistenceParticipant;
     private volatile DiagnosticReportPersistenceParticipant diagnosticsPersistenceParticipant;
+    private ScopedPersistenceParticipant startupDiagnostics;
     private volatile ProductionAuthorityBundlePersistenceParticipant authorityBundlePersistenceParticipant;
     private final ProductionAuthorityIssuer authorityIssuer;
     private volatile MigrationReportsPersistenceParticipant migrationReportsPersistenceParticipant;
@@ -361,7 +378,13 @@ public class ReSyncServer {
             this.freshRootAuthority = this.assetMigration
                 .freshRootAuthority(this.persistence.coordinationRoot(), dataRoot).orElse(null);
             initialIdentity = ServerIdentityStore.open(dataRoot.resolve("server-id"), this.freshRootAuthority,
-                hostedServerId());
+                hostedServerId(), LuckPermsOperationPersistenceParticipant::prepareFreshJournal);
+            if (luckPermsBackendPersistence != null || Bukkit.getServer() != null
+                && Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) {
+                requireExistingRuntimeJournal(initialIdentity, dataRoot
+                    .resolve(LuckPermsOperationPersistenceParticipant.DIRECTORY)
+                    .resolve(LuckPermsOperationPersistenceParticipant.FILE_NAME));
+            }
             TemporaryLifecycleDiagnostics.bindServerId(initialIdentity.serverId());
             TemporaryLifecycleDiagnostics.event("startup_diagnostics", startupStarted,
                 TemporaryLifecycleDiagnostics.with(TemporaryLifecycleDiagnostics.identity(initialIdentity.serverId(), null,
@@ -434,7 +457,7 @@ public class ReSyncServer {
                 PaperPlayerDataMutationAdmission.clearSharedInstallation(admissionInstallation);
             }
             TemporaryLifecycleDiagnostics.close(lifecycleDiagnosticSink);
-            throw new IllegalStateException("ReSync server identity could not be loaded", exception);
+            throw new IllegalStateException("ReSync startup persistence could not be loaded: " + exception.getMessage(), exception);
         } catch (RuntimeException failure) {
             try {
                 admission.close();
@@ -513,7 +536,7 @@ public class ReSyncServer {
                             resourceRegistry, moduleContext.getRequiredService(
                                 MigrationReportsPersistenceParticipant.class),
                             SqliteProtocolResourceMutationAuthority.CatalogStartup.DEFERRED);
-                        protocolEnvelopeDispatch.setHandler(new FlowResourceProtocolEnvelopeHandler(resourceRegistry, serverId, resourceMutationAuthority,
+                        setProtocolEnvelopeHandler(new FlowResourceProtocolEnvelopeHandler(resourceRegistry, serverId, resourceMutationAuthority,
                             ProtocolResourceAuthorizer.serverGranted(), authorityEpoch, authoringTemplateProducer, providerOptionQueryService));
                         TemporaryLifecycleDiagnostics.event("protocol_authority_binding", authorityStarted,
                             TemporaryLifecycleDiagnostics.with(TemporaryLifecycleDiagnostics.identity(serverId, null,
@@ -524,7 +547,7 @@ public class ReSyncServer {
                         resourceMutationAuthorityUnavailableReason = persistenceReason(
                             "Durable resource mutation authority could not be created", exception);
                         resourceMutationAuthority = null;
-                        protocolEnvelopeDispatch.setHandler(new FlowResourceProtocolEnvelopeHandler(resourceRegistry, serverId,
+                        setProtocolEnvelopeHandler(new FlowResourceProtocolEnvelopeHandler(resourceRegistry, serverId,
                             ProtocolResourceMutationAuthority.failClosed(), ProtocolResourceAuthorizer.serverGranted(), authorityEpoch,
                             authoringTemplateProducer, providerOptionQueryService));
                         TemporaryLifecycleDiagnostics.event("protocol_authority_binding", authorityStarted,
@@ -605,6 +628,7 @@ public class ReSyncServer {
             TemporaryLifecycleDiagnostics.event("startup_stage", worldGenReady,
                 Map.of("stageName", "extensions", "outcome", "complete"));
             publishPersistenceReadinessCertificate(readinessProof);
+            initializeQa();
             startScheduler();
             long startupReady = System.nanoTime();
             TemporaryLifecycleDiagnostics.event("startup_stage", extensionsReady,
@@ -620,8 +644,9 @@ public class ReSyncServer {
                 + ", Extensions " + startupMillis(worldGenReady, extensionsReady) + " ms"
                 + ", Readiness " + startupMillis(extensionsReady, startupReady) + " ms]");
         } catch (RuntimeException failure) {
+            Log.error("ReSync startup failed; shutting down initialized modules", failure);
             try {
-                shutdownSynchronously();
+                shutdownSynchronously(NetworkPersistenceDrainController.DEFAULT_DRAIN_TIMEOUT);
             } catch (RuntimeException cleanupFailure) {
                 failure.addSuppressed(cleanupFailure);
             }
@@ -629,6 +654,34 @@ public class ReSyncServer {
             TemporaryLifecycleDiagnostics.close(lifecycleDiagnosticSink);
             throw failure;
         }
+    }
+
+    private void initializeQa() {
+        FlowRuntimeModule runtime = moduleContext.getRequiredService(FlowRuntimeModule.class);
+        FlowModule flow = moduleContext.getRequiredService(FlowModule.class);
+        ServerQaService service = new ServerQaService(authorityEpoch::current);
+        QaResourceAdapter resources = new QaResourceAdapter(
+            () -> moduleContext.getRequiredService(FlowResourceRegistry.class), () -> resourceProtocolHandler,
+            () -> moduleContext.getRequiredService(ServerIdentityStore.class).serverId(), flow::activeCatalogSnapshot,
+            authorityEpoch, action -> {
+                if (Bukkit.isPrimaryThread()) action.run();
+                else Bukkit.getScheduler().runTask(moduleContext.getPlugin(), action);
+            }, protocolEnvelopeMailbox::submitOperator);
+        QaExecutionAdapter execution = runtime.createQaExecutionAdapter();
+        QaGameAdapter game = new QaGameAdapter(moduleContext.getPlugin(),
+            () -> moduleContext.getService(CustomContentStorage.class), () -> moduleContext.getService(CustomContentService.class),
+            () -> moduleContext.getService(NpcService.class), () -> moduleContext.getService(PlayerNpcRuntime.class));
+        QaAdvancementAdapter advancements = new QaAdvancementAdapter(() -> moduleContext.getService(AdvancementModule.class));
+        service.register(resources.describe(), resources::invoke);
+        service.register(execution.describe(), execution::invoke);
+        service.register(game.describe(), game::invoke);
+        service.register(advancements.describe(), advancements::invoke);
+        moduleContext.registerService(QaService.class, service);
+        qaService = service;
+    }
+
+    public QaService getQaService() {
+        return qaService;
     }
 
     private static long startupMillis(long started, long completed) {
@@ -730,7 +783,10 @@ public class ReSyncServer {
                                                           Path suppliedActiveRoot) {
         Path originalRoot = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
         try {
-            MigrationPaths.requireDirectory(originalRoot, "originalRoot");
+            MigrationPaths.requirePath(originalRoot, "originalRoot");
+            if (Files.exists(originalRoot, LinkOption.NOFOLLOW_LINKS)) {
+                MigrationPaths.requireDirectory(originalRoot, "originalRoot");
+            }
             ReSyncPersistenceCoordinator coordinator = Objects.requireNonNull(
                 suppliedPersistence, "Prepared ReSync Persistence Coordination Is Required");
             if (!originalRoot.equals(coordinator.dataRoot().toAbsolutePath().normalize())) {
@@ -947,7 +1003,8 @@ public class ReSyncServer {
 
     private void prepareNetworkTopology() {
         try {
-            ReSyncNetworkAgentConfig loaded = ReSyncNetworkAgentConfig.load(operatorDataRoot, dataRoot);
+            Properties networkSettings = NetworkSettings.load(operatorDataRoot);
+            ReSyncNetworkAgentConfig loaded = ReSyncNetworkAgentConfig.load(operatorDataRoot, dataRoot, networkSettings);
             networkConfig = loaded;
             if (!loaded.enabled()) {
                 return;
@@ -987,7 +1044,7 @@ public class ReSyncServer {
                             serverDirectory, dataRoot, operatorDataRoot));
                     }
                 }
-                playerStateConfig = NetworkPlayerStateConfig.load(operatorDataRoot);
+                playerStateConfig = NetworkPlayerStateConfig.load(networkSettings);
                 networkPlayerStateEnabled = playerStateConfig.enabled();
                 if (playerStateConfig.enabled()) {
                     preparedPlayerState = new NetworkPlayerStateCoordinator(plugin, playerStateConfig,
@@ -1311,6 +1368,12 @@ public class ReSyncServer {
             DiagnosticReportPersistenceParticipant.OWNER,
             diagnosticsRoot,
             diagnosticsPersistenceParticipant));
+        Path retainedDiagnostics = dataRoot.resolve(FreshInstallInputs.DIAGNOSTICS_DIRECTORY);
+        if (startupDiagnostics != null || Files.exists(retainedDiagnostics, LinkOption.NOFOLLOW_LINKS)) {
+            if (startupDiagnostics == null) startupDiagnostics = retainedDiagnostics(dataRoot, retainedDiagnostics);
+            bindings.add(ReSyncPersistenceTopology.requiredForRestore(
+                startupDiagnostics.owner(), startupDiagnostics.root(), startupDiagnostics));
+        }
         MigrationReportsPersistenceParticipant migrationReportsParticipant =
             moduleContext.getService(MigrationReportsPersistenceParticipant.class);
         if (migrationReportsParticipant != null) {
@@ -1523,6 +1586,47 @@ public class ReSyncServer {
             persistenceRegistration = ReSyncPersistenceTopology.failClosed(dataRoot,
                 "Persistence topology registration failed: " + reason, uncoveredWriters);
             Log.warn("ReSync persistence topology remains unavailable: " + reason);
+        }
+    }
+
+    private static ScopedPersistenceParticipant retainedDiagnostics(Path scope, Path directory) {
+        return new ScopedPersistenceParticipant("resync.startup-diagnostics", scope, directory, new ScopedPersistenceParticipant.Lifecycle() {
+            @Override
+            public void flush(Path root) throws IOException {
+                healthCheck(root);
+            }
+
+            @Override
+            public void quiesce(Path root) throws IOException {
+                healthCheck(root);
+            }
+
+            @Override
+            public void resume(Path root) throws IOException {
+                healthCheck(root);
+            }
+
+            @Override
+            public void rebind(Path previousRoot, Path nextRoot) throws IOException {
+                healthCheck(nextRoot);
+            }
+
+            @Override
+            public void healthCheck(Path root) throws IOException {
+                if (!FreshInstallInputs.acceptsEntry(root)) throw new IOException("Retained Startup Diagnostics Are Invalid: " + root);
+            }
+        });
+    }
+
+    static void requireExistingRuntimeJournal(ServerIdentityStore identity, Path file) throws IOException {
+        Objects.requireNonNull(identity, "identity");
+        Path journal = MigrationPaths.requirePath(file, "runtime journal");
+        if (identity.freshInstall()) {
+            return;
+        }
+        if (!Files.isRegularFile(journal, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("Required runtime journal is missing or is not a regular file: " + journal
+                + ". Restore the journal from a verified backup before restarting ReSync. Do not replace it with an empty file.");
         }
     }
 
@@ -1963,12 +2067,16 @@ public class ReSyncServer {
         }
 
         LuckPermsManagementService luckPerms = moduleContext.getService(LuckPermsManagementService.class);
-        if (luckPerms != null) {
-            Path luckPermsJournal = dataRoot.resolve("runtime").resolve(LuckPermsOperationPersistenceParticipant.FILE_NAME)
-                .toAbsolutePath().normalize();
+        Path luckPermsJournal = dataRoot.resolve("runtime").resolve(LuckPermsOperationPersistenceParticipant.FILE_NAME)
+            .toAbsolutePath().normalize();
+        if (luckPerms != null || Files.exists(luckPermsJournal, LinkOption.NOFOLLOW_LINKS)) {
             try {
-                LuckPermsOperationPersistenceParticipant participant =
-                    moduleContext.getService(LuckPermsOperationPersistenceParticipant.class);
+                if (luckPerms == null && dormantLuckPermsJournal == null) {
+                    dormantLuckPermsJournal = LuckPermsOperationPersistenceParticipant.dormant(dataRoot);
+                }
+                RebindablePersistenceParticipant participant = luckPerms == null
+                    ? dormantLuckPermsJournal
+                    : moduleContext.getService(LuckPermsOperationPersistenceParticipant.class);
                 if (participant == null) {
                     throw new IllegalStateException("LuckPerms operation persistence participant is not registered by its module");
                 }
@@ -2049,7 +2157,7 @@ public class ReSyncServer {
         FlowResourceRegistry resourceRegistry = moduleContext.getService(FlowResourceRegistry.class);
         ServerIdentityStore identity = moduleContext.getService(ServerIdentityStore.class);
         if (resourceRegistry != null && identity != null) {
-            protocolEnvelopeDispatch.setHandler(new FlowResourceProtocolEnvelopeHandler(resourceRegistry, identity.serverId(),
+            setProtocolEnvelopeHandler(new FlowResourceProtocolEnvelopeHandler(resourceRegistry, identity.serverId(),
                 ProtocolResourceMutationAuthority.failClosed(), ProtocolResourceAuthorizer.serverGranted(), authorityEpoch,
                 authoringTemplateProducer, providerOptionQueryService));
         }
@@ -3431,6 +3539,7 @@ public class ReSyncServer {
     }
 
     public void setProtocolEnvelopeHandler(ProtocolEnvelopeHandler handler) {
+        resourceProtocolHandler = handler instanceof FlowResourceProtocolEnvelopeHandler resources ? resources : null;
         protocolEnvelopeDispatch.setHandler(handler);
     }
 
@@ -3455,16 +3564,26 @@ public class ReSyncServer {
     }
 
     public void shutdownSynchronously() {
+        shutdownSynchronously(NetworkPersistenceDrainController.DEFAULT_DRAIN_TIMEOUT.multipliedBy(3));
+    }
+
+    private void shutdownSynchronously(Duration timeout) {
         prepareNetworkShutdown();
         prepareCoreShutdown();
-        try {
-            continuePreparedShutdown(true).toCompletableFuture().join();
-        } catch (RuntimeException exception) {
-            Log.error("ReSync synchronous shutdown remains retained", exception);
-            throw exception;
-        }
+        awaitShutdown(continuePreparedShutdown(true), timeout);
         if (!coreShutdownFinalized.get()) {
             throw new IllegalStateException("ReSync Synchronous Shutdown Remains Retained");
+        }
+    }
+
+    static void awaitShutdown(CompletionStage<Void> shutdown, Duration timeout) {
+        try {
+            shutdown.toCompletableFuture().get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("ReSync Shutdown Was Interrupted; Persistence Authority Is Retained", exception);
+        } catch (ExecutionException | TimeoutException exception) {
+            throw new IllegalStateException("ReSync Shutdown Did Not Complete; Persistence Authority Is Retained", exception);
         }
     }
 
@@ -3490,7 +3609,21 @@ public class ReSyncServer {
         authoringHandshakes.values().forEach(handshake -> handshake.cancel(false));
         authoringHandshakes.clear();
         handshakeExecutor.shutdownNow();
+        ServerQaService qa = qaService;
+        if (qa != null) qa.close();
         protocolEnvelopeMailbox.closeAdmission();
+        if (Bukkit.getServer() == null || Bukkit.isPrimaryThread()) {
+            FlowRuntimeModule runtime = moduleContext.getService(FlowRuntimeModule.class);
+            if (runtime != null) runtime.closeLiveRefreshAdmission();
+            try {
+                protocolEnvelopeMailbox.whenIdle().get(NetworkPersistenceDrainController.DEFAULT_DRAIN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                Log.warn("Protocol shutdown was interrupted; active resource authority remains retained");
+            } catch (ExecutionException | TimeoutException failure) {
+                Log.warn("Protocol shutdown is still draining; active resource authority remains retained");
+            }
+        }
         prepareCoreShutdownAfterProtocolDrain();
     }
 
@@ -3502,6 +3635,10 @@ public class ReSyncServer {
                     prepareCoreShutdownAfterProtocolDrain();
                 }, scheduler);
             }
+            return;
+        }
+        if (Bukkit.getServer() != null && !Bukkit.isPrimaryThread() && !moduleContext.getPlugin().isEnabled()) {
+            Log.warn("Core shutdown requires retained primary preparation after resource drain");
             return;
         }
         if (!coreShutdownPipelineStarted.compareAndSet(false, true)) {
@@ -3541,7 +3678,6 @@ public class ReSyncServer {
             return;
         }
         if (networkPrepared.get() && !networkShutdownSucceeded()) {
-            Log.error("ReSync core shutdown remains retained because network shutdown has not completed");
             return;
         }
         CompletableFuture<Void> modules = coreModuleShutdown.toCompletableFuture();

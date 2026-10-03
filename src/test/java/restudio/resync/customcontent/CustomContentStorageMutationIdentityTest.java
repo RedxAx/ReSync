@@ -41,6 +41,43 @@ class CustomContentStorageMutationIdentityTest {
     Path tempDir;
 
     @Test
+    void rejectedNewGraphLeavesNoMutationAndCanBeSavedWithTheSameIdentity() throws Exception {
+        AssetPersistenceGate gate = new AssetPersistenceGate(tempDir);
+        try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(tempDir.resolve("assets"), new Gson())) {
+            CanonicalProjectMetadataFixture.seed(coordinator);
+            CustomContentStorage storage = new CustomContentStorage(tempDir.toFile(), gate, coordinator);
+            try {
+                CustomContentDefinition definition = definition("new_item", "New Item");
+                String expectedHash = ResourcePayloadCodecs.json().hashPayload(
+                    new Gson().fromJson(FlowSerializer.serializeCustomContent(definition), Map.class)).canonicalText();
+                byte[] metadataBefore = Files.readAllBytes(tempDir.resolve("assets/project.json"));
+                storage.setGraphAdmission((content, intended) -> {
+                    throw new IllegalArgumentException("The configured graph is invalid");
+                });
+
+                assertThrows(FlowResourceAdapter.PreCommitRejection.class,
+                    () -> storage.save(definition, SAVE_MUTATION, 0L, expectedHash));
+                assertNull(storage.readMutationStamp("new_item"));
+                assertArrayEquals(metadataBefore, Files.readAllBytes(tempDir.resolve("assets/project.json")));
+                storage.setGraphAdmission((content, intended) -> {
+                    if (intended == null || intended.revision() != 1L || !expectedHash.equals(intended.payloadHash())) {
+                        throw new IllegalArgumentException("The new graph has no admitted resource identity");
+                    }
+                });
+
+                storage.save(definition, SAVE_MUTATION, 0L, expectedHash);
+
+                assertEquals(SAVE_MUTATION, storage.readMutationStamp("new_item").mutationId());
+                assertEquals(expectedHash, storage.readMutationStamp("new_item").payloadHash());
+                assertNotNull(storage.get("new_item"));
+            } finally {
+                gate.quiesce();
+                storage.close();
+            }
+        }
+    }
+
+    @Test
     void exactSaveRetainsEditorPassthroughPinIdentity() throws Exception {
         AssetPersistenceGate gate = new AssetPersistenceGate(tempDir);
         try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(tempDir.resolve("assets"), new Gson())) {

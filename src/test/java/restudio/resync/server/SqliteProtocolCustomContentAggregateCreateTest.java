@@ -23,6 +23,7 @@ import restudio.resync.flow.identity.ResourceTypeId;
 import restudio.resync.flow.identity.ServerId;
 import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.flow.protocol.ProtocolRejectionCode;
 import restudio.resync.flow.protocol.CanonicalPayload;
 import restudio.resync.flow.protocol.ProtocolBody;
 import restudio.resync.flow.protocol.ProtocolEnvelope;
@@ -178,7 +179,9 @@ class SqliteProtocolCustomContentAggregateCreateTest {
                     });
                     ProtocolEnvelopeDispatchResult rejectedResult = mutate(authority, rejectedRequest);
                     assertFalse(rejectedResult.handled());
-                    assertEquals("RESOURCE_OPERATION_FAILED", rejectedResult.code());
+                    assertEquals(ProtocolRejectionCode.RESOURCE_OPERATION_FAILED, rejectedResult.rejectionCode());
+                    assertEquals(ProtocolRejectionCode.RESOURCE_OPERATION_FAILED.wireValue(), rejectedResult.code());
+                    assertEquals(ProtocolRejectionCode.RESOURCE_OPERATION_FAILED.wireValue(), rejectedResult.structured().get("rejectionCode"));
                     assertEquals("The item graph cannot run", rejectedResult.message());
                     assertFalse(rejectedResult.message().contains("durable recovery"));
                     assertEquals(rejectedResult, mutate(authority, rejectedRequest));

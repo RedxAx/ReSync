@@ -7,6 +7,8 @@ import restudio.resync.migration.PersistenceParticipant;
 import restudio.resync.migration.PersistenceParticipantClassification;
 import restudio.resync.migration.PersistenceRootReadiness;
 import restudio.resync.migration.ReSyncPersistenceCoordinator;
+import restudio.resync.migration.RebindablePersistenceParticipant;
+import restudio.resync.permissions.LuckPermsOperationPersistenceParticipant;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -24,6 +26,136 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ReSyncServerRuntimeJournalInitializationTest {
     @TempDir
     Path temporary;
+
+    @Test
+    void freshIdentityCommitsItsJournalBeforeItCanBeReopenedAsExisting() throws Exception {
+        Path dataRoot = Files.createDirectory(temporary.resolve("journal-before-identity"));
+        Path identityFile = dataRoot.resolve(ServerIdentityStore.FILE_NAME);
+        Path journal = dataRoot.resolve("runtime/luckperms-operations.json");
+
+        ServerIdentityStore initial = ServerIdentityStore.open(identityFile, null, null,
+            LuckPermsOperationPersistenceParticipant::prepareFreshJournal);
+        ServerIdentityStore reopened = ServerIdentityStore.open(identityFile, null, null,
+            LuckPermsOperationPersistenceParticipant::prepareFreshJournal);
+        ReSyncServer.requireExistingRuntimeJournal(reopened, journal);
+
+        assertEquals("[]\n", Files.readString(journal));
+        assertEquals(initial.serverId(), reopened.serverId());
+        assertFalse(reopened.freshInstall());
+    }
+
+    @Test
+    void interruptedJournalInitializationResumesWithTheSameIdentity() throws Exception {
+        Path dataRoot = Files.createDirectory(temporary.resolve("journal-interrupted"));
+        Path identityFile = dataRoot.resolve(ServerIdentityStore.FILE_NAME);
+        Path journal = dataRoot.resolve("runtime/luckperms-operations.json");
+        assertThrows(IOException.class, () -> ServerIdentityStore.open(identityFile, null, null, root -> {
+            throw new IOException("Journal Initialization Interrupted");
+        }));
+        String identity = Files.readString(identityFile);
+        assertFalse(Files.exists(journal));
+
+        ServerIdentityStore resumed = ServerIdentityStore.open(identityFile, null, null,
+            LuckPermsOperationPersistenceParticipant::prepareFreshJournal);
+
+        assertTrue(resumed.freshInstall());
+        assertEquals(identity, Files.readString(identityFile));
+        assertEquals("[]\n", Files.readString(journal));
+        assertFalse(ServerIdentityStore.open(identityFile).freshInstall());
+    }
+
+    @Test
+    void committedIdentityDoesNotRecreateAnEstablishedMissingJournal() throws Exception {
+        Path dataRoot = Files.createDirectory(temporary.resolve("journal-lost"));
+        Path identityFile = dataRoot.resolve(ServerIdentityStore.FILE_NAME);
+        Path journal = dataRoot.resolve("runtime/luckperms-operations.json");
+        ServerIdentityStore.open(identityFile, null, null, LuckPermsOperationPersistenceParticipant::prepareFreshJournal);
+        Files.delete(journal);
+
+        ServerIdentityStore reopened = ServerIdentityStore.open(identityFile, null, null,
+            LuckPermsOperationPersistenceParticipant::prepareFreshJournal);
+
+        assertThrows(IOException.class, () -> ReSyncServer.requireExistingRuntimeJournal(reopened, journal));
+        assertFalse(Files.exists(journal));
+    }
+
+    @Test
+    void journalInitializationPreservesExistingReceipts() throws Exception {
+        Path dataRoot = Files.createDirectory(temporary.resolve("journal-receipts"));
+        Path journal = dataRoot.resolve("runtime/luckperms-operations.json");
+        Files.createDirectory(journal.getParent());
+        Files.writeString(journal, "[{\"operationId\":\"receipt\"}]");
+
+        LuckPermsOperationPersistenceParticipant.prepareFreshJournal(dataRoot);
+
+        assertEquals("[{\"operationId\":\"receipt\"}]", Files.readString(journal));
+    }
+
+    @Test
+    void dormantJournalPreservesReceiptsAcrossQuiesceAndRebind() throws Exception {
+        Path dataRoot = Files.createDirectory(temporary.resolve("journal-dormant"));
+        LuckPermsOperationPersistenceParticipant.prepareFreshJournal(dataRoot);
+        RebindablePersistenceParticipant participant = LuckPermsOperationPersistenceParticipant.dormant(dataRoot);
+        Path restoredRoot = Files.createDirectory(temporary.resolve("journal-restored"));
+        Path restored = restoredRoot.resolve("runtime/luckperms-operations.json");
+        Files.createDirectory(restored.getParent());
+        String receipts = "[{\"operationId\":\"receipt\"}]";
+        Files.writeString(restored, receipts);
+
+        assertThrows(IOException.class, () -> participant.rebind(restoredRoot));
+        participant.quiesce();
+        participant.rebind(restoredRoot);
+        participant.resume();
+        participant.flush();
+
+        assertEquals(restored, participant.root());
+        assertEquals(receipts, Files.readString(restored));
+        Files.delete(restored);
+        assertThrows(IOException.class, participant::healthCheck);
+        assertFalse(Files.exists(restored));
+    }
+
+    @Test
+    void existingInstallationRejectsAnAbsentRequiredJournalWithoutCreatingIt() throws Exception {
+        Path dataRoot = Files.createDirectory(temporary.resolve("missing-required"));
+        Path identityFile = dataRoot.resolve(ServerIdentityStore.FILE_NAME);
+        ServerIdentityStore.open(identityFile);
+        ServerIdentityStore identity = ServerIdentityStore.open(identityFile);
+        Path journal = dataRoot.resolve("runtime").resolve("luckperms-operations.json");
+
+        IOException failure = assertThrows(IOException.class,
+            () -> ReSyncServer.requireExistingRuntimeJournal(identity, journal));
+
+        assertTrue(failure.getMessage().contains(journal.toString()));
+        assertTrue(failure.getMessage().contains("verified backup"));
+        assertFalse(Files.exists(journal));
+    }
+
+    @Test
+    void freshInstallLeavesJournalCreationWithItsParticipant() throws Exception {
+        Path dataRoot = Files.createDirectory(temporary.resolve("fresh-required"));
+        ServerIdentityStore identity = ServerIdentityStore.open(dataRoot.resolve(ServerIdentityStore.FILE_NAME));
+        Path journal = dataRoot.resolve("runtime").resolve("luckperms-operations.json");
+
+        ReSyncServer.requireExistingRuntimeJournal(identity, journal);
+
+        assertFalse(Files.exists(journal));
+    }
+
+    @Test
+    void existingInstallationKeepsAnExistingRequiredJournalUntouched() throws Exception {
+        Path dataRoot = Files.createDirectory(temporary.resolve("existing-required"));
+        Path identityFile = dataRoot.resolve(ServerIdentityStore.FILE_NAME);
+        ServerIdentityStore.open(identityFile);
+        ServerIdentityStore identity = ServerIdentityStore.open(identityFile);
+        Path journal = dataRoot.resolve("runtime").resolve("luckperms-operations.json");
+        Files.createDirectories(journal.getParent());
+        Files.writeString(journal, "existing receipts");
+
+        ReSyncServer.requireExistingRuntimeJournal(identity, journal);
+
+        assertEquals("existing receipts", Files.readString(journal));
+    }
 
     @Test
     void freshInstallMaterializesAnAbsentJournalThroughItsParticipant() throws Exception {

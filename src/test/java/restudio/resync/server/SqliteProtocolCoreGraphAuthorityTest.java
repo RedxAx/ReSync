@@ -198,8 +198,9 @@ class SqliteProtocolCoreGraphAuthorityTest {
         ServerResourceLocator resource = resource("command", "core-replay");
         UUID mutationId = UUID.fromString("55555555-5555-4555-8555-555555555555");
         CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
-        ProtocolEnvelope<Map<String, Object>> request = create(resource, graph(resource, 1L), mutationId, boundary);
         CoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER);
+        ProtocolEnvelope<Map<String, Object>> request = create(resource,
+            graph(resource, 1L, core.activeCatalogBinding().orElseThrow()), mutationId, boundary);
         List<CoreResourceMutationTransition> initial = new ArrayList<>();
         registry.addCoreMutationListener(initial::add);
 
@@ -223,6 +224,7 @@ class SqliteProtocolCoreGraphAuthorityTest {
         recoveredRegistry.addCoreMutationListener(recovered::add);
         try (SqliteProtocolResourceMutationAuthority authority = authority(recoveredRegistry, directory, core)) {
             assertEquals(1, recovered.size());
+            assertTransition(recovered.getFirst(), resource, 1L, mutationId, false, ResourceActivationState.ACTIVE);
             ProtocolEnvelopeDispatchResult replay = mutate(authority, request);
             assertTrue(replay.handled(), replay.code() + ": " + replay.message());
             assertEquals(mutationId, document(replay).mutationId());
@@ -263,9 +265,10 @@ class SqliteProtocolCoreGraphAuthorityTest {
         ServerResourceLocator resource = resource("flow", "core-recovery");
         UUID mutationId = UUID.fromString("88888888-8888-4888-8888-888888888888");
         CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
-        ProtocolEnvelope<Map<String, Object>> request = create(resource, graph(resource, 1L), mutationId, boundary);
-        ThrowAfterSaveCoreAuthority failing = new ThrowAfterSaveCoreAuthority(
-            new FlowStorageCoreGraphResourceAuthority(storage, SERVER));
+        CoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER);
+        ProtocolEnvelope<Map<String, Object>> request = create(resource,
+            graph(resource, 1L, core.activeCatalogBinding().orElseThrow()), mutationId, boundary);
+        ThrowAfterSaveCoreAuthority failing = new ThrowAfterSaveCoreAuthority(core);
         List<CoreResourceMutationTransition> transitions = new ArrayList<>();
         registry.addCoreMutationListener(transitions::add);
 
@@ -280,6 +283,8 @@ class SqliteProtocolCoreGraphAuthorityTest {
             new FlowStorageCoreGraphResourceAuthority(storage, SERVER))) {
             ResourceDocument<Map<String, Object>> recovered = authority.load(resource);
             assertEquals(1L, recovered.revision());
+            assertEquals(resource, recovered.resource());
+            assertEquals(mutationId, recovered.mutationId());
         }
         assertEquals(1, transitions.size());
         assertTransition(transitions.getFirst(), resource, 1L, mutationId, false, ResourceActivationState.ACTIVE);
@@ -384,7 +389,9 @@ class SqliteProtocolCoreGraphAuthorityTest {
             }
             secondConsumer.add(transition);
         });
-        ProtocolEnvelope<Map<String, Object>> request = create(resource, graph(resource, 1L), mutationId, boundary);
+        CoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER);
+        ProtocolEnvelope<Map<String, Object>> request = create(resource,
+            graph(resource, 1L, core.activeCatalogBinding().orElseThrow()), mutationId, boundary);
         UUID nextMutation = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
         ProtocolEnvelope<Map<String, Object>> next = activate(resource, 1L,
             ResourceActivationState.INACTIVE, nextMutation);
@@ -408,6 +415,9 @@ class SqliteProtocolCoreGraphAuthorityTest {
             assertEquals(1, secondConsumer.size());
             ProtocolEnvelopeDispatchResult replay = mutate(authority, request);
             assertTrue(replay.handled(), replay.code() + ": " + replay.message());
+            assertEquals(resource, document(replay).resource());
+            assertEquals(1L, document(replay).revision());
+            assertEquals(mutationId, document(replay).mutationId());
             ProtocolEnvelopeDispatchResult activated = mutate(authority, next);
             assertTrue(activated.handled(), activated.code() + ": " + activated.message());
             assertEquals(2L, authority.load(resource).revision());
@@ -510,11 +520,15 @@ class SqliteProtocolCoreGraphAuthorityTest {
     }
 
     private static GraphDocument graph(ServerResourceLocator resource, long revision) {
+        return graph(resource, revision, BINDING);
+    }
+
+    private static GraphDocument graph(ServerResourceLocator resource, long revision, CatalogBinding binding) {
         List<GraphNode> nodes = "command".equals(resource.resourceType().value())
             ? List.of(new GraphNode(NodeInstanceId.deterministic("command-start"),
                 CommandGraphContract.CANONICAL_START, 1, Map.of()))
             : List.of();
-        return new GraphDocument(new CatalogVersion(1, 0), resource, revision, BINDING, Set.of(), nodes,
+        return new GraphDocument(new CatalogVersion(1, 0), resource, revision, binding, Set.of(), nodes,
             List.of(), List.of(), List.of(), OpaqueData.of(Map.of("future", "preserve")));
     }
 

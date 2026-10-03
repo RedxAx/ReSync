@@ -415,15 +415,25 @@ public class CustomContentStorage implements AutoCloseable {
             if (safeId == null) {
                 throw new IllegalArgumentException("Invalid custom content id");
             }
-            List<String> errors = validator.validate(definition);
-            if (!errors.isEmpty()) {
-                throw new IllegalArgumentException(String.join("; ", errors));
+            try {
+                List<String> errors = validator.validate(definition);
+                if (!errors.isEmpty()) {
+                    throw new IllegalArgumentException(String.join(". ", errors));
+                }
+                List<Map<String, Object>> componentErrors = attributeSchemaService.validate(definition.getMaterial(), definition.getComponents());
+                if (!componentErrors.isEmpty()) {
+                    throw new ItemAttributeValidationException(componentErrors);
+                }
+                FlowResourceMutationStamp current = readMutationStamp(safeId);
+                long revision = Math.addExact(expectedRevision < 0L ? current == null ? 0L : current.revision() : expectedRevision, 1L);
+                String payloadHash = expectedPayloadHash == null
+                    ? ResourcePayloadCodecs.json().hashPayload(gson.fromJson(serializeDefinition(definition), Map.class)).canonicalText()
+                    : expectedPayloadHash;
+                admitGraph(definition, new FlowResourceMutationStamp(ReSyncResourceCatalog.CUSTOM_CONTENT,
+                    safeId, revision, mutationId, payloadHash, false));
+            } catch (IllegalArgumentException rejection) {
+                throw new FlowResourceAdapter.PreCommitRejection(rejection);
             }
-            List<Map<String, Object>> componentErrors = attributeSchemaService.validate(definition.getMaterial(), definition.getComponents());
-            if (!componentErrors.isEmpty()) {
-                throw new ItemAttributeValidationException(componentErrors);
-            }
-            admitGraph(definition, null);
             try {
                 Snapshot snapshot = assetStore.coordinatorSnapshot();
                 List<JsonAssetStore.PreparedMutation> mutations = new ArrayList<>();

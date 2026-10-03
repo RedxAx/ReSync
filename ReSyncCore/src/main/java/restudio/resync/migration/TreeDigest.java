@@ -25,14 +25,18 @@ public final class TreeDigest {
     }
 
     public static String of(Path root) throws IOException {
-        return digest(root, false);
+        return digest(root, false, false);
     }
 
     public static String migratableOf(Path root) throws IOException {
-        return digest(root, true);
+        return digest(root, true, false);
     }
 
-    private static String digest(Path root, boolean skipRootQuarantine) throws IOException {
+    static String freshInputsOf(Path root) throws IOException {
+        return digest(root, false, true);
+    }
+
+    private static String digest(Path root, boolean skipRootQuarantine, boolean skipMigrations) throws IOException {
         Path normalizedRoot = MigrationPaths.requireDirectory(root, "root");
         List<String> rows = new ArrayList<>();
         Files.walkFileTree(normalizedRoot, Set.of(), Integer.MAX_VALUE, new SimpleFileVisitor<>() {
@@ -43,6 +47,9 @@ public final class TreeDigest {
                 }
                 if (!directory.equals(normalizedRoot)) {
                     String relative = MigrationPaths.relative(normalizedRoot, directory);
+                    if (skipMigrations && relative.equals(ReSyncDataFixer.VERSION_DIRECTORY)) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
                     if (skipRootQuarantine && isRootQuarantinePath(relative)) {
                         requireReservedQuarantine(directory);
                         return FileVisitResult.SKIP_SUBTREE;

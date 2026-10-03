@@ -190,16 +190,27 @@ class AssetTransactionManagerExactMutationTest {
         manager.commit(Map.of(first, "first"), "55555555-5555-4555-8555-555555555555");
         AssetTransactionManager.IoMetrics committed = manager.ioMetrics();
         Path second = root.resolve("second.json");
-        manager.commit(Map.of(second, "second"), "66666666-6666-4666-8666-666666666666");
+        manager.commit(Map.of(second, "other"), "66666666-6666-4666-8666-666666666666");
         AssetTransactionManager.IoMetrics appended = manager.ioMetrics();
 
         assertEquals(before.fullJournalPasses(), appended.fullJournalPasses());
         assertEquals(before.journalReads(), appended.journalReads());
         assertEquals(before.stagedPayloadReads(), appended.stagedPayloadReads());
         assertEquals(committed.indexedMutationLookups() + 1L, appended.indexedMutationLookups());
-        assertEquals(2L, committed.assetPathCanonicalizations() - before.assetPathCanonicalizations());
-        assertEquals(2L, appended.assetPathCanonicalizations() - committed.assetPathCanonicalizations());
+        long pathWork = committed.assetPathCanonicalizations() - before.assetPathCanonicalizations();
+        assertTrue(pathWork > 0L);
+        assertEquals(pathWork, appended.assetPathCanonicalizations() - committed.assetPathCanonicalizations(),
+            "Equal-sized commits must not add path validation work as history grows");
+        Path third = root.resolve("third.json");
+        manager.commit(Map.of(third, "third"), "77777777-7777-4777-8777-777777777777");
+        AssetTransactionManager.IoMetrics repeated = manager.ioMetrics();
+        assertEquals(pathWork, repeated.assetPathCanonicalizations() - appended.assetPathCanonicalizations());
+        assertEquals(before.fullJournalPasses(), repeated.fullJournalPasses());
+        assertEquals(before.journalReads(), repeated.journalReads());
+        assertEquals(before.stagedPayloadReads(), repeated.stagedPayloadReads());
+        assertEquals(appended.indexedMutationLookups() + 1L, repeated.indexedMutationLookups());
         assertEquals("first", Files.readString(first));
-        assertEquals("second", Files.readString(second));
+        assertEquals("other", Files.readString(second));
+        assertEquals("third", Files.readString(third));
     }
 }

@@ -106,7 +106,7 @@ class SqliteCompatibleCoreCatalogRebindTest {
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
              var receipt = connection.prepareStatement("SELECT COUNT(*), MIN(status), MAX(status) "
                  + "FROM resource_mutation_receipt WHERE actor_id = ?")) {
-            receipt.setString(1, CoreCatalogCompatibilityRebind.ACTOR);
+            receipt.setString(1, CoreCatalogCompatibilityRebind.PROOF_ACTOR);
             try (var result = receipt.executeQuery()) {
                 assertTrue(result.next());
                 assertEquals(1, result.getInt(1));
@@ -141,7 +141,7 @@ class SqliteCompatibleCoreCatalogRebindTest {
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
              var receipt = connection.prepareStatement(
                  "SELECT COUNT(*) FROM resource_mutation_receipt WHERE actor_id = ?")) {
-            receipt.setString(1, CoreCatalogCompatibilityRebind.ACTOR);
+            receipt.setString(1, CoreCatalogCompatibilityRebind.PROOF_ACTOR);
             try (var result = receipt.executeQuery()) {
                 assertTrue(result.next());
                 assertEquals(0, result.getInt(1));

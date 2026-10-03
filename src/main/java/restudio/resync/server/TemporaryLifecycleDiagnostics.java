@@ -344,12 +344,12 @@ public final class TemporaryLifecycleDiagnostics {
         if (!status.enabled()) {
             return;
         }
-        if (!status.mode().accepts(LifecycleDiagnosticPolicy.priority(stage, values, terminal))) {
-            return;
-        }
         try {
             DiagnosticEvent event = LifecycleDiagnosticEventAdapter.event(stage, elapsedMillis,
                 SERVER_ID.get(), values, terminal);
+            if (!status.mode().accepts(event.priority())) {
+                return;
+            }
             DiagnosticSink.Offer offer = sink.offer(event);
             if (offer == DiagnosticSink.Offer.FAILED) {
                 warn(sink.status());

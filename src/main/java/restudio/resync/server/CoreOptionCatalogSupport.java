@@ -1,6 +1,7 @@
 package restudio.resync.server;
 
 import restudio.resync.api.OptionCatalogItem;
+import restudio.flow.data.FlowDataType;
 import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.catalog.CatalogNodeDescriptor;
 import restudio.resync.flow.catalog.CatalogOwned;
@@ -90,10 +91,19 @@ final class CoreOptionCatalogSupport {
             case "integer" -> parseInteger(value);
             case "number" -> parseNumber(value);
             case "uuid" -> parseUuid(value);
-            default -> throw rejected(ProtocolRejectionCode.UNSUPPORTED_GENERATION,
-                "Option provider type does not have an exact scalar materializer");
+            default -> symbolicValue(named, value);
         };
         return TypedValue.value(type, material);
+    }
+
+    private static String symbolicValue(TypeExpr.Named named, String value) {
+        FlowDataType type = FlowDataType.fromString(named.reference().localId());
+        if (type.isResolved() && "builtin".equals(type.getOwner())
+            && named.reference().localId().equals(type.getId()) && type.getJavaType().isEnum()) {
+            return value;
+        }
+        throw rejected(ProtocolRejectionCode.UNSUPPORTED_GENERATION,
+            "Option provider type does not have an exact scalar materializer");
     }
 
     static Object material(TypedValue value) {

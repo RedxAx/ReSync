@@ -77,21 +77,23 @@ public final class LegacyInstallBoundary {
     }
 
     private static InstallState inspect(Path data, Path coordination) throws IOException {
-        boolean occupied = nonEmpty(data);
+        boolean occupied = nonEmpty(data) && !FreshInstallInputs.accepts(data);
+        boolean versioned = Files.isDirectory(data, LinkOption.NOFOLLOW_LINKS)
+            && ReSyncDataFixer.installedVersion(data).isPresent();
         if (!Files.exists(coordination, LinkOption.NOFOLLOW_LINKS)) {
-            return new InstallState(false, occupied);
+            return new InstallState(versioned, occupied);
         }
         if (Files.isSymbolicLink(coordination) || !Files.isDirectory(coordination, LinkOption.NOFOLLOW_LINKS)) {
             throw new MigrationException("ReSync Coordination Root Is Not A Regular Directory");
         }
         Path restoreControl = coordination.resolve("restore-control");
         if (!Files.exists(restoreControl, LinkOption.NOFOLLOW_LINKS)) {
-            return new InstallState(false, occupied);
+            return new InstallState(versioned, occupied);
         }
         AtomicDirectoryRootStore roots = new AtomicDirectoryRootStore(restoreControl);
         Optional<Path> active = roots.activeRoot();
         if (active.isEmpty()) {
-            return new InstallState(false, occupied);
+            return new InstallState(versioned, occupied);
         }
         Path activeRoot = active.orElseThrow();
         boolean activeOccupied = nonEmpty(activeRoot);

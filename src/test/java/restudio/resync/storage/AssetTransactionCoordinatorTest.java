@@ -940,7 +940,7 @@ class AssetTransactionCoordinatorTest {
             coordinator.transact(request("d1000000-0000-4000-8000-000000000002",
                 coordinator.read(AssetTransactionCoordinator.Snapshot::project),
                 AssetTransactionCoordinator.AssetDelta.write(second, Path.of("second.json"),
-                    AssetTransactionCoordinator.Missing.INSTANCE, "second".getBytes(StandardCharsets.UTF_8))));
+                    AssetTransactionCoordinator.Missing.INSTANCE, "other".getBytes(StandardCharsets.UTF_8))));
             AssetTransactionCoordinator.ValidationMetrics appended = coordinator.validationMetrics();
 
             assertEquals(opened.fullValidationPasses(), appended.fullValidationPasses());
@@ -948,8 +948,8 @@ class AssetTransactionCoordinatorTest {
             assertEquals(opened.managerFullJournalPasses(), appended.managerFullJournalPasses());
             assertEquals(opened.managerJournalReads(), appended.managerJournalReads());
             assertEquals(opened.managerStagedPayloadReads(), appended.managerStagedPayloadReads());
-            assertEquals(8L, appended.managerAssetPathCanonicalizations()
-                - committed.managerAssetPathCanonicalizations());
+            long pathWork = appended.managerAssetPathCanonicalizations() - committed.managerAssetPathCanonicalizations();
+            assertTrue(pathWork > 0L);
             assertEquals(committed.incrementalValidationPasses() + 1L, appended.incrementalValidationPasses());
             assertEquals(committed.managerIndexedMutationLookups() + 1L, appended.managerIndexedMutationLookups());
             assertEquals(opened.watcherFullRegistrationPasses(), appended.watcherFullRegistrationPasses());
@@ -995,6 +995,22 @@ class AssetTransactionCoordinatorTest {
             assertTrue(afterManager.applyNanos() > beforeManager.applyNanos());
             assertTrue(afterManager.journalDurabilityNanos() > beforeManager.journalDurabilityNanos());
             assertTrue(afterManager.residualNanos() >= beforeManager.residualNanos());
+            AssetTransactionCoordinator.AssetKey third = new AssetTransactionCoordinator.AssetKey("flow", "third");
+            coordinator.transact(request("d1000000-0000-4000-8000-000000000003",
+                coordinator.read(AssetTransactionCoordinator.Snapshot::project),
+                AssetTransactionCoordinator.AssetDelta.write(third, Path.of("third.json"),
+                    AssetTransactionCoordinator.Missing.INSTANCE, "third".getBytes(StandardCharsets.UTF_8))));
+            AssetTransactionCoordinator.ValidationMetrics repeated = coordinator.validationMetrics();
+            assertEquals(pathWork, repeated.managerAssetPathCanonicalizations() - appended.managerAssetPathCanonicalizations(),
+                "Equal-sized commits must not add path validation work as history grows");
+            assertEquals(opened.fullValidationPasses(), repeated.fullValidationPasses());
+            assertEquals(opened.historyEvidenceScans(), repeated.historyEvidenceScans());
+            assertEquals(opened.managerFullJournalPasses(), repeated.managerFullJournalPasses());
+            assertEquals(opened.managerJournalReads(), repeated.managerJournalReads());
+            assertEquals(opened.managerStagedPayloadReads(), repeated.managerStagedPayloadReads());
+            assertEquals("first", Files.readString(root.resolve("first.json")));
+            assertEquals("other", Files.readString(root.resolve("second.json")));
+            assertEquals("third", Files.readString(root.resolve("third.json")));
         }
     }
 

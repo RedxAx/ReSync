@@ -42,6 +42,7 @@ import restudio.resync.flow.protocol.ResourceDocument;
 import restudio.resync.flow.protocol.ResourceOperation;
 import restudio.resync.flow.protocol.ResourceSaveRequest;
 import restudio.resync.flow.resource.ResourcePayloadCodecs;
+import restudio.resync.modules.flow.CoreResourceMutationTransition;
 import restudio.resync.modules.flow.FlowResourceCommitListener;
 import restudio.resync.modules.flow.FlowResourceAdapter;
 import restudio.resync.modules.flow.FlowResourceMutationListener;
@@ -268,12 +269,23 @@ class SqliteProtocolProjectMetadataMutationTest {
                 ContractRef.of(new OwnerId("restudio.resync"), new ResourceTypeId("flow")), "metadata-drift");
             UUID graphMutation = UUID.fromString("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
             CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
+            CoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER);
+            List<CoreResourceMutationTransition> transitions = new ArrayList<>();
+            registry.addCoreMutationListener(transitions::add);
 
-            try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory,
-                new FlowStorageCoreGraphResourceAuthority(storage, SERVER))) {
-                ProtocolEnvelopeDispatchResult result = mutate(authority, createCore(graph, graphMutation, boundary));
+            try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory, core)) {
+                ProtocolEnvelopeDispatchResult result = mutate(authority,
+                    createCore(graph, graphMutation, boundary, core.activeCatalogBinding().orElseThrow()));
                 assertTrue(result.handled(), result.code() + ": " + result.message());
             }
+            assertEquals(1, transitions.size());
+            CoreResourceMutationTransition transition = transitions.getFirst();
+            assertEquals(graph, transition.locator());
+            assertEquals(1L, transition.revision());
+            assertEquals(graphMutation, transition.mutationId());
+            assertFalse(transition.deleted());
+            assertEquals(ResourceActivationState.ACTIVE, transition.activationState());
+            CoreGraphStorageBoundary.Decoded committed = core.load(graph).orElseThrow();
 
             String metadataResource = new ServerResourceLocator(SERVER, TYPE, SERVER.canonicalText()).canonicalText();
             ContentHash initialHash = hash(initialMetadata);
@@ -294,8 +306,7 @@ class SqliteProtocolProjectMetadataMutationTest {
                 assertEquals(1, update.executeUpdate());
             }
 
-            try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory,
-                new FlowStorageCoreGraphResourceAuthority(storage, SERVER))) {
+            try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory, core)) {
                 List<ResourceDocument<Map<String, Object>>> documents = authority.list(SERVER, TYPE, "");
 
                 assertEquals(1, documents.size());
@@ -306,6 +317,11 @@ class SqliteProtocolProjectMetadataMutationTest {
                 assertEquals(SERVER.canonicalText(), document.payload().get("serverId"));
                 assertEquals(Map.of("keep", true), document.payload().get("unknown"));
             }
+            CoreGraphStorageBoundary.Decoded recovered = core.load(graph).orElseThrow();
+            assertEquals(committed.envelope().assetRevision(), recovered.envelope().assetRevision());
+            assertEquals(committed.envelope().assetMutationId(), recovered.envelope().assetMutationId());
+            assertEquals(committed.graphDocument().checksum(), recovered.graphDocument().checksum());
+            assertEquals(1, transitions.size());
 
             try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("resource.db"));
                  var state = connection.prepareStatement(
@@ -315,6 +331,22 @@ class SqliteProtocolProjectMetadataMutationTest {
                     assertTrue(result.next());
                     assertEquals(2L, result.getLong(1));
                     assertEquals(graphMutation.toString(), result.getString(2));
+                    assertFalse(result.next());
+                }
+            }
+            try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("resource.db"));
+                 var receipt = connection.prepareStatement("""
+                     SELECT status, result_revision, transition_published, transition_envelope
+                     FROM resource_mutation_receipt WHERE mutation_id = ?
+                     """)) {
+                receipt.setString(1, graphMutation.toString());
+                try (var result = receipt.executeQuery()) {
+                    assertTrue(result.next());
+                    assertEquals("APPLIED", result.getString("status"));
+                    assertEquals(1L, result.getLong("result_revision"));
+                    assertEquals(1, result.getInt("transition_published"));
+                    assertNull(result.getString("transition_envelope"));
+                    assertFalse(result.next());
                 }
             }
         }
@@ -1592,7 +1624,12 @@ class SqliteProtocolProjectMetadataMutationTest {
 
     private static ProtocolEnvelope<Map<String, Object>> createCore(ServerResourceLocator resource, UUID mutationId,
                                                                      CoreGraphStorageBoundary boundary) {
-        GraphDocument graph = new GraphDocument(new CatalogVersion(1, 0), resource, 1L, GRAPH_BINDING, Set.of(),
+        return createCore(resource, mutationId, boundary, GRAPH_BINDING);
+    }
+
+    private static ProtocolEnvelope<Map<String, Object>> createCore(ServerResourceLocator resource, UUID mutationId,
+                                                                     CoreGraphStorageBoundary boundary, CatalogBinding binding) {
+        GraphDocument graph = new GraphDocument(new CatalogVersion(1, 0), resource, 1L, binding, Set.of(),
             List.of(), List.of(), List.of(), List.of(), OpaqueData.of(Map.of("test", "metadata-drift")));
         byte[] bytes = boundary.encode(graph, new CoreGraphStorageBoundary.AssetMetadata(resource.resourceType().value(),
             1L, mutationId, ResourceActivationState.ACTIVE), resource);

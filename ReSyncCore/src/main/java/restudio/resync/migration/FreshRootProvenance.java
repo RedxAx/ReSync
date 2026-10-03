@@ -66,7 +66,10 @@ public final class FreshRootProvenance {
         }
         if (Files.exists(source, LinkOption.NOFOLLOW_LINKS)) {
             MigrationPaths.requireDirectory(source, "dataRoot");
-            return null;
+            if (!empty(coordination) || !FreshInstallInputs.accepts(source)) {
+                return null;
+            }
+            return write(proof, Phase.SOURCE_EMPTY, source, null, TreeDigest.of(source), "", "", "");
         }
         if (!empty(coordination)) {
             Path pointer = coordination.resolve("restore-control").resolve("active-root");
@@ -92,8 +95,8 @@ public final class FreshRootProvenance {
         if (phase != Phase.SOURCE_EMPTY) {
             throw new MigrationException("Fresh Root Provenance Is Not Ready For Active Root Binding");
         }
-        ensureEmpty(sourceRoot, "Fresh ReSync Data Root");
-        ensureEmpty(active, "Fresh ReSync Active Root");
+        ensureInputs(sourceRoot, "Fresh ReSync Data Root");
+        ensureInputs(active, "Fresh ReSync Active Root");
         String currentSourceHash = TreeDigest.of(sourceRoot);
         String currentActiveHash = TreeDigest.of(active);
         if (!currentSourceHash.equals(sourceHash) || !currentActiveHash.equals(sourceHash)) {
@@ -115,11 +118,11 @@ public final class FreshRootProvenance {
             || !current.sourceHash.equals(sourceHash) || !current.activeHash.equals(activeHash)) {
             throw new MigrationException("Fresh Root Provenance Changed Before Consumption");
         }
-        ensureEmpty(sourceRoot, "Fresh ReSync Data Root");
+        ensureInputs(sourceRoot, "Fresh ReSync Data Root");
         ensureFreshActive(activeRoot);
         if (!TreeDigest.of(sourceRoot).equals(sourceHash)
-            || (ReSyncDataFixer.installedVersion(activeRoot).isEmpty() && !TreeDigest.of(activeRoot).equals(activeHash))) {
-            throw new MigrationException("Fresh Root Provenance No Longer Matches Empty Persistence Roots");
+            || !TreeDigest.freshInputsOf(activeRoot).equals(activeHash)) {
+            throw new MigrationException("Fresh Root Provenance No Longer Matches Its Initial Persistence Roots");
         }
     }
 
@@ -187,7 +190,7 @@ public final class FreshRootProvenance {
         if (!Files.exists(source, LinkOption.NOFOLLOW_LINKS)) {
             Files.createDirectory(source);
         }
-        ensureEmpty(source, "Fresh ReSync Data Root");
+        ensureInputs(source, "Fresh ReSync Data Root");
         if (!provenance.sourceHash.isEmpty() && !TreeDigest.of(source).equals(provenance.sourceHash)) {
             throw new MigrationException("Fresh ReSync Data Root Changed After Provenance Was Recorded");
         }
@@ -201,6 +204,12 @@ public final class FreshRootProvenance {
         }
     }
 
+    private static void ensureInputs(Path root, String name) throws IOException {
+        if (!FreshInstallInputs.accepts(root)) {
+            throw new MigrationException(name + " Contains Data Other Than Fresh Configuration Or Empty Directories");
+        }
+    }
+
     private static void ensureFreshActive(Path root) throws IOException {
         Path directory = MigrationPaths.requireDirectory(root, "activeRoot");
         MigrationPaths.requireNoSymlinkTree(directory);
@@ -208,13 +217,15 @@ public final class FreshRootProvenance {
         try (var children = Files.list(directory)) {
             entries = children.toList();
         }
-        if (entries.isEmpty()) {
-            return;
-        }
         Path versionDirectory = directory.resolve(ReSyncDataFixer.VERSION_DIRECTORY);
-        if (entries.size() != 1 || !entries.getFirst().equals(versionDirectory)
-            || ReSyncDataFixer.installedVersion(directory).orElse(-1) != 1) {
-            throw new MigrationException("Fresh ReSync Active Root Contains Unowned Data");
+        for (Path entry : entries) {
+            if (!entry.equals(versionDirectory) && !FreshInstallInputs.acceptsEntry(entry)) {
+                throw new MigrationException("Fresh ReSync Active Root Contains Unowned Data");
+            }
+        }
+        if (!Files.exists(versionDirectory, LinkOption.NOFOLLOW_LINKS)) return;
+        if (ReSyncDataFixer.installedVersion(directory).orElse(-1) != 1) {
+            throw new MigrationException("Fresh ReSync Active Root Has Invalid Migration Data");
         }
         try (var versionEntries = Files.list(versionDirectory)) {
             List<Path> files = versionEntries.toList();

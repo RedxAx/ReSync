@@ -23,6 +23,7 @@ public final class RecoverableJsonStore {
     private static final int SCHEMA_VERSION = 1;
     private static final String QUARANTINE_DIRECTORY = ".quarantine";
     private static final String QUARANTINE_CATEGORY = "journals";
+    private static final String ATOMIC_WRITE_CATEGORY = "atomic-writes";
     private static final String ATOMIC_TEMP_PREFIX = ".resync-";
     private static final String ATOMIC_TEMP_SUFFIX = ".tmp";
     private static final String ATOMIC_COPY_TEMP_SUFFIX = ".backup.tmp";
@@ -144,13 +145,64 @@ public final class RecoverableJsonStore {
         StorageSafety.writeUtf8AtomicStrict(file, gson.toJson(envelope));
     }
 
-    static void recoverCanonicalArtifacts(Path root, Path quarantine) throws IOException {
+    static int recoverCanonicalArtifacts(Path root, Path quarantine) throws IOException {
         Path normalizedRoot = MigrationPaths.requireDirectory(root, "journalRoot");
         Path normalizedQuarantine = MigrationPaths.requirePath(quarantine, "journalQuarantine");
         if (!normalizedQuarantine.startsWith(normalizedRoot) || normalizedQuarantine.equals(normalizedRoot)) {
             throw new IOException("Journal quarantine escapes its root: " + normalizedQuarantine);
         }
-        inventoryCanonicalArtifacts(normalizedRoot, null, null, normalizedQuarantine);
+        return inventoryCanonicalArtifacts(normalizedRoot, null, null, normalizedQuarantine);
+    }
+
+    static int recoverAtomicWrites(Path root) throws IOException {
+        validateAtomicWriteRecovery(root);
+        return recoverCanonicalArtifacts(root, root.resolve(QUARANTINE_DIRECTORY).resolve(ATOMIC_WRITE_CATEGORY));
+    }
+
+    static void validateAtomicWriteRecovery(Path root) throws IOException {
+        Path directory = MigrationPaths.requireDirectory(root, "atomicWriteRoot");
+        Path container = directory.resolve(QUARANTINE_DIRECTORY);
+        if (!existsNoFollow(container)) {
+            return;
+        }
+        requireDirectory(container, "Atomic write recovery container");
+        Path quarantine = container.resolve(ATOMIC_WRITE_CATEGORY);
+        try (var entries = Files.list(container)) {
+            for (Path entry : entries.toList()) {
+                if (!entry.equals(quarantine)) {
+                    throw new IOException("Atomic write recovery contains an unexpected directory: " + entry);
+                }
+                requireDirectory(entry, "Atomic write recovery directory");
+            }
+        }
+        if (!existsNoFollow(quarantine)) {
+            return;
+        }
+        try (var entries = Files.list(quarantine)) {
+            for (Path entry : entries.toList()) {
+                requireRegular(entry, "Atomic write recovery evidence");
+                if (!isPreservedTemporaryName(entry.getFileName().toString())) {
+                    throw new IOException("Atomic write recovery evidence name is invalid: " + entry);
+                }
+            }
+        }
+    }
+
+    private static boolean isPreservedTemporaryName(String name) {
+        if (isCanonicalTemporaryName(name)) {
+            return true;
+        }
+        int separator = name.lastIndexOf('.');
+        if (separator < 0 || !isCanonicalTemporaryName(name.substring(0, separator))) {
+            return false;
+        }
+        String suffix = name.substring(separator + 1);
+        try {
+            int attempt = Integer.parseInt(suffix);
+            return attempt > 0 && attempt < MAX_PRESERVATION_ATTEMPTS && Integer.toString(attempt).equals(suffix);
+        } catch (NumberFormatException exception) {
+            return false;
+        }
     }
 
     private JsonElement decode(JsonElement parsed) {
@@ -293,7 +345,7 @@ public final class RecoverableJsonStore {
         StorageSafety.forceDirectory(quarantine.getParent());
     }
 
-    private static void inventoryCanonicalArtifacts(Path root, String reservedName, String previousName,
+    private static int inventoryCanonicalArtifacts(Path root, String reservedName, String previousName,
                                                     Path quarantine) throws IOException {
         Path normalizedRoot = MigrationPaths.requireDirectory(root, "journalRoot");
         Path normalizedQuarantine = MigrationPaths.requirePath(quarantine, "journalQuarantine");
@@ -328,7 +380,7 @@ public final class RecoverableJsonStore {
             }
         }
         if (artifacts.isEmpty()) {
-            return;
+            return 0;
         }
         inventoryQuarantineDirectory(normalizedRoot, normalizedQuarantine, true);
         for (Path artifact : artifacts) {
@@ -340,6 +392,7 @@ public final class RecoverableJsonStore {
         StorageSafety.forceDirectory(normalizedQuarantine);
         StorageSafety.forceDirectory(normalizedQuarantine.getParent());
         StorageSafety.forceDirectory(normalizedRoot);
+        return artifacts.size();
     }
 
     private static void inventoryQuarantineDirectory(Path root, Path quarantine, boolean create) throws IOException {

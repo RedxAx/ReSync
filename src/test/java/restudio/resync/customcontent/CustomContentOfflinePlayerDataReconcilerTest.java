@@ -8,6 +8,7 @@ import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
@@ -76,8 +77,13 @@ class CustomContentOfflinePlayerDataReconcilerTest {
     }
 
     @Test
-    void preservesSymlinkPlayerTempEvidenceAndFailsClosed() throws Exception {
-        Path playerData = Files.createDirectories(temporary.resolve("symlink-temp").resolve("playerdata"));
+    void preservesSymlinkPlayerTempEvidenceAndRecoversLaterRoots() throws Exception {
+        Path firstWorld = Files.createDirectories(temporary.resolve("first-world"));
+        Path secondWorld = Files.createDirectories(temporary.resolve("second-world"));
+        Set<Path> directories = Set.of(Files.createDirectories(firstWorld.resolve("playerdata")),
+            Files.createDirectories(secondWorld.resolve("playerdata")));
+        Path playerData = directories.iterator().next();
+        Path laterRoot = directories.stream().filter(path -> !path.equals(playerData)).findFirst().orElseThrow();
         Path external = Files.writeString(temporary.resolve("external-temp"), "external");
         UUID playerId = UUID.fromString("0b3ec67a-3381-48e2-add1-efb503353842");
         Path linked = playerData.resolve("." + playerId + ".dat." + UUID.randomUUID() + ".resync.tmp");
@@ -88,8 +94,22 @@ class CustomContentOfflinePlayerDataReconcilerTest {
         }
 
         assertThrows(IOException.class, () -> CustomContentOfflinePlayerDataReconciler.recoverPlayerDataTemps(playerData));
+        String laterName = "." + playerId + ".dat." + UUID.randomUUID() + ".resync.tmp";
+        Path laterTemp = Files.writeString(laterRoot.resolve(laterName), "later-evidence");
+        PaperPlayerDataMutationAdmission admission = new PaperPlayerDataMutationAdmission(
+            List.of(firstWorld, secondWorld), temporary);
+        CustomContentOfflinePlayerDataReconciler reconciler = new CustomContentOfflinePlayerDataReconciler(
+            null, admission, new RecordingScheduler(), ignored -> true);
+
+        invokeReconcileSnapshot(reconciler, directories);
+
         assertTrue(Files.isSymbolicLink(linked));
         assertEquals("external", Files.readString(external));
+        assertFalse(Files.exists(laterTemp));
+        assertEquals("later-evidence", Files.readString(laterRoot.resolve(".quarantine/player-data")
+            .resolve(playerId.toString()).resolve(laterName)));
+        assertEquals(0, admission.activeWorkCount());
+        reconciler.shutdown();
     }
 
     @Test
@@ -218,6 +238,25 @@ class CustomContentOfflinePlayerDataReconcilerTest {
             throw new AssertionError(cause);
         } catch (ReflectiveOperationException exception) {
             throw new AssertionError(exception);
+        }
+    }
+
+    private static void invokeReconcileSnapshot(CustomContentOfflinePlayerDataReconciler reconciler,
+                                                Set<Path> directories) throws Exception {
+        Class<?> snapshotType = Class.forName(CustomContentOfflinePlayerDataReconciler.class.getName() + "$OfflinePlayerDataSnapshot");
+        Constructor<?> constructor = snapshotType.getDeclaredConstructor(Set.class, Set.class);
+        constructor.setAccessible(true);
+        Object snapshot = constructor.newInstance(directories, Set.of());
+        Method method = CustomContentOfflinePlayerDataReconciler.class.getDeclaredMethod(
+            "reconcileSnapshot", JavaPlugin.class, snapshotType, String.class, boolean.class);
+        method.setAccessible(true);
+        try {
+            method.invoke(reconciler, null, snapshot, "content", false);
+        } catch (InvocationTargetException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof Exception failure) throw failure;
+            if (cause instanceof Error error) throw error;
+            throw new AssertionError(cause);
         }
     }
 

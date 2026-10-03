@@ -20,6 +20,13 @@ public interface ProtocolResourceMutationAuthority {
     ProtocolEnvelopeDispatchResult mutate(ConnectionInfo connection, Session session,
                                            ProtocolEnvelope<Map<String, Object>> envelope, ResourceOperation operation);
 
+    default ProtocolEnvelopeDispatchResult mutateOperator(ProtocolRequestAuthority.OperatorGrant grant,
+                                                          ProtocolEnvelope<Map<String, Object>> envelope,
+                                                          ResourceOperation operation) {
+        return ProtocolEnvelopeDispatchResult.rejected(ProtocolRejectionCode.AUTHORIZATION_DENIED,
+            "Local operator resource admission is unavailable");
+    }
+
     default boolean authoritativeReads() {
         return false;
     }

@@ -501,12 +501,12 @@ class CustomContentOfflinePlayerDataReconciler {
 
     private static void validatePlayerTemp(Path temp, Path root) throws IOException {
         Path normalizedRoot = MigrationPaths.requireDirectory(root, "playerDataRoot");
-        Path normalized = MigrationPaths.requirePath(temp, "playerDataTemporaryTarget");
+        Path normalized = Objects.requireNonNull(temp, "temp").toAbsolutePath().normalize();
         if (normalized.getParent() == null || !normalized.getParent().equals(normalizedRoot)
             || parsePlayerTemp(normalized) == null) {
             throw new IOException("Player Data Temporary Target Is Not Canonical: " + normalized);
         }
-        MigrationPaths.requireNoSymlinkTraversal(normalizedRoot, normalizedRoot);
+        MigrationPaths.requireNoSymlinkTraversal(normalizedRoot, normalized);
         if (Files.isSymbolicLink(normalized)
             || !Files.isRegularFile(normalized, LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("Player Data Temporary Target Is Not A Safe Regular File: " + normalized);

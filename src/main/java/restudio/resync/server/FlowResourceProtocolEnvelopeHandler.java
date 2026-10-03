@@ -321,6 +321,37 @@ public final class FlowResourceProtocolEnvelopeHandler implements ProtocolEnvelo
         }
     }
 
+    public ProtocolEnvelopeDispatchResult handleOperator(ProtocolRequestAuthority.OperatorGrant grant,
+                                                         ProtocolEnvelope<Map<String, Object>> envelope) {
+        if (!supports(envelope) || !(envelope.body() instanceof ProtocolBody.ResourceRequest request)) {
+            return reject(ProtocolRejectionCode.UNSUPPORTED_OPERATION, "A supported typed resource request is required");
+        }
+        if (grant == null || !grant.matches(serverId, envelope) || !ProtocolRequestAuthority.owns(serverId, envelope)
+            || !requestResource(request).map(resource -> ownerMatches(resource.type()))
+                .orElseGet(() -> requestType(request).map(this::ownerMatches).orElse(false))) {
+            return reject(ProtocolRejectionCode.AUTHORIZATION_DENIED, "Local operator resource request is not authorized");
+        }
+        if (!authorityEpoch.acceptsTyped(envelope.authorityEpoch())) {
+            return reject(ProtocolRejectionCode.RESOURCE_REVISION_CONFLICT, "Protocol envelope authority epoch is stale");
+        }
+        ResourceOperation operation = request.operation();
+        try {
+            return switch (operation) {
+                case ResourceListRequest list -> grant.claim(serverId, envelope) ? list(envelope, list)
+                    : reject(ProtocolRejectionCode.AUTHORIZATION_DENIED, "Local operator admission was already consumed");
+                case ResourceQueryRequest query -> grant.claim(serverId, envelope) ? query(envelope, query)
+                    : reject(ProtocolRejectionCode.AUTHORIZATION_DENIED, "Local operator admission was already consumed");
+                case ResourceLoadRequest load -> grant.claim(serverId, envelope) ? load(envelope, load)
+                    : reject(ProtocolRejectionCode.AUTHORIZATION_DENIED, "Local operator admission was already consumed");
+                default -> mutationAuthority.supports(operation)
+                    ? stampMutationResponse(mutationAuthority.mutateOperator(grant, envelope, operation))
+                    : mutationAuthority.rejectUnsupported(operation);
+            };
+        } catch (RuntimeException exception) {
+            return reject(ProtocolRejectionCode.RESOURCE_OPERATION_FAILED, "Resource operation failed");
+        }
+    }
+
     private boolean authorizeOptionQuery(ConnectionInfo connection, Session session,
                                          ProtocolEnvelope<Map<String, Object>> envelope, OptionQuery query) {
         if (!ownsOptionQuery(connection, session, envelope, query)) {

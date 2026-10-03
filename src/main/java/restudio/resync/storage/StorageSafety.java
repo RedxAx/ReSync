@@ -83,6 +83,14 @@ public final class StorageSafety {
         writeBytesAtomic(file, content, true);
     }
 
+    public static int recoverAtomicWrites(Path directory) throws IOException {
+        return RecoverableJsonStore.recoverAtomicWrites(directory);
+    }
+
+    public static void validateAtomicWriteRecovery(Path directory) throws IOException {
+        RecoverableJsonStore.validateAtomicWriteRecovery(directory);
+    }
+
     public static void copyIfAbsentAtomic(Path source, Path target) throws IOException {
         Path normalizedSource = requireSafePath(source, "source");
         Path normalizedTarget = requireSafePath(target, "target");

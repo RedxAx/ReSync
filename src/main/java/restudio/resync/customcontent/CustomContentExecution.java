@@ -162,7 +162,7 @@ public final class CustomContentExecution implements CoreGraphResourceAuthority,
         }
         String id = content.getId();
         FlowResourceMutationStamp before = storage.readMutationStamp(id);
-        FlowResourceMutationStamp identity = before != null && !before.deleted() ? before : intended;
+        FlowResourceMutationStamp identity = intended != null ? intended : before != null && !before.deleted() ? before : null;
         if (identity != null && (!TYPE.equals(identity.type()) || !id.equals(identity.id()) || identity.deleted())) {
             throw new IllegalArgumentException("Custom content admission identity does not match the item");
         }
@@ -195,7 +195,7 @@ public final class CustomContentExecution implements CoreGraphResourceAuthority,
             })
             .filter(message -> message != null && !message.isBlank())
             .limit(8)
-            .reduce((left, right) -> left + "; " + right)
+            .reduce((left, right) -> left + ". " + right)
             .orElse(failure.getMessage());
         return details == null || details.isBlank() ? "This item graph cannot run" : details;
     }

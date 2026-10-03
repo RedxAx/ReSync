@@ -10,8 +10,11 @@ import restudio.resync.api.OptionCatalogQuery;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.flow.CoreGraphStorageBoundary;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.catalog.CatalogActivationAuthority;
 import restudio.resync.flow.catalog.CatalogBindingProof;
+import restudio.resync.flow.catalog.CatalogCapabilityDescriptor;
+import restudio.resync.flow.catalog.CatalogNodeDescriptor;
 import restudio.resync.flow.catalog.CatalogCategoryDescriptor;
 import restudio.resync.flow.catalog.CatalogCompiler;
 import restudio.resync.flow.catalog.CatalogContractRange;
@@ -22,6 +25,10 @@ import restudio.resync.flow.catalog.CatalogSnapshot;
 import restudio.resync.flow.catalog.CatalogSourceIngestor;
 import restudio.resync.flow.catalog.CatalogVersion;
 import restudio.resync.flow.diagnostic.Diagnostic;
+import restudio.resync.flow.function.FunctionLocator;
+import restudio.resync.flow.function.FunctionRevision;
+import restudio.resync.flow.function.FunctionSignature;
+import restudio.resync.flow.function.FunctionSourceDocument;
 import restudio.resync.flow.graph.BranchBinding;
 import restudio.resync.flow.graph.BranchCase;
 import restudio.resync.flow.graph.FunctionBinding;
@@ -43,6 +50,7 @@ import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.InspectorFieldId;
 import restudio.resync.flow.identity.NodeId;
 import restudio.resync.flow.identity.NodeInstanceId;
+import restudio.resync.flow.identity.OperationId;
 import restudio.resync.flow.identity.OwnerId;
 import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.identity.ProviderId;
@@ -61,6 +69,7 @@ import restudio.resync.flow.protocol.ResourceActivationState;
 import restudio.resync.flow.protocol.ResourcePresentationIntent;
 import restudio.resync.flow.runtime.RuntimeBinding;
 import restudio.resync.flow.runtime.RuntimeBindingRegistry;
+import restudio.resync.flow.runtime.RuntimeRegistrySnapshot;
 import restudio.resync.flow.runtime.RuntimeFailureContract;
 import restudio.resync.flow.runtime.RuntimeOperationDescriptor;
 import restudio.resync.flow.runtime.RuntimeProviderDescriptor;
@@ -71,8 +80,11 @@ import restudio.resync.flow.type.TypeReference;
 import restudio.resync.flow.type.TypedValue;
 import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.modules.flow.FlowResourceRegistry;
 
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -82,9 +94,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -251,9 +266,259 @@ class CoreGraphOptionValidatorTest {
     }
 
     @Test
+    void materialMembershipUsesTheExactTypedCatalogIdentity() {
+        TypeExpr material = TypeExpr.named(TypeReference.of("builtin", "material"));
+        Fixture fixture = fixture(STRING_SOURCE, material);
+        fixture.catalogs().register(provider(STRING_SOURCE, Set.of(), query -> available("stone")));
+        CoreGraphOptionValidator validator = new CoreGraphOptionValidator(fixture.catalogs());
+        GraphDocument valid = graph(fixture, resource("command", "raycast"), node(Map.of(pin("choice"),
+            new PinValue(pin("choice"), TypedValue.value(material, "stone"))), List.of(), List.of()), List.of(), List.of());
+        GraphDocument invalid = graph(fixture, resource("command", "raycast"), node(Map.of(pin("choice"),
+            new PinValue(pin("choice"), TypedValue.value(material, "any"))), List.of(), List.of()), List.of(), List.of());
+
+        assertTrue(validator.validate(valid, fixture.catalog()).isEmpty());
+        assertEquals(List.of("CATALOG.REFERENCE_UNRESOLVED"), codes(validator.validate(invalid, fixture.catalog())));
+    }
+
+    @Test
     void authoritySaveAndCreateRejectAProviderReadWhoseStorageObservationBecomesStale() throws Exception {
         runStaleAuthorityMutation(false, tempDir.resolve("save"));
         runStaleAuthorityMutation(true, tempDir.resolve("create"));
+    }
+
+    @Test
+    void durableNestedProjectionsRetainStorageFencesAndRecoverWithoutLiveSelectors() throws Exception {
+        for (int interruption : List.of(0, 1, 2)) {
+            Path root = tempDir.resolve("projection-" + interruption);
+            ServerResourceLocator child = resource("function", "projection-child");
+            ServerResourceLocator parent = resource("function", "projection-parent");
+            Fixture options = projectionFixture(fixture(STRING_SOURCE), child);
+            RuntimeRegistrySnapshot runtime = options.activation().active().runtime();
+            CatalogSnapshot sourceCatalog = options.catalog();
+            CatalogSnapshot targetCatalog = sourceCatalog.withGeneration(2L);
+            CatalogBinding sourceBinding = new CatalogBinding(sourceCatalog.generation(), sourceCatalog.contentChecksum(), runtime.bindingManifestHash());
+            CatalogBinding targetBinding = new CatalogBinding(targetCatalog.generation(), targetCatalog.contentChecksum(), runtime.bindingManifestHash());
+            AtomicReference<CatalogRuntimeActivation.ActivationRecord> active = new AtomicReference<>(
+                new CatalogRuntimeActivation.ActivationRecord(sourceCatalog, runtime));
+            AtomicBoolean fail = new AtomicBoolean(false);
+            List<ServerResourceLocator> published = new ArrayList<>();
+            AssetPersistenceGate gate = new AssetPersistenceGate(root);
+            AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(root.resolve("assets"), new Gson());
+            try {
+                FlowStorage storage = new FlowStorage(root.toFile(), LegacyRuntimeActivationGate.runtime(root), gate, SERVER, coordinator) {
+                    @Override
+                    public CoreGraphStorageBoundary.Decoded saveCoreGraph(FunctionSourceDocument source,
+                            ResourceActivationState state, UUID mutation, long expectedRevision, RuntimeObservation observation) {
+                        boolean interrupt = parent.equals(source.graph().resource()) && expectedRevision == 1L && fail.compareAndSet(true, false);
+                        if (interrupt && interruption == 1) {
+                            throw new IllegalStateException("Interrupted Before Parent Write");
+                        }
+                        CoreGraphStorageBoundary.Decoded saved = super.saveCoreGraph(source, state, mutation, expectedRevision, observation);
+                        if (interrupt && interruption == 2) {
+                            throw new IllegalStateException("Interrupted After Parent Write");
+                        }
+                        return saved;
+                    }
+                };
+                for (long revision = 1L; revision <= 5L; revision++) {
+                    storage.saveCoreGraph(projectionFunction(child, revision, sourceBinding, List.of(), false, "child"),
+                        ResourceActivationState.ACTIVE, UUID.randomUUID(), revision - 1L);
+                }
+                storage.saveCoreGraph(projectionFunction(parent, 1L, sourceBinding,
+                    List.of(new FunctionBinding(child, 5L, List.of(), List.of(), OpaqueData.of(Map.of("catalogRevision", 5L)))), true, "parent"),
+                    ResourceActivationState.ACTIVE, UUID.randomUUID(), 0L);
+                CoreGraphMutationValidator validator = new CoreGraphMutationValidator(SERVER, active::get,
+                    CatalogActivationAuthority::freshInstall);
+                FlowStorageCoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER, validator, options::catalogs);
+                for (ServerResourceLocator resource : List.of(child, parent)) {
+                    CoreGraphMutationValidator.AdmissionResult admission = validator.validate(resource, core.load(resource).orElseThrow());
+                    assertTrue(admission.valid(), admission.diagnostics().toString());
+                }
+                Path database = root.resolve("runtime/resource-mutations.db");
+                try (var authority = projectionAuthority(database, core, published)) {
+                    authority.load(child);
+                    authority.load(parent);
+                }
+                active.set(new CatalogRuntimeActivation.ActivationRecord(targetCatalog, runtime));
+                for (ServerResourceLocator resource : List.of(child, parent)) {
+                    CoreGraphStorageBoundary.Decoded source = core.load(resource).orElseThrow();
+                    Map<ServerResourceLocator, Long> dependencies = resource.equals(parent) ? Map.of(child, 6L) : Map.of();
+                    UUID mutation = CoreCatalogCompatibilityRebind.mutationId(resource, source, targetBinding, dependencies);
+                    CoreGraphMutationValidator.AdmissionResult admission = validator.validate(resource,
+                        CoreCatalogCompatibilityRebind.project(source, targetBinding, mutation, dependencies));
+                    assertTrue(admission.valid(), admission.diagnostics().toString());
+                }
+                fail.set(interruption != 0);
+                String pendingMutation = null;
+                if (interruption != 0) {
+                    assertThrows(IllegalStateException.class, () -> projectionAuthority(database, core, published));
+                    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+                         var statement = connection.prepareStatement("SELECT mutation_id FROM resource_mutation_receipt WHERE status = 'PENDING'");
+                         var rows = statement.executeQuery()) {
+                        assertTrue(rows.next());
+                        pendingMutation = rows.getString(1);
+                    }
+                }
+                try (var authority = projectionAuthority(database, core, published)) {
+                    assertTrue(authority.durable());
+                    assertEquals(6L, authority.load(child).revision());
+                    assertEquals(2L, authority.load(parent).revision());
+                    if (pendingMutation != null) {
+                        assertEquals(pendingMutation, authority.load(parent).mutationId().toString());
+                    }
+                    CoreGraphStorageBoundary.Decoded saved = core.load(parent).orElseThrow();
+                    FunctionSourceDocument source = saved.functionSourceDocument();
+                    assertEquals(targetBinding, source.graph().catalogBinding());
+                    assertEquals(6L, source.graph().functions().getFirst().revision());
+                    assertEquals("parent", source.graph().unknown().get("body"));
+                    assertEquals("alpha", source.graph().nodes().stream().filter(node -> node.definition().equals(DEFINITION))
+                        .findFirst().orElseThrow().values().get(pin("choice")).value().value());
+                    for (boolean bodyEdit : List.of(false, true)) {
+                        FunctionSourceDocument unproven = projectionFunction(parent, 3L, targetBinding,
+                            List.of(new FunctionBinding(child, bodyEdit ? 6L : 7L, List.of(), List.of(),
+                                OpaqueData.of(Map.of("catalogRevision", bodyEdit ? 6L : 7L)))), true, bodyEdit ? "edited" : "parent");
+                        UUID mutation = UUID.randomUUID();
+                        CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
+                        CoreGraphStorageBoundary.Decoded requested = boundary.decode(boundary.encode(unproven,
+                            new CoreGraphStorageBoundary.AssetMetadata("function", 3L, mutation, ResourceActivationState.ACTIVE), parent), parent);
+                        CoreGraphMutationValidationException rejected = assertThrows(CoreGraphMutationValidationException.class,
+                            () -> core.save(parent, requested, mutation, 2L, requested.envelope().assetHash()));
+                        assertTrue(rejected.diagnostics().stream().anyMatch(value -> "CATALOG.SELECTOR_UNRESOLVED".equals(value.code())));
+                        assertArrayEquals(boundary.encode(saved), boundary.encode(core.load(parent).orElseThrow()));
+                    }
+                }
+                assertEquals(List.of(child, parent), published);
+                try (var authority = projectionAuthority(database, core, published)) {
+                    assertTrue(authority.durable());
+                    assertEquals(6L, authority.load(child).revision());
+                    assertEquals(2L, authority.load(parent).revision());
+                }
+                assertEquals(List.of(child, parent), published);
+                try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+                     var statement = connection.prepareStatement("""
+                         SELECT SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END),
+                             SUM(CASE WHEN status = 'APPLIED' AND transition_published = 1 THEN 1 ELSE 0 END)
+                         FROM resource_mutation_receipt
+                         """);
+                     var rows = statement.executeQuery()) {
+                    assertTrue(rows.next());
+                    assertEquals(0L, rows.getLong(1));
+                    assertEquals(2L, rows.getLong(2));
+                }
+            } finally {
+                gate.quiesce();
+                coordinator.close();
+            }
+        }
+    }
+
+    private static SqliteProtocolResourceMutationAuthority projectionAuthority(Path database, CoreGraphResourceAuthority core,
+            List<ServerResourceLocator> published) {
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        registry.bindCoreGraphResourceAuthority(core);
+        registry.addCoreMutationListener(transition -> {
+            CoreGraphStorageBoundary.Decoded current = core.load(transition.locator()).orElseThrow();
+            assertEquals(current.envelope().assetRevision(), transition.revision());
+            assertEquals(current.envelope().assetMutationId(), transition.mutationId().toString());
+            assertEquals(current.envelope().assetActivationState(), transition.activationState());
+            assertEquals(new String(new CoreGraphStorageBoundary().encode(current), StandardCharsets.UTF_8), transition.canonicalEnvelope());
+            core.publishCommitted(transition.locator(), transition.mutationId());
+            published.add(transition.locator());
+        });
+        return new SqliteProtocolResourceMutationAuthority(registry, SERVER, database, core,
+            ProtocolResourceAuthorizer.serverGranted(), AuthorityEpoch.fixed(1L), registry, null);
+    }
+
+    private static FunctionSourceDocument projectionFunction(ServerResourceLocator resource, long revision, CatalogBinding binding,
+            List<FunctionBinding> functions, boolean option, String body) {
+        NodeInstanceId start = NodeInstanceId.deterministic(resource.id() + "-start");
+        NodeInstanceId end = NodeInstanceId.deterministic(resource.id() + "-end");
+        List<GraphNode> nodes = new ArrayList<>(List.of(
+            new GraphNode(start, ContractRef.of(OWNER, NodeId.of("function_start")), 1, Map.of()),
+            new GraphNode(end, ContractRef.of(OWNER, NodeId.of("function_end")), 1, Map.of())));
+        if (option) {
+            nodes.add(node(Map.of(pin("choice"), value("alpha")), List.of(), List.of()));
+        }
+        GraphDocument graph = new GraphDocument(VERSION, resource, revision, binding, Set.of(), nodes,
+            List.of(new GraphConnection(ConnectionId.deterministic(resource.id() + "-flow"),
+                new GraphEndpoint(start, pin("flow")), new GraphEndpoint(end, pin("flow")))), List.of(), functions,
+            OpaqueData.of(Map.of("body", body)));
+        return new FunctionSourceDocument(new FunctionSignature(new FunctionLocator(resource), new FunctionRevision(revision),
+            List.of(), List.of()), graph);
+    }
+
+    private static Fixture projectionFixture(Fixture options, ServerResourceLocator child) {
+        CatalogContribution base = options.catalog().contributions().getFirst();
+        List<CatalogNodeDescriptor> definitions = new ArrayList<>(base.definitions());
+        ContractRef<CapabilityId> capability = ContractRef.of(OWNER, CapabilityId.of("flow.function"));
+        TypeExpr execution = TypeExpr.named(TypeReference.of("builtin", "execution"));
+        RuntimeSemantics semantics = projectionSemantics(capability);
+        definitions.add(projectionBoundary("function_start", "Function Start", CatalogNodeDescriptor.Direction.OUTPUT,
+            "inputs", capability, execution, semantics));
+        definitions.add(projectionBoundary("function_end", "Function End", CatalogNodeDescriptor.Direction.INPUT,
+            "outputs", capability, execution, semantics));
+        definitions.add(CatalogNodeDescriptor.builder("projection_child_call").displayName("Projection Child")
+            .description("Calls the child Function used by this durable projection contract.")
+            .category(ContractRef.of(OWNER, CapabilityId.of("function")))
+            .handler(new CatalogNodeDescriptor.Handler(capability, ContractRef.of(OWNER, OperationId.of("custom_function_call"))))
+            .pins(List.of(new CatalogNodeDescriptor.Pin("flow", CatalogNodeDescriptor.Direction.INPUT, execution,
+                "Flow", "Starts this Function call.", CatalogNodeDescriptor.Requirement.REQUIRED, capability),
+                new CatalogNodeDescriptor.Pin("output_flow", CatalogNodeDescriptor.Direction.OUTPUT, execution,
+                    "Flow", "Continues after this Function returns.", CatalogNodeDescriptor.Requirement.REQUIRED, capability)))
+            .semantics(semantics)
+            .branches(List.of(projectionFailure()))
+            .metadata(Map.of("customFunctionIdentity", Map.of("owner", OWNER.value(), "namespace", "local", "id", child.id())))
+            .build());
+        List<RuntimeOperationDescriptor> requirements = definitions.stream().map(definition -> new RuntimeOperationDescriptor(
+            definition.handler().capability(), definition.handler().operation(), definition.pins().stream()
+                .map(pin -> new RuntimeOperationDescriptor.Pin(pin.id(), pin.direction() == CatalogNodeDescriptor.Direction.INPUT
+                    ? RuntimeOperationDescriptor.Direction.INPUT : RuntimeOperationDescriptor.Direction.OUTPUT, pin.type()))
+                .toList(), definition.semantics())).toList();
+        List<CatalogCapabilityDescriptor> capabilities = new ArrayList<>(base.capabilities());
+        capabilities.add(new CatalogCapabilityDescriptor(capability.id(), 1, false, InspectorFallback.GENERIC));
+        List<CatalogCategoryDescriptor> categories = new ArrayList<>(base.categories());
+        categories.add(new CatalogCategoryDescriptor("function", "Function", "Typed Function boundaries and calls.", 2));
+        CatalogContribution contribution = CatalogContribution.builder(OWNER, base.version(), base.contractRange(), base.provenance())
+            .definitions(definitions).types(base.types()).categories(categories).inspectors(base.inspectors())
+            .capabilities(capabilities).runtimeRequirements(requirements).optionSources(base.optionSources())
+            .validators(base.validators()).editors(base.editors()).previews(base.previews()).build();
+        RuntimeBindingRegistry registry = new RuntimeBindingRegistry();
+        ContractRef<ProviderId> provider = ContractRef.of(OWNER, ProviderId.of("projection"));
+        registry.activate(new RuntimeProviderDescriptor(provider, "1.0.0", 0L, 0L, RuntimeSemantics.UnloadPolicy.DRAIN),
+            requirements.stream().map(requirement -> RuntimeBinding.available(requirement, provider, "1.0.0",
+                ignored -> CompletableFuture.completedFuture(RuntimeResult.success()))).toList());
+        var compiled = new CatalogCompiler(VERSION, CatalogBindingProof.live(registry)).compile(List.of(contribution), 1L);
+        assertTrue(compiled.accepted(), compiled.diagnostics().toString());
+        CatalogSnapshot catalog = compiled.snapshot().orElseThrow();
+        RuntimeRegistrySnapshot runtime = registry.snapshot();
+        CatalogBinding binding = new CatalogBinding(catalog.generation(), catalog.contentChecksum(), runtime.bindingManifestHash());
+        return new Fixture(catalog, new CatalogRuntimeActivation(catalog, runtime), binding, options.catalogs());
+    }
+
+    private static CatalogNodeDescriptor projectionBoundary(String id, String name, CatalogNodeDescriptor.Direction direction,
+            String role, ContractRef<CapabilityId> capability, TypeExpr execution, RuntimeSemantics semantics) {
+        return CatalogNodeDescriptor.builder(id).displayName(name)
+            .description("Marks a typed Function boundary for the durable projection contract.")
+            .category(ContractRef.of(OWNER, CapabilityId.of("function")))
+            .handler(new CatalogNodeDescriptor.Handler(capability, ContractRef.of(OWNER, OperationId.of(id))))
+            .pins(List.of(new CatalogNodeDescriptor.Pin("flow", direction, execution, "Flow", "Continues Function execution.",
+                CatalogNodeDescriptor.Requirement.REQUIRED, capability)))
+            .semantics(semantics).branches(List.of(projectionFailure()))
+            .metadata(Map.of("functionBoundary", Map.of("role", role, "flowPin", "flow"))).build();
+    }
+
+    private static CatalogNodeDescriptor.Branch projectionFailure() {
+        return new CatalogNodeDescriptor.Branch("failed", "Failed", "Reports an unsuccessful Function operation.",
+            List.of(new CatalogNodeDescriptor.Case("failure", "Failure", "The operation reported a structured failure.")));
+    }
+
+    private static RuntimeSemantics projectionSemantics(ContractRef<CapabilityId> capability) {
+        return new RuntimeSemantics(RuntimeSemantics.Effect.PURE, RuntimeSemantics.ThreadMode.CURRENT, capability,
+            RuntimeSemantics.Cancellation.NONE, 0L, 0L, 0L, RuntimeSemantics.UnloadPolicy.DRAIN,
+            RuntimeSemantics.Retry.NEVER, RuntimeSemantics.Idempotency.INTRINSIC, RuntimeSemantics.Audit.NONE,
+            RuntimeSemantics.Confirmation.NONE, RuntimeSemantics.SensitiveData.NONE, RuntimeSemantics.Determinism.DETERMINISTIC,
+            Set.of(), Set.of("failed"), Set.of(), new RuntimeFailureContract(STRING, Set.of("RUNTIME.FAILURE"), Set.of("failed"),
+                RuntimeFailureContract.CommitBoundary.NO_MUTATION), Set.of(), Set.of());
     }
 
     private void runStaleAuthorityMutation(boolean create, Path root) throws Exception {
@@ -301,8 +566,12 @@ class CoreGraphOptionValidatorTest {
     }
 
     private static Fixture fixture(String stringSource) {
+        return fixture(stringSource, STRING);
+    }
+
+    private static Fixture fixture(String stringSource, TypeExpr optionType) {
         RuntimeSemantics semantics = semantics();
-        CatalogContribution contribution = contribution(stringSource, semantics);
+        CatalogContribution contribution = contribution(stringSource, semantics, optionType);
         RuntimeOperationDescriptor requirement = contribution.runtimeRequirements().getFirst();
         RuntimeBindingRegistry runtime = new RuntimeBindingRegistry();
         ContractRef<ProviderId> provider = ContractRef.of(OwnerId.of("resync"), ProviderId.of("fixture"));
@@ -320,7 +589,8 @@ class CoreGraphOptionValidatorTest {
         return new Fixture(catalog, activation, binding, new OptionCatalogRegistry());
     }
 
-    private static CatalogContribution contribution(String stringSource, RuntimeSemantics semantics) {
+    private static CatalogContribution contribution(String stringSource, RuntimeSemantics semantics, TypeExpr optionType) {
+        String optionId = ((TypeExpr.Named) optionType).reference().localId();
         Map<String, Object> node = new LinkedHashMap<>();
         node.put("id", DEFINITION.id().value());
         node.put("displayName", "Option Fixture");
@@ -340,17 +610,17 @@ class CoreGraphOptionValidatorTest {
         List<Map<String, Object>> inputs = new ArrayList<>();
         inputs.add(pin("mode", "string", null, "hide", null, null));
         inputs.add(pin("dependency", "string", null, null, null, null));
-        inputs.add(pin("choice", "string", stringSource, "alpha", null, null));
-        inputs.add(pin("hidden-choice", "string", stringSource, null, null, Map.of("mode", "show")));
+        inputs.add(pin("choice", optionId, stringSource, "alpha", null, null));
+        inputs.add(pin("hidden-choice", optionId, stringSource, null, null, Map.of("mode", "show")));
         inputs.add(pin("repeat-dependency", "string", null, null, repeatable(), null));
-        inputs.add(pin("repeat-choice", "string", stringSource, null, repeatable(), null));
-        inputs.add(pin("branch-choice", "string", stringSource, null, null, null));
+        inputs.add(pin("repeat-choice", optionId, stringSource, null, repeatable(), null));
+        inputs.add(pin("branch-choice", optionId, stringSource, null, null, null));
         inputs.add(pin("resource-choice", "resource<flow>", RESOURCE_SOURCE, null, null, null));
         node.put("inputs", inputs);
         node.put("outputs", List.of());
         node.put("semantics", semantics.canonicalValue());
         node.put("sourceDescriptor", Map.of());
-        byte[] bytes = restudio.resync.flow.canonical.CanonicalJson.canonicalBytes(List.of(node));
+        byte[] bytes = CanonicalJson.canonicalBytes(List.of(node));
         CatalogSourceIngestor.CatalogSource source = new CatalogSourceIngestor.CatalogSource(OWNER,
             CatalogProvenance.SourceKind.BUNDLED, "nodes/options.json", "1.0.0", "test-build", bytes);
         InspectorCapability editor = new InspectorCapability(ContractRef.of(OWNER, CapabilityId.of("generic-editor")),
@@ -360,13 +630,13 @@ class CoreGraphOptionValidatorTest {
         CatalogSourceIngestor.CatalogIngestionContext context = new CatalogSourceIngestor.CatalogIngestionContext(
             new CatalogContractRange(VERSION, VERSION),
             List.of(new CatalogCategoryDescriptor("logic", "Logic", "Logic operations used by this catalog test.", 1)),
-            editor, id -> Optional.of(optionSource(id)), request -> Optional.of(new RuntimeOperationDescriptor(
+            editor, id -> Optional.of(optionSource(id, optionType)), request -> Optional.of(new RuntimeOperationDescriptor(
             request.capability(), request.operation(), request.pins(), semantics)), Optional::of);
         return new CatalogSourceIngestor().ingest(source, context);
     }
 
-    private static InspectorOptionSource optionSource(InspectorFieldId id) {
-        TypeExpr type = id.value().equals("server-test-flows") ? RESOURCE : STRING;
+    private static InspectorOptionSource optionSource(InspectorFieldId id, TypeExpr optionType) {
+        TypeExpr type = id.value().equals("server-test-flows") ? RESOURCE : optionType;
         return new InspectorOptionSource(id, "Fixture Options", "Provides authoritative options for this catalog test.",
             type, OptionQuerySchemaV1.empty(), ContractRef.of(OWNER, CapabilityId.of("fixture-options")), 100);
     }

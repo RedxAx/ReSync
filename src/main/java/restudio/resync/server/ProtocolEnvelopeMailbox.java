@@ -11,6 +11,8 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -238,6 +240,50 @@ public final class ProtocolEnvelopeMailbox implements AutoCloseable {
         synchronized (admissionFence) {
             return admittedBytes;
         }
+    }
+
+    public CompletionStage<Void> submitOperator(int requestBytes, Runnable action) {
+        Objects.requireNonNull(action, "Operator action is required");
+        CompletableFuture<Void> result = new CompletableFuture<>();
+        synchronized (admissionFence) {
+            if (!accepting || shutdown) return CompletableFuture.failedFuture(new RejectedExecutionException("Protocol mailbox admission is closed"));
+            if (requestBytes < 0 || requestBytes > limits.maxRequestBytes()
+                || admittedRequests >= limits.maxGlobalRequests() || requestBytes > limits.maxGlobalBytes() - admittedBytes) {
+                return CompletableFuture.failedFuture(new RejectedExecutionException("Protocol mailbox admission limit reached"));
+            }
+            if (admittedRequests == 0L && closingGenerations.isEmpty()) idle = new CompletableFuture<>();
+            admittedRequests++;
+            admittedBytes += requestBytes;
+        }
+        try {
+            workers.execute(() -> {
+                Throwable failure = null;
+                try {
+                    action.run();
+                } catch (Throwable error) {
+                    failure = error;
+                } finally {
+                    settleOperator(requestBytes);
+                }
+                if (failure == null) result.complete(null);
+                else result.completeExceptionally(failure);
+            });
+        } catch (Throwable failure) {
+            settleOperator(requestBytes);
+            result.completeExceptionally(failure);
+        }
+        return result;
+    }
+
+    private void settleOperator(int requestBytes) {
+        CompletableFuture<Void> completion;
+        synchronized (admissionFence) {
+            admittedRequests--;
+            admittedBytes -= requestBytes;
+            if (admittedRequests < 0L || admittedBytes < 0L) throw new IllegalStateException("Protocol mailbox accounting is inconsistent");
+            completion = idleCompletionLocked();
+        }
+        completeIdle(completion);
     }
 
     public void shutdown() {

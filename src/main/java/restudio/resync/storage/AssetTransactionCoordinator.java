@@ -180,6 +180,17 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         return context.state.rootSequence();
     }
 
+    public Snapshot committedSnapshot() {
+        requireOpen();
+        CoordinatorState state = context.state;
+        Snapshot snapshot = context.cachedSnapshot;
+        if (snapshot == null || snapshot.rootSequence() != state.rootSequence() || context.state != state) {
+            throw new IllegalStateException("Asset committed snapshot is being published");
+        }
+        requireOpen();
+        return snapshot;
+    }
+
     public <T> T read(Function<Snapshot, T> reader) {
         Objects.requireNonNull(reader, "reader");
         lifecycle.readLock().lock();
@@ -509,6 +520,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             this.evidenceWatcher = evidenceWatcher;
             this.state = state;
             this.metadata = metadata;
+            this.cachedSnapshot = state.snapshot(metadata, root);
             this.historyValidation = historyValidation;
             this.historyEvidenceScans = historyEvidenceScans;
         }
@@ -1446,13 +1458,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         }
 
         private Snapshot snapshotForRead() {
-            Snapshot snapshot = cachedSnapshot;
-            if (snapshot != null) {
-                return snapshot;
-            }
-            snapshot = state.snapshot(metadata, root);
-            cachedSnapshot = snapshot;
-            return snapshot;
+            return cachedSnapshot;
         }
 
         private Path resolvedPath(AssetKey key, ResourceEntry entry, long sequence) {
@@ -1467,9 +1473,11 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         }
 
         private void publishState(CoordinatorState nextState, AssetProjectMetadata nextMetadata) {
+            Snapshot nextSnapshot = state == nextState && metadata == nextMetadata
+                ? cachedSnapshot : nextState.snapshot(nextMetadata, root);
             state = nextState;
             metadata = nextMetadata;
-            cachedSnapshot = null;
+            cachedSnapshot = nextSnapshot;
         }
 
         private void healthCheck() throws IOException {

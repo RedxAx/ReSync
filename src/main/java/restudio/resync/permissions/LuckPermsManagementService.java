@@ -575,11 +575,10 @@ public final class LuckPermsManagementService implements AutoCloseable {
                 throw new IOException("LuckPerms operation persistence must be quiesced before rebind");
             }
             Path candidate = requirePersistenceFile(activeFile);
-            List<SaveResult> staged = loadCompletedStrict(candidate);
             if (!Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) {
-                writeJournal(staged, candidate);
-                staged = loadCompletedStrict(candidate);
+                throw missingOperationJournal(candidate);
             }
+            List<SaveResult> staged = loadCompletedStrict(candidate);
             Map<String, SaveResult> previousCompleted = new LinkedHashMap<>(completedSaves);
             List<String> previousOrder = List.copyOf(completedSaveOrder);
             Path previousJournal = operationJournal;
@@ -1422,12 +1421,17 @@ public final class LuckPermsManagementService implements AutoCloseable {
     private void healthCheckPersistenceLocked() throws IOException {
         if (!Files.isRegularFile(operationJournal, LinkOption.NOFOLLOW_LINKS)
             || Files.isSymbolicLink(operationJournal)) {
-            throw new IOException("LuckPerms operation journal is missing: " + operationJournal);
+            throw missingOperationJournal(operationJournal);
         }
         List<SaveResult> persisted = loadCompletedStrict(operationJournal);
         if (!GSON.toJson(journalSnapshot()).equals(GSON.toJson(persisted))) {
             throw new IOException("LuckPerms operation journal is out of sync: " + operationJournal);
         }
+    }
+
+    private IOException missingOperationJournal(Path journal) {
+        return new IOException("LuckPerms operation journal is missing: " + journal
+            + ". Restore a verified backup before restarting or rebinding. Do not replace the journal with an empty file.");
     }
 
     private Path requirePersistenceFile(Path file) throws IOException {

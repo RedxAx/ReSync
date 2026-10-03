@@ -662,6 +662,8 @@ public class ReSyncJsonResourceStorage {
             notifySaveFailure(type, working, failure);
             throw failure;
         }
+        FlowResourceMutationStamp stamp = mutationStamp(result.primaryStamp());
+        completePostCommitRecovery(type, safeId, stamp.mutationId(), stamp.revision(), false);
         return result;
     }
 
@@ -692,17 +694,58 @@ public class ReSyncJsonResourceStorage {
     }
 
     public FlowResourceMutationStamp readMutationStamp(String type, String id) {
-        JsonAssetStore<JsonObject> store = requireStore(type);
         try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
-            JsonAssetStore.AssetStamp stamp = store.readStamp(id);
-            if (stamp == null) {
+            return mutationStamp(requireStore(type).readStamp(id));
+        }
+    }
+
+    public void completePostCommitRecovery(String type, String id, UUID mutationId, long revision, boolean deleted) {
+        Objects.requireNonNull(mutationId, "Committed mutation ID is required");
+        if (revision < 1L) throw new IllegalArgumentException("Committed revision must be positive");
+        publishCommitted(committedResource(type, id, mutationId, revision, deleted));
+    }
+
+    private CommittedResource committedResource(String type, String id, UUID mutationId, long revision, Boolean deleted) {
+        try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+            JsonAssetStore<JsonObject> store = requireStore(type);
+            JsonAssetStore.AssetStamp before = store.readStamp(id);
+            if (before == null) {
+                if (mutationId != null || deleted != null) throw new IllegalStateException("Committed JSON resource is unavailable: " + type + "/" + id);
                 return null;
             }
-            UUID runtimeMutationId = stamp.runtimeMutationId().orElseThrow(() -> new IllegalStateException(
-                "Adopted JSON resource lineage cannot be exposed as a runtime mutation UUID: " + stamp.mutationValue()));
-            return new FlowResourceMutationStamp(stamp.type(), stamp.id(), stamp.revision(), runtimeMutationId,
-                stamp.payloadHash(), stamp.deleted());
+            FlowResourceMutationStamp stamp = mutationStamp(before);
+            if (!type.equals(stamp.type()) || !id.equals(stamp.id()) || mutationId != null && !mutationId.equals(stamp.mutationId())
+                || revision > 0L && revision != stamp.revision() || deleted != null && deleted != stamp.deleted()) {
+                throw new IllegalStateException("Committed JSON resource identity changed: " + type + "/" + id);
+            }
+            JsonObject value = stamp.deleted() ? null : logicalPayload(store.get(id));
+            if (!stamp.deleted() && value == null || !before.equals(store.readStamp(id))) {
+                throw new IllegalStateException("Committed JSON resource changed during projection capture: " + type + "/" + id);
+            }
+            normalizeAssetId(value, id);
+            return new CommittedResource(stamp, value);
         }
+    }
+
+    private FlowResourceMutationStamp mutationStamp(JsonAssetStore.AssetStamp stamp) {
+        if (stamp == null) return null;
+        UUID runtimeMutationId = stamp.runtimeMutationId().orElseThrow(() -> new IllegalStateException(
+            "Adopted JSON resource lineage cannot be exposed as a runtime mutation UUID: " + stamp.mutationValue()));
+        return new FlowResourceMutationStamp(stamp.type(), stamp.id(), stamp.revision(), runtimeMutationId,
+            stamp.payloadHash(), stamp.deleted());
+    }
+
+    private void publishCommitted(CommittedResource committed) {
+        if (committed == null) return;
+        FlowResourceMutationStamp stamp = committed.stamp();
+        JsonObject value = committed.value();
+        for (ResourceMutationInterceptor interceptor : interceptors) {
+            interceptor.afterCommit(stamp.type(), stamp.id(), value == null ? null : value.deepCopy(), stamp);
+        }
+        notifyListeners(stamp.type(), stamp.id(), value, stamp.deleted());
+    }
+
+    private record CommittedResource(FlowResourceMutationStamp stamp, JsonObject value) {
     }
 
     public boolean matchesCommittedPayloadRecovery(String type, JsonObject previous, JsonObject requested,
@@ -724,9 +767,8 @@ public class ReSyncJsonResourceStorage {
 
     public JsonObject reload(String type, String id) {
         JsonAssetStore<JsonObject> store = requireStore(type);
-        JsonObject value;
         try {
-            value = store.reload(id, candidate -> {
+            store.reload(id, candidate -> {
                 normalizeAssetId(candidate, id);
                 for (ResourceMutationInterceptor interceptor : interceptors) {
                     interceptor.beforeSave(type, candidate);
@@ -739,12 +781,9 @@ public class ReSyncJsonResourceStorage {
             notifySaveFailure(type, null, failure);
             throw failure;
         }
-        normalizeAssetId(value, id);
-        if (value == null) {
-            return null;
-        }
-        notifyListeners(type, id, value.deepCopy(), false);
-        return logicalPayload(store.get(id));
+        CommittedResource committed = committedResource(type, id, null, 0L, null);
+        publishCommitted(committed);
+        return committed == null || committed.value() == null ? null : committed.value().deepCopy();
     }
 
     public void addListener(ResourceListener listener) {
@@ -894,7 +933,11 @@ public class ReSyncJsonResourceStorage {
             notifySaveFailure(type, working, failure);
             throw failure;
         }
-        notifyListeners(type, safeId, working.deepCopy(), false);
+        if (authoritative) {
+            completePostCommitRecovery(type, safeId, mutationId, Math.addExact(expectedRevision, 1L), false);
+        } else {
+            publishCommitted(committedResource(type, safeId, null, 0L, false));
+        }
     }
 
     private void deleteMutation(String type, String id, UUID mutationId, long expectedRevision,
@@ -928,7 +971,11 @@ public class ReSyncJsonResourceStorage {
             notifyDeleteFailure(type, id, failure);
             throw failure;
         }
-        notifyListeners(type, id, null, true);
+        if (authoritative) {
+            completePostCommitRecovery(type, id, mutationId, Math.addExact(expectedRevision, 1L), true);
+        } else {
+            publishCommitted(committedResource(type, id, null, 0L, true));
+        }
     }
 
     private void requireMutationRequest(UUID mutationId, long expectedRevision) {
@@ -1213,6 +1260,9 @@ public class ReSyncJsonResourceStorage {
         }
 
         default void beforeDelete(String type, String id) {
+        }
+
+        default void afterCommit(String type, String id, JsonObject value, FlowResourceMutationStamp stamp) {
         }
 
         default void afterSaveFailure(String type, JsonObject value, RuntimeException failure) {

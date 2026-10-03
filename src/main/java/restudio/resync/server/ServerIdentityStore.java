@@ -3,6 +3,7 @@ package restudio.resync.server;
 import restudio.resync.flow.identity.ServerId;
 import restudio.resync.filesystem.windows.WindowsFileIdentity;
 import restudio.resync.migration.AtomicFiles;
+import restudio.resync.migration.FreshInstallInputs;
 import restudio.resync.migration.MigrationPaths;
 import restudio.resync.migration.PersistenceOwnershipContext;
 import restudio.resync.migration.PersistenceOwnershipIndex;
@@ -145,6 +146,11 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
         return open(path, freshAuthority, configuredServerId, AuthorityFaultInjector.none(), ProjectionWriter.atomic());
     }
 
+    static synchronized ServerIdentityStore open(Path path, FreshRootAuthority freshAuthority,
+                                                  ServerId configuredServerId, FreshInstallInitializer initializer) throws IOException {
+        return open(path, freshAuthority, configuredServerId, AuthorityFaultInjector.none(), ProjectionWriter.atomic(), initializer);
+    }
+
     static synchronized ServerIdentityStore open(Path path, AuthorityFaultInjector faultInjector) throws IOException {
         return open(path, null, faultInjector, ProjectionWriter.atomic());
     }
@@ -164,6 +170,12 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
                                                           ServerId configuredServerId,
                                                           AuthorityFaultInjector faultInjector,
                                                           ProjectionWriter projectionWriter) throws IOException {
+        return open(path, freshAuthority, configuredServerId, faultInjector, projectionWriter, root -> {});
+    }
+
+    private static synchronized ServerIdentityStore open(Path path, FreshRootAuthority freshAuthority,
+                                                          ServerId configuredServerId, AuthorityFaultInjector faultInjector,
+                                                          ProjectionWriter projectionWriter, FreshInstallInitializer initializer) throws IOException {
         Path normalized = MigrationPaths.requirePath(Objects.requireNonNull(path, "Server Identity Path Is Required"), FILE_NAME);
         Path dataRoot = normalized.getParent();
         if (dataRoot == null) {
@@ -171,6 +183,7 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
         }
         AuthorityFaultInjector injector = Objects.requireNonNull(faultInjector, "faultInjector");
         ProjectionWriter writer = Objects.requireNonNull(projectionWriter, "projectionWriter");
+        FreshInstallInitializer preparation = Objects.requireNonNull(initializer, "initializer");
         ensureDataRoot(dataRoot);
         recoverInterruptedArtifacts(dataRoot);
         MigrationPaths.ValidatedRoot authorityRoot = MigrationPaths.requireValidatedRoot(dataRoot,
@@ -185,6 +198,7 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
                 projectPair(dataRoot, record, projection, injector, writer);
             }
             if (record.state() == ProjectionState.PENDING) {
+                preparation.prepare(dataRoot);
                 finalizeAuthority(authorityRoot, record, injector);
                 return new ServerIdentityStore(dataRoot, new Binding(normalized, record.serverId(), true));
             }
@@ -213,6 +227,7 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
         writeAuthority(authorityRoot, pending, injector);
         ProjectionPresence projection = inspectProjection(normalized, signal, pending);
         projectPair(dataRoot, pending, projection, injector, writer);
+        preparation.prepare(dataRoot);
         finalizeAuthority(authorityRoot, pending, injector);
         return new ServerIdentityStore(dataRoot, new Binding(normalized, created, true));
     }
@@ -1751,10 +1766,12 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
         }
         Path migrations = root.resolve(ReSyncDataFixer.VERSION_DIRECTORY);
         try (var entries = Files.list(root)) {
-            if (!entries.map(entry -> entry.getFileName().toString())
-                .allMatch(name -> FRESH_INSTALL_ENTRIES.contains(name)
-                    || name.equals(ReSyncDataFixer.VERSION_DIRECTORY))) {
-                throw new IOException("Fresh ReSync Identity Root Contains Unowned Data");
+            for (Path entry : entries.toList()) {
+                String name = entry.getFileName().toString();
+                if (!FRESH_INSTALL_ENTRIES.contains(name) && !name.equals(ReSyncDataFixer.VERSION_DIRECTORY)
+                    && !FreshInstallInputs.acceptsEntry(entry)) {
+                    throw new IOException("Fresh ReSync Identity Root Contains Unowned Data");
+                }
             }
         }
         if (!Files.exists(migrations, LinkOption.NOFOLLOW_LINKS)) {
@@ -1774,6 +1791,11 @@ public final class ServerIdentityStore implements RebindablePersistenceParticipa
 
     private static IOException sqlFailure(String message, SQLException exception) {
         return new IOException(message, exception);
+    }
+
+    @FunctionalInterface
+    interface FreshInstallInitializer {
+        void prepare(Path root) throws IOException;
     }
 
     public record Binding(Path path, ServerId serverId, boolean freshInstall) {

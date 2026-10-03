@@ -14,10 +14,13 @@ import restudio.resync.contract.identity.IdentityCodec;
 import restudio.resync.flow.CoreGraphStorageBoundary;
 import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.function.FunctionLocator;
+import restudio.resync.flow.function.FunctionParameterContract;
 import restudio.resync.flow.function.FunctionRevision;
 import restudio.resync.flow.function.FunctionSignature;
 import restudio.resync.flow.function.FunctionSourceDocument;
 import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.graph.FunctionBinding;
+import restudio.resync.flow.graph.FunctionParameter;
 import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.CapabilityId;
 import restudio.resync.flow.identity.ContentHash;
@@ -297,6 +300,32 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             return ProtocolEnvelopeDispatchResult.rejected(ProtocolRejectionCode.AUTHORIZATION_DENIED,
                 "Protocol resource mutation is not authorized");
         }
+        return mutateAdmitted(clientId, connectionInfo.getConnectionId(), envelope, operation, mutationStarted);
+    }
+
+    @Override
+    public synchronized ProtocolEnvelopeDispatchResult mutateOperator(ProtocolRequestAuthority.OperatorGrant grant,
+                                                                       ProtocolEnvelope<Map<String, Object>> envelope,
+                                                                       ResourceOperation operation) {
+        if (grant == null || !validResourceEnvelope(envelope, operation)
+            || !ProtocolRequestAuthority.owns(serverId, envelope, operation) || !grant.matches(serverId, envelope)) {
+            return ProtocolEnvelopeDispatchResult.rejected(ProtocolRejectionCode.AUTHORIZATION_DENIED,
+                "Local operator resource mutation is not authorized");
+        }
+        if (!authorityEpoch.acceptsTyped(envelope.authorityEpoch())) {
+            return ProtocolEnvelopeDispatchResult.rejected(ProtocolRejectionCode.RESOURCE_REVISION_CONFLICT,
+                "Protocol envelope authority epoch is stale");
+        }
+        if (!grant.claim(serverId, envelope)) {
+            return ProtocolEnvelopeDispatchResult.rejected(ProtocolRejectionCode.AUTHORIZATION_DENIED,
+                "Local operator resource admission was already consumed");
+        }
+        return mutateAdmitted(grant.actorId(), null, envelope, operation, TemporaryLifecycleDiagnostics.start());
+    }
+
+    private ProtocolEnvelopeDispatchResult mutateAdmitted(String clientId, Integer connectionId,
+                                                            ProtocolEnvelope<Map<String, Object>> envelope,
+                                                            ResourceOperation operation, long mutationStarted) {
         if (requiresMutationEpoch(operation) && !authorityEpoch.acceptsTyped(envelope.authorityEpoch())) {
             return ProtocolEnvelopeDispatchResult.rejected(ProtocolRejectionCode.RESOURCE_REVISION_CONFLICT,
                 "Protocol envelope authority epoch is stale");
@@ -334,7 +363,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                     "Aggregate resource create storage is unavailable");
             }
             Map<String, Object> diagnosticIdentity = diagnosticIdentity(command, envelope,
-                connectionInfo == null ? null : connectionInfo.getConnectionId());
+                connectionId);
             TemporaryLifecycleDiagnostics.event("authority_admission", mutationStarted,
                 TemporaryLifecycleDiagnostics.with(diagnosticIdentity, "operation", command.operationName(), "outcome", "accepted"));
             try {
@@ -384,7 +413,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 return storedResponse(envelope, command.kind(), previous);
             }
             if (isCoreResource(command.responseResource()) && command.presentation() == null) {
-                return mutateCore(envelope, command, clientId, session, previous, requestFingerprint);
+                return mutateCore(envelope, command, clientId, previous, requestFingerprint);
             }
             FlowResourceAdapter<Object> adapter = adapter(command.resource());
             if (command.presentation() == null && (adapter == null || !adapter.durable() || !supportsExactMutation(command))) {
@@ -477,7 +506,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 }
                 FlowOperationResult<?> result;
                 try {
-                    result = applyExternal(command, outcome, clientId, session, lease);
+                    result = applyExternal(command, outcome, clientId, lease);
                 } catch (RuntimeException exception) {
                     Log.error("Resource mutation " + pending.mutationId() + " requires durable recovery after "
                         + command.operationName() + " " + command.responseResource().canonicalText() + ": " + safeMessage(exception), exception);
@@ -1619,62 +1648,65 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         int inspected = 0;
         int rebound = 0;
         int rejected = 0;
-        for (String type : CORE_RESOURCE_TYPES.stream().sorted().toList()) {
-            for (CoreGraphResourceAuthority.CoreGraphResourceState listed : coreAuthority.list(type)) {
-                if (listed.deleted()) {
-                    continue;
-                }
-                CoreGraphStorageBoundary.Decoded source = listed.envelope();
-                if (target.equals(CoreCatalogCompatibilityRebind.graph(source).catalogBinding())) {
-                    continue;
-                }
-                inspected++;
-                if (!CoreCatalogCompatibilityRebind.eligible(source, target)) {
-                    rejected++;
-                    continue;
-                }
-                ServerResourceLocator resource = listed.resource();
-                CoreState before = synchronizeCore(resource);
-                CoreState listedState = coreState(source);
-                MutationRow sourceReceipt = before == null ? null : mutation(before.mutationId());
-                if (before == null || !sameCoreState(before, listedState)
-                    || !compatibleCoreCatalogSource(before, sourceReceipt)) {
-                    rejected++;
-                    continue;
-                }
-                UUID mutationId = CoreCatalogCompatibilityRebind.mutationId(resource, source, target);
-                if (mutation(mutationId) != null) {
-                    throw new IllegalStateException("Compatible Core catalog rebind mutation ID is already registered: "
-                        + resource.canonicalText());
-                }
-                CoreGraphStorageBoundary.Decoded candidate = CoreCatalogCompatibilityRebind.project(source, target,
-                    mutationId);
-                try {
-                    coreAuthority.validateSave(resource, candidate);
-                } catch (RuntimeException incompatible) {
-                    CatalogBinding currentTarget = coreAuthority.activeCatalogBinding().orElse(null);
-                    if (!target.equals(currentTarget)) {
-                        throw new IllegalStateException("Active Core catalog binding changed during compatibility rebind",
-                            incompatible);
-                    }
-                    rejected++;
-                    continue;
-                }
-                Map<String, Object> payload = corePayload(candidate);
-                ContentHash payloadHash = payloadCodec.canonicalize(payload).checksum();
-                Command command = new Command("SAVE", resource, null, resource, mutationId,
-                    source.envelope().assetRevision(), payload, payloadHash,
-                    source.envelope().assetActivationState(), null);
-                CoreOutcome outcome = corePending(command, before, coreState(candidate));
-                MutationRow pending = insertCorePending(command, CoreCatalogCompatibilityRebind.ACTOR,
-                    compatibleCoreCatalogFingerprint(source, target, mutationId), outcome);
-                CoreGraphStorageBoundary.Decoded saved = coreAuthority.save(resource, candidate, mutationId,
-                    source.envelope().assetRevision(), candidate.envelope().assetHash());
-                CoreState after = coreState(saved);
-                verifyCorePostApply(command, outcome, after);
-                commitCoreApplied(pending, after);
-                rebound++;
+        for (CoreGraphResourceAuthority.CoreGraphResourceState listed : compatibleCatalogOrder()) {
+            if (recoveryBlocked) {
+                break;
             }
+            if (listed.deleted()) {
+                continue;
+            }
+            CoreGraphStorageBoundary.Decoded source = listed.envelope();
+            if (target.equals(CoreCatalogCompatibilityRebind.graph(source).catalogBinding())) {
+                continue;
+            }
+            inspected++;
+            if (!CoreCatalogCompatibilityRebind.eligible(source, target)) {
+                rejected++;
+                continue;
+            }
+            ServerResourceLocator resource = listed.resource();
+            CoreState before = synchronizeCore(resource);
+            CoreState listedState = coreState(source);
+            MutationRow sourceReceipt = before == null ? null : mutation(before.mutationId());
+            if (before == null || !sameCoreState(before, listedState)
+                || !compatibleCoreCatalogSource(before, sourceReceipt)) {
+                rejected++;
+                continue;
+            }
+            Map<ServerResourceLocator, Long> dependencies;
+            CoreGraphStorageBoundary.Decoded candidate;
+            UUID mutationId;
+            try {
+                dependencies = compatibleCatalogDependencies(source, target, 0L, true, new LinkedHashSet<>());
+                mutationId = CoreCatalogCompatibilityRebind.mutationId(resource, source, target, dependencies);
+                candidate = CoreCatalogCompatibilityRebind.project(source, target, mutationId, dependencies);
+                coreAuthority.validateSave(resource, candidate);
+            } catch (RuntimeException incompatible) {
+                CatalogBinding currentTarget = coreAuthority.activeCatalogBinding().orElse(null);
+                if (!target.equals(currentTarget)) {
+                    throw new IllegalStateException("Active Core catalog binding changed during compatibility rebind", incompatible);
+                }
+                rejected++;
+                continue;
+            }
+            if (mutation(mutationId) != null) {
+                throw new IllegalStateException("Compatible Core catalog rebind mutation ID is already registered: "
+                    + resource.canonicalText());
+            }
+            Map<String, Object> payload = corePayload(candidate);
+            ContentHash payloadHash = payloadCodec.canonicalize(payload).checksum();
+            Command command = new Command("SAVE", resource, null, resource, mutationId,
+                source.envelope().assetRevision(), payload, payloadHash,
+                source.envelope().assetActivationState(), null);
+            CoreOutcome outcome = corePending(command, before, coreState(candidate));
+            MutationRow pending = insertCatalogPending(command, CoreCatalogCompatibilityRebind.PROOF_ACTOR,
+                compatibleCoreCatalogFingerprint(source, target, mutationId), CoreCatalogCompatibilityRebind.REGISTRATION,
+                source, target, candidate, outcome);
+            CoreGraphStorageBoundary.Decoded saved = saveCatalogProjection(pending, candidate);
+            CoreState after = coreState(saved);
+            verifyCorePostApply(command, outcome, after);
+            commitCoreApplied(pending, after);
+            rebound++;
         }
         if (!target.equals(coreAuthority.activeCatalogBinding().orElse(null))) {
             throw new IllegalStateException("Active Core catalog binding changed during compatibility rebind");
@@ -1684,6 +1716,120 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 null, null, authorityEpoch.current(), null), "outcome", "complete", "targetBinding",
                 target.canonicalText(), "inspectedCount", inspected, "reboundCount", rebound, "rejectedCount",
                 rejected));
+    }
+
+    private CoreGraphStorageBoundary.Decoded saveCatalogProjection(MutationRow row, CoreGraphStorageBoundary.Decoded candidate) {
+        row = Objects.requireNonNull(mutation(row.mutationId()), "Catalog Projection Pending Receipt Is Required");
+        if (row.status() != Status.PENDING || !CoreCatalogCompatibilityRebind.PROOF_ACTOR.equals(row.actorId())) {
+            throw new IllegalStateException("Catalog Projection Requires Its Pending Proof Receipt");
+        }
+        EvolutionReceipt evidence = Objects.requireNonNull(evolutionReceipt(row.mutationId()), "Catalog Projection Evidence Is Required");
+        CoreGraphStorageBoundary.Decoded verified = verifyCompatibleCatalogProjection(row, evidence, true, new LinkedHashSet<>());
+        String canonical = new String(coreBoundary.encode(verified), StandardCharsets.UTF_8);
+        if (!canonical.equals(new String(coreBoundary.encode(candidate), StandardCharsets.UTF_8))) {
+            throw new IllegalStateException("Catalog Projection Does Not Match Its Durable Proof");
+        }
+        Command command = command(row);
+        verifyCoreExternalPrecondition(command, validateStoredCorePrecondition(command, row));
+        CoreGraphStorageBoundary.Decoded source = coreBoundary.decodeText(evidence.sourceEnvelope(), command.responseResource());
+        try (CatalogProjection projection = new CatalogProjection(this, source, verified)) {
+            return coreAuthority.saveCatalogProjection(command.responseResource(), candidate, row.mutationId(),
+                row.expectedRevision(), candidate.envelope().assetHash(), projection);
+        }
+    }
+
+    public static final class CatalogProjection implements CoreGraphResourceAuthority.CatalogProjection, AutoCloseable {
+        private final SqliteProtocolResourceMutationAuthority owner;
+        private final ServerResourceLocator resource;
+        private final UUID mutationId;
+        private final long expectedRevision;
+        private final ContentHash checksum;
+        private final CatalogBinding target;
+        private final long epoch;
+        private final String source;
+        private final String candidate;
+        private volatile boolean open = true;
+
+        private CatalogProjection(SqliteProtocolResourceMutationAuthority owner,
+                CoreGraphStorageBoundary.Decoded source, CoreGraphStorageBoundary.Decoded candidate) {
+            this.owner = owner;
+            this.resource = CoreCatalogCompatibilityRebind.graph(candidate).resource();
+            this.mutationId = UUID.fromString(candidate.envelope().assetMutationId());
+            this.expectedRevision = source.envelope().assetRevision();
+            this.checksum = candidate.envelope().assetHash();
+            this.target = CoreCatalogCompatibilityRebind.graph(candidate).catalogBinding();
+            this.epoch = owner.authorityEpoch.current();
+            this.source = new String(owner.coreBoundary.encode(source), StandardCharsets.UTF_8);
+            this.candidate = new String(owner.coreBoundary.encode(candidate), StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void requireCurrent(CoreGraphResourceAuthority authority, ServerResourceLocator resource,
+                CoreGraphStorageBoundary.Decoded candidate, UUID mutationId, long expectedRevision, ContentHash checksum) {
+            if (!open || authority != owner.coreAuthority || owner.connection == null || owner.recoveryBlocked
+                || owner.persistenceState != PersistenceState.OPEN || owner.mutationAdmissionClosed
+                || epoch != owner.authorityEpoch.current() || !this.resource.equals(resource)
+                || !this.mutationId.equals(mutationId) || this.expectedRevision != expectedRevision
+                || !this.checksum.equals(checksum) || candidate == null
+                || !this.candidate.equals(new String(owner.coreBoundary.encode(candidate), StandardCharsets.UTF_8))
+                || !target.equals(authority.activeCatalogBinding().orElse(null))) {
+                throw new IllegalStateException("Catalog Projection Admission Is Stale Or Does Not Match The Save");
+            }
+            CoreGraphStorageBoundary.Decoded current = authority.load(resource)
+                .orElseThrow(() -> new IllegalStateException("Catalog Projection Source Is No Longer Available"));
+            if (!source.equals(new String(owner.coreBoundary.encode(current), StandardCharsets.UTF_8))) {
+                throw new IllegalStateException("Catalog Projection Source Changed Before The Save");
+            }
+        }
+
+        @Override
+        public void close() {
+            open = false;
+        }
+    }
+
+    private List<CoreGraphResourceAuthority.CoreGraphResourceState> compatibleCatalogOrder() {
+        Map<ServerResourceLocator, CoreGraphResourceAuthority.CoreGraphResourceState> sources = new LinkedHashMap<>();
+        CORE_RESOURCE_TYPES.stream().sorted().forEach(type -> coreAuthority.list(type).stream()
+            .filter(state -> !state.deleted()).sorted(Comparator.comparing(CoreGraphResourceAuthority.CoreGraphResourceState::resource))
+            .forEach(state -> sources.put(state.resource(), state)));
+        List<CoreGraphResourceAuthority.CoreGraphResourceState> ordered = new ArrayList<>();
+        Set<ServerResourceLocator> complete = new LinkedHashSet<>();
+        Set<ServerResourceLocator> invalid = new LinkedHashSet<>();
+        for (ServerResourceLocator resource : sources.keySet()) {
+            orderCompatibleCatalog(resource, sources, new LinkedHashSet<>(), complete, invalid, ordered);
+        }
+        return List.copyOf(ordered);
+    }
+
+    private void orderCompatibleCatalog(ServerResourceLocator resource,
+            Map<ServerResourceLocator, CoreGraphResourceAuthority.CoreGraphResourceState> sources,
+            Set<ServerResourceLocator> path, Set<ServerResourceLocator> complete, Set<ServerResourceLocator> invalid,
+            List<CoreGraphResourceAuthority.CoreGraphResourceState> ordered) {
+        if (complete.contains(resource)) {
+            return;
+        }
+        if (path.size() >= 64 || !path.add(resource)) {
+            invalid.addAll(path);
+            invalid.add(resource);
+            return;
+        }
+        CoreGraphResourceAuthority.CoreGraphResourceState state = sources.get(resource);
+        if (state == null) {
+            invalid.add(resource);
+        } else {
+            for (FunctionBinding binding : CoreCatalogCompatibilityRebind.graph(state.envelope()).functions()) {
+                orderCompatibleCatalog(binding.function(), sources, path, complete, invalid, ordered);
+                if (invalid.contains(binding.function())) {
+                    invalid.add(resource);
+                }
+            }
+        }
+        path.remove(resource);
+        complete.add(resource);
+        if (state != null && !invalid.contains(resource)) {
+            ordered.add(state);
+        }
     }
 
     private void evolveCoreCatalogBindings() throws SQLException {
@@ -1784,15 +1930,20 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     private MutationRow insertEvolutionPending(Command command, CoreCatalogEvolution.Proof proof,
                                                 CoreGraphStorageBoundary.Decoded source,
                                                 CoreGraphStorageBoundary.Decoded candidate, CoreOutcome outcome) {
+        return insertCatalogPending(command, proof.evolution().id(), proof.fingerprint(source, command.mutationId()),
+            proof.evolution().registrationHash().canonicalText(), source, proof.target(), candidate, outcome);
+    }
+
+    private MutationRow insertCatalogPending(Command command, String actor, String fingerprint, String registrationHash,
+            CoreGraphStorageBoundary.Decoded source, CatalogBinding target,
+            CoreGraphStorageBoundary.Decoded candidate, CoreOutcome outcome) {
         String envelope = new String(coreBoundary.encode(source), StandardCharsets.UTF_8);
-        String registrationHash = proof.evolution().registrationHash().canonicalText();
         String resultHash = candidate.envelope().assetHash().canonicalText();
         String evidenceHash = evolutionEvidenceHash(command.mutationId(), registrationHash, envelope,
-            proof.target().canonicalText(), resultHash);
+            target.canonicalText(), resultHash);
         try {
             connection.setAutoCommit(false);
-            MutationRow pending = insertCorePending(command, proof.evolution().id(),
-                proof.fingerprint(source, command.mutationId()), outcome);
+            MutationRow pending = insertCorePending(command, actor, fingerprint, outcome);
             try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO core_catalog_evolution_receipt(mutation_id, registration_hash, source_envelope,
                     target_binding, result_asset_hash, proof_hash) VALUES(?, ?, ?, ?, ?, ?)
@@ -1800,7 +1951,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 statement.setString(1, command.mutationId().toString());
                 statement.setString(2, registrationHash);
                 statement.setString(3, envelope);
-                statement.setString(4, proof.target().canonicalText());
+                statement.setString(4, target.canonicalText());
                 statement.setString(5, resultHash);
                 statement.setString(6, evidenceHash);
                 statement.executeUpdate();
@@ -1818,10 +1969,14 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     private EvolutionReceipt verifyEvolutionReceipt(MutationRow row, boolean requireActive) {
         EvolutionReceipt evidence = evolutionReceipt(row.mutationId());
         if (evidence == null) {
-            if (CoreCatalogEvolution.isActor(row.actorId())) {
+            if (CoreCatalogEvolution.isActor(row.actorId()) || CoreCatalogCompatibilityRebind.PROOF_ACTOR.equals(row.actorId())) {
                 throw new IllegalStateException("Core catalog evolution receipt has no durable proof");
             }
             return null;
+        }
+        if (CoreCatalogCompatibilityRebind.REGISTRATION.equals(evidence.registrationHash())) {
+            verifyCompatibleCatalogProjection(row, evidence, requireActive, new LinkedHashSet<>());
+            return evidence;
         }
         CoreCatalogEvolution evolution = CoreCatalogEvolution.registered(evidence.registrationHash());
         ServerResourceLocator resource = locator(row.responseResource());
@@ -1877,6 +2032,179 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         return evidence;
     }
 
+    private CoreGraphStorageBoundary.Decoded verifyCompatibleCatalogProjection(MutationRow row, EvolutionReceipt evidence,
+            boolean requireActive, Set<UUID> path) {
+        if (path.size() >= 64 || !path.add(row.mutationId())) {
+            throw new IllegalStateException("Compatible Catalog Receipt Dependency Is Cyclic Or Too Deep");
+        }
+        try {
+            ServerResourceLocator resource = locator(row.responseResource());
+            CoreGraphStorageBoundary.Decoded source = coreBoundary.decodeText(evidence.sourceEnvelope(), resource);
+            CatalogBinding target = CatalogBinding.parseCanonicalText(evidence.targetBinding());
+            CoreState before = coreState(source);
+            Map<ServerResourceLocator, Long> dependencies = compatibleCatalogDependencies(source, target, row.sequence(), requireActive, path);
+            UUID expectedId = CoreCatalogCompatibilityRebind.mutationId(resource, source, target, dependencies);
+            CoreGraphStorageBoundary.Decoded projected = CoreCatalogCompatibilityRebind.project(source, target, expectedId, dependencies);
+            CoreState expected = coreState(projected);
+            MutationRow sourceReceipt = mutation(before.mutationId());
+            if (!CoreCatalogCompatibilityRebind.REGISTRATION.equals(evidence.registrationHash())
+                || !CoreCatalogCompatibilityRebind.PROOF_ACTOR.equals(row.actorId()) || !"SAVE".equals(row.operation())
+                || row.status() != Status.PENDING && row.status() != Status.APPLIED
+                || !expectedId.equals(row.mutationId())
+                || !compatibleCoreCatalogFingerprint(source, target, expectedId).equals(row.fingerprint())
+                || !resource.canonicalText().equals(row.requestedResource())
+                || !resource.canonicalText().equals(row.targetResource()) || row.sourceResource() != null
+                || row.expectedRevision() != before.revision() || !before.protocolHash().equals(row.preconditionHash())
+                || !Objects.equals(before.assetHash(), row.preconditionAssetHash())
+                || !Objects.equals(before.corePayloadHash(), row.preconditionCorePayloadHash())
+                || !Objects.equals(before.corePayloadKind(), row.preconditionCorePayloadKind())
+                || row.targetActivationState() != before.activationState() || row.resultActivationState() != before.activationState()
+                || !compatibleCoreCatalogSource(before, sourceReceipt)
+                || row.status() == Status.APPLIED && (row.sequence() < 1L || sourceReceipt != null && row.sequence() <= sourceReceipt.sequence())
+                || !matchesCoreOutcome(expected, row) || !expected.assetHash().equals(evidence.resultAssetHash())
+                || !evolutionEvidenceHash(row.mutationId(), evidence.registrationHash(), evidence.sourceEnvelope(),
+                    evidence.targetBinding(), evidence.resultAssetHash()).equals(evidence.proofHash())) {
+                throw new IllegalStateException("Compatible Catalog Source And Result Receipt Proof Is Invalid");
+            }
+            if (row.status() == Status.PENDING) {
+                if (row.sequence() != 0L || row.resultPayload() == null
+                    || !payloadCodec.canonicalInput(corePayload(projected)).equals(row.resultPayload())) {
+                    throw new IllegalStateException("Compatible Catalog Pending Payload Proof Is Invalid");
+                }
+            } else if (row.resultPayload() != null
+                || !validCoreCatalogRebindTransition(target, row, uncheckedCoreTransitionProof(row.mutationId()), expected)) {
+                throw new IllegalStateException("Compatible Catalog Committed Transition Proof Is Invalid");
+            }
+            if (requireActive) {
+                if (!target.equals(coreAuthority.activeCatalogBinding().orElse(null))) {
+                    throw new IllegalStateException("Compatible Catalog Target Changed While Pending");
+                }
+                coreAuthority.validateSave(resource, projected);
+            }
+            return projected;
+        } finally {
+            path.remove(row.mutationId());
+        }
+    }
+
+    private Map<ServerResourceLocator, Long> compatibleCatalogDependencies(CoreGraphStorageBoundary.Decoded source,
+            CatalogBinding target, long sequence, boolean requireCurrent, Set<UUID> path) {
+        Map<ServerResourceLocator, Long> revisions = new LinkedHashMap<>();
+        for (FunctionBinding binding : CoreCatalogCompatibilityRebind.graph(source).functions()) {
+            ServerResourceLocator resource = binding.function();
+            if (!serverId.equals(resource.serverId()) || !OwnerId.of("restudio.resync").equals(resource.owner())
+                || !"function".equals(resource.resourceType().value()) || binding.revision() < 1L) {
+                throw new IllegalStateException("Compatible Catalog Function Dependency Identity Is Invalid");
+            }
+            CoreState current = requireCurrent ? synchronizeCore(resource) : null;
+            MutationRow selected = requireCurrent ? current == null ? null : mutation(current.mutationId())
+                : compatibleCatalogHead(resource, sequence);
+            long revision = requireCurrent ? current == null ? -1L : current.revision()
+                : selected == null ? binding.revision() : selected.resultRevision();
+            if (revision < binding.revision() || requireCurrent && (current.deleted()
+                || current.activationState() != ResourceActivationState.ACTIVE
+                || current.decoded().functionSourceDocument() == null
+                || !target.equals(CoreCatalogCompatibilityRebind.graph(current.decoded()).catalogBinding()))) {
+                throw new IllegalStateException("Compatible Catalog Function Dependency Is Not An Active Current Target");
+            }
+            if (revision == binding.revision()) {
+                if (requireCurrent) {
+                    requireCompatibleSignature(binding, current.decoded().functionSourceDocument().signature());
+                }
+                continue;
+            }
+            CoreGraphStorageBoundary.Decoded previous = null;
+            for (MutationRow child : compatibleCatalogChain(resource, binding.revision(), revision, sequence)) {
+                EvolutionReceipt proof = evolutionReceipt(child.mutationId());
+                if (proof == null || !CoreCatalogCompatibilityRebind.REGISTRATION.equals(proof.registrationHash())
+                    || !publishedCoreReceipt(child)) {
+                    throw new IllegalStateException("Function Pin Advancement Requires Durable Catalog Only Source Evidence");
+                }
+                CoreGraphStorageBoundary.Decoded childSource = coreBoundary.decodeText(proof.sourceEnvelope(), resource);
+                if (previous == null) {
+                    if (childSource.envelope().assetRevision() != binding.revision()
+                        || childSource.functionSourceDocument() == null) {
+                        throw new IllegalStateException("Function Pin Source Revision Is Not Proven");
+                    }
+                    requireCompatibleSignature(binding, childSource.functionSourceDocument().signature());
+                } else if (!sameCoreState(coreState(previous), coreState(childSource))) {
+                    throw new IllegalStateException("Function Catalog Receipt Chain Is Not Contiguous");
+                }
+                previous = verifyCompatibleCatalogProjection(child, proof, false, path);
+            }
+            if (previous == null || previous.envelope().assetRevision() != revision
+                || !target.equals(CoreCatalogCompatibilityRebind.graph(previous).catalogBinding())
+                || requireCurrent && !sameCoreState(coreState(previous), current)) {
+                throw new IllegalStateException("Function Catalog Receipt Chain Does Not Prove The Selected Head");
+            }
+            requireCompatibleSignature(binding, previous.functionSourceDocument().signature());
+            if (revisions.putIfAbsent(resource, revision) != null) {
+                throw new IllegalStateException("Compatible Catalog Function Dependency Is Duplicated");
+            }
+        }
+        return Map.copyOf(revisions);
+    }
+
+    private static void requireCompatibleSignature(FunctionBinding binding, FunctionSignature signature) {
+        if (!binding.function().equals(signature.function().resource())
+            || !compatibleParameters(binding.inputs(), signature.inputs()) || !compatibleParameters(binding.outputs(), signature.outputs())) {
+            throw new IllegalStateException("Function Pin Parameters Do Not Match The Proven Source Signature");
+        }
+    }
+
+    private static boolean compatibleParameters(List<FunctionParameter> declared, List<FunctionParameterContract> parameters) {
+        return declared.size() == parameters.size() && declared.stream().allMatch(parameter -> parameters.stream()
+            .anyMatch(current -> current.id().equals(parameter.parameterId()) && current.type().equals(parameter.type())
+                && Objects.equals(current.defaultValue(), parameter.defaultValue())));
+    }
+
+    private MutationRow compatibleCatalogHead(ServerResourceLocator resource, long sequence) {
+        try (PreparedStatement statement = connection.prepareStatement("""
+            SELECT * FROM resource_mutation_receipt WHERE response_resource = ? AND status = 'APPLIED'
+                AND sequence > 0 AND sequence < ? ORDER BY sequence DESC LIMIT 1
+            """)) {
+            statement.setString(1, resource.canonicalText());
+            statement.setLong(2, sequence);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? readMutation(result) : null;
+            }
+        } catch (SQLException failure) {
+            throw new IllegalStateException("Failed To Read Historical Function Catalog Head", failure);
+        }
+    }
+
+    private List<MutationRow> compatibleCatalogChain(ServerResourceLocator resource, long sourceRevision,
+            long targetRevision, long sequence) {
+        List<MutationRow> receipts = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+            SELECT * FROM resource_mutation_receipt WHERE response_resource = ? AND status = 'APPLIED'
+                AND result_revision > ? AND result_revision <= ? AND sequence > 0 AND sequence < ?
+            ORDER BY result_revision, sequence
+            """)) {
+            statement.setString(1, resource.canonicalText());
+            statement.setLong(2, sourceRevision);
+            statement.setLong(3, targetRevision);
+            statement.setLong(4, sequence == 0L ? Long.MAX_VALUE : sequence);
+            long expectedRevision = Math.addExact(sourceRevision, 1L);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    MutationRow row = readMutation(result);
+                    if (row.resultRevision() != expectedRevision || row.expectedRevision() != expectedRevision - 1L) {
+                        throw new IllegalStateException("Function Catalog Receipt History Has A Gap Or Collision");
+                    }
+                    expectedRevision = Math.addExact(expectedRevision, 1L);
+                    receipts.add(row);
+                }
+            }
+            if (expectedRevision != Math.addExact(targetRevision, 1L)) {
+                throw new IllegalStateException("Function Catalog Receipt History Is Incomplete");
+            }
+            return List.copyOf(receipts);
+        } catch (SQLException failure) {
+            throw new IllegalStateException("Failed To Read Function Catalog Receipt History", failure);
+        }
+    }
+
     private EvolutionReceipt evolutionReceipt(UUID mutationId) {
         try (PreparedStatement statement = connection.prepareStatement(
             "SELECT * FROM core_catalog_evolution_receipt WHERE mutation_id = ?")) {
@@ -1893,7 +2221,9 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
 
     private String evolutionEvidenceHash(UUID mutationId, String registrationHash, String sourceEnvelope,
                                          String targetBinding, String resultAssetHash) {
-        return StorageSafety.sha256(String.join("\n", CoreCatalogEvolution.registered(registrationHash).id(), mutationId.toString(),
+        String actor = CoreCatalogCompatibilityRebind.REGISTRATION.equals(registrationHash)
+            ? CoreCatalogCompatibilityRebind.PROOF_ACTOR : CoreCatalogEvolution.registered(registrationHash).id();
+        return StorageSafety.sha256(String.join("\n", actor, mutationId.toString(),
             registrationHash, sourceEnvelope, targetBinding, resultAssetHash));
     }
 
@@ -2830,7 +3160,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     }
 
     private ProtocolEnvelopeDispatchResult mutateCore(ProtocolEnvelope<Map<String, Object>> envelope, Command command,
-                                                       String clientId, Session session, MutationRow previous,
+                                                       String clientId, MutationRow previous,
                                                        String requestFingerprint) {
         if (!coreAuthority.available()) {
             return unavailable(ProtocolRejectionCode.RESOURCE_DURABILITY_UNAVAILABLE,
@@ -3161,9 +3491,14 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         verifyCoreExternalPrecondition(command, precondition);
         CoreOutcome outcome = coreOutcome(row, precondition);
         try {
-            applyCore(command, outcome);
+            if (compatibleCatalogActor(row)) {
+                CoreGraphStorageBoundary.Decoded candidate = coreBoundary.decode(CanonicalJson.canonicalBytes(outcome.payload()), command.responseResource());
+                saveCatalogProjection(row, candidate);
+            } else {
+                applyCore(command, outcome);
+            }
         } catch (CoreGraphMutationValidationException rejection) {
-            if (CoreCatalogEvolution.isActor(row.actorId())) {
+            if (CoreCatalogEvolution.isActor(row.actorId()) || compatibleCatalogActor(row)) {
                 throw rejection;
             }
             finishCoreValidationRejected(row, rejection);
@@ -3517,7 +3852,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             TemporaryLifecycleDiagnostics.with(diagnosticIdentity(row), "outcome", publication, "recovery", recovery));
         if (publication == CoreResourceMutationBus.Publication.FAILED
             || publication == CoreResourceMutationBus.Publication.STALE) {
-            if (CoreCatalogEvolution.isActor(row.actorId())) {
+            if (CoreCatalogEvolution.isActor(row.actorId()) || compatibleCatalogActor(row)) {
                 blockRecovery("Core catalog evolution " + row.mutationId()
                     + " is awaiting committed transition publication");
             }
@@ -3550,6 +3885,10 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                     "failure", exception.getClass().getSimpleName()));
         }
         return publication;
+    }
+
+    private boolean compatibleCatalogActor(MutationRow row) {
+        return CoreCatalogCompatibilityRebind.PROOF_ACTOR.equals(row.actorId());
     }
 
     private void writeCoreTransitionOutbox(UUID mutationId, CoreResourceMutationTransition transition) throws SQLException {
@@ -3621,7 +3960,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         }
         verifyExternalPrecondition(command, row, precondition);
         Outcome outcome = recoveryOutcome(command, row, precondition);
-        FlowOperationResult<?> result = applyExternal(command, outcome, row.actorId(), null, lease);
+        FlowOperationResult<?> result = applyExternal(command, outcome, row.actorId(), lease);
         if (!result.success()) {
             if (!mayHaveAppliedExternally(result)) {
                 finishRejected(row, result.errorCode(), result.message());
@@ -5672,7 +6011,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         }
     }
 
-    private FlowOperationResult<?> applyExternal(Command command, Outcome outcome, String clientId, Session session,
+    private FlowOperationResult<?> applyExternal(Command command, Outcome outcome, String clientId,
                                                  FlowResourceMutationLease lease) {
         FlowResourceMutationContext context = new FlowResourceMutationContext("protocol", "", "", clientId, lease,
             command.mutationId(), "CREATE".equals(command.operationName()) ? outcome.resultRevision() - 1L : command.expectedRevision(),

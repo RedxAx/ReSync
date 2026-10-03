@@ -316,9 +316,10 @@ class ReSyncJsonResourceStorageTest {
         target.addProperty("id", "second");
         value.add("target", target);
 
-        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+        FlowResourceAdapter.PreCommitRejection failure = assertThrows(FlowResourceAdapter.PreCommitRejection.class,
             () -> storage.save(ReSyncResourceCatalog.SCHEDULE_DEFINITION, value, UUID.randomUUID(), 0L));
-        assertEquals("Schedule target ID fields conflict", failure.getMessage());
+        assertTrue(failure.getCause() instanceof IllegalArgumentException);
+        assertEquals("Schedule target ID fields conflict", failure.getCause().getMessage());
         assertNull(storage.readMutationStamp(ReSyncResourceCatalog.SCHEDULE_DEFINITION, "conflicting-schedule"));
     }
 
@@ -380,7 +381,16 @@ class ReSyncJsonResourceStorageTest {
         Field field = AdvancementModule.class.getDeclaredField("storage");
         field.setAccessible(true);
         field.set(module, storage);
-        storage.addListener(module);
+        List<FlowResourceMutationStamp> committed = new ArrayList<>();
+        storage.addInterceptor(new ReSyncJsonResourceStorage.ResourceMutationInterceptor() {
+            @Override
+            public void afterCommit(String type, String id, JsonObject value, FlowResourceMutationStamp stamp) {
+                if (ReSyncResourceCatalog.ADVANCEMENT_TREE.equals(type)) {
+                    assertEquals(storage.readMutationStamp(type, id), stamp);
+                    committed.add(stamp);
+                }
+            }
+        });
         Method read = AdvancementModule.class.getDeclaredMethod("admitTrees");
         read.setAccessible(true);
         JsonObject tree = JsonParser.parseString("""
@@ -400,8 +410,12 @@ class ReSyncJsonResourceStorageTest {
         assertTrue(((Map<?, ?>) read.invoke(module)).isEmpty());
         storage.save(ReSyncResourceCatalog.ADVANCEMENT_TREE, tree);
         assertFalse(((Map<?, ?>) read.invoke(module)).isEmpty());
+        assertEquals(List.of(1L, 2L, 3L, 4L), committed.stream().map(FlowResourceMutationStamp::revision).toList());
+        assertEquals(List.of(false, false, true, false), committed.stream().map(FlowResourceMutationStamp::deleted).toList());
         Path replacement = tempDir.resolve("replacement");
+        storage.quiescePersistence();
         storage.rebindPersistence(replacement, coordinator(replacement));
+        storage.resumePersistence();
         assertTrue(((Map<?, ?>) read.invoke(module)).isEmpty());
         storage.quiescePersistence();
         assertTrue(((Map<?, ?>) read.invoke(module)).isEmpty());

@@ -122,6 +122,85 @@ class LuckPermsOperationPersistenceParticipantTest {
     }
 
     @Test
+    void missingRebindJournalPreservesCurrentBindingAndDurableReceipts() throws Exception {
+        Path candidateRoot = Files.createDirectory(temporary.resolve("missing"));
+        Path candidate = candidateRoot.resolve("runtime").resolve("luckperms-operations.json");
+
+        Exception failure = assertRejectedCandidatePreservesReceipts(candidateRoot);
+
+        assertTrue(failure.getMessage().contains("Restore a verified backup"));
+        assertTrue(failure.getMessage().contains("Do not replace the journal with an empty file"));
+        assertFalse(Files.exists(candidate));
+    }
+
+    @Test
+    void nonregularRebindJournalPreservesCurrentBindingAndDurableReceipts() throws Exception {
+        Path candidateRoot = Files.createDirectory(temporary.resolve("directory"));
+        Path candidate = candidateRoot.resolve("runtime").resolve("luckperms-operations.json");
+        Files.createDirectories(candidate);
+
+        assertRejectedCandidatePreservesReceipts(candidateRoot);
+
+        assertTrue(Files.isDirectory(candidate));
+    }
+
+    @Test
+    void symbolicRebindJournalPreservesCurrentBindingAndDurableReceipts() throws Exception {
+        Path candidateRoot = Files.createDirectory(temporary.resolve("symbolic"));
+        Path candidate = candidateRoot.resolve("runtime").resolve("luckperms-operations.json");
+        Files.createDirectories(candidate.getParent());
+        Path target = temporary.resolve("target.json");
+        String targetJournal = journal("candidate", 2);
+        Files.writeString(target, targetJournal);
+        Files.createSymbolicLink(candidate, target);
+
+        assertRejectedCandidatePreservesReceipts(candidateRoot);
+
+        assertTrue(Files.isSymbolicLink(candidate));
+        assertEquals(targetJournal, Files.readString(target));
+    }
+
+    @Test
+    void repeatedValidRebindPreservesCandidateReceiptsAcrossRestart() throws Exception {
+        Path dataRoot = plugin.getDataFolder().toPath();
+        Path source = dataRoot.resolve("runtime").resolve("luckperms-operations.json");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, journal("source", 1));
+        Path candidateRoot = Files.createDirectory(temporary.resolve("repeated"));
+        Path candidate = candidateRoot.resolve("runtime").resolve("luckperms-operations.json");
+        Files.createDirectories(candidate.getParent());
+        String candidateJournal = journal("candidate", 2);
+        Files.writeString(candidate, candidateJournal);
+        LuckPermsManagementService service = new LuckPermsManagementService(plugin);
+        LuckPermsOperationPersistenceParticipant participant = new LuckPermsOperationPersistenceParticipant(dataRoot, service);
+        try {
+            participant.quiesce();
+            participant.rebind(candidateRoot);
+            participant.rebind(candidateRoot);
+
+            assertEquals(candidate.toAbsolutePath().normalize(), participant.root());
+            assertTrue(service.hasCompletedOperation("candidate"));
+            assertFalse(service.hasCompletedOperation("source"));
+            assertEquals(candidateJournal, Files.readString(candidate));
+            participant.healthCheck();
+            participant.resume();
+        } finally {
+            service.close();
+        }
+
+        LuckPermsManagementService restarted = new LuckPermsManagementService(plugin,
+            LuckPermsBackendPersistenceCapability.unavailable(), candidateRoot);
+        try {
+            assertTrue(restarted.hasCompletedOperation("candidate"));
+            assertFalse(restarted.hasCompletedOperation("source"));
+            restarted.healthCheckPersistence();
+            assertEquals(candidateJournal, Files.readString(candidate));
+        } finally {
+            restarted.close();
+        }
+    }
+
+    @Test
     void ownershipIndexClaimsOnlyTheLuckPermsJournal() throws Exception {
         Path dataRoot = plugin.getDataFolder().toPath();
         LuckPermsManagementService service = new LuckPermsManagementService(plugin);
@@ -132,6 +211,46 @@ class LuckPermsOperationPersistenceParticipantTest {
         assertFalse(index.owns("runtime/luckperms-operations.json.tmp"));
         assertFalse(index.owns("runtime/luckperms-operations.json/nested"));
         service.close();
+    }
+
+    private Exception assertRejectedCandidatePreservesReceipts(Path candidateRoot) throws Exception {
+        Path dataRoot = plugin.getDataFolder().toPath();
+        Path source = dataRoot.resolve("runtime").resolve("luckperms-operations.json");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, journal("source", 1));
+        LuckPermsManagementService service = new LuckPermsManagementService(plugin);
+        LuckPermsOperationPersistenceParticipant participant = new LuckPermsOperationPersistenceParticipant(dataRoot, service);
+        Exception failure;
+        String persisted;
+        try {
+            participant.quiesce();
+            persisted = Files.readString(source);
+
+            failure = assertThrows(Exception.class, () -> participant.rebind(candidateRoot));
+            assertTrue(failure instanceof IOException || failure instanceof IllegalArgumentException);
+
+            assertEquals(source.toAbsolutePath().normalize(), service.persistenceRoot());
+            assertEquals(source.toAbsolutePath().normalize(), participant.root());
+            assertTrue(service.hasCompletedOperation("source"));
+            assertFalse(service.hasCompletedOperation("candidate"));
+            assertTrue(service.isPersistenceQuiesced());
+            assertEquals(persisted, Files.readString(source));
+            participant.healthCheck();
+            participant.resume();
+        } finally {
+            service.close();
+        }
+
+        LuckPermsManagementService restarted = new LuckPermsManagementService(plugin);
+        try {
+            assertTrue(restarted.hasCompletedOperation("source"));
+            assertFalse(restarted.hasCompletedOperation("candidate"));
+            restarted.healthCheckPersistence();
+            assertEquals(persisted, Files.readString(source));
+        } finally {
+            restarted.close();
+        }
+        return failure;
     }
 
     private String journal(String operationId, long revision) {

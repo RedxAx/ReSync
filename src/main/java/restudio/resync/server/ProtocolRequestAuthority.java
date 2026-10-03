@@ -1,5 +1,9 @@
 package restudio.resync.server;
 
+import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.ConsoleCommandSender;
+import org.bukkit.entity.Player;
 import restudio.resync.core.ConnectionInfo;
 import restudio.resync.core.ConnectionState;
 import restudio.resync.core.Session;
@@ -23,8 +27,12 @@ import restudio.resync.security.ClientIdentity;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-final class ProtocolRequestAuthority {
+public final class ProtocolRequestAuthority {
+    private static final String OPERATOR_PREFIX = "resync.qa/";
+
     private ProtocolRequestAuthority() {
     }
 
@@ -37,11 +45,76 @@ final class ProtocolRequestAuthority {
         String connectionClientId = connection.getClientId();
         String sessionClientId = session.getClientId();
         String identityClientId = identity != null ? identity.clientId() : null;
-        if (connectionClientId == null || connectionClientId.isBlank() || sessionClientId == null || sessionClientId.isBlank()
+        if (connectionClientId == null || connectionClientId.isBlank() || connectionClientId.startsWith(OPERATOR_PREFIX)
+            || sessionClientId == null || sessionClientId.isBlank()
             || identityClientId == null || identityClientId.isBlank()) {
             return null;
         }
         return connectionClientId.equals(sessionClientId) && connectionClientId.equals(identityClientId) ? connectionClientId : null;
+    }
+
+    public static String trustedOperatorId(CommandSender actor) {
+        if (!Bukkit.isPrimaryThread() || actor == null || !actor.hasPermission("resync.qa")) {
+            return null;
+        }
+        if (actor instanceof Player player) {
+            return OPERATOR_PREFIX + "player/" + player.getUniqueId();
+        }
+        if (actor instanceof ConsoleCommandSender) {
+            return OPERATOR_PREFIX + "console";
+        }
+        String name = actor.getName();
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        return OPERATOR_PREFIX + "sender/" + name;
+    }
+
+    public static OperatorGrant admitOperator(CommandSender actor, ProtocolEnvelope<Map<String, Object>> envelope) {
+        String actorId = trustedOperatorId(actor);
+        if (actorId == null) {
+            throw new SecurityException("ReSync QA permission and server thread admission are required");
+        }
+        if (envelope == null || envelope.kind() != ProtocolEnvelope.Kind.REQUEST || envelope.requestId() == null
+            || envelope.authorityEpoch() < 1L || !owns(envelope.serverId(), envelope)) {
+            throw new IllegalArgumentException("A typed resource request is required");
+        }
+        return new OperatorGrant(actorId, envelope);
+    }
+
+    public static final class OperatorGrant {
+        private final String actorId;
+        private final ProtocolEnvelope<Map<String, Object>> request;
+        private final AtomicBoolean claimed = new AtomicBoolean();
+
+        private OperatorGrant(String actorId, ProtocolEnvelope<Map<String, Object>> request) {
+            this.actorId = actorId;
+            this.request = request;
+        }
+
+        public String actorId() {
+            return actorId;
+        }
+
+        public ServerId serverId() {
+            return request.serverId();
+        }
+
+        public UUID requestId() {
+            return request.requestId();
+        }
+
+        public long authorityEpoch() {
+            return request.authorityEpoch();
+        }
+
+        boolean matches(ServerId serverId, ProtocolEnvelope<Map<String, Object>> envelope) {
+            return request == envelope && request.serverId().equals(serverId) && !claimed.get();
+        }
+
+        boolean claim(ServerId serverId, ProtocolEnvelope<Map<String, Object>> envelope) {
+            return request == envelope && request.serverId().equals(serverId) && claimed.compareAndSet(false, true);
+        }
     }
 
     static boolean owns(ServerId serverId, ProtocolEnvelope<Map<String, Object>> envelope) {

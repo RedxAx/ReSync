@@ -88,7 +88,7 @@ public class CustomContentListener implements Listener {
                 }
             }
         }
-        if (event.getClickedBlock() != null) {
+        if (event.getClickedBlock() != null && event.getHand() != EquipmentSlot.OFF_HAND) {
             Location location = event.getClickedBlock().getLocation();
             String blockId = service.identifyBlock(location);
             if (blockId != null) {

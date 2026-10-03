@@ -12,12 +12,99 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class LegacyInstallBoundaryTest {
     @TempDir
     Path temporary;
+
+    @Test
+    void configurationAndEmptyFoldersBootstrapWithoutAnArchiveAndPreserveInputs() throws Exception {
+        Path data = Files.createDirectory(temporary.resolve("ReSync"));
+        Path coordination = temporary.resolve(".resync-coordination");
+        String configuration = "enabled=true\nport=12451\n";
+        Files.writeString(data.resolve("resync.properties"), configuration);
+        Files.createDirectory(data.resolve("assets"));
+        Files.createDirectory(data.resolve("runtime"));
+        Files.createDirectory(data.resolve("diagnostic-channel"));
+        Files.writeString(data.resolve("diagnostic-channel/resync-lifecycle.jsonl"), "startup evidence\n");
+
+        assertFalse(LegacyInstallBoundary.prepare(data, coordination).archived());
+        ReSyncPersistenceCoordinator.PreparedBootstrap prepared = ReSyncPersistenceCoordinator.bootstrapPrepared(data, coordination);
+        try {
+            FreshRootProvenance provenance = prepared.coordinator().freshRootProvenance().orElseThrow();
+            String artifactHash = AssetAdoptionArtifactProducer.produceEmptyUnconsumed(coordination, provenance).artifactHash();
+            prepared.coordinator().prepareDataFixes(new ReSyncDataFixer(1, List.of()), true);
+            provenance.consume(artifactHash);
+
+            assertEquals(configuration, Files.readString(data.resolve("resync.properties")));
+            assertEquals(configuration, Files.readString(prepared.activeRoot().resolve("resync.properties")));
+            assertEquals("startup evidence\n", Files.readString(prepared.activeRoot().resolve("diagnostic-channel/resync-lifecycle.jsonl")));
+            assertFalse(LegacyInstallBoundary.prepare(data, coordination).archived());
+            assertFalse(Files.exists(temporary.resolve(LegacyInstallBoundary.STATUS_FILE)));
+        } finally {
+            prepared.coordinator().close();
+        }
+    }
+
+    @Test
+    void existingEmptyFolderGetsFreshProvenance() throws Exception {
+        Path data = Files.createDirectory(temporary.resolve("ReSync"));
+        Path coordination = temporary.resolve(".resync-coordination");
+        assertFalse(LegacyInstallBoundary.prepare(data, coordination).archived());
+        ReSyncPersistenceCoordinator.PreparedBootstrap prepared = ReSyncPersistenceCoordinator.bootstrapPrepared(data, coordination);
+        try {
+            assertTrue(prepared.coordinator().freshBootstrap());
+        } finally {
+            prepared.coordinator().close();
+        }
+    }
+
+    @Test
+    void changedFreshConfigurationAfterVersioningCannotBeConsumed() throws Exception {
+        Path data = Files.createDirectory(temporary.resolve("ReSync"));
+        Path coordination = temporary.resolve(".resync-coordination");
+        Files.writeString(data.resolve("resync.properties"), "port=12451\n");
+        ReSyncPersistenceCoordinator.PreparedBootstrap prepared = ReSyncPersistenceCoordinator.bootstrapPrepared(data, coordination);
+        try {
+            FreshRootProvenance provenance = prepared.coordinator().freshRootProvenance().orElseThrow();
+            String artifactHash = AssetAdoptionArtifactProducer.produceEmptyUnconsumed(coordination, provenance).artifactHash();
+            prepared.coordinator().prepareDataFixes(new ReSyncDataFixer(1, List.of()), true);
+            Files.writeString(prepared.activeRoot().resolve("resync.properties"), "port=12452\n");
+
+            assertThrows(MigrationException.class, () -> provenance.consume(artifactHash));
+            assertEquals("port=12451\n", Files.readString(data.resolve("resync.properties")));
+        } finally {
+            prepared.coordinator().close();
+        }
+    }
+
+    @Test
+    void versionedSourceWithoutCoordinationCannotBeArchivedAsLegacy() throws Exception {
+        Path data = Files.createDirectory(temporary.resolve("ReSync"));
+        Path coordination = Files.createDirectory(temporary.resolve(".resync-coordination"));
+        AtomicDirectoryRootStore roots = new AtomicDirectoryRootStore(coordination.resolve("restore-control"));
+        new ReSyncDataFixer(1, List.of()).prepare(data, coordination, true, roots);
+        Files.writeString(data.resolve("important.json"), "preserve");
+
+        assertFalse(LegacyInstallBoundary.prepare(data, coordination).archived());
+        Files.writeString(temporary.resolve(LegacyInstallBoundary.RESET_MARKER), "");
+        assertThrows(MigrationException.class, () -> LegacyInstallBoundary.prepare(data, coordination));
+        assertEquals("preserve", Files.readString(data.resolve("important.json")));
+    }
+
+    @Test
+    void payloadInAnOtherwiseEmptyFolderStillRequiresAnArchive() throws Exception {
+        Path data = Files.createDirectory(temporary.resolve("ReSync"));
+        Files.writeString(data.resolve("resync.properties"), "enabled=true\n");
+        Files.createDirectory(data.resolve("runtime"));
+        Files.writeString(data.resolve("runtime/luckperms-operations.json"), "[]");
+
+        assertThrows(MigrationException.class, () -> LegacyInstallBoundary.prepare(data, temporary.resolve(".resync-coordination")));
+        assertEquals("[]", Files.readString(data.resolve("runtime/luckperms-operations.json")));
+    }
 
     @Test
     void rejectsPreRewriteDataWithoutExplicitArchiveRequest() throws Exception {

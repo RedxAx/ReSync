@@ -1,7 +1,6 @@
 package restudio.resync.network.paper;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -65,13 +64,12 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
     public static ReSyncNetworkAgentConfig load(Path operatorDataDirectory, Path activeDataDirectory) throws IOException {
         Path operatorRoot = operatorDataDirectory.toAbsolutePath().normalize();
         Path activeRoot = activeDataDirectory.toAbsolutePath().normalize();
-        Path propertiesFile = operatorRoot.resolve("resync.properties");
-        Properties properties = new Properties();
-        if (Files.exists(propertiesFile)) {
-            try (InputStream input = Files.newInputStream(propertiesFile)) {
-                properties.load(input);
-            }
-        }
+        return load(operatorRoot, activeRoot, NetworkSettings.load(operatorRoot));
+    }
+
+    public static ReSyncNetworkAgentConfig load(Path operatorDataDirectory, Path activeDataDirectory, Properties properties) throws IOException {
+        Path operatorRoot = operatorDataDirectory.toAbsolutePath().normalize();
+        Path activeRoot = activeDataDirectory.toAbsolutePath().normalize();
         Path credentialFile = activeRoot.resolve(properties.getProperty("network.credential-file", "network/node.credential")).normalize();
         Path networkRoot = activeRoot.resolve("network").normalize();
         if (!credentialFile.getParent().equals(networkRoot)) {

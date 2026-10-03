@@ -1,8 +1,8 @@
 package restudio.resync.network.paper.state;
 
+import restudio.resync.network.paper.NetworkSettings;
+
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Properties;
@@ -27,13 +27,10 @@ public record NetworkPlayerStateConfig(NetworkPlayerStateProfile profile, String
     }
 
     public static NetworkPlayerStateConfig load(Path dataDirectory) throws IOException {
-        Properties properties = new Properties();
-        Path file = dataDirectory.toAbsolutePath().normalize().resolve("resync.properties");
-        if (Files.exists(file)) {
-            try (InputStream input = Files.newInputStream(file)) {
-                properties.load(input);
-            }
-        }
+        return load(NetworkSettings.load(dataDirectory));
+    }
+
+    public static NetworkPlayerStateConfig load(Properties properties) {
         NetworkPlayerStateProfile profile;
         try {
             profile = NetworkPlayerStateProfile.valueOf(properties.getProperty("network.transfer.profile", "PRESENCE_ONLY").trim().replace(' ', '_').toUpperCase(Locale.ROOT));

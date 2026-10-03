@@ -11,6 +11,7 @@ import restudio.resync.storage.StorageSafety;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,6 +48,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
         Path scope = MigrationPaths.requirePath(dataRoot, "dataRoot");
         this.dossierDirectory = scope.resolve("player-dossiers").toAbsolutePath().normalize();
         ensureDirectory();
+        recoverPersistence();
         loadAll();
     }
 
@@ -312,7 +314,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
     private void loadAll() {
         try (var stream = Files.list(dossierDirectory)) {
             stream.filter(path -> path.getFileName().toString().endsWith(".json"))
-                .forEach(this::load);
+                .toList().forEach(this::load);
         } catch (IOException e) {
             Log.warn("Failed to load player dossiers: " + e.getMessage());
         }
@@ -321,45 +323,76 @@ public class PlayerTrackingManager implements PlayerTrackingService {
     private void load(Path path) {
         try {
             String fileName = path.getFileName().toString();
-            if (!fileName.endsWith(".json") || StorageSafety.validateId(fileName.substring(0, fileName.length() - 5)) == null) {
+            if (!fileName.endsWith(".json")) {
                 return;
             }
+            if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Player dossier is not a regular file: " + fileName);
+            }
+            String fileId = StorageSafety.validateId(fileName.substring(0, fileName.length() - 5));
             String json = StorageSafety.readUtf8(path);
             PlayerDossier dossier = gson.fromJson(json, PlayerDossier.class);
             if (dossier == null || dossier.getPlayerId() == null || dossier.getPlayerId().isBlank()) {
                 return;
             }
             StorageSafety.validateId(dossier.getPlayerId());
-            normalizeLoadedDossier(dossier);
-            dossier.setOnline(false);
-            closeStaleSession(dossier);
+            if (!fileId.equals(dossier.getPlayerId())) {
+                throw new IOException("Player dossier file id does not match its player id: " + fileName);
+            }
+            boolean changed = normalizeLoadedDossier(dossier);
+            if (dossier.isOnline()) {
+                dossier.setOnline(false);
+                changed = true;
+            }
+            changed |= closeStaleSession(dossier);
             dossiers.put(UUID.fromString(dossier.getPlayerId()), dossier);
-            save(dossier);
+            if (changed) {
+                save(dossier);
+            }
         } catch (Exception e) {
             Log.warn("Failed to load dossier " + path.getFileName() + ": " + e.getMessage());
         }
     }
 
-    private void normalizeLoadedDossier(PlayerDossier dossier) {
+    private boolean normalizeLoadedDossier(PlayerDossier dossier) {
+        boolean changed = false;
         if (dossier.getPlayerName() == null || dossier.getPlayerName().isBlank()) {
             dossier.setPlayerName(dossier.getPlayerId());
+            changed = true;
         }
         if (dossier.getSessions() == null) {
             dossier.setSessions(new ArrayList<>());
+            changed = true;
         }
         if (dossier.getRecentEvents() == null) {
             dossier.setRecentEvents(new ArrayList<>());
+            changed = true;
         }
         if (dossier.getFacets() == null) {
             dossier.setFacets(new LinkedHashMap<>());
+            changed = true;
+        }
+        return changed;
+    }
+
+    private void recoverPersistence() {
+        try {
+            Path root = requireDossierDirectory();
+            int recovered = StorageSafety.recoverAtomicWrites(root);
+            if (recovered > 0) {
+                Log.warn("Preserved " + recovered + " interrupted player history writes in "
+                    + root.resolve(".quarantine/atomic-writes"));
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to recover player history persistence", exception);
         }
     }
 
-    private void closeStaleSession(PlayerDossier dossier) {
+    private boolean closeStaleSession(PlayerDossier dossier) {
         PlayerSessionRecord session = dossier.getActiveSession();
         if (session == null || session.getEndedAt() > 0) {
             dossier.setActiveSession(null);
-            return;
+            return session != null;
         }
         long now = System.currentTimeMillis();
         session.setEndedAt(now);
@@ -372,6 +405,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
         dossier.getSessions().add(0, session.copy());
         trimSessions(dossier);
         dossier.setActiveSession(null);
+        return true;
     }
 
     private void save(PlayerDossier dossier) {
@@ -408,9 +442,13 @@ public class PlayerTrackingManager implements PlayerTrackingService {
     }
 
     private Map<UUID, PlayerDossier> readDossiers(Path root) throws IOException {
+        StorageSafety.validateAtomicWriteRecovery(root);
         Map<UUID, PlayerDossier> loaded = new LinkedHashMap<>();
         try (var stream = Files.list(root)) {
             for (Path path : stream.sorted().toList()) {
+                if (path.getFileName().toString().equals(".quarantine")) {
+                    continue;
+                }
                 if (!Files.isRegularFile(path) || Files.isSymbolicLink(path)) {
                     throw new IOException("Player dossier root contains a non-regular file: " + path.getFileName());
                 }

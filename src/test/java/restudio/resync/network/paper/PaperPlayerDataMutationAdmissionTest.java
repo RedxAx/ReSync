@@ -185,6 +185,38 @@ class PaperPlayerDataMutationAdmissionTest {
     }
 
     @Test
+    void anIdleQuiesceRequestCanResumeWithoutWaitingForAnotherDrain() throws Exception {
+        Path world = Files.createDirectories(temporary.resolve("idle-world").resolve("playerdata")).getParent();
+        PaperPlayerDataMutationAdmission admission = new PaperPlayerDataMutationAdmission(List.of(world), temporary);
+        PaperPlayerDataMutationAdmission.ReadinessObservation previous = admission.readinessObservation();
+
+        admission.requestQuiesce();
+
+        assertEquals(PaperPlayerDataMutationAdmission.State.QUIESCED, admission.state());
+        assertFalse(admission.isCurrent(previous));
+        assertThrows(IllegalStateException.class, () -> admission.acquire("late"));
+        admission.resume();
+        try (PaperPlayerDataMutationAdmission.Lease lease = admission.acquire("resumed")) {
+            assertEquals(PaperPlayerDataMutationAdmission.State.OPEN, admission.state());
+        }
+    }
+
+    @Test
+    void anActiveQuiesceRequestStillRequiresTheAdmittedWorkToDrain() throws Exception {
+        Path world = Files.createDirectories(temporary.resolve("active-world").resolve("playerdata")).getParent();
+        PaperPlayerDataMutationAdmission admission = new PaperPlayerDataMutationAdmission(List.of(world), temporary);
+        try (PaperPlayerDataMutationAdmission.Lease lease = admission.acquire("active")) {
+            admission.requestQuiesce();
+            assertEquals(PaperPlayerDataMutationAdmission.State.QUIESCING, admission.state());
+            assertThrows(IOException.class, admission::resume);
+            assertThrows(IllegalStateException.class, () -> admission.acquire("late"));
+        }
+        admission.quiesce(Duration.ofSeconds(1));
+        admission.resume();
+        assertEquals(PaperPlayerDataMutationAdmission.State.OPEN, admission.state());
+    }
+
+    @Test
     void drainTimeoutFailsClosedAndReadinessDoesNotClaimSnapshotRestore() throws Exception {
         Path world = Files.createDirectories(temporary.resolve("world"));
         Files.createDirectories(world.resolve("playerdata"));

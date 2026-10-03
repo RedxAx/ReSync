@@ -56,6 +56,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -72,10 +73,16 @@ import java.util.stream.Collectors;
 public class ReSyncCommand implements TabExecutor {
     private static final String AUTHORITY_ANCHOR_RELATIVE_PATH = "authority/authority-trust-anchor.json";
     private final ReSync plugin;
+    private final QaCommand qa;
     private final Map<String, CommandBranch> commandTree = new LinkedHashMap<>();
 
     public ReSyncCommand(ReSync plugin) {
         this.plugin = plugin;
+        this.qa = new QaCommand(() -> {
+            ReSyncServer server = plugin.getReSyncServer();
+            return server == null ? null : server.getQaService();
+        });
+        register("qa", "Inspect And Run QA Operations", (sender, args) -> qa.execute(sender, Arrays.copyOfRange(args, 1, args.length)), args -> List.of());
         register("help", "Command Guide", (sender, args) -> {
             sendUsage(sender, args.length > 1 ? args[1] : "");
             return true;
@@ -107,6 +114,9 @@ public class ReSyncCommand implements TabExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length > 0 && "qa".equalsIgnoreCase(args[0])) {
+            return qa.execute(sender, Arrays.copyOfRange(args, 1, args.length));
+        }
         boolean authorityExport = args.length >= 2 && "authority".equalsIgnoreCase(args[0])
             && "export".equalsIgnoreCase(args[1]);
         boolean authorityAnchor = args.length >= 2 && "authority".equalsIgnoreCase(args[0])
@@ -139,7 +149,10 @@ public class ReSyncCommand implements TabExecutor {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(new ArrayList<>(commandTree.keySet()), args[0]);
+            return filter(commandTree.keySet().stream().filter(group -> !"qa".equals(group) || sender.hasPermission("resync.qa")).toList(), args[0]);
+        }
+        if (args.length > 1 && "qa".equalsIgnoreCase(args[0])) {
+            return qa.complete(sender, Arrays.copyOfRange(args, 1, args.length));
         }
         CommandBranch branch = commandTree.get(args[0].toLowerCase(Locale.ROOT));
         return branch != null ? branch.completer().apply(args) : List.of();

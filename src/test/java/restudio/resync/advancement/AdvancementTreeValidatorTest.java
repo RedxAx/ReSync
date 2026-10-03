@@ -64,4 +64,32 @@ class AdvancementTreeValidatorTest {
             {"id":"other","enabled":true,"nodes":{"root":{"enabled":true,"parent":"","display":{"icon":"minecraft:stone"}}}}
             """).getAsJsonObject())));
     }
+
+    @Test
+    void rejectsAParentInADisabledTree() {
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(Map.of(
+            "main", JsonParser.parseString("""
+                {"id":"main","nodes":{"root":{"display":{"icon":"minecraft:stone"}},"child":{"parent":"other/root","display":{"icon":"minecraft:stone"}}}}
+                """).getAsJsonObject(),
+            "other", JsonParser.parseString("""
+                {"id":"other","enabled":false,"nodes":{"root":{"display":{"icon":"minecraft:stone"}}}}
+                """).getAsJsonObject())));
+    }
+
+    @Test
+    void namespacedReSyncParentsUseTheSameInventoryAndCycleValidation() {
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(Map.of("main", JsonParser.parseString("""
+            {"id":"main","nodes":{"root":{"display":{"icon":"minecraft:stone"}},"child":{"parent":"resync:missing/root","display":{"icon":"minecraft:stone"}}}}
+            """).getAsJsonObject())));
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(Map.of("main", JsonParser.parseString("""
+            {"id":"main","nodes":{"root":{"display":{"icon":"minecraft:stone"}},"a":{"parent":"resync:main/b","display":{"icon":"minecraft:stone"}},"b":{"parent":"resync:main/a","display":{"icon":"minecraft:stone"}}}}
+            """).getAsJsonObject())));
+    }
+
+    @Test
+    void aConfiguredCriterionCannotBeAutoAwardedAsRootVisibility() {
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(Map.of("main", JsonParser.parseString("""
+            {"id":"main","nodes":{"root":{"display":{"icon":"minecraft:stone"},"criteria":{"__resync_root":{"trigger":"held_item","conditions":{"heldItem":"minecraft:diamond"}}}}}}
+            """).getAsJsonObject())));
+    }
 }

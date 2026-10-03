@@ -605,8 +605,14 @@ public final class NetworkPlayerStateReconciler implements Listener {
     }
 
     private static void validatePlayerTemp(Path temp, Path root) throws IOException {
-        Path normalizedRoot = MigrationPaths.requireDirectory(root, "playerDataRoot");
-        Path normalized = MigrationPaths.requirePath(temp, "playerDataTemporaryTarget");
+        Path normalizedRoot;
+        Path normalized;
+        try {
+            normalizedRoot = MigrationPaths.requireDirectory(root, "playerDataRoot");
+            normalized = MigrationPaths.requirePath(temp, "playerDataTemporaryTarget");
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("Player Data Temporary Target Is Invalid", exception);
+        }
         if (normalized.getParent() == null || !normalized.getParent().equals(normalizedRoot)
             || parsePlayerTemp(normalized) == null) {
             throw new IOException("Player Data Temporary Target Is Not Canonical: " + normalized);

@@ -9,6 +9,7 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import io.papermc.paper.event.player.PlayerTradeEvent;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.Event;
@@ -63,6 +64,8 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FunctionCallSupport;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.resources.JsonAssetStore;
+import restudio.resync.modules.flow.FlowResourceMutationStamp;
 import restudio.flow.data.FlowGraph;
 
 import java.util.HashMap;
@@ -74,7 +77,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class AdvancementModule implements Module, Listener, ReSyncJsonResourceStorage.ResourceMutationInterceptor, ReSyncJsonResourceStorage.ResourceListener {
+public class AdvancementModule implements Module, Listener, ReSyncJsonResourceStorage.ResourceMutationInterceptor {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("advancements", "Advancements").withDependencies("flow");
     private final AdvancementTreeValidator validator = new AdvancementTreeValidator();
     private AdvancementRuntimeBridge bridge;
@@ -85,11 +88,28 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     private FlowStorage flowStorage;
     private FlowExecutor flowExecutor;
     private BukkitTask pollingTask;
+    private BukkitTask reloadTask;
+    private volatile boolean running;
     private JavaPlugin plugin;
     private final AtomicLong treeGeneration = new AtomicLong();
     private volatile TreeSnapshot residentSnapshot;
+    private volatile NativeProjection projection;
 
-    private record TreeSnapshot(long generation, long storageGeneration, ReSyncJsonResourceStorage.ResourceSnapshot stamp, Map<String, JsonObject> trees) {
+    private record TreeSnapshot(long generation, long storageGeneration, long verifiedSequence, ReSyncJsonResourceStorage.ResourceSnapshot stamp, Map<String, JsonObject> trees) {
+    }
+
+    private record NativeProjection(TreeSnapshot snapshot, boolean ready) {
+    }
+
+    public record TreeState(JsonObject definition, JsonAssetStore.AssetStamp stamp) {
+        public TreeState {
+            definition = definition.deepCopy();
+        }
+
+        @Override
+        public JsonObject definition() {
+            return definition.deepCopy();
+        }
     }
 
     public AdvancementModule() {
@@ -118,17 +138,20 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         predicates = new AdvancementPredicateEvaluator(customContent);
         bridge = new PaperAdvancementRuntimeBridge(customContent, playerDataAdmission);
         storage.addInterceptor(this);
-        storage.addListener(this);
         context.registerService(AdvancementModule.class, this);
         context.registerService(AdvancementService.class, service);
     }
 
     @Override
     public void start(ModuleContext context) {
+        running = true;
         Bukkit.getPluginManager().registerEvents(this, context.getPlugin());
         reloadAdvancements();
-        Bukkit.getScheduler().runTaskLater(context.getPlugin(), this::reloadAdvancements, 40L);
+        reloadTask = Bukkit.getScheduler().runTaskLater(context.getPlugin(), this::reloadAdvancements, 40L);
         pollingTask = Bukkit.getScheduler().runTaskTimer(context.getPlugin(), () -> {
+            if (!running) {
+                return;
+            }
             Map<String, JsonObject> trees = admitTrees();
             if (trees.isEmpty()) {
                 return;
@@ -144,16 +167,21 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
 
     @Override
     public void stop(ModuleContext context) {
-        HandlerList.unregisterAll(this);
-        storage.removeListener(this);
-        storage.removeInterceptor(this);
-        invalidateTrees();
-        if (bridge.supported()) {
-            bridge.replace(Map.of());
+        running = false;
+        projection = null;
+        if (reloadTask != null) {
+            reloadTask.cancel();
+            reloadTask = null;
         }
         if (pollingTask != null) {
             pollingTask.cancel();
             pollingTask = null;
+        }
+        HandlerList.unregisterAll(this);
+        storage.removeInterceptor(this);
+        invalidateTrees();
+        if (bridge.supported()) {
+            bridge.replace(Map.of());
         }
     }
 
@@ -163,9 +191,7 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
             return;
         }
         requireSupported();
-        Map<String, JsonObject> trees = trees(id(value), value);
-        validator.validate(trees);
-        replaceSynchronously(trees);
+        validator.validate(trees(id(value), value));
     }
 
     @Override
@@ -174,19 +200,17 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
             return;
         }
         requireSupported();
-        Map<String, JsonObject> trees = trees(id, null);
-        validator.validate(trees);
-        replaceSynchronously(trees);
+        validator.validate(trees(id, null));
     }
 
     @Override
-    public void afterSaveFailure(String type, JsonObject value, RuntimeException failure) {
-        rollback(type);
-    }
-
-    @Override
-    public void afterDeleteFailure(String type, String id, RuntimeException failure) {
-        rollback(type);
+    public void afterCommit(String type, String id, JsonObject value, FlowResourceMutationStamp stamp) {
+        if (ReSyncResourceCatalog.ADVANCEMENT_TREE.equals(type)) {
+            if (stamp == null || !type.equals(stamp.type()) || !id.equals(stamp.id())) {
+                throw new IllegalArgumentException("Advancement commit identity is required");
+            }
+            replaceSynchronously(stamp);
+        }
     }
 
     @EventHandler
@@ -204,33 +228,39 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
 
     @EventHandler
     public void onPluginEnable(PluginEnableEvent event) {
-        if (plugin == null || !bridge.supported()) {
+        if (!running || plugin == null || !bridge.supported()) {
             return;
         }
         if ("Nexo".equalsIgnoreCase(event.getPlugin().getName())) {
-            Bukkit.getScheduler().runTask(plugin, this::reloadAdvancements);
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (running) {
+                    NativeProjection current = projection;
+                    projection = current == null ? null : new NativeProjection(current.snapshot(), false);
+                    reloadAdvancements();
+                }
+            });
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPickup(EntityPickupItemEvent event) {
         if (event.getEntity() instanceof Player player) {
             dispatch(player, "obtain_item", event, Map.of("event.item", event.getItem().getItemStack()));
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onConsume(PlayerItemConsumeEvent event) {
         dispatch(event.getPlayer(), "consume_item", event, Map.of("event.item", event.getItem()));
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
         dispatch(event.getPlayer(), "place_block", event, Map.of("event.block", event.getBlockPlaced()));
         dispatch(event.getPlayer(), "place_furniture", event, Map.of("event.block", event.getBlockPlaced(), "event.item", event.getItemInHand()));
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         dispatch(event.getPlayer(), "break_block", event, Map.of("event.block", event.getBlock()));
         dispatch(event.getPlayer(), "break_furniture", event, Map.of("event.block", event.getBlock()));
@@ -402,10 +432,70 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
 
     public Map<String, Object> capabilityPayload() {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("supported", bridge.supported());
-        payload.put("unsupportedReason", bridge.unsupportedReason());
+        payload.put("supported", bridge != null && bridge.supported());
+        payload.put("unsupportedReason", bridge == null ? "Advancement runtime is not initialized" : bridge.unsupportedReason());
+        payload.put("active", running);
         payload.put("triggers", AdvancementTriggerDescriptors.sorted());
         return payload;
+    }
+
+    public AdvancementService advancementService() {
+        return service;
+    }
+
+    public List<TreeState> treeStates() {
+        TreeSnapshot snapshot = runtimeTrees();
+        return snapshot.stamp().values().stream()
+            .map(value -> new TreeState(snapshot.trees().get(value.id()), value.stamp())).toList();
+    }
+
+    public TreeState treeState(String treeId) {
+        TreeSnapshot snapshot = runtimeTrees();
+        return snapshot.stamp().values().stream().filter(value -> value.id().equals(treeId))
+            .map(value -> new TreeState(snapshot.trees().get(treeId), value.stamp())).findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Unknown advancement tree: " + treeId));
+    }
+
+    public boolean conditionsMatch(Player player, String treeId, String nodeId, String criterionId, Map<String, Object> inputs) {
+        JsonObject tree = treeState(treeId).definition();
+        if (!bool(tree, "enabled", true)) {
+            throw new IllegalArgumentException("Advancement tree is disabled: " + treeId);
+        }
+        JsonObject nodes = object(tree, "nodes");
+        if (!nodes.has(nodeId) || !nodes.get(nodeId).isJsonObject()) {
+            throw new IllegalArgumentException("Unknown advancement node: " + nodeId);
+        }
+        JsonObject node = nodes.getAsJsonObject(nodeId);
+        if (!bool(node, "enabled", true)) {
+            throw new IllegalArgumentException("Advancement node is disabled: " + nodeId);
+        }
+        JsonObject criteria = object(node, "criteria");
+        if (!criteria.has(criterionId) || !criteria.get(criterionId).isJsonObject()) {
+            throw new IllegalArgumentException("Unknown advancement criterion: " + criterionId);
+        }
+        return predicates.matches(player, object(criteria.getAsJsonObject(criterionId), "conditions"), inputs);
+    }
+
+    private TreeSnapshot runtimeTrees() {
+        if (!Bukkit.isPrimaryThread() || !running || storage == null || bridge == null || !bridge.supported()) {
+            throw new IllegalStateException("Advancement runtime is unavailable on this thread");
+        }
+        TreeSnapshot snapshot = admitSnapshot();
+        if (!projected(snapshot)) {
+            throw new IllegalStateException("Committed advancement trees are awaiting native runtime activation");
+        }
+        return snapshot;
+    }
+
+    public void requireRuntimeCurrent() {
+        runtimeTrees();
+    }
+
+    public void requireCurrent(TreeState state) {
+        TreeState current = treeState(state.stamp().id());
+        if (!current.stamp().equals(state.stamp())) {
+            throw new IllegalStateException("Advancement tree changed before native progress access");
+        }
     }
 
     private void dispatchKill(Player killer, Entity killed, EntityDeathEvent event) {
@@ -423,10 +513,13 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
 
     private void dispatch(Player player, String trigger, Event event, Map<String, Object> inputs,
                           Map<String, JsonObject> trees) {
-        if (player == null || trees.isEmpty() || !AdvancementTriggerDescriptors.IDS.contains(trigger)) {
+        if (!current(trees) || player == null || trees.isEmpty() || !AdvancementTriggerDescriptors.IDS.contains(trigger)) {
             return;
         }
         for (Map.Entry<String, JsonObject> treeEntry : trees.entrySet()) {
+            if (!bool(treeEntry.getValue(), "enabled", true)) {
+                continue;
+            }
             JsonObject nodes = treeEntry.getValue().getAsJsonObject("nodes");
             for (Map.Entry<String, JsonElement> nodeEntry : nodes.entrySet()) {
                 JsonObject node = nodeEntry.getValue().getAsJsonObject();
@@ -446,17 +539,20 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
                     if (!FunctionCallSupport.evaluate(flowStorage, flowExecutor, object(criterion, "predicate"), player, event, vars)) {
                         continue;
                     }
-                    grantAndComplete(node, player, event, treeEntry.getKey(), nodeEntry.getKey(), criterionEntry.getKey(), vars);
+                    grantAndComplete(trees, node, player, event, treeEntry.getKey(), nodeEntry.getKey(), criterionEntry.getKey(), vars);
                 }
             }
         }
     }
 
     private void pollQuestCompletion(Player player, Map<String, JsonObject> trees) {
-        if (player == null || trees.isEmpty() || flowStorage == null || flowExecutor == null) {
+        if (!current(trees) || player == null || trees.isEmpty() || flowStorage == null || flowExecutor == null) {
             return;
         }
         for (Map.Entry<String, JsonObject> treeEntry : trees.entrySet()) {
+            if (!bool(treeEntry.getValue(), "enabled", true)) {
+                continue;
+            }
             JsonObject nodes = treeEntry.getValue().getAsJsonObject("nodes");
             for (Map.Entry<String, JsonElement> nodeEntry : nodes.entrySet()) {
                 JsonObject node = nodeEntry.getValue().getAsJsonObject();
@@ -474,7 +570,7 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
                 Map<String, Object> vars = eventVars(player, treeEntry.getKey(), nodeEntry.getKey(), criterion, "flow", Map.of());
                 boolean flowPass = flowId.isBlank() || FlowPredicateSupport.evaluate(flowStorage, flowExecutor, flowId, player, null, vars);
                 if (flowPass && FunctionCallSupport.evaluate(flowStorage, flowExecutor, predicate, player, null, vars)) {
-                    grantAndComplete(node, player, null, treeEntry.getKey(), nodeEntry.getKey(), criterion, vars);
+                    grantAndComplete(trees, node, player, null, treeEntry.getKey(), nodeEntry.getKey(), criterion, vars);
                 }
             }
         }
@@ -484,7 +580,14 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         if (player == null || command.isBlank()) {
             return;
         }
-        for (Map.Entry<String, JsonObject> treeEntry : admitTrees().entrySet()) {
+        Map<String, JsonObject> trees = admitTrees();
+        if (!current(trees)) {
+            return;
+        }
+        for (Map.Entry<String, JsonObject> treeEntry : trees.entrySet()) {
+            if (!bool(treeEntry.getValue(), "enabled", true)) {
+                continue;
+            }
             JsonObject nodes = treeEntry.getValue().getAsJsonObject("nodes");
             for (Map.Entry<String, JsonElement> nodeEntry : nodes.entrySet()) {
                 JsonObject node = nodeEntry.getValue().getAsJsonObject();
@@ -497,12 +600,15 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
                 }
                 String criterion = firstCriterion(node);
                 Map<String, Object> vars = eventVars(player, treeEntry.getKey(), nodeEntry.getKey(), criterion, "command", Map.of("event.command", command));
-                grantAndComplete(node, player, event, treeEntry.getKey(), nodeEntry.getKey(), criterion, vars);
+                grantAndComplete(trees, node, player, event, treeEntry.getKey(), nodeEntry.getKey(), criterion, vars);
             }
         }
     }
 
-    private void grantAndComplete(JsonObject node, Player player, Event event, String tree, String nodeId, String criterion, Map<String, Object> vars) {
+    private void grantAndComplete(Map<String, JsonObject> trees, JsonObject node, Player player, Event event, String tree, String nodeId, String criterion, Map<String, Object> vars) {
+        if (!current(trees)) {
+            return;
+        }
         boolean completed = service.complete(player, tree, nodeId);
         if (service.grant(player, tree, nodeId, criterion) && !completed && service.complete(player, tree, nodeId)) {
             complete(node, player, event, vars);
@@ -563,7 +669,7 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     }
 
     private Map<String, JsonObject> trees(String replacementId, JsonObject replacement) {
-        Map<String, JsonObject> trees = new LinkedHashMap<>(admitTrees());
+        Map<String, JsonObject> trees = new LinkedHashMap<>(admitSnapshot().trees());
         if (replacementId != null) {
             trees.remove(replacementId);
         }
@@ -574,42 +680,65 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     }
 
     private Map<String, JsonObject> admitTrees() {
-        if (storage == null) {
-            return Map.of();
-        }
-        long storageGeneration;
         try {
-            storageGeneration = storage.snapshotGeneration();
-            storage.committedSequence();
+            return storage == null ? Map.of() : admitSnapshot().trees();
         } catch (RuntimeException failed) {
             invalidateTrees();
             return Map.of();
         }
+    }
+
+    private TreeSnapshot admitSnapshot() {
         while (true) {
+            long storageGeneration = storage.snapshotGeneration();
+            long sequence = storage.committedSequence();
             long generation = treeGeneration.get();
             TreeSnapshot current = residentSnapshot;
             if (current != null && current.generation() == generation && current.storageGeneration() == storageGeneration) {
-                return current.trees();
+                if (current.verifiedSequence() == sequence) {
+                    return current;
+                }
+                if (storage.isCurrent(current.stamp()) && sequence == storage.committedSequence()
+                    && storageGeneration == storage.snapshotGeneration() && generation == treeGeneration.get()) {
+                    TreeSnapshot admitted = new TreeSnapshot(generation, storageGeneration, sequence, current.stamp(), current.trees());
+                    residentSnapshot = admitted;
+                    return admitted;
+                }
             }
             ReSyncJsonResourceStorage.ResourceSnapshot snapshot = storage.readSnapshot(ReSyncResourceCatalog.ADVANCEMENT_TREE);
             Map<String, JsonObject> trees = new LinkedHashMap<>();
             for (ReSyncJsonResourceStorage.ResourceSnapshotValue value : snapshot.values()) {
                 trees.put(value.id(), value.value());
             }
-            if (generation == treeGeneration.get() && storageGeneration == storage.snapshotGeneration()) {
-                TreeSnapshot admitted = new TreeSnapshot(generation, storageGeneration, snapshot, Map.copyOf(trees));
+            if (generation == treeGeneration.get() && storageGeneration == storage.snapshotGeneration()
+                && snapshot.rootSequence() == storage.committedSequence()) {
+                TreeSnapshot admitted = new TreeSnapshot(generation, storageGeneration, snapshot.rootSequence(), snapshot, Map.copyOf(trees));
                 residentSnapshot = admitted;
-                return admitted.trees();
+                return admitted;
             }
-            storageGeneration = storage.snapshotGeneration();
         }
     }
 
-    @Override
-    public void resourceChanged(String type, String id, JsonObject value, boolean deleted) {
-        if (ReSyncResourceCatalog.ADVANCEMENT_TREE.equals(type)) {
-            invalidateTrees();
+    private boolean current(Map<String, JsonObject> trees) {
+        if (!running || !Bukkit.isPrimaryThread()) {
+            return false;
         }
+        try {
+            TreeSnapshot snapshot = admitSnapshot();
+            return snapshot.trees() == trees && projected(snapshot);
+        } catch (RuntimeException unavailable) {
+            return false;
+        }
+    }
+
+    private boolean projected(TreeSnapshot snapshot) {
+        NativeProjection nativeProjection = projection;
+        return nativeProjection != null && nativeProjection.ready() && sameTrees(nativeProjection.snapshot(), snapshot);
+    }
+
+    private boolean sameTrees(TreeSnapshot left, TreeSnapshot right) {
+        return left.storageGeneration() == right.storageGeneration() && left.stamp().root().equals(right.stamp().root())
+            && left.stamp().revision().equals(right.stamp().revision());
     }
 
     private void invalidateTrees() {
@@ -618,38 +747,35 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     }
 
     private void requireSupported() {
+        if (!running || bridge == null) {
+            throw new IllegalStateException("Advancement runtime is stopped");
+        }
         if (!bridge.supported()) {
             throw new IllegalStateException(bridge.unsupportedReason());
         }
     }
 
     private void sync(Player player, Map<String, JsonObject> trees) {
-        fingerprints.reconcile(player, trees);
-        bridge.sync(player);
+        if (current(trees)) {
+            fingerprints.reconcile(player, trees);
+            bridge.sync(player);
+        }
     }
 
     private void reloadAdvancements() {
-        if (!bridge.supported()) {
-            return;
+        if (running && bridge.supported()) {
+            replaceSynchronously(null);
         }
-        invalidateTrees();
-        Map<String, JsonObject> trees = admitTrees();
-        if (trees.isEmpty()) {
-            return;
-        }
-        validator.validate(trees);
-        replaceSynchronously(trees);
-        Bukkit.getOnlinePlayers().forEach(player -> sync(player, trees));
     }
 
-    private void replaceSynchronously(Map<String, JsonObject> trees) {
+    private void replaceSynchronously(FlowResourceMutationStamp stamp) {
         if (Bukkit.isPrimaryThread()) {
-            replace(trees);
+            activateCommitted(stamp);
             return;
         }
         try {
             Bukkit.getScheduler().callSyncMethod(plugin, () -> {
-                replace(trees);
+                activateCommitted(stamp);
                 return null;
             }).get();
         } catch (InterruptedException interrupted) {
@@ -660,27 +786,58 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
             if (cause instanceof RuntimeException runtime) {
                 throw runtime;
             }
+            if (cause instanceof Error error) {
+                throw error;
+            }
             throw new IllegalStateException("Advancement update failed", cause);
         }
     }
 
-    private void replace(Map<String, JsonObject> trees) {
+    private void activateCommitted(FlowResourceMutationStamp stamp) {
+        requireSupported();
+        requireStamp(stamp);
+        TreeSnapshot snapshot = admitSnapshot();
+        validator.validate(snapshot.trees());
+        if (projected(snapshot)) {
+            requireStamp(stamp);
+            return;
+        }
+        NativeProjection previous = projection;
+        projection = previous == null ? null : new NativeProjection(previous.snapshot(), false);
         List<Player> players = List.copyOf(Bukkit.getOnlinePlayers());
-        Map<UUID, Map<NamespacedKey, Set<String>>> snapshots = service.snapshot(players);
+        Map<UUID, Map<NamespacedKey, Set<String>>> progress = service.snapshot(players);
+        boolean replaced = false;
         try {
-            players.forEach(player -> fingerprints.revokeChanged(player, trees));
-            bridge.replace(trees);
-            players.forEach(player -> fingerprints.commit(player, trees));
+            players.forEach(player -> fingerprints.revokeChanged(player, snapshot.trees()));
+            bridge.replace(snapshot.trees());
+            replaced = true;
+            players.forEach(player -> fingerprints.commit(player, snapshot.trees()));
             players.forEach(bridge::sync);
-        } catch (RuntimeException failure) {
-            service.restore(players, snapshots);
+            requireStamp(stamp);
+            if (snapshot.storageGeneration() != storage.snapshotGeneration() || !storage.isCurrent(snapshot.stamp())) {
+                throw new IllegalStateException("Committed advancement trees changed during native activation");
+            }
+            projection = new NativeProjection(snapshot, true);
+        } catch (RuntimeException | Error failure) {
+            try {
+                if (replaced) {
+                    Map<String, JsonObject> oldTrees = previous == null ? Map.of() : previous.snapshot().trees();
+                    bridge.replace(oldTrees);
+                    players.forEach(player -> fingerprints.commit(player, oldTrees));
+                }
+                service.restore(players, progress);
+            } catch (RuntimeException | Error compensationFailure) {
+                if (failure != compensationFailure) {
+                    failure.addSuppressed(compensationFailure);
+                }
+            }
             throw failure;
         }
     }
 
-    private void rollback(String type) {
-        if (ReSyncResourceCatalog.ADVANCEMENT_TREE.equals(type) && bridge.supported()) {
-            replaceSynchronously(trees(null, null));
+    private void requireStamp(FlowResourceMutationStamp stamp) {
+        if (stamp != null && !stamp.equals(storage.readMutationStamp(stamp.type(), stamp.id()))) {
+            throw new IllegalStateException("Committed advancement identity changed before native activation");
         }
     }
 

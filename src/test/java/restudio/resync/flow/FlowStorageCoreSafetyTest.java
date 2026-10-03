@@ -79,12 +79,13 @@ class FlowStorageCoreSafetyTest {
 
     @Test
     void rejectsSymlinkedProjectMetadataBeforeCoreSave() throws Exception {
+        FlowStorage storage = storage();
         Path target = tempDir.resolve("outside-project.json");
         Files.writeString(target, "{\"resources\":[]}");
         Path project = tempDir.resolve("assets/project.json");
         Files.createDirectories(project.getParent());
+        Files.deleteIfExists(project);
         createSymlink(project, target);
-        FlowStorage storage = storage();
 
         assertThrows(IllegalStateException.class, () -> storage.saveCoreGraph(graph("symlink-project", 1),
             ResourceActivationState.ACTIVE, mutation("55555555-5555-4555-8555-555555555555"), 0L));
@@ -154,7 +155,7 @@ class FlowStorageCoreSafetyTest {
         Path assets = tempDir.resolve("assets");
         createSymlink(assets, outside);
 
-        assertThrows(IllegalStateException.class, this::storage);
+        assertThrows(IllegalArgumentException.class, this::storage);
         assertTrue(Files.isDirectory(outside));
     }
 

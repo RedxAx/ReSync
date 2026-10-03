@@ -70,4 +70,38 @@ class FlowModuleDeferredOutputTest {
         CompletionException completion = assertThrows(CompletionException.class, result::join);
         assertSame(failure, completion.getCause());
     }
+
+    @Test
+    void synchronousHandlerFailureWaitsForPhysicalOperationsAndPreservesItsCause() {
+        IllegalStateException original = new IllegalStateException("handler failed after scheduling work");
+        CompletableFuture<Void> first = new CompletableFuture<>();
+        CompletableFuture<Void> nested = new CompletableFuture<>();
+        List<CompletableFuture<?>> pending = new CopyOnWriteArrayList<>(List.of(first));
+        CompletableFuture<Void> result = FlowModule.completeLegacyFailure(() -> pending, original);
+
+        assertFalse(result.isDone());
+        pending.add(nested);
+        first.completeExceptionally(new IllegalArgumentException("physical operation failed"));
+        assertFalse(result.isDone());
+        nested.complete(null);
+
+        assertSame(original, assertThrows(CompletionException.class, result::join).getCause());
+    }
+
+    @Test
+    void synchronousHandlerErrorWaitsForNestedPhysicalOperationsAndPreservesItsCause() {
+        AssertionError original = new AssertionError("handler failed after scheduling work");
+        CompletableFuture<Void> first = new CompletableFuture<>();
+        CompletableFuture<Void> nested = new CompletableFuture<>();
+        List<CompletableFuture<?>> pending = new CopyOnWriteArrayList<>(List.of(first));
+        CompletableFuture<Void> result = FlowModule.completeLegacyFailure(() -> pending, original);
+
+        assertFalse(result.isDone());
+        pending.add(nested);
+        first.completeExceptionally(new LinkageError("physical operation failed"));
+        assertFalse(result.isDone());
+        nested.complete(null);
+
+        assertSame(original, assertThrows(CompletionException.class, result::join).getCause());
+    }
 }

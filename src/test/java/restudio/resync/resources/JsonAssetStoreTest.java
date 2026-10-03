@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -208,13 +209,15 @@ class JsonAssetStoreTest {
     }
 
     @Test
-    void defaultPayloadMergerPreservesNestedAndArrayUnknownFields() throws Exception {
+    void explicitFieldOwnershipPreservesNestedAndArrayUnknownFields() throws Exception {
         Path assets = tempDir.resolve("assets");
         try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
              JsonAssetStore<JsonObject> store = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
                  json -> JsonParser.parseString(json).getAsJsonObject(), GSON::toJson,
                  value -> value.get("id").getAsString(), null, LegacyRuntimeActivationGate.runtime(tempDir), coordinator,
-                 () -> true)) {
+                 () -> true, () -> () -> {},
+                 (value, existing, serialized) -> JsonAssetStore.mergePayload(existing, serialized, Set.of(
+                     "id", "name", "nested", "nested.known", "entries", "entries[].id", "entries[].value")))) {
             JsonObject initial = new JsonObject();
             initial.addProperty("id", "nested");
             initial.addProperty("name", "Initial");

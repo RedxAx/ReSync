@@ -1,250 +1,250 @@
-# schemaVersion=1
+# schemaVersion=2
 # baselineActiveDescriptors=1240
 # baselineActivePins=6748
 # baselineActiveInputs=3440
 # baselineActiveOutputs=3308
 # baselineCatalogBackedResourceSelectors=128
-# authoritativeTypeSyntax=resource<restudio.resync:{type}>
+# authoritativeTypeSyntax=resource<{owner}:{type}>
 # legacyColumnsAreEvidenceOnly=true
 descriptor	pin	operation	intent	expectedOptionSource	expectedOwner	expectedType	runtimeProvider	legacyType	legacyOptionSource	note
-ability_cooldown_remaining	content_id	cooldown_remaining	REFERENCE_SELECTOR	server:resync:custom_content	restudio.resync	custom_content	custom_content	string		
-ability_is_holding_content	content_id	is_holding_content	REFERENCE_SELECTOR	server:resync:custom_content	restudio.resync	custom_content	custom_content	string		
-ability_is_wearing_content	content_id	is_wearing_content	REFERENCE_SELECTOR	server:resync:custom_content	restudio.resync	custom_content	custom_content	string		
-ability_set_cooldown	content_id	set_cooldown	REFERENCE_SELECTOR	server:resync:custom_content	restudio.resync	custom_content	custom_content	string		
-ability_trigger_content_ability	content_id	trigger_content_ability	REFERENCE_SELECTOR	server:resync:custom_content	restudio.resync	custom_content	custom_content	string		
-advancement_get_tree	tree	resource_get	REFERENCE_SELECTOR	server:resync:advancement_tree	restudio.resync	advancement_tree	resync_storage	advancement_tree_id	server:resync:advancement_tree	
-automation.schedule	schedule	schedule_definition	REFERENCE_SELECTOR	server:resync:schedule_definition	restudio.resync	schedule_definition	resync_storage	schedule_reference	server:resync:schedule_definition	
-automation.scheduled_task	schedule	scheduled_task	REFERENCE_SELECTOR	server:resync:schedule_definition	restudio.resync	schedule_definition	resync_storage	schedule_reference	server:resync:schedule_definition	
-automation.scheduled_task	task	scheduled_task	REFERENCE_VALUE		restudio.resync	scheduled_task	resync_runtime	scheduled_task		TYPED_RUNTIME_HANDLE
-automation.timer	timer	timer	REFERENCE_SELECTOR	server:resync:timer_definition	restudio.resync	timer_definition	resync_storage	timer_reference	server:resync:timer_definition	
-automation.variable	variable	variable_access	REFERENCE_SELECTOR	server:resync:variable_definition	restudio.resync	variable_definition	resync_storage	variable_reference	server:resync:variable_definition	
-call_function	function	call_function	REFERENCE_SELECTOR	server:resync:function	restudio.resync	function	resync_storage	function	server:resync:function	
-chat_get_profile	profile	resource_get	REFERENCE_SELECTOR	server:resync:chat	restudio.resync	chat	resync_storage	chat_id	server:resync:chat	
-command_get	command	resource_get	REFERENCE_SELECTOR	server:resync:command	restudio.resync	command	resync_storage	command_id	server:resync:command	
-command_run	command	run_graph_id	REFERENCE_SELECTOR	server:resync:command	restudio.resync	command	resync_storage	command_id	server:resync:command	
-custom_content_cooldown	content_id	content_cooldown_state	REFERENCE_SELECTOR	server:resync:custom_content	restudio.resync	custom_content	custom_content	custom_content_id	server:resync:custom_content	
-custom_content_cooldown	instance_id	content_cooldown_state	REFERENCE_SELECTOR	server:resync:custom_content_instance	restudio.resync	custom_content_instance	custom_content	string		RUNTIME_PROVIDER_INSTANCE
-custom_content_get	content	resource_get	REFERENCE_SELECTOR	server:resync:custom_content	restudio.resync	custom_content	custom_content	custom_content_id	server:resync:custom_content	
-custom_content_give	content_id	give_content	REFERENCE_SELECTOR	server:resync:custom_content	restudio.resync	custom_content	custom_content	custom_content_id	server:resync:custom_content	
-custom_content.armor	content_id	content_start	FREEFORM_CREATION		restudio.resync	custom_content	custom_content	string		
-custom_content.armor	external_id	content_start	REFERENCE_SELECTOR	server:custom_content:asset	restudio.resync	provider_asset	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE
-custom_content.block	content_id	content_start	FREEFORM_CREATION		restudio.resync	custom_content	custom_content	string		
-custom_content.block	external_id	content_start	REFERENCE_SELECTOR	server:custom_content:asset	restudio.resync	provider_asset	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE
-custom_content.item	content_id	content_start	FREEFORM_CREATION		restudio.resync	custom_content	custom_content	string		
-custom_content.item	external_id	content_start	REFERENCE_SELECTOR	server:custom_content:asset	restudio.resync	provider_asset	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE
-custom_content.projectile	content_id	content_start	FREEFORM_CREATION		restudio.resync	custom_content	custom_content	string		
-custom_content.projectile	external_id	content_start	REFERENCE_SELECTOR	server:custom_content:asset	restudio.resync	provider_asset	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE
-custom.event.clear	event_id	custom_event_clear	REFERENCE_SELECTOR	server:resync:custom_event	restudio.resync	custom_event	resync_runtime	string		
-custom.event.emit	event_id	custom_event_trigger	REFERENCE_SELECTOR	server:resync:custom_event	restudio.resync	custom_event	resync_runtime	string		
-custom.event.get.data	event_id	custom_event_get_data	REFERENCE_SELECTOR	server:resync:custom_event	restudio.resync	custom_event	resync_runtime	string		
-custom.event.listen	event_id	custom_event_listen	REFERENCE_SELECTOR	server:resync:custom_event	restudio.resync	custom_event	resync_runtime	string		
-dialog_get	dialog	resource_get	REFERENCE_SELECTOR	server:resync:dialog	restudio.resync	dialog	resync_storage	dialog_id	server:resync:dialog	
-event.custom_event_define	event_id	custom_event_define	FREEFORM_CREATION		restudio.resync	custom_event	resync_runtime	string		
-event.custom_event_remove_listener	event_id	custom_event_remove_listener	REFERENCE_SELECTOR	server:resync:custom_event	restudio.resync	custom_event	resync_runtime	string		
-event.schedule	schedule	event.schedule	REFERENCE_SELECTOR	server:resync:schedule_definition	restudio.resync	schedule_definition	resync_storage	schedule_reference	server:resync:schedule_definition	
-event.scheduled_task	schedule	event.scheduled_task	REFERENCE_SELECTOR	server:resync:schedule_definition	restudio.resync	schedule_definition	resync_storage	schedule_reference	server:resync:schedule_definition	
-event.timer	timer	event.timer	REFERENCE_SELECTOR	server:resync:timer_definition	restudio.resync	timer_definition	resync_storage	timer_reference	server:resync:timer_definition	
-event.variable.changed	variable	event.variable.changed	REFERENCE_SELECTOR	server:resync:variable_definition	restudio.resync	variable_definition	resync_storage	variable_reference	server:resync:variable_definition	
-flow_get	flow_id	resource_get	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-flow_run	selected_flow	run_graph_id	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-function_exists	function	exists	REFERENCE_SELECTOR	server:resync:function	restudio.resync	function	resync_storage	function	server:resync:function	
-function_get	function	resource_get	REFERENCE_SELECTOR	server:resync:function	restudio.resync	function	resync_storage	function	server:resync:function	
-function_index	function	index	REFERENCE_SELECTOR	server:resync:function	restudio.resync	function	resync_storage	function	server:resync:function	
-gui_get	gui	resource_get	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-gui_open	gui	resource_apply	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-job_cancel	job	job_cancel	REFERENCE_VALUE		restudio.resync	job	resync_runtime	job_reference<any>		TYPED_RUNTIME_HANDLE
-job_cancel	job_id	job_cancel	REFERENCE_SELECTOR	server:resync:job	restudio.resync	job	resync_runtime	string		STRING_FALLBACK_FOR_RUNTIME_HANDLE
-job_status	job	job_status	REFERENCE_VALUE		restudio.resync	job	resync_runtime	job_reference<any>		TYPED_RUNTIME_HANDLE
-job_status	job_id	job_status	REFERENCE_SELECTOR	server:resync:job	restudio.resync	job	resync_runtime	string		STRING_FALLBACK_FOR_RUNTIME_HANDLE
-itemstack.apply_component_builder	builder	item_apply_component_builder	REFERENCE_SELECTOR	server:resync:component_builder	restudio.resync	component_builder	generic-itemstack	component_builder_id	server:resync:component_builder	COMPONENT_BUILDER_TEMPLATE
-loot_get_table	loot_table	resource_get	REFERENCE_SELECTOR	server:resync:loot_table	restudio.resync	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
-loot.fill_container	loot_table	loot_fill_container	REFERENCE_SELECTOR	server:resync:loot_table	restudio.resync	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
-loot.generate	loot_table	loot_generate	REFERENCE_SELECTOR	server:resync:loot_table	restudio.resync	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
-loot.give	loot_table	loot_give	REFERENCE_SELECTOR	server:resync:loot_table	restudio.resync	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
-menu_add_item	flow_to_execute	menu_add_item	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-menu_add_item	menu_id	menu_add_item	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_clear	menu_id	menu_clear	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_clear_slot	menu_id	menu_clear_slot	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_create	menu_id	menu_create	FREEFORM_CREATION		restudio.resync	gui	resync_storage	gui_id		
-menu_duplicate	new_menu_id	menu_duplicate	FREEFORM_CREATION		restudio.resync	gui	resync_storage	gui_id		
-menu_duplicate	source_menu_id	menu_duplicate	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_fill_pattern	menu_id	menu_fill_pattern	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_get_all_items	menu_id	menu_get_all_items	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_get_item	menu_id	menu_get_item	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_open	menu_id	menu_open	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_click_action	flow_id	menu_set_click_action	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-menu_set_click_action	menu_id	menu_set_click_action	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_click_sound	menu_id	menu_set_click_sound	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_close_action	flow_id	menu_set_close_action	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-menu_set_close_action	menu_id	menu_set_close_action	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_custom_model	menu_id	menu_set_custom_model	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_enchant	menu_id	menu_set_enchant	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_flags	menu_id	menu_set_flags	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_head_texture	menu_id	menu_set_head_texture	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_item	flow_to_execute	menu_set_item	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-menu_set_item	menu_id	menu_set_item	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_item_with_action	flow_id	menu_set_item_with_action	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-menu_set_item_with_action	menu_id	menu_set_item_with_action	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_open_action	flow_id	menu_set_open_action	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-menu_set_open_action	menu_id	menu_set_open_action	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_title	menu_id	menu_set_title	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_set_update_interval	flow_id	menu_set_update_interval	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-menu_set_update_interval	menu_id	menu_set_update_interval	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-menu_update	menu_id	menu_update	REFERENCE_SELECTOR	server:resync:gui	restudio.resync	gui	resync_storage	gui_id	server:resync:gui	
-message_rule_get	rule	resource_get	REFERENCE_SELECTOR	server:resync:message_rule	restudio.resync	message_rule	resync_storage	message_rule_id	server:resync:message_rule	
-motd_get_profile	profile	resource_get	REFERENCE_SELECTOR	server:resync:motd_profile	restudio.resync	motd_profile	resync_storage	motd_profile_id	server:resync:motd_profile	
-network.get.server.health	node_id	network_server_health	REFERENCE_SELECTOR	server:resync:network_node	restudio.resync	network_node	resync_network	network_node	server:resync:network_node	
-network.player.handoff	target_node	network_player_handoff	REFERENCE_SELECTOR	server:resync:network_node	restudio.resync	network_node	resync_network	network_node	server:resync:network_node	
-network.server.mode	node_id	network_node_mode	REFERENCE_SELECTOR	server:resync:network_node	restudio.resync	network_node	resync_network	network_node	server:resync:network_node	
-npc_get	npc	resource_get	REFERENCE_SELECTOR	server:resync:npc_definition	restudio.resync	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
-npc.despawn	npc_id	npc_despawn	REFERENCE_SELECTOR	server:resync:npc_definition	restudio.resync	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
-npc.is_active	npc_id	npc_is_active	REFERENCE_SELECTOR	server:resync:npc_definition	restudio.resync	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
-npc.lookup	npc_id	npc_lookup	REFERENCE_SELECTOR	server:resync:npc_definition	restudio.resync	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
-npc.open	npc_id	npc_open	REFERENCE_SELECTOR	server:resync:npc_definition	restudio.resync	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
-npc.set_profile	npc_id	npc_set_profile	REFERENCE_SELECTOR	server:resync:npc_definition	restudio.resync	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
-npc.set_profile	profile_id	npc_set_profile	REFERENCE_SELECTOR	server:resync:trade_profile	restudio.resync	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
-npc.spawn	npc_id	npc_spawn	REFERENCE_SELECTOR	server:resync:npc_definition	restudio.resync	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
-perm.add.group	group	perm_add_group	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-perm.demote	track	perm_demote	REFERENCE_SELECTOR	server:luckperms:track	restudio.resync	permission_track	luckperms	permission_track	server:luckperms:track	
-perm.get.group.permissions	group	perm_get_group_permissions	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-perm.group.add.permission	group	perm_group_add_permission	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-perm.group.has.permission	group	perm_group_has_permission	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-perm.group.remove.permission	group	perm_group_remove_permission	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-perm.has.group	group	perm_has_group	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-perm.promote	track	perm_promote	REFERENCE_SELECTOR	server:luckperms:track	restudio.resync	permission_track	luckperms	permission_track	server:luckperms:track	
-perm.remove.group	group	perm_remove_group	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-perm.set.group	group	perm_set_group	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-permission.perm_check_inheritance	group	perm_check_inheritance	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-permission.perm_check_inheritance	parent_group	perm_check_inheritance	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-permission.perm_in_group	group	perm_in_group	REFERENCE_SELECTOR	server:luckperms:group	restudio.resync	permission_group	luckperms	permission_group	server:luckperms:group	
-player.player_hide_bossbar	bossbar_id	player_hide_bossbar	REFERENCE_SELECTOR	server:resync:bossbar	restudio.resync	bossbar	bukkit	string		RUNTIME_BUKKIT_HANDLE
-player.player_update_bossbar	bossbar_id	player_update_bossbar	REFERENCE_SELECTOR	server:resync:bossbar	restudio.resync	bossbar	bukkit	string		RUNTIME_BUKKIT_HANDLE
-recipe_get	recipe	resource_get	REFERENCE_SELECTOR	server:resync:recipe_definition	restudio.resync	recipe_definition	resync_storage	recipe_id	server:resync:recipe_definition	
-region_clone	new_clipboard_id	region_clone	FREEFORM_CREATION		restudio.resync	clipboard	resync_region	string		
-region_clone	source_clipboard_id	region_clone	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_copy	clipboard_id	region_copy	FREEFORM_CREATION		restudio.resync	clipboard	resync_region	string		
-region_create	clipboard_id	region_create	FREEFORM_CREATION		restudio.resync	clipboard	resync_region	string		
-region_cut	clipboard_id	region_cut	FREEFORM_CREATION		restudio.resync	clipboard	resync_region	string		
-region_distribute	clipboard_id	region_distribute	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_load	clipboard_id	region_load	FREEFORM_CREATION		restudio.resync	clipboard	resync_region	string		
-region_mirror	clipboard_id	region_mirror	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_mirror_x	clipboard_id	region_mirror_x	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_mirror_y	clipboard_id	region_mirror_y	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_mirror_z	clipboard_id	region_mirror_z	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_paste	clipboard_id	region_paste	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_rotate	clipboard_id	region_rotate	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_rotate_180	clipboard_id	region_rotate_180	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_rotate_90	clipboard_id	region_rotate_90	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_save	clipboard_id	region_save	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-region_stack	clipboard_id	region_stack	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-resource.build_advancement_tree	id	build_advancement_tree	FREEFORM_CREATION		restudio.resync	advancement_tree	resync_storage	string		
-resource.build_custom_content	external_id	build_custom_content	REFERENCE_SELECTOR	server:custom_content:asset	restudio.resync	provider_asset	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE
-resource.build_custom_content	flow_id	build_custom_content	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_custom_content	id	build_custom_content	FREEFORM_CREATION		restudio.resync	custom_content	resync_storage	string		
-resource.build_dialog	id	build_dialog	FREEFORM_CREATION		restudio.resync	dialog	resync_storage	string		
-resource.build_gui	close_flow	build_gui	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_gui	id	build_gui	FREEFORM_CREATION		restudio.resync	gui	resync_storage	string		
-resource.build_gui	open_flow	build_gui	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_loot_table	id	build_loot_table	FREEFORM_CREATION		restudio.resync	loot_table	resync_storage	string		
-resource.build_npc	damage_flow	build_npc	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_npc	death_flow	build_npc	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_npc	despawn_flow	build_npc	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_npc	dialog	build_npc	REFERENCE_SELECTOR	server:resync:dialog	restudio.resync	dialog	resync_storage	dialog_id	server:resync:dialog	
-resource.build_npc	id	build_npc	FREEFORM_CREATION		restudio.resync	npc_definition	resync_storage	string		
-resource.build_npc	interact_flow	build_npc	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_npc	left_click_flow	build_npc	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_npc	loot_table	build_npc	REFERENCE_SELECTOR	server:resync:loot_table	restudio.resync	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
-resource.build_npc	right_click_flow	build_npc	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_npc	spawn_flow	build_npc	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	string		
-resource.build_npc	trade_profile	build_npc	REFERENCE_SELECTOR	server:resync:trade_profile	restudio.resync	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
-resource.build_recipe	id	build_recipe	FREEFORM_CREATION		restudio.resync	recipe_definition	resync_storage	string		
-resource.build_scoreboard	id	build_scoreboard	FREEFORM_CREATION		restudio.resync	scoreboard	resync_storage	string		SAVED_RESYNC_SCOREBOARD_TEMPLATE_ID
-resource.build_scoreboard	objective_id	build_scoreboard	FREEFORM_CREATION		restudio.resync	scoreboard_objective	bukkit	string		EMBEDS_NEW_LIVE_OBJECTIVE_ID
-resource.build_tab	id	build_tab	FREEFORM_CREATION		restudio.resync	tab	resync_storage	string		
-resource.build_trade_profile	id	build_trade_profile	FREEFORM_CREATION		restudio.resync	trade_profile	resync_storage	string		
-schedule.at.time	flow_id	schedule_at_time	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-schedule.cancel_task	task_id	cancel_task	REFERENCE_SELECTOR	server:resync:scheduled_task	restudio.resync	scheduled_task	resync_runtime	string		
-schedule.cron	flow_id	cron	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-schedule.get_task	task_id	get_task	REFERENCE_SELECTOR	server:resync:scheduled_task	restudio.resync	scheduled_task	resync_runtime	string		
-schedule.interval	flow_id	interval	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-schedule.schedule	flow_id	schedule	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-schedule.schedule_repeating	flow_id	schedule_repeating	REFERENCE_SELECTOR	server:resync:flow	restudio.resync	flow	resync_storage	flow_id	server:resync:flow	
-scoreboard_add_score	objective_id	scoreboard_add_score	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_clear_sidebar	objective_id	scoreboard_clear_sidebar	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_create	objective_id	scoreboard_create	FREEFORM_CREATION		restudio.resync	scoreboard_objective	bukkit	scoreboard_id		CREATES_LIVE_BUKKIT_OBJECTIVE
-scoreboard_get_score	objective_id	scoreboard_get_score	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_get_template	scoreboard	resource_get	REFERENCE_SELECTOR	server:resync:scoreboard	restudio.resync	scoreboard	resync_storage	scoreboard_id	server:resync:scoreboard	SAVED_RESYNC_SCOREBOARD_TEMPLATE
-scoreboard_remove	objective_id	scoreboard_remove	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_remove_score	objective_id	scoreboard_remove_score	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_reset_score	objective_id	scoreboard_reset_score	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_set_display	objective_id	scoreboard_set_display	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_set_name	objective_id	scoreboard_set_name	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_set_render_type	objective_id	scoreboard_set_render_type	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_set_score	objective_id	scoreboard_set_score	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_set_sidebar_line	objective_id	scoreboard_set_sidebar_line	REFERENCE_SELECTOR	server:resync:scoreboard_objective	restudio.resync	scoreboard_objective	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
-scoreboard_show_template	scoreboard_id	scoreboard_show_template	REFERENCE_SELECTOR	server:resync:scoreboard	restudio.resync	scoreboard	resync_storage	scoreboard_id	server:resync:scoreboard	SAVED_RESYNC_SCOREBOARD_TEMPLATE
+ability_cooldown_remaining	content_id	cooldown_remaining	SCALAR_VALUE		builtin	string	custom_content	string		SCALAR_RUNTIME_ID(custom_content)
+ability_is_holding_content	content_id	is_holding_content	SCALAR_VALUE		builtin	string	custom_content	string		SCALAR_RUNTIME_ID(custom_content)
+ability_is_wearing_content	content_id	is_wearing_content	SCALAR_VALUE		builtin	string	custom_content	string		SCALAR_RUNTIME_ID(custom_content)
+ability_set_cooldown	content_id	set_cooldown	SCALAR_VALUE		builtin	string	custom_content	string		SCALAR_RUNTIME_ID(custom_content)
+ability_trigger_content_ability	content_id	trigger_content_ability	SCALAR_VALUE		builtin	string	custom_content	string		SCALAR_RUNTIME_ID(custom_content)
+advancement_get_tree	tree	resource_get	REFERENCE_SELECTOR	server:resync:advancement_tree	builtin	advancement_tree	resync_storage	advancement_tree_id	server:resync:advancement_tree	
+automation.schedule	schedule	schedule_definition	REFERENCE_SELECTOR	server:resync:schedule_definition	builtin	schedule_definition	resync_storage	schedule_reference	server:resync:schedule_definition	
+automation.scheduled_task	schedule	scheduled_task	REFERENCE_SELECTOR	server:resync:schedule_definition	builtin	schedule_definition	resync_storage	schedule_reference	server:resync:schedule_definition	
+automation.scheduled_task	task	scheduled_task	SCALAR_VALUE		builtin	scheduled_task	resync_runtime	scheduled_task		TYPED_RUNTIME_HANDLE
+automation.timer	timer	timer	REFERENCE_SELECTOR	server:resync:timer_definition	builtin	timer_definition	resync_storage	timer_reference	server:resync:timer_definition	
+automation.variable	variable	variable_access	REFERENCE_SELECTOR	server:resync:variable_definition	builtin	variable_definition	resync_storage	variable_reference	server:resync:variable_definition	
+call_function	function	call_function	REFERENCE_SELECTOR	server:resync:function	builtin	function	resync_storage	function	server:resync:function	
+chat_get_profile	profile	resource_get	REFERENCE_SELECTOR	server:resync:chat	builtin	chat	resync_storage	chat_id	server:resync:chat	
+command_get	command	resource_get	REFERENCE_SELECTOR	server:resync:command	builtin	command	resync_storage	command_id	server:resync:command	
+command_run	command	run_graph_id	REFERENCE_SELECTOR	server:resync:command	builtin	command	resync_storage	command_id	server:resync:command	
+custom_content_cooldown	content_id	content_cooldown_state	REFERENCE_SELECTOR	server:resync:custom_content	builtin	custom_content	custom_content	custom_content_id	server:resync:custom_content	
+custom_content_cooldown	instance_id	content_cooldown_state	SCALAR_VALUE		builtin	string	custom_content	string		RUNTIME_PROVIDER_INSTANCE SCALAR_RUNTIME_ID(custom_content_instance)
+custom_content_get	content	resource_get	REFERENCE_SELECTOR	server:resync:custom_content	builtin	custom_content	custom_content	custom_content_id	server:resync:custom_content	
+custom_content_give	content_id	give_content	REFERENCE_SELECTOR	server:resync:custom_content	builtin	custom_content	custom_content	custom_content_id	server:resync:custom_content	
+custom_content.armor	content_id	content_start	FREEFORM_CREATION		builtin	custom_content	custom_content	string		
+custom_content.armor	external_id	content_start	SCALAR_SELECTOR	server:custom_content:asset	builtin	string	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE SCALAR_RUNTIME_ID(provider_asset)
+custom_content.block	content_id	content_start	FREEFORM_CREATION		builtin	custom_content	custom_content	string		
+custom_content.block	external_id	content_start	SCALAR_SELECTOR	server:custom_content:asset	builtin	string	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE SCALAR_RUNTIME_ID(provider_asset)
+custom_content.item	content_id	content_start	FREEFORM_CREATION		builtin	custom_content	custom_content	string		
+custom_content.item	external_id	content_start	SCALAR_SELECTOR	server:custom_content:asset	builtin	string	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE SCALAR_RUNTIME_ID(provider_asset)
+custom_content.projectile	content_id	content_start	FREEFORM_CREATION		builtin	custom_content	custom_content	string		
+custom_content.projectile	external_id	content_start	SCALAR_SELECTOR	server:custom_content:asset	builtin	string	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE SCALAR_RUNTIME_ID(provider_asset)
+custom.event.clear	event_id	custom_event_clear	SCALAR_VALUE		builtin	string	resync_runtime	string		SCALAR_RUNTIME_ID(custom_event)
+custom.event.emit	event_id	custom_event_trigger	SCALAR_VALUE		builtin	string	resync_runtime	string		SCALAR_RUNTIME_ID(custom_event)
+custom.event.get.data	event_id	custom_event_get_data	SCALAR_VALUE		builtin	string	resync_runtime	string		SCALAR_RUNTIME_ID(custom_event)
+custom.event.listen	event_id	custom_event_listen	SCALAR_VALUE		builtin	string	resync_runtime	string		SCALAR_RUNTIME_ID(custom_event)
+dialog_get	dialog	resource_get	REFERENCE_SELECTOR	server:resync:dialog	builtin	dialog	resync_storage	dialog_id	server:resync:dialog	
+event.custom_event_define	event_id	custom_event_define	FREEFORM_CREATION		builtin	custom_event	resync_runtime	string		
+event.custom_event_remove_listener	event_id	custom_event_remove_listener	SCALAR_VALUE		builtin	string	resync_runtime	string		SCALAR_RUNTIME_ID(custom_event)
+event.schedule	schedule	trigger_event.schedule	REFERENCE_SELECTOR	server:resync:schedule_definition	builtin	schedule_definition	resync_storage	schedule_reference	server:resync:schedule_definition	
+event.scheduled_task	schedule	trigger_event.scheduled_task	REFERENCE_SELECTOR	server:resync:schedule_definition	builtin	schedule_definition	resync_storage	schedule_reference	server:resync:schedule_definition	
+event.timer	timer	trigger_event.timer	REFERENCE_SELECTOR	server:resync:timer_definition	builtin	timer_definition	resync_storage	timer_reference	server:resync:timer_definition	
+event.variable.changed	variable	trigger_event.variable.changed	REFERENCE_SELECTOR	server:resync:variable_definition	builtin	variable_definition	resync_storage	variable_reference	server:resync:variable_definition	
+flow_get	flow_id	resource_get	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+flow_run	selected_flow	run_graph_id	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+function_exists	function	exists	REFERENCE_SELECTOR	server:resync:function	builtin	function	resync_storage	function	server:resync:function	
+function_get	function	resource_get	REFERENCE_SELECTOR	server:resync:function	builtin	function	resync_storage	function	server:resync:function	
+function_index	function	index	REFERENCE_SELECTOR	server:resync:function	builtin	function	resync_storage	function	server:resync:function	
+gui_get	gui	resource_get	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+gui_open	gui	resource_apply	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+job_cancel	job	job_cancel	SCALAR_VALUE		builtin	job_reference<any>	resync_runtime	job_reference<any>		TYPED_RUNTIME_HANDLE
+job_cancel	job_id	job_cancel	SCALAR_VALUE		builtin	string	resync_runtime	string		STRING_FALLBACK_FOR_RUNTIME_HANDLE SCALAR_RUNTIME_ID(job)
+job_status	job	job_status	SCALAR_VALUE		builtin	job_reference<any>	resync_runtime	job_reference<any>		TYPED_RUNTIME_HANDLE
+job_status	job_id	job_status	SCALAR_VALUE		builtin	string	resync_runtime	string		STRING_FALLBACK_FOR_RUNTIME_HANDLE SCALAR_RUNTIME_ID(job)
+itemstack.apply_component_builder	builder	item_apply_component_builder	REFERENCE_SELECTOR	server:resync:component_builder	builtin	component_builder	generic-itemstack	component_builder_id	server:resync:component_builder	COMPONENT_BUILDER_TEMPLATE
+loot_get_table	loot_table	resource_get	REFERENCE_SELECTOR	server:resync:loot_table	builtin	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
+loot.fill_container	loot_table	loot_fill_container	REFERENCE_SELECTOR	server:resync:loot_table	builtin	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
+loot.generate	loot_table	loot_generate	REFERENCE_SELECTOR	server:resync:loot_table	builtin	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
+loot.give	loot_table	loot_give	REFERENCE_SELECTOR	server:resync:loot_table	builtin	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
+menu_add_item	flow_to_execute	menu_add_item	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+menu_add_item	menu_id	menu_add_item	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_clear	menu_id	menu_clear	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_clear_slot	menu_id	menu_clear_slot	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_create	menu_id	menu_create	FREEFORM_CREATION		builtin	gui	resync_storage	gui_id		
+menu_duplicate	new_menu_id	menu_duplicate	FREEFORM_CREATION		builtin	gui	resync_storage	gui_id		
+menu_duplicate	source_menu_id	menu_duplicate	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_fill_pattern	menu_id	menu_fill_pattern	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_get_all_items	menu_id	menu_get_all_items	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_get_item	menu_id	menu_get_item	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_open	menu_id	menu_open	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_click_action	flow_id	menu_set_click_action	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+menu_set_click_action	menu_id	menu_set_click_action	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_click_sound	menu_id	menu_set_click_sound	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_close_action	flow_id	menu_set_close_action	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+menu_set_close_action	menu_id	menu_set_close_action	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_custom_model	menu_id	menu_set_custom_model	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_enchant	menu_id	menu_set_enchant	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_flags	menu_id	menu_set_flags	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_head_texture	menu_id	menu_set_head_texture	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_item	flow_to_execute	menu_set_item	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+menu_set_item	menu_id	menu_set_item	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_item_with_action	flow_id	menu_set_item_with_action	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+menu_set_item_with_action	menu_id	menu_set_item_with_action	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_open_action	flow_id	menu_set_open_action	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+menu_set_open_action	menu_id	menu_set_open_action	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_title	menu_id	menu_set_title	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_set_update_interval	flow_id	menu_set_update_interval	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+menu_set_update_interval	menu_id	menu_set_update_interval	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+menu_update	menu_id	menu_update	REFERENCE_SELECTOR	server:resync:gui	builtin	gui	resync_storage	gui_id	server:resync:gui	
+message_rule_get	rule	resource_get	REFERENCE_SELECTOR	server:resync:message_rule	builtin	message_rule	resync_storage	message_rule_id	server:resync:message_rule	
+motd_get_profile	profile	resource_get	REFERENCE_SELECTOR	server:resync:motd_profile	builtin	motd_profile	resync_storage	motd_profile_id	server:resync:motd_profile	
+network.get.server.health	node_id	network_server_health	REFERENCE_SELECTOR	server:resync:network_node	builtin	network_node	resync_network	network_node	server:resync:network_node	
+network.player.handoff	target_node	network_player_handoff	REFERENCE_SELECTOR	server:resync:network_node	builtin	network_node	resync_network	network_node	server:resync:network_node	
+network.server.mode	node_id	network_node_mode	REFERENCE_SELECTOR	server:resync:network_node	builtin	network_node	resync_network	network_node	server:resync:network_node	
+npc_get	npc	resource_get	REFERENCE_SELECTOR	server:resync:npc_definition	builtin	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
+npc.despawn	npc_id	npc_despawn	REFERENCE_SELECTOR	server:resync:npc_definition	builtin	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
+npc.is_active	npc_id	npc_is_active	REFERENCE_SELECTOR	server:resync:npc_definition	builtin	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
+npc.lookup	npc_id	npc_lookup	REFERENCE_SELECTOR	server:resync:npc_definition	builtin	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
+npc.open	npc_id	npc_open	REFERENCE_SELECTOR	server:resync:npc_definition	builtin	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
+npc.set_profile	npc_id	npc_set_profile	REFERENCE_SELECTOR	server:resync:npc_definition	builtin	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
+npc.set_profile	profile_id	npc_set_profile	REFERENCE_SELECTOR	server:resync:trade_profile	builtin	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
+npc.spawn	npc_id	npc_spawn	REFERENCE_SELECTOR	server:resync:npc_definition	builtin	npc_definition	resync_storage	npc_id	server:resync:npc_definition	
+perm.add.group	group	perm_add_group	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+perm.demote	track	perm_demote	REFERENCE_SELECTOR	server:luckperms:track	builtin	permission_track	luckperms	permission_track	server:luckperms:track	
+perm.get.group.permissions	group	perm_get_group_permissions	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+perm.group.add.permission	group	perm_group_add_permission	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+perm.group.has.permission	group	perm_group_has_permission	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+perm.group.remove.permission	group	perm_group_remove_permission	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+perm.has.group	group	perm_has_group	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+perm.promote	track	perm_promote	REFERENCE_SELECTOR	server:luckperms:track	builtin	permission_track	luckperms	permission_track	server:luckperms:track	
+perm.remove.group	group	perm_remove_group	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+perm.set.group	group	perm_set_group	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+permission.perm_check_inheritance	group	perm_check_inheritance	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+permission.perm_check_inheritance	parent_group	perm_check_inheritance	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+permission.perm_in_group	group	perm_in_group	SCALAR_SELECTOR	server:luckperms:group	builtin	permission_group	luckperms	permission_group	server:luckperms:group	
+player.player_hide_bossbar	bossbar_id	player_hide_bossbar	SCALAR_VALUE		builtin	string	bukkit	string		RUNTIME_BUKKIT_HANDLE SCALAR_RUNTIME_ID(bossbar)
+player.player_update_bossbar	bossbar_id	player_update_bossbar	SCALAR_VALUE		builtin	string	bukkit	string		RUNTIME_BUKKIT_HANDLE SCALAR_RUNTIME_ID(bossbar)
+recipe_get	recipe	resource_get	REFERENCE_SELECTOR	server:resync:recipe_definition	builtin	recipe_definition	resync_storage	recipe_id	server:resync:recipe_definition	
+region_clone	new_clipboard_id	region_clone	FREEFORM_CREATION		builtin	clipboard	resync_region	string		
+region_clone	source_clipboard_id	region_clone	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_copy	clipboard_id	region_copy	FREEFORM_CREATION		builtin	clipboard	resync_region	string		
+region_create	clipboard_id	region_create	FREEFORM_CREATION		builtin	clipboard	resync_region	string		
+region_cut	clipboard_id	region_cut	FREEFORM_CREATION		builtin	clipboard	resync_region	string		
+region_distribute	clipboard_id	region_distribute	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_load	clipboard_id	region_load	FREEFORM_CREATION		builtin	clipboard	resync_region	string		
+region_mirror	clipboard_id	region_mirror	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_mirror_x	clipboard_id	region_mirror_x	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_mirror_y	clipboard_id	region_mirror_y	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_mirror_z	clipboard_id	region_mirror_z	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_paste	clipboard_id	region_paste	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_rotate	clipboard_id	region_rotate	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_rotate_180	clipboard_id	region_rotate_180	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_rotate_90	clipboard_id	region_rotate_90	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_save	clipboard_id	region_save	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+region_stack	clipboard_id	region_stack	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+resource.build_advancement_tree	id	build_advancement_tree	FREEFORM_CREATION		builtin	advancement_tree	resync_storage	string		
+resource.build_custom_content	external_id	build_custom_content	SCALAR_SELECTOR	server:custom_content:asset	builtin	string	custom_content	string	server:custom_content:asset	PROVIDER_ASSET_REFERENCE SCALAR_RUNTIME_ID(provider_asset)
+resource.build_custom_content	flow_id	build_custom_content	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_custom_content	id	build_custom_content	FREEFORM_CREATION		builtin	custom_content	resync_storage	string		
+resource.build_dialog	id	build_dialog	FREEFORM_CREATION		builtin	dialog	resync_storage	string		
+resource.build_gui	close_flow	build_gui	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_gui	id	build_gui	FREEFORM_CREATION		builtin	gui	resync_storage	string		
+resource.build_gui	open_flow	build_gui	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_loot_table	id	build_loot_table	FREEFORM_CREATION		builtin	loot_table	resync_storage	string		
+resource.build_npc	damage_flow	build_npc	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_npc	death_flow	build_npc	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_npc	despawn_flow	build_npc	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_npc	dialog	build_npc	REFERENCE_SELECTOR	server:resync:dialog	builtin	dialog	resync_storage	dialog_id	server:resync:dialog	
+resource.build_npc	id	build_npc	FREEFORM_CREATION		builtin	npc_definition	resync_storage	string		
+resource.build_npc	interact_flow	build_npc	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_npc	left_click_flow	build_npc	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_npc	loot_table	build_npc	REFERENCE_SELECTOR	server:resync:loot_table	builtin	loot_table	resync_storage	loot_table_id	server:resync:loot_table	
+resource.build_npc	right_click_flow	build_npc	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_npc	spawn_flow	build_npc	SCALAR_VALUE		builtin	string	resync_storage	string		SCALAR_RUNTIME_ID(flow)
+resource.build_npc	trade_profile	build_npc	REFERENCE_SELECTOR	server:resync:trade_profile	builtin	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
+resource.build_recipe	id	build_recipe	FREEFORM_CREATION		builtin	recipe_definition	resync_storage	string		
+resource.build_scoreboard	id	build_scoreboard	FREEFORM_CREATION		builtin	scoreboard	resync_storage	string		SAVED_RESYNC_SCOREBOARD_TEMPLATE_ID
+resource.build_scoreboard	objective_id	build_scoreboard	FREEFORM_CREATION		builtin	scoreboard_objective	bukkit	string		EMBEDS_NEW_LIVE_OBJECTIVE_ID
+resource.build_tab	id	build_tab	FREEFORM_CREATION		builtin	tab	resync_storage	string		
+resource.build_trade_profile	id	build_trade_profile	FREEFORM_CREATION		builtin	trade_profile	resync_storage	string		
+schedule.at.time	flow_id	schedule_at_time	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+schedule.cancel_task	task_id	cancel_task	SCALAR_VALUE		builtin	string	resync_runtime	string		SCALAR_RUNTIME_ID(scheduled_task)
+schedule.cron	flow_id	cron	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+schedule.get_task	task_id	get_task	SCALAR_VALUE		builtin	string	resync_runtime	string		SCALAR_RUNTIME_ID(scheduled_task)
+schedule.interval	flow_id	interval	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+schedule.schedule	flow_id	schedule	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+schedule.schedule_repeating	flow_id	schedule_repeating	REFERENCE_SELECTOR	server:resync:flow	builtin	flow	resync_storage	flow_id	server:resync:flow	
+scoreboard_add_score	objective_id	scoreboard_add_score	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_clear_sidebar	objective_id	scoreboard_clear_sidebar	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_create	objective_id	scoreboard_create	FREEFORM_CREATION		builtin	scoreboard_objective	bukkit	scoreboard_id		CREATES_LIVE_BUKKIT_OBJECTIVE
+scoreboard_get_score	objective_id	scoreboard_get_score	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_get_template	scoreboard	resource_get	REFERENCE_SELECTOR	server:resync:scoreboard	builtin	scoreboard	resync_storage	scoreboard_id	server:resync:scoreboard	SAVED_RESYNC_SCOREBOARD_TEMPLATE
+scoreboard_remove	objective_id	scoreboard_remove	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_remove_score	objective_id	scoreboard_remove_score	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_reset_score	objective_id	scoreboard_reset_score	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_set_display	objective_id	scoreboard_set_display	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_set_name	objective_id	scoreboard_set_name	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_set_render_type	objective_id	scoreboard_set_render_type	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_set_score	objective_id	scoreboard_set_score	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_set_sidebar_line	objective_id	scoreboard_set_sidebar_line	SCALAR_SELECTOR	server:minecraft:scoreboard_objective	builtin	string	bukkit	scoreboard_id	server:resync:scoreboard	LIVE_BUKKIT_OBJECTIVE_NOT_SAVED_TEMPLATE
+scoreboard_show_template	scoreboard_id	scoreboard_show_template	REFERENCE_SELECTOR	server:resync:scoreboard	builtin	scoreboard	resync_storage	scoreboard_id	server:resync:scoreboard	SAVED_RESYNC_SCOREBOARD_TEMPLATE
 structure_delete	structure_id	structure_delete	REFERENCE_SELECTOR	server:resync:structure	restudio.resync	structure	resync_region	resource_reference<restudio.resync:structure>	server:resync:structure	
-structure_exists	structure_id	structure_exists	REFERENCE_SELECTOR	server:resync:structure	restudio.resync	structure	resync_region	string		
-structure_load	clipboard_id	structure_load	FREEFORM_CREATION		restudio.resync	clipboard	resync_region	string		CREATES_LOADED_CLIPBOARD
-structure_load	structure_id	structure_load	REFERENCE_SELECTOR	server:resync:structure	restudio.resync	structure	resync_region	string		
-structure_paste	structure_id	structure_paste	REFERENCE_SELECTOR	server:resync:structure	restudio.resync	structure	resync_region	string		
-structure_save	clipboard_id	structure_save	REFERENCE_SELECTOR	server:resync:clipboard	restudio.resync	clipboard	resync_region	string		
-structure_save	structure_id	structure_save	FREEFORM_CREATION		restudio.resync	structure	resync_region	string		CREATES_NAMED_STRUCTURE
-tab_apply	tab	resource_apply	REFERENCE_SELECTOR	server:resync:tab	restudio.resync	tab	resync_storage	tab_id	server:resync:tab	
-tab_get	tab	resource_get	REFERENCE_SELECTOR	server:resync:tab	restudio.resync	tab	resync_storage	tab_id	server:resync:tab	
-team_add_player	team_id	team_add_player	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_create	team_id	team_create	FREEFORM_CREATION		restudio.resync	scoreboard_team	bukkit	string		CREATES_LIVE_BUKKIT_TEAM
-team_get_players	team_id	team_get_players	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_has_player	team_id	team_has_player	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_remove	team_id	team_remove	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_remove_player	team_id	team_remove_player	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_see_friendly_invisibles	team_id	team_see_friendly_invisibles	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_set_color	team_id	team_set_color	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_set_display_name	team_id	team_set_display_name	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_set_friendly_fire	team_id	team_set_friendly_fire	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_set_prefix	team_id	team_set_prefix	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-team_set_suffix	team_id	team_set_suffix	REFERENCE_SELECTOR	server:resync:scoreboard_team	restudio.resync	scoreboard_team	bukkit	string		LIVE_BUKKIT_TEAM
-text_get_template	template	resource_get	REFERENCE_SELECTOR	server:resync:text_template	restudio.resync	text_template	resync_storage	text_template_id	server:resync:text_template	
-text.entries	text_id	entries	REFERENCE_SELECTOR	server:resync:text_template	restudio.resync	text_template	resync_storage	text_template_id	server:resync:text_template	
-text.lines	text_id	lines	REFERENCE_SELECTOR	server:resync:text_template	restudio.resync	text_template	resync_storage	text_template_id	server:resync:text_template	
-text.lookup	text_id	lookup	REFERENCE_SELECTOR	server:resync:text_template	restudio.resync	text_template	resync_storage	text_template_id	server:resync:text_template	
-trade_get_profile	profile	resource_get	REFERENCE_SELECTOR	server:resync:trade_profile	restudio.resync	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
-trade.apply_trade_profile	profile_id	trade_apply_trade_profile	REFERENCE_SELECTOR	server:resync:trade_profile	restudio.resync	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
-trade.open_trades	profile_id	trade_open_trades	REFERENCE_SELECTOR	server:resync:trade_profile	restudio.resync	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
-trade.open_virtual_trades	profile_id	trade_open_virtual_trades	REFERENCE_SELECTOR	server:resync:trade_profile	restudio.resync	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
-world_get_by_name	world_name	world_get_by_name	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management	portal_id	world_management	REFERENCE_SELECTOR	server:resync:portal	restudio.resync	portal	resync_world_management	string		
-world_management	portal_name	world_management	FREEFORM_CREATION		restudio.resync	portal	resync_world_management	string		CONDITIONAL_CREATE_TARGET
-world_management	world_name	world_management	MIXED		restudio.resync	world	bukkit	string		CREATE_AND_REFERENCE_OPERATIONS_SHARE_ONE_PIN
-world_management_create_portal	portal_name	world_management_create_portal	FREEFORM_CREATION		restudio.resync	portal	resync_world_management	string		
-world_management_create_world	generator	world_management_create_world	REFERENCE_SELECTOR	server:resync:world_generator	restudio.resync	world_generator	bukkit	string	server:resync:world_generator	
-world_management_create_world	generator_config	world_management_create_world	REFERENCE_SELECTOR	server:resync:worldgen	restudio.resync	worldgen	resync_worldgen	worldgen_project	server:resync:worldgen	
-world_management_create_world	world_name	world_management_create_world	FREEFORM_CREATION		restudio.resync	world	bukkit	string		
-world_management_delete_portal	portal_id	world_management_delete_portal	REFERENCE_SELECTOR	server:resync:portal	restudio.resync	portal	resync_world_management	string		
-world_management_delete_world	world_name	world_management_delete_world	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_get_game_rules	world_name	world_management_get_game_rules	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_get_map_snapshot	world_name	world_management_get_map_snapshot	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_get_portal	portal_id	world_management_get_portal	REFERENCE_SELECTOR	server:resync:portal	restudio.resync	portal	resync_world_management	string		
-world_management_get_portals	world_name	world_management_get_portals	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_get_world	world_name	world_management_get_world	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_load_world	world_name	world_management_load_world	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_set_difficulty	world_name	world_management_set_difficulty	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_set_isolated_state	world_name	world_management_set_isolated_state	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_set_portal_bounds	portal_id	world_management_set_portal_bounds	REFERENCE_SELECTOR	server:resync:portal	restudio.resync	portal	resync_world_management	string		
-world_management_set_portal_destination	portal_id	world_management_set_portal_destination	REFERENCE_SELECTOR	server:resync:portal	restudio.resync	portal	resync_world_management	string		
-world_management_set_portal_enabled	portal_id	world_management_set_portal_enabled	REFERENCE_SELECTOR	server:resync:portal	restudio.resync	portal	resync_world_management	string		
-world_management_set_rule	world_name	world_management_set_rule	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_set_time_lock	world_name	world_management_set_time_lock	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_set_weather_lock	world_name	world_management_set_weather_lock	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_teleport_player_to_portal	portal_id	world_management_teleport_player_to_portal	REFERENCE_SELECTOR	server:resync:portal	restudio.resync	portal	resync_world_management	string		
-world_management_teleport_player_to_world	world_name	world_management_teleport_player_to_world	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_teleport_player_to_world_spawn	world_name	world_management_teleport_player_to_world_spawn	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-world_management_unload_world	world_name	world_management_unload_world	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string		
-worldgen_get	project	resource_get	REFERENCE_SELECTOR	server:resync:worldgen	restudio.resync	worldgen	resync_worldgen	worldgen_project	server:resync:worldgen	
-worldgen.compile_project	project	worldgen_compile	REFERENCE_SELECTOR	server:resync:worldgen	restudio.resync	worldgen	resync_worldgen	worldgen_project	server:resync:worldgen	
-worldgen.install_project	project	worldgen_install	REFERENCE_SELECTOR	server:resync:worldgen	restudio.resync	worldgen	resync_worldgen	worldgen_project	server:resync:worldgen	
-worldgen.install_project	world_name	worldgen_install	REFERENCE_SELECTOR	server:resync:world	restudio.resync	world	bukkit	string	server:resync:world	
-worldgen.preview_project	preview_id	worldgen_preview	FREEFORM_CREATION		restudio.resync	worldgen_preview	resync_worldgen	string		
-worldgen.preview_project	project	worldgen_preview	REFERENCE_SELECTOR	server:resync:worldgen	restudio.resync	worldgen	resync_worldgen	worldgen_project	server:resync:worldgen	
-worldgen.stop_preview	preview_id	worldgen_preview_stop	REFERENCE_SELECTOR	server:resync:worldgen_preview	restudio.resync	worldgen_preview	resync_worldgen	string		
-worldgen.validate_project	project	worldgen_validate	REFERENCE_SELECTOR	server:resync:worldgen	restudio.resync	worldgen	resync_worldgen	worldgen_project	server:resync:worldgen	
+structure_exists	structure_id	structure_exists	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(structure)
+structure_load	clipboard_id	structure_load	FREEFORM_CREATION		builtin	clipboard	resync_region	string		CREATES_LOADED_CLIPBOARD
+structure_load	structure_id	structure_load	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(structure)
+structure_paste	structure_id	structure_paste	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(structure)
+structure_save	clipboard_id	structure_save	SCALAR_VALUE		builtin	string	resync_region	string		SCALAR_RUNTIME_ID(clipboard)
+structure_save	structure_id	structure_save	FREEFORM_CREATION		builtin	structure	resync_region	string		CREATES_NAMED_STRUCTURE
+tab_apply	tab	resource_apply	REFERENCE_SELECTOR	server:resync:tab	builtin	tab	resync_storage	tab_id	server:resync:tab	
+tab_get	tab	resource_get	REFERENCE_SELECTOR	server:resync:tab	builtin	tab	resync_storage	tab_id	server:resync:tab	
+team_add_player	team_id	team_add_player	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_create	team_id	team_create	FREEFORM_CREATION		builtin	scoreboard_team	bukkit	string		CREATES_LIVE_BUKKIT_TEAM
+team_get_players	team_id	team_get_players	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_has_player	team_id	team_has_player	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_remove	team_id	team_remove	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_remove_player	team_id	team_remove_player	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_see_friendly_invisibles	team_id	team_see_friendly_invisibles	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_set_color	team_id	team_set_color	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_set_display_name	team_id	team_set_display_name	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_set_friendly_fire	team_id	team_set_friendly_fire	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_set_prefix	team_id	team_set_prefix	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+team_set_suffix	team_id	team_set_suffix	SCALAR_VALUE		builtin	string	bukkit	string		LIVE_BUKKIT_TEAM SCALAR_RUNTIME_ID(scoreboard_team)
+text_get_template	template	resource_get	REFERENCE_SELECTOR	server:resync:text_template	builtin	text_template	resync_storage	text_template_id	server:resync:text_template	
+text.entries	text_id	entries	REFERENCE_SELECTOR	server:resync:text_template	builtin	text_template	resync_storage	text_template_id	server:resync:text_template	
+text.lines	text_id	lines	REFERENCE_SELECTOR	server:resync:text_template	builtin	text_template	resync_storage	text_template_id	server:resync:text_template	
+text.lookup	text_id	lookup	REFERENCE_SELECTOR	server:resync:text_template	builtin	text_template	resync_storage	text_template_id	server:resync:text_template	
+trade_get_profile	profile	resource_get	REFERENCE_SELECTOR	server:resync:trade_profile	builtin	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
+trade.apply_trade_profile	profile_id	trade_apply_trade_profile	REFERENCE_SELECTOR	server:resync:trade_profile	builtin	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
+trade.open_trades	profile_id	trade_open_trades	REFERENCE_SELECTOR	server:resync:trade_profile	builtin	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
+trade.open_virtual_trades	profile_id	trade_open_virtual_trades	REFERENCE_SELECTOR	server:resync:trade_profile	builtin	trade_profile	resync_storage	trade_profile_id	server:resync:trade_profile	
+world_get_by_name	world_name	world_get_by_name	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management	portal_id	world_management	SCALAR_VALUE		builtin	string	resync_world_management	string		SCALAR_RUNTIME_ID(portal)
+world_management	portal_name	world_management	FREEFORM_CREATION		builtin	portal	resync_world_management	string		CONDITIONAL_CREATE_TARGET
+world_management	world_name	world_management	SCALAR_VALUE		builtin	string	bukkit	string		CREATE_AND_REFERENCE_OPERATIONS_SHARE_ONE_PIN SCALAR_RUNTIME_ID(world)
+world_management_create_portal	portal_name	world_management_create_portal	FREEFORM_CREATION		builtin	portal	resync_world_management	string		
+world_management_create_world	generator	world_management_create_world	SCALAR_SELECTOR	server:resync:world_generator	builtin	string	bukkit	string	server:resync:world_generator	SCALAR_RUNTIME_ID(world_generator)
+world_management_create_world	generator_config	world_management_create_world	REFERENCE_SELECTOR	server:resync:worldgen	builtin	worldgen_project	resync_worldgen	worldgen_project	server:resync:worldgen	
+world_management_create_world	world_name	world_management_create_world	FREEFORM_CREATION		builtin	world	bukkit	string		
+world_management_delete_portal	portal_id	world_management_delete_portal	SCALAR_VALUE		builtin	string	resync_world_management	string		SCALAR_RUNTIME_ID(portal)
+world_management_delete_world	world_name	world_management_delete_world	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_get_game_rules	world_name	world_management_get_game_rules	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_get_map_snapshot	world_name	world_management_get_map_snapshot	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_get_portal	portal_id	world_management_get_portal	SCALAR_VALUE		builtin	string	resync_world_management	string		SCALAR_RUNTIME_ID(portal)
+world_management_get_portals	world_name	world_management_get_portals	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_get_world	world_name	world_management_get_world	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_load_world	world_name	world_management_load_world	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_set_difficulty	world_name	world_management_set_difficulty	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_set_isolated_state	world_name	world_management_set_isolated_state	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_set_portal_bounds	portal_id	world_management_set_portal_bounds	SCALAR_VALUE		builtin	string	resync_world_management	string		SCALAR_RUNTIME_ID(portal)
+world_management_set_portal_destination	portal_id	world_management_set_portal_destination	SCALAR_VALUE		builtin	string	resync_world_management	string		SCALAR_RUNTIME_ID(portal)
+world_management_set_portal_enabled	portal_id	world_management_set_portal_enabled	SCALAR_VALUE		builtin	string	resync_world_management	string		SCALAR_RUNTIME_ID(portal)
+world_management_set_rule	world_name	world_management_set_rule	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_set_time_lock	world_name	world_management_set_time_lock	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_set_weather_lock	world_name	world_management_set_weather_lock	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_teleport_player_to_portal	portal_id	world_management_teleport_player_to_portal	SCALAR_VALUE		builtin	string	resync_world_management	string		SCALAR_RUNTIME_ID(portal)
+world_management_teleport_player_to_world	world_name	world_management_teleport_player_to_world	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_teleport_player_to_world_spawn	world_name	world_management_teleport_player_to_world_spawn	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+world_management_unload_world	world_name	world_management_unload_world	SCALAR_VALUE		builtin	string	bukkit	string		SCALAR_RUNTIME_ID(world)
+worldgen_get	project	resource_get	REFERENCE_SELECTOR	server:resync:worldgen	builtin	worldgen_project	resync_worldgen	worldgen_project	server:resync:worldgen	
+worldgen.compile_project	project	worldgen_compile	REFERENCE_SELECTOR	server:resync:worldgen	builtin	worldgen_project	resync_worldgen	worldgen_project	server:resync:worldgen	
+worldgen.install_project	project	worldgen_install	REFERENCE_SELECTOR	server:resync:worldgen	builtin	worldgen_project	resync_worldgen	worldgen_project	server:resync:worldgen	
+worldgen.install_project	world_name	worldgen_install	SCALAR_SELECTOR	server:resync:world	builtin	string	bukkit	string	server:resync:world	SCALAR_RUNTIME_ID(world)
+worldgen.preview_project	preview_id	worldgen_preview	FREEFORM_CREATION		builtin	worldgen_preview	resync_worldgen	string		
+worldgen.preview_project	project	worldgen_preview	REFERENCE_SELECTOR	server:resync:worldgen	builtin	worldgen_project	resync_worldgen	worldgen_project	server:resync:worldgen	
+worldgen.stop_preview	preview_id	worldgen_preview_stop	SCALAR_VALUE		builtin	string	resync_worldgen	string		SCALAR_RUNTIME_ID(worldgen_preview)
+worldgen.validate_project	project	worldgen_validate	REFERENCE_SELECTOR	server:resync:worldgen	builtin	worldgen_project	resync_worldgen	worldgen_project	server:resync:worldgen	

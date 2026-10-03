@@ -212,7 +212,7 @@ class FlowStorageDurabilityTest {
     }
 
     @Test
-    void projectMetadataSelectsTheCanonicalDuplicate() throws Exception {
+    void adoptedCanonicalResourceWinsOverDuplicatePresentationCopies() throws Exception {
         Path assets = tempDir.resolve("assets");
         Path canonical = assets.resolve("Blueprints").resolve("Commands").resolve("shared.json");
         Path stale = assets.resolve("Blueprints").resolve("Flows").resolve("shared.json");
@@ -552,6 +552,7 @@ class FlowStorageDurabilityTest {
         try (var paths = Files.walk(assets)) {
             return paths.filter(Files::isRegularFile)
                 .filter(path -> !isCoordinatorPath(assets, path))
+                .sorted()
                 .toList();
         }
     }

@@ -14,8 +14,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -42,12 +44,18 @@ class JsonAssetInventoryTest {
                 value.addProperty("name", resource.displayName());
                 store.save(value, UUID.randomUUID(), 0L);
             }
-            assertEquals(13, stores.size());
             AtomicInteger observed = new AtomicInteger();
 
             JsonAssetInventory inventory = JsonAssetInventory.scan(assets, ignored -> observed.incrementAndGet());
             int traversalCount = observed.get();
+            Map<String, List<String>> expected = ReSyncResourceCatalog.jsonStorageTypes().stream()
+                .collect(Collectors.toMap(type -> type, type -> List.of("asset_" + type)));
+            Map<String, List<String>> actual = inventory.jsonFilesUnder(assets).stream()
+                .filter(entry -> !entry.type().isBlank())
+                .collect(Collectors.groupingBy(JsonAssetInventory.Entry::type,
+                    Collectors.mapping(JsonAssetInventory.Entry::id, Collectors.toList())));
 
+            assertEquals(expected, actual);
             assertTrue(traversalCount > 2);
             assertEquals(traversalCount, inventory.visitedPathCount());
             for (JsonAssetStore<JsonObject> store : stores) {
@@ -85,10 +93,10 @@ class JsonAssetInventoryTest {
              JsonAssetStore<FolderResource> store = new JsonAssetStore<>(assets, tempDir.resolve("legacy-custom"), "gui", "GUIs",
                  FolderResource::fromJson, FolderResource::toJson, FolderResource::id, FolderResource::folder,
                  LegacyRuntimeActivationGate.runtime(tempDir), coordinator, () -> true)) {
-            store.save(new FolderResource("custom__v2", "Custom", "Nested/Menus"), UUID.randomUUID(), 0L);
+            store.save(new FolderResource("custom__v2", "Custom", "GUIs/Nested/Menus"), UUID.randomUUID(), 0L);
 
             store.healthCheck();
-            assertTrue(Files.exists(assets.resolve("Nested/Menus/custom__v2.json")));
+            assertTrue(Files.exists(assets.resolve("GUIs/Nested/Menus/custom__v2.json")));
 
             store.delete("custom__v2", UUID.randomUUID(), 1L);
             store.healthCheck();

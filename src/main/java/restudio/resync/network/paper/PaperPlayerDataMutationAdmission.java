@@ -643,7 +643,7 @@ public final class PaperPlayerDataMutationAdmission {
             }
             invalidateReadinessLocked();
             rediscoveryRequired = Bukkit.getServer() != null;
-            state = State.QUIESCING;
+            state = activeWork == 0 ? State.QUIESCED : State.QUIESCING;
             generation++;
             monitor.notifyAll();
         }

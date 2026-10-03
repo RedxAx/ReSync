@@ -1,5 +1,6 @@
 package restudio.resync;
 
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -28,7 +29,7 @@ public final class Log {
         if (levelName == null) {
             return;
         }
-        Level level = switch (levelName.toLowerCase()) {
+        Level level = switch (levelName.toLowerCase(Locale.ROOT)) {
             case "off" -> Level.OFF;
             case "severe", "error" -> Level.SEVERE;
             case "warn", "warning" -> Level.WARNING;
@@ -40,12 +41,6 @@ public final class Log {
         };
         Logger activeLogger = logger();
         activeLogger.setLevel(level);
-        if (activeLogger.getParent() == null) {
-            return;
-        }
-        for (var handler : activeLogger.getParent().getHandlers()) {
-            handler.setLevel(level);
-        }
     }
 
     public static void info(String msg) {

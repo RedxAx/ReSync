@@ -44,7 +44,9 @@ public class AdvancementTreeValidator {
                 validateDisplay(treeId, nodeId, object(node, "display"));
                 validateCriteria(treeId, nodeId, object(node, "criteria"));
                 validateRequirements(treeId, nodeId, node);
-                nodes.put(treeId + "/" + nodeId, new NodeRef(treeId, nodeId, parent));
+                if (bool(tree, "enabled", true)) {
+                    nodes.put(treeId + "/" + nodeId, new NodeRef(treeId, nodeId, parent));
+                }
             }
             if (roots != 1 && bool(tree, "enabled", true)) {
                 throw new IllegalArgumentException("Advancement tree " + treeId + " must contain exactly one enabled root");
@@ -80,6 +82,9 @@ public class AdvancementTreeValidator {
         }
         for (Map.Entry<String, JsonElement> entry : criteria.entrySet()) {
             requireId(entry.getKey(), "Criterion");
+            if ("__resync_root".equals(entry.getKey())) {
+                throw new IllegalArgumentException("Advancement criterion __resync_root is reserved for tree visibility");
+            }
             if (!entry.getValue().isJsonObject()) {
                 throw new IllegalArgumentException("Criterion " + treeId + "/" + nodeId + "/" + entry.getKey() + " must be an object");
             }
@@ -127,6 +132,9 @@ public class AdvancementTreeValidator {
     }
 
     private String localParent(NodeRef node) {
+        if (node.parent().startsWith("resync:")) {
+            return node.parent().substring("resync:".length());
+        }
         if (node.parent().isBlank() || node.parent().contains(":")) {
             return null;
         }

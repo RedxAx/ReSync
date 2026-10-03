@@ -37,6 +37,7 @@ import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.flow.CompiledTriggerExecution;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowExecutor;
+import restudio.resync.flow.FunctionCallSupport;
 import restudio.resync.flow.FlowRuntime;
 import restudio.resync.flow.TypeAdapterRegistry;
 import restudio.resync.flow.FlowValueCodecRegistry;
@@ -47,6 +48,10 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
+import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.function.FunctionParameterContract;
+import restudio.resync.flow.graph.FunctionParameter;
+import restudio.resync.flow.protocol.ResourceActivationState;
 import restudio.resync.flow.handler.property.PropertyRegistry;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
@@ -115,6 +120,7 @@ import restudio.resync.flow.diagnostic.Diagnostic;
 import restudio.resync.flow.identity.CapabilityId;
 import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.ContentHash;
+import restudio.resync.flow.identity.FunctionParameterId;
 import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.identity.InspectorFieldId;
@@ -133,6 +139,9 @@ import restudio.resync.flow.inspector.OptionQuerySchemaV1;
 import restudio.resync.flow.runtime.RuntimeFailureContract;
 import restudio.resync.flow.runtime.CompiledRuntimeContext;
 import restudio.resync.flow.CompiledRuntimeValueCodec;
+import restudio.flow.data.FlowOperationResult;
+import restudio.resync.flow.graph.FunctionBinding;
+import java.util.concurrent.CompletionException;
 import restudio.resync.flow.runtime.RuntimeBinding;
 import restudio.resync.flow.runtime.RuntimeBindingKey;
 import restudio.resync.flow.runtime.RuntimeBindingRegistry;
@@ -163,7 +172,9 @@ import restudio.resync.flow.type.ConversionGraph;
 import restudio.resync.flow.type.TypeDescriptor;
 import restudio.resync.flow.type.TypeExpr;
 import restudio.resync.flow.type.TypeReference;
+import restudio.resync.flow.type.TypeValueCodec;
 import restudio.resync.flow.type.TypedValue;
+import restudio.resync.contract.canonical.JsonValue;
 import restudio.resync.migration.PersistenceRootReadiness;
 import restudio.resync.migration.ReplacementActivationRecord;
 
@@ -2187,6 +2198,9 @@ public class FlowModule implements Module {
         if (CustomFunctionCallHandler.HANDLER_ID.equals(handlerId)) {
             return invocation -> invokeCustomFunction(definition, requirement, invocation);
         }
+        if ("FunctionHandler".equals(handlerId) && "call_function".equals(definition.getHandlerConfig().get("operation"))) {
+            return invocation -> invokeFunctionCall(definition, requirement, invocation);
+        }
         return invocation -> invokeLegacyHandler(handler, definition, requirement, definitionsRegistry, invocation);
     }
 
@@ -2256,6 +2270,7 @@ public class FlowModule implements Module {
                                                                  RuntimeOperationDescriptor requirement,
                                                                  NodeDefinitionRegistry definitionsRegistry,
                                                                  RuntimeInvocation invocation) {
+        FlowContext context = null;
         try {
             invocation.throwIfCancelled();
             authorizeLegacyInvocation(definition, requirement, invocation);
@@ -2265,12 +2280,37 @@ public class FlowModule implements Module {
             FlowNode node = new FlowNode(definition.getId(), 0, 0, inputs);
             node.setHandlerConfig(definition.getHandlerConfig());
             FlowGraph graph = new FlowGraph("runtime", Map.of("runtime", node), List.of(), List.of());
-            FlowRuntime runtime = new FlowRuntime(graph, runtimeTypeAdapters, Map.of(), legacyContext.variables(), definitionsRegistry,
-                storage.legacyRuntimeGate(), invocation.invocationId());
+            String operation = definition.getHandlerConfig().get("operation") instanceof String value ? value : "";
+            boolean returning = "FunctionHandler".equals(definition.getHandler())
+                && ("return_value".equals(operation) || "function_output".equals(operation))
+                && invocation.scope() != null && invocation.scope().functionSignature() != null;
+            if ("FunctionHandler".equals(definition.getHandler()) && invocation.scope() != null
+                && invocation.scope().functionSignature() != null) {
+                graph.setFunction(true);
+                graph.setFunctionInputs(invocation.scope().functionSignature().inputs().stream().map(parameter ->
+                    new FlowGraph.FunctionParameter(parameter.id(), parameter.unknown().get("name") instanceof String name
+                        && !name.isBlank() ? name : parameter.id().canonicalText(), FlowDataType.ANY)).toList());
+                graph.setFunctionOutputs(invocation.scope().functionSignature().outputs().stream().map(parameter ->
+                    new FlowGraph.FunctionParameter(parameter.id(), parameter.unknown().get("name") instanceof String name
+                        && !name.isBlank() ? name : parameter.id().canonicalText(), FlowDataType.ANY)).toList());
+            }
+            FlowRuntime runtime = new FlowRuntime(graph, runtimeTypeAdapters, executor != null ? executor.getGlobalVariables() : Map.of(),
+                legacyContext.variables(), definitionsRegistry, storage.legacyRuntimeGate(), invocation.invocationId(),
+                invocation.scope() == null ? null : returning ? new LinkedHashMap<>(invocation.scope().locals()) : invocation.scope().locals());
+            Map<FunctionParameterId, Object> functionInputs = new LinkedHashMap<>();
+            if (invocation.scope() != null) {
+                invocation.scope().functionInputs().values().forEach((id, value) -> functionInputs.put(id, legacyValue(value)));
+            }
+            if (returning) {
+                runtime.callFunctionById(graph, "runtime", functionInputs);
+            } else {
+                functionInputs.forEach(runtime::setFunctionInput);
+            }
             List<String> deferredOutputs = new CopyOnWriteArrayList<>();
-            FlowContext context = new FlowContext(runtime, legacyContext.player(), legacyContext.event(), deferredOutputs::add, executor,
+            context = new FlowContext(runtime, legacyContext.player(), legacyContext.event(), deferredOutputs::add, executor,
                 invocation.principal(), invocation.invocationId(), invocation.idempotencyKey(), invocation.runtimeContext(),
-                invocation.deadlineMillis());
+                invocation.deadlineMillis(), node, invocation.cancellationToken());
+            FlowContext invocationContext = context;
             handler.execute(context, node);
             context.finishSynchronousCapture();
             List<String> synchronousOutputs = context.consumeTriggeredOutputs();
@@ -2289,13 +2329,25 @@ public class FlowModule implements Module {
                     synchronousOutputs));
             }
             return completeLegacyOutputCapture(synchronousOutputs, deferredOutputs,
-                () -> new ArrayList<>(context.getAsyncOperations().values()), triggeredOutputs -> {
+                () -> new ArrayList<>(invocationContext.getAsyncOperations().values()), triggeredOutputs -> {
                 invocation.throwIfCancelled();
                 return legacyRuntimeResult(requirement, definition, runtime, triggeredOutputs);
             });
-        } catch (RuntimeException exception) {
-            return CompletableFuture.failedFuture(exception);
+        } catch (Throwable exception) {
+            if (context == null) {
+                return CompletableFuture.failedFuture(exception);
+            }
+            context.finishSynchronousCapture();
+            FlowContext invocationContext = context;
+            return completeLegacyFailure(() -> new ArrayList<>(invocationContext.getAsyncOperations().values()), exception);
         }
+    }
+
+    static <T> CompletableFuture<T> completeLegacyFailure(Supplier<List<CompletableFuture<?>>> pendingSupplier,
+                                                         Throwable failure) {
+        Set<CompletableFuture<?>> awaited = Collections.newSetFromMap(new IdentityHashMap<>());
+        return awaitPendingOperations(pendingSupplier, awaited, Objects.requireNonNull(failure, "Legacy invocation failure is required"))
+            .thenCompose(ignored -> CompletableFuture.failedFuture(failure));
     }
 
     static <T> CompletableFuture<T> completeLegacyOutputCapture(List<String> synchronousOutputs,
@@ -2365,37 +2417,22 @@ public class FlowModule implements Module {
             if (!(functionIdValue instanceof String functionId) || functionId.isBlank()) {
                 throw new IllegalArgumentException("Custom function runtime binding has no function ID");
             }
-            FlowGraph function = storage.getGraph("function", functionId);
-            if (function == null) {
-                throw new IllegalStateException("Custom function is unavailable: " + functionId);
-            }
-            function.adaptLegacyFunctionParameterIds();
+            FunctionSourceDocument function = boundFunction(invocation, functionId);
             Map<String, Object> inputs = new LinkedHashMap<>();
             for (Map.Entry<PinId, TypedValue> entry : invocation.inputs().entrySet()) {
                 NodeDefinition.PinDefinition pin = inputPin(definition, entry.getKey());
                 if (pin != null && pin.getType() == NodeDefinition.PinType.FLOW) {
                     continue;
                 }
-                FlowGraph.FunctionParameter parameter = pin != null ? functionParameter(function, pin)
-                    : CustomFunctionNodeDefinitions.parameterForKey(function, entry.getKey().value(),
-                        NodeDefinition.PinDirection.INPUT, true);
-                if (parameter == null) {
-                    throw new IllegalArgumentException("Custom function runtime input pin is not declared: " + entry.getKey().value());
+                FunctionParameterContract parameter = sourceParameter(function.signature().inputs(), entry.getKey().value(), "function-input-");
+                if (parameter == null || pin == null || !parameter.type().equals(entry.getValue().type())) {
+                    throw new IllegalArgumentException("Custom Function Input Does Not Match Its Declared Parameter: " + entry.getKey().value());
                 }
-                if (pin == null) {
-                    pin = customFunctionPin(definition, parameter, NodeDefinition.PinDirection.INPUT);
-                }
-                if (pin == null) {
-                    throw new IllegalStateException("Custom function runtime input has no matching definition pin: " + entry.getKey().value());
-                }
-                String parameterKey = CustomFunctionNodeDefinitions.parameterKey(parameter);
-                if (parameterKey == null || parameterKey.isBlank()) {
-                    throw new IllegalStateException("Custom function runtime input parameter has no stable identity: " + pin.getId().value());
-                }
+                String parameterKey = parameter.id().canonicalText();
                 if (inputs.containsKey(parameterKey)) {
                     throw new IllegalArgumentException("Custom function runtime input is supplied more than once: " + parameterKey);
                 }
-                inputs.put(parameterKey, legacyValue(entry.getValue()));
+                inputs.put(parameterKey, entry.getValue());
             }
             RuntimePrincipal principal = invocation.principal();
             CorrelationId invocationId = invocation.invocationId();
@@ -2406,12 +2443,101 @@ public class FlowModule implements Module {
             FlowExecutor.FunctionInvocationContext functionContext = new FlowExecutor.FunctionInvocationContext(
                 principal, invocationId, invocation.runtimeContext(), invocation.deadlineMillis()).child(childIdentity);
             return executor.withInheritedLiveEventScope(invocation.runtimeContext(), invocationId, functionContext.invocationId(),
-                    () -> executor.executeFunction(function, legacyContext.player(), legacyContext.event(), inputs, legacyContext.variables(),
-                        functionContext))
+                    () -> executor.executeFunctionSource(function, legacyContext.player(), legacyContext.event(), inputs, legacyContext.variables(),
+                        functionContext, invocation.cancellationToken()))
                 .thenApply(outputs -> customFunctionRuntimeResult(requirement, definition, function, outputs,
                     flowOutputAliases(definition)));
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | Error exception) {
             return CompletableFuture.failedFuture(exception);
+        }
+    }
+
+    private FunctionSourceDocument boundFunction(RuntimeInvocation invocation, String functionId) {
+        var stored = storage.getCoreGraph("function", functionId)
+            .orElseThrow(() -> new IllegalStateException("The Typed Function Is Unavailable: " + functionId));
+        FunctionSourceDocument source = stored.functionSourceDocument();
+        ServerResourceLocator resource = new ServerResourceLocator(runtimeServerId,
+            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("function")), functionId);
+        if (source == null || stored.envelope().assetActivationState() != ResourceActivationState.ACTIVE
+            || !resource.equals(source.signature().function().resource())
+            || source.signature().revision().value() != stored.envelope().assetRevision()
+            || source.graph().revision() != stored.envelope().assetRevision()) {
+            throw new IllegalStateException("The Typed Function Is Not Active At Its Committed Revision: " + functionId);
+        }
+        if (invocation.scope() != null) {
+            FunctionBinding binding = invocation.functionBindings().stream().filter(value -> value.function().equals(resource))
+                .findFirst().orElseThrow(() -> new IllegalStateException("The Function Is Not Declared In The Compiled Parent Closure: " + functionId));
+            if (binding.revision() != source.signature().revision().value()
+                || !sourceParametersMatch(binding.inputs(), source.signature().inputs())
+                || !sourceParametersMatch(binding.outputs(), source.signature().outputs())) {
+                throw new IllegalStateException("The Function Signature No Longer Matches The Compiled Parent Closure: " + functionId);
+            }
+        }
+        return source;
+    }
+
+    private static boolean sourceParametersMatch(List<FunctionParameter> bound, List<FunctionParameterContract> declared) {
+        if (bound.size() != declared.size()) {
+            return false;
+        }
+        for (FunctionParameter parameter : bound) {
+            FunctionParameterContract contract = declared.stream().filter(value -> parameter.parameterId().equals(value.id())).findFirst().orElse(null);
+            if (contract == null || !parameter.type().equals(contract.type())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static FunctionParameterContract sourceParameter(List<FunctionParameterContract> parameters, String key, String prefix) {
+        if (key == null) {
+            return null;
+        }
+        return parameters.stream().filter(parameter -> key.equals(parameter.id().canonicalText())
+            || key.equals(prefix + parameter.id().canonicalText())).findFirst().orElse(null);
+    }
+
+    private CompletableFuture<RuntimeResult> invokeFunctionCall(NodeDefinition definition, RuntimeOperationDescriptor requirement,
+                                                                RuntimeInvocation invocation) {
+        try {
+            invocation.throwIfCancelled();
+            authorizeLegacyInvocation(definition, requirement, invocation);
+            establishRuntimeEvidence(invocation);
+            Object target = legacyValue(invocation.inputs().get(PinId.of("function")));
+            String functionId;
+            if (target instanceof ServerResourceLocator resource && runtimeServerId.equals(resource.serverId())
+                && Set.of("builtin", "restudio.resync").contains(resource.owner().canonicalText())
+                && "function".equals(resource.resourceType().canonicalText())) {
+                functionId = resource.id();
+            } else if (target instanceof String text && !text.isBlank()) {
+                functionId = text;
+            } else {
+                throw new IllegalArgumentException("A Current Typed Function Reference Is Required");
+            }
+            FunctionSourceDocument function = boundFunction(invocation, functionId);
+            Object arguments = legacyValue(invocation.inputs().get(PinId.of("arguments")));
+            Map<String, Object> inputs = FunctionCallSupport.normalizeSourceArguments(function, arguments);
+            LegacyInvocationContext context = legacyInvocationContext(invocation.runtimeContext());
+            FlowExecutor.FunctionInvocationContext child = new FlowExecutor.FunctionInvocationContext(invocation.principal(),
+                invocation.invocationId(), invocation.runtimeContext(), invocation.deadlineMillis())
+                .child("runtime-operation|" + invocation.idempotencyKey() + "|" + functionId);
+            boolean continueOnFailure = Boolean.TRUE.equals(legacyValue(invocation.inputs().get(PinId.of("continue_on_failure"))));
+            return executor.withInheritedLiveEventScope(invocation.runtimeContext(), invocation.invocationId(), child.invocationId(),
+                    () -> executor.executeFunctionSource(function, context.player(), context.event(), inputs, context.variables(), child,
+                        invocation.cancellationToken()))
+                .handle((outputs, failure) -> {
+                    invocation.throwIfCancelled();
+                    if (failure != null && !continueOnFailure) {
+                        throw new CompletionException(failure);
+                    }
+                    Map<String, Object> values = new LinkedHashMap<>();
+                    values.put("results", failure == null ? outputs : Map.of());
+                    values.put("result", failure == null ? FlowOperationResult.success(outputs)
+                        : FlowOperationResult.failure("FUNCTION_EXECUTION_FAILED", "Function Execution Failed", Map.of("functionId", functionId)));
+                    return legacyRuntimeResult(requirement, definition, values, flowOutputAliases(definition));
+                });
+        } catch (RuntimeException | Error failure) {
+            return CompletableFuture.failedFuture(failure);
         }
     }
 
@@ -2497,6 +2623,31 @@ public class FlowModule implements Module {
         List<NodeDefinition.PinDefinition> pins = direction == NodeDefinition.PinDirection.INPUT
             ? definition.getInputs() : definition.getOutputs();
         return pins.stream().filter(pin -> pin != null && expected.equals(pin.getId())).findFirst().orElse(null);
+    }
+
+    private RuntimeResult customFunctionRuntimeResult(RuntimeOperationDescriptor requirement, NodeDefinition definition,
+            FunctionSourceDocument source, Map<String, Object> values, List<String> triggeredOutputs) {
+        Map<PinId, TypedValue> outputs = new LinkedHashMap<>();
+        for (RuntimeOperationDescriptor.Pin expected : requirement.outputPins()) {
+            NodeDefinition.PinDefinition pin = definition.getOutputs().stream()
+                .filter(value -> expected.id().equals(value.getId())).findFirst()
+                .orElseThrow(() -> new IllegalStateException("The Function Definition Is Missing An Output Pin: " + expected.id().value()));
+            Object value;
+            if (pin.getType() == NodeDefinition.PinType.FLOW) {
+                value = containsPinAlias(triggeredOutputs, pin) ? pin.getId().value() : null;
+            } else {
+                FunctionParameterContract parameter = sourceParameter(source.signature().outputs(), expected.id().value(), "function-output-");
+                if (parameter == null || !expected.type().equals(parameter.type())) {
+                    throw new IllegalStateException("The Function Output Does Not Match Its Declared Parameter: " + expected.id().value());
+                }
+                String id = parameter.id().canonicalText();
+                Object authoredName = parameter.unknown().get("name");
+                String name = authoredName instanceof String text && !text.isBlank() ? text : id;
+                value = values.containsKey(id) ? values.get(id) : values.get(name);
+            }
+            outputs.put(expected.id(), runtimeTypedValue(expected.type(), value));
+        }
+        return outputs.isEmpty() ? RuntimeResult.success() : RuntimeResult.success(outputs, null);
     }
 
     private RuntimeResult customFunctionRuntimeResult(RuntimeOperationDescriptor requirement,
@@ -2722,11 +2873,12 @@ public class FlowModule implements Module {
         List<NodeDefinition> current = definitionRegistry.getDefinitionsForPlugin(CustomFunctionNodeDefinitions.PLUGIN_ID)
             .stream().filter(definition -> nodeId.equals(definition.getId())).toList();
         return customFunctionDefinitionChanged(current, deleted,
-            () -> storage.getGraph(ReSyncResourceCatalog.FUNCTION, resourceId));
+            () -> storage.getCoreGraph(ReSyncResourceCatalog.FUNCTION, resourceId)
+                .map(value -> value.functionSourceDocument()).orElse(null));
     }
 
     static boolean customFunctionDefinitionChanged(List<NodeDefinition> current, boolean deleted,
-                                                    Supplier<FlowGraph> storedGraph) {
+                                                    Supplier<FunctionSourceDocument> storedGraph) {
         Objects.requireNonNull(current, "Current custom Function definitions are required");
         Objects.requireNonNull(storedGraph, "Stored custom Function graph supplier is required");
         if (deleted) {
@@ -2736,11 +2888,11 @@ public class FlowModule implements Module {
             return true;
         }
         try {
-            FlowGraph graph = storedGraph.get();
-            if (graph == null || !graph.isFunction()) {
+            FunctionSourceDocument source = storedGraph.get();
+            if (source == null) {
                 return !current.isEmpty();
             }
-            NodeDefinition candidate = CustomFunctionNodeDefinitions.buildDefinition(graph);
+            NodeDefinition candidate = CustomFunctionNodeDefinitions.buildDefinition(source);
             return current.size() != 1 || !sameDefinition(current.getFirst(), candidate);
         } catch (RuntimeException exception) {
             return true;
@@ -4468,7 +4620,7 @@ public class FlowModule implements Module {
         if (!usedIds.add(pinId)) {
             throw new IllegalArgumentException("Duplicate Flow catalog pin ID: " + pinId.value());
         }
-        TypeExpr type = typeExpression(source.getTypeRef());
+        TypeExpr type = functionPinType(definition, source);
         String editorId = "generic-editor";
         ContractRef<CapabilityId> editor = ContractRef.of(owner, CapabilityId.of(editorId));
         ContractRef<InspectorFieldId> optionSource = null;
@@ -4485,10 +4637,12 @@ public class FlowModule implements Module {
             }
             optionSource = ContractRef.of(owner, option.id());
         }
-        TypedValue defaultValue = null;
+        TypedValue defaultValue = functionDefault(definition, source, type);
         CatalogNodeDescriptor.Requirement requirement = source.isOptional()
             ? CatalogNodeDescriptor.Requirement.OPTIONAL : CatalogNodeDescriptor.Requirement.REQUIRED;
-        if (source.getDefaultValue() != null && !source.getDefaultValue().isBlank()) {
+        if (defaultValue != null) {
+            requirement = CatalogNodeDescriptor.Requirement.DEFAULTED;
+        } else if (source.getDefaultValue() != null && !source.getDefaultValue().isBlank()) {
             try {
                 defaultValue = TypedValue.value(type, catalogDefaultValue(type, source.getDefaultValue()));
                 requirement = CatalogNodeDescriptor.Requirement.DEFAULTED;
@@ -4503,6 +4657,86 @@ public class FlowModule implements Module {
         String resourceRole = type instanceof TypeExpr.ResourceType ? "reference" : null;
         return new CatalogNodeDescriptor.Pin(pinId, direction, type, text(source.getDisplayName(), pinId.value()),
             pinDescription(source.getDescription()), requirement, defaultValue, editor, optionSource, InspectorCondition.always(), repeatableIntent, resourceRole);
+    }
+
+    private static TypedValue functionDefault(NodeDefinition definition, NodeDefinition.PinDefinition source, TypeExpr type) {
+        Map<String, Object> config = definition.getHandlerConfig();
+        if (config == null || !config.containsKey(CustomFunctionNodeDefinitions.FUNCTION_DEFAULTS)) {
+            return null;
+        }
+        if (!CustomFunctionCallHandler.HANDLER_ID.equals(definition.getHandler())
+            || !CustomFunctionCallHandler.OPERATION.equals(config.get("operation"))
+            || !(config.get(CustomFunctionNodeDefinitions.FUNCTION_DEFAULTS) instanceof Map<?, ?> defaults)) {
+            throw new IllegalArgumentException("Typed Function defaults require a custom Function call descriptor");
+        }
+        for (Object key : defaults.keySet()) {
+            if (!(key instanceof String id)) {
+                throw new IllegalArgumentException("Typed Function defaults require stable parameter pin IDs");
+            }
+            String prefix = id.startsWith("function-input-") ? "function-input-"
+                : id.startsWith("function-output-") ? "function-output-" : null;
+            if (prefix == null) {
+                throw new IllegalArgumentException("Typed Function default is not a parameter pin: " + id);
+            }
+            FunctionParameterId.parseCanonicalText(id.substring(prefix.length()));
+            List<NodeDefinition.PinDefinition> pins = "function-input-".equals(prefix)
+                ? definition.getInputs() : definition.getOutputs();
+            long matches = pins.stream().filter(pin -> pin.getType() == NodeDefinition.PinType.DATA && id.equals(pin.getId().value())).count();
+            if (matches != 1) {
+                throw new IllegalArgumentException("Typed Function default must identify exactly one parameter pin: " + id);
+            }
+        }
+        if (!defaults.containsKey(source.getId().value())) {
+            return null;
+        }
+        TypedValue value = TypeValueCodec.INSTANCE.decode(JsonValue.fromJava(defaults.get(source.getId().value())));
+        if (!type.equals(value.type())) {
+            throw new IllegalArgumentException("Typed Function default type must match its qualified parameter type: " + source.getId().value());
+        }
+        if (!source.isOptional() && value.state() == TypedValue.State.ABSENT) {
+            throw new IllegalArgumentException("Required Function parameters cannot use an absent default");
+        }
+        return value;
+    }
+
+    private static TypeExpr functionPinType(NodeDefinition definition, NodeDefinition.PinDefinition source) {
+        Map<String, Object> config = definition.getHandlerConfig();
+        if (config == null || !config.containsKey(CustomFunctionNodeDefinitions.FUNCTION_TYPES)) {
+            return typeExpression(source.getTypeRef());
+        }
+        if (!CustomFunctionCallHandler.HANDLER_ID.equals(definition.getHandler())
+            || !CustomFunctionCallHandler.OPERATION.equals(config.get("operation"))
+            || !(config.get(CustomFunctionNodeDefinitions.FUNCTION_TYPES) instanceof Map<?, ?> types)) {
+            throw new IllegalArgumentException("Typed Function pin types require a custom Function call descriptor");
+        }
+        Set<String> expected = new HashSet<>();
+        Set<FunctionParameterId> parameters = new HashSet<>();
+        for (NodeDefinition.PinDefinition pin : definition.getInputs()) {
+            requireFunctionTypeIdentity(pin, NodeDefinition.PinDirection.INPUT, expected, parameters);
+        }
+        for (NodeDefinition.PinDefinition pin : definition.getOutputs()) {
+            requireFunctionTypeIdentity(pin, NodeDefinition.PinDirection.OUTPUT, expected, parameters);
+        }
+        if (!expected.equals(types.keySet())) {
+            throw new IllegalArgumentException("Typed Function pin types must identify every declared parameter exactly once");
+        }
+        if (source.getType() != NodeDefinition.PinType.DATA) {
+            return typeExpression(source.getTypeRef());
+        }
+        return TypeValueCodec.INSTANCE.decodeType(JsonValue.fromJava(types.get(source.getId().value())));
+    }
+
+    private static void requireFunctionTypeIdentity(NodeDefinition.PinDefinition pin, NodeDefinition.PinDirection direction,
+                                                     Set<String> expected, Set<FunctionParameterId> parameters) {
+        if (pin.getType() != NodeDefinition.PinType.DATA) {
+            return;
+        }
+        String prefix = direction == NodeDefinition.PinDirection.INPUT ? "function-input-" : "function-output-";
+        String id = pin.getId().value();
+        if (pin.getDirection() != direction || !id.startsWith(prefix)
+            || !parameters.add(FunctionParameterId.parseCanonicalText(id.substring(prefix.length()))) || !expected.add(id)) {
+            throw new IllegalArgumentException("Typed Function parameter pins require unique stable UUID identities: " + id);
+        }
     }
 
     private static Object catalogDefaultValue(TypeExpr type, String value) {
@@ -4563,11 +4797,11 @@ public class FlowModule implements Module {
         List<RuntimeOperationDescriptor.Pin> pins = new ArrayList<>(definition.getInputs().size() + definition.getOutputs().size());
         for (NodeDefinition.PinDefinition pin : definition.getInputs()) {
             pins.add(new RuntimeOperationDescriptor.Pin(pin.getId(), RuntimeOperationDescriptor.Direction.INPUT,
-                typeExpression(pin.getTypeRef())));
+                functionPinType(definition, pin)));
         }
         for (NodeDefinition.PinDefinition pin : definition.getOutputs()) {
             pins.add(new RuntimeOperationDescriptor.Pin(pin.getId(), RuntimeOperationDescriptor.Direction.OUTPUT,
-                typeExpression(pin.getTypeRef())));
+                functionPinType(definition, pin)));
         }
         if (localFunction(definition)) {
             operation = CatalogFunctionShape.operation(pins);

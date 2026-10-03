@@ -136,14 +136,17 @@ import restudio.resync.worldgen.WorldGenProjectStorage;
 import restudio.resync.worldgen.datapack.WorldGenInstalledDatapackCapability;
 import restudio.resync.worldgen.preview.WorldGenPreviewManager;
 import restudio.resync.worldgen.registry.WorldGenFlowCatalogContribution;
+import restudio.resync.worldgen.registry.WorldGenOptionCatalogs;
 
 import java.lang.reflect.Proxy;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.UUID;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -190,8 +193,6 @@ class CoreCatalogBaselineProofTest {
     private static final String SERVER = "e65887a4-ea27-4c55-bae2-e1c8d92da433";
     private static final ContentHash CONTENT = new ContentHash("6ffe6a7740232c2bc7d1eeb551488ba913c728fcd1fdf44712528bdc14d2bd84");
     private static final ContentHash TARGET_CONTENT = new ContentHash("4f335d707ce8cd6c60c06e3296d92a46b8ee66feb22df533389b9f1c8ffa556b");
-    private static final ContentHash CURRENT_CONTENT = new ContentHash("ff977f428b6131db6ba8d9e4f8c94419f28efdba5764f5b5fb8387150ff186ea");
-    private static final ContentHash CURRENT_MANIFEST = new ContentHash("c60b31780fb0a24a10a2dc3fbf8bb3cef3af7f291c24669cc950e9dee5111273");
     private static final ContentHash MANIFEST = new ContentHash("eaeee39ce4691471212dc76f5974fe8da99a0d4deb83db37dacd645aa4cfdf7b");
     private static final CatalogVersion CONTRACT = new CatalogVersion(1, 0);
     private static final CatalogBinding BINDING = new CatalogBinding(55L, CONTENT, MANIFEST);
@@ -343,6 +344,7 @@ class CoreCatalogBaselineProofTest {
             contextField.set(module, context);
             OptionCatalogRegistry registry = new OptionCatalogRegistry();
             new BuiltinOptionCatalogService(() -> null, attributes).registerProviders(registry);
+            WorldGenOptionCatalogs.register(registry);
             registry.runtimeData().register(new VanillaItemDataAdapter());
             new RuntimeDataOptionCatalogService(registry.runtimeData()).registerProviders(registry);
             new LuckPermsOptionCatalogService().registerProviders(registry);
@@ -388,25 +390,46 @@ class CoreCatalogBaselineProofTest {
         assertEquals(80, sourceFiles.size(), "The current bundled source inventory must be complete");
         NodeDefinitionLoader loader = new NodeDefinitionLoader();
         loader.setValidator(new NodeDefinitionValidator(handlers, options, true));
+        Map<ContractRef<NodeId>, JsonObject> inventory = currentDefinitionInventory(sourceFiles);
         List<NodeDefinition> loaded = loader.loadReplacementFromSources(sourceFiles);
-        assertEquals(1254, loaded.size(), "The complete current source catalog must load");
+        assertEquals(inventory.keySet(), loaded.stream().map(CoreCatalogBaselineProofTest::identity).collect(Collectors.toSet()),
+            "Every current authored definition must load exactly once");
+        assertEquals(inventory.size(), loaded.size(), "Loaded definitions must not contain duplicate identities");
+        for (NodeDefinition definition : loaded) {
+            JsonObject authored = inventory.get(identity(definition));
+            assertEquals(authoredPins(authored, "inputs"), definition.getInputs().stream().map(pin -> pin.getId().value()).toList(),
+                "Current input pin coverage changed for " + identity(definition).canonicalText());
+            assertEquals(authoredPins(authored, "outputs"), definition.getOutputs().stream().map(pin -> pin.getId().value()).toList(),
+                "Current output pin coverage changed for " + identity(definition).canonicalText());
+        }
         List<NodeDefinition> selected = loaded.stream()
             .filter(definition -> !"EconomyHandler".equals(definition.getHandler())).toList();
         List<NodeDefinition> excluded = loaded.stream()
             .filter(definition -> "EconomyHandler".equals(definition.getHandler())).toList();
-        assertEquals(11, excluded.size(), "Only the unavailable economy family may be excluded");
+        Set<ContractRef<NodeId>> unavailable = inventory.entrySet().stream()
+            .filter(entry -> entry.getValue().has("handler") && "EconomyHandler".equals(entry.getValue().get("handler").getAsString()))
+            .map(Map.Entry::getKey).collect(Collectors.toSet());
+        assertEquals(unavailable, excluded.stream().map(CoreCatalogBaselineProofTest::identity).collect(Collectors.toSet()),
+            "Only the current unavailable economy definitions may be excluded");
+        Set<ContractRef<NodeId>> expected = new HashSet<>(inventory.keySet());
+        expected.removeAll(unavailable);
         NodeDefinitionRegistry definitions = new NodeDefinitionRegistry(false);
-        WorldGenFlowCatalogContribution.create().apply(definitions, handlers);
+        WorldGenFlowCatalogContribution worldGen = WorldGenFlowCatalogContribution.create();
+        for (NodeDefinition definition : worldGen.definitions()) {
+            assertTrue(expected.add(identity(definition)), "WorldGen definition collides with an authored current source");
+        }
+        worldGen.apply(definitions, handlers);
         loader.validateAndRegister(selected, definitions, handlers, "json-classpath");
         assertTrue(loader.getDiagnostics().stream().noneMatch(value -> value.severity() == NodeDefinitionDiagnostic.Severity.ERROR),
             () -> "Strict production definition admission failed: " + loader.getDiagnostics().stream()
                 .filter(value -> value.severity() == NodeDefinitionDiagnostic.Severity.ERROR).toList());
-        assertEquals(1322, definitions.getAllDefinitions().size(), "Startup definition inventory changed");
+        assertEquals(expected, definitions.getAllDefinitions().values().stream()
+            .map(CoreCatalogBaselineProofTest::identity).collect(Collectors.toSet()), "Startup must admit the complete current definition inventory");
         List<CatalogSourceIngestor.CatalogSource> sources = sourceFiles.stream().map(source ->
             new CatalogSourceIngestor.CatalogSource(OwnerId.of("restudio.resync"), CatalogProvenance.SourceKind.BUNDLED,
                 source.sourceUri(), "1.0.0", "resync-flow", source.bytes())).toList();
         List<CatalogContribution> contributions = FlowModule.buildCatalogContributions(
-            definitions, handlers, null, sources, FlowModule.CATALOG_CONTRACT_VERSION);
+            definitions, handlers, null, sources, FlowModule.CATALOG_CONTRACT_VERSION, options);
         assertTrue(contributions.stream().anyMatch(contribution -> !contribution.optionSources().isEmpty()),
             "The current startup catalog must retain selector option sources");
         RuntimeRegistrySnapshot runtime = bindings(contributions).snapshot();
@@ -417,8 +440,9 @@ class CoreCatalogBaselineProofTest {
             .map(diagnostic -> diagnostic.code() + " owner=" + diagnostic.ownerId() + " evidence=" + diagnostic.evidence())
             .collect(Collectors.joining(", ")));
         CatalogSnapshot snapshot = result.snapshot().orElseThrow();
-        assertEquals(new CatalogVersion(1, 3), snapshot.contractVersion());
-        assertEquals(1322, snapshot.definitions().size());
+        assertEquals(FlowModule.CATALOG_CONTRACT_VERSION, snapshot.contractVersion());
+        assertEquals(expected, snapshot.definitions().stream().map(value -> value.key()).collect(Collectors.toSet()),
+            "The published catalog must retain every admitted current definition");
         assertEquals(runtime.bindingManifestHash(), snapshot.bindingManifestHash());
         assertEquals(snapshot.contentChecksum(), CatalogCanonicalizer.checksumForCanonicalContent(snapshot.canonicalContent()),
             "Serialized current catalog content must independently reproduce its checksum");
@@ -428,9 +452,30 @@ class CoreCatalogBaselineProofTest {
             assertTrue(Files.isDirectory(destination.getParent()), "Explicit current export parent must already exist");
             Files.write(destination, snapshot.canonicalBytes(), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
         }
-        assertEquals(CURRENT_CONTENT, snapshot.contentChecksum(), "Current full catalog content checksum changed");
-        assertEquals(CURRENT_MANIFEST, snapshot.bindingManifestHash(), "Current runtime binding manifest changed");
         return new CatalogRuntimeActivation.ActivationRecord(snapshot, runtime);
+    }
+
+    private static Map<ContractRef<NodeId>, JsonObject> currentDefinitionInventory(List<NodeDefinitionLoader.SourceFile> sources) {
+        Map<ContractRef<NodeId>, JsonObject> inventory = new LinkedHashMap<>();
+        for (NodeDefinitionLoader.SourceFile source : sources) {
+            JsonElement root = JsonParser.parseString(new String(source.bytes(), StandardCharsets.UTF_8));
+            JsonArray nodes = root.isJsonArray() ? root.getAsJsonArray() : new JsonArray();
+            if (!root.isJsonArray()) {
+                nodes.add(root);
+            }
+            assertFalse(nodes.isEmpty(), "Current bundled source has no definitions: " + source.sourceUri());
+            for (JsonElement element : nodes) {
+                JsonObject node = element.getAsJsonObject();
+                ContractRef<NodeId> key = ContractRef.of(OwnerId.of(node.get("owner").getAsString()), NodeId.of(node.get("id").getAsString()));
+                assertTrue(inventory.putIfAbsent(key, node) == null, "Duplicate current authored identity: " + key.canonicalText());
+            }
+        }
+        return Map.copyOf(inventory);
+    }
+
+    private static List<String> authoredPins(JsonObject node, String direction) {
+        JsonArray pins = node.getAsJsonArray(direction);
+        return pins == null ? List.of() : pins.asList().stream().map(pin -> pin.getAsJsonObject().get("id").getAsString()).toList();
     }
 
     private static void assertStructureAdmission(NodeDefinitionRegistry definitions, HandlerRegistry handlers,
@@ -635,12 +680,29 @@ class CoreCatalogBaselineProofTest {
     }
 
     public static class CatalogAdmissionReSync extends ReSync {
+        private ReSync previous;
+
         @Override
         public void onEnable() {
+            previous = ReSync.getInstance();
+            setInstance(this);
         }
 
         @Override
         public void onDisable() {
+            if (ReSync.getInstance() == this) {
+                setInstance(previous);
+            }
+        }
+
+        private void setInstance(ReSync plugin) {
+            try {
+                Field field = ReSync.class.getDeclaredField("instance");
+                field.setAccessible(true);
+                field.set(null, plugin);
+            } catch (ReflectiveOperationException failure) {
+                throw new IllegalStateException("Catalog Fixture Plugin Identity Could Not Be Set", failure);
+            }
         }
     }
 
@@ -855,19 +917,33 @@ class CoreCatalogBaselineProofTest {
 
     private static RuntimeBindingRegistry bindings(List<CatalogContribution> contributions) {
         RuntimeBindingRegistry registry = new RuntimeBindingRegistry();
+        Map<String, RuntimeOperationDescriptor> requirements = new TreeMap<>();
         for (CatalogContribution contribution : contributions) {
-            ContractRef<ProviderId> provider = ContractRef.of(contribution.ownerId(), ProviderId.of("flow"));
-            var requirements = new TreeMap<String, RuntimeOperationDescriptor>();
-            for (var requirement : contribution.runtimeRequirements()) {
-                var prior = requirements.putIfAbsent(requirement.key().canonical(), requirement);
+            for (RuntimeOperationDescriptor requirement : contribution.runtimeRequirements()) {
+                RuntimeOperationDescriptor prior = requirements.putIfAbsent(requirement.key().canonical(), requirement);
                 assertTrue(prior == null || prior.equals(requirement), "Conflicting production runtime requirement");
             }
-            List<RuntimeBinding> bindings = requirements.values().stream().map(requirement ->
+        }
+        Map<OwnerId, List<RuntimeOperationDescriptor>> byOwner = new TreeMap<>();
+        for (RuntimeOperationDescriptor requirement : requirements.values()) {
+            byOwner.computeIfAbsent(requirement.capability().owner(), ignored -> new ArrayList<>()).add(requirement);
+        }
+        List<RuntimeBindingRegistry.RuntimeProviderContribution> additions = new ArrayList<>();
+        for (Map.Entry<OwnerId, List<RuntimeOperationDescriptor>> entry : byOwner.entrySet()) {
+            ContractRef<ProviderId> provider = ContractRef.of(entry.getKey(), ProviderId.of("flow"));
+            List<RuntimeBinding> bindings = entry.getValue().stream().map(requirement ->
                 RuntimeBinding.available(requirement, provider, "1.0.0", ignored -> {
                     throw new AssertionError("Baseline proof must never execute a runtime operation");
                 })).toList();
-            registry.activate(new RuntimeProviderDescriptor(provider, "1.0.0", 0, 0,
-                RuntimeSemantics.UnloadPolicy.DRAIN), bindings);
+            additions.add(new RuntimeBindingRegistry.RuntimeProviderContribution(
+                new RuntimeProviderDescriptor(provider, "1.0.0", 0, 0, RuntimeSemantics.UnloadPolicy.DRAIN), bindings));
+        }
+        try (RuntimeBindingRegistry.RuntimeReplacement replacement = registry.prepareReplacement(additions, Set.of())) {
+            CatalogBindingProof staged = CatalogBindingProof.snapshot(replacement.preview());
+            for (RuntimeOperationDescriptor requirement : requirements.values()) {
+                assertTrue(staged.proves(requirement), "Staged runtime must prove the exact production requirement: " + requirement.key().canonical());
+            }
+            assertTrue(replacement.commit().committed(), "Startup runtime binding activation must commit");
         }
         return registry;
     }

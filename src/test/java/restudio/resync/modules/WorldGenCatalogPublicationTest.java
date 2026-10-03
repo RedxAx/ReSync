@@ -120,7 +120,7 @@ class WorldGenCatalogPublicationTest {
                     ignored -> CompletableFuture.completedFuture(RuntimeResult.success())))
                 .toList());
 
-        CatalogVersion version = new CatalogVersion(1, 0);
+        CatalogVersion version = FlowModule.CATALOG_CONTRACT_VERSION;
         CatalogContribution catalogContribution = CatalogContribution.builder(owner, "1.0.0",
                 new CatalogContractRange(version, version),
                 CatalogProvenance.fromText(CatalogProvenance.SourceKind.BUNDLED,

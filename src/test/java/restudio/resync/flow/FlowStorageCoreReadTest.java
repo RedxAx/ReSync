@@ -15,6 +15,7 @@ import restudio.resync.flow.identity.ResourceTypeId;
 import restudio.resync.flow.identity.ServerId;
 import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.flow.protocol.ResourceActivationState;
 import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.storage.StorageSafety;
@@ -86,6 +87,46 @@ class FlowStorageCoreReadTest {
             IllegalStateException failure = assertThrows(IllegalStateException.class,
                 () -> legacy.getCoreGraph("flow", "main"));
             assertTrue(failure.getCause() instanceof IOException);
+        }
+    }
+
+    @Test
+    void residentSourceFollowsCommittedIdentityAndColdReadsRejectTamperedBytes() throws Exception {
+        writeCore(SERVER, "main");
+        Path file = tempDir.resolve("assets/Blueprints/Flows/main.json");
+        byte[] original = Files.readAllBytes(file);
+        try (AssetTransactionCoordinator coordinator = transactions()) {
+            FlowStorage storage = new FlowStorage(tempDir.toFile(), LegacyRuntimeActivationGate.runtime(tempDir),
+                new AssetPersistenceGate(tempDir), SERVER, coordinator);
+            GraphDocument admitted = storage.getCoreGraph("flow", "main").orElseThrow().graphDocument();
+            assertThrows(UnsupportedOperationException.class, () -> admitted.unknown().fields().put("future", "changed"));
+            Files.writeString(file, "{\"tampered\":true}");
+            assertEquals(admitted.checksum(), storage.getCoreGraph("flow", "main").orElseThrow().graphDocument().checksum());
+            storage.clearCache();
+            assertThrows(IllegalStateException.class, () -> storage.getCoreGraph("flow", "main"));
+            Files.write(file, original);
+            storage.getCoreGraph("flow", "main").orElseThrow();
+            ServerResourceLocator peerId = new ServerResourceLocator(SERVER,
+                ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("flow")), "peer");
+            GraphDocument peer = new GraphDocument(new CatalogVersion(1, 0), peerId, 1, BINDING, Set.of(),
+                List.of(), List.of(), List.of(), OpaqueData.of(Map.of("future", "peer")));
+            storage.saveCoreGraph(peer, ResourceActivationState.ACTIVE, UUID.randomUUID(), 0);
+            assertEquals(peer.checksum(), storage.getCoreGraph("flow", "peer").orElseThrow().graphDocument().checksum());
+            assertEquals(admitted.checksum(), storage.getCoreGraph("flow", "main").orElseThrow().graphDocument().checksum());
+            GraphDocument updated = new GraphDocument(admitted.schemaVersion(), admitted.resource(), 4, BINDING, Set.of(),
+                List.of(), List.of(), List.of(), OpaqueData.of(Map.of("future", "updated")));
+            UUID mutation = UUID.randomUUID();
+            storage.saveCoreGraph(updated, ResourceActivationState.ACTIVE, mutation, 3);
+            var current = storage.getCoreGraph("flow", "main").orElseThrow();
+            assertEquals(4, current.envelope().assetRevision());
+            assertEquals(mutation.toString(), current.envelope().assetMutationId());
+            assertEquals("updated", current.graphDocument().unknown().get("future"));
+            assertTrue(storage.getCoreGraph("function", "main").isEmpty());
+            storage.deleteCoreGraph("flow", "main", UUID.randomUUID(), 4);
+            assertTrue(storage.getCoreGraph("flow", "main").isEmpty());
+            storage.clearCache();
+            assertTrue(storage.getCoreGraph("flow", "main").isEmpty());
+            assertEquals(peer.checksum(), storage.getCoreGraph("flow", "peer").orElseThrow().graphDocument().checksum());
         }
     }
 

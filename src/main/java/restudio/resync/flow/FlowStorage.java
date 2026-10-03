@@ -57,6 +57,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -105,6 +106,16 @@ public class FlowStorage {
     private static final int MAX_TYPED_COMMAND_REFRESH_PROOFS = 256;
     private final Map<String, CachedGraph> graphCache = new ConcurrentHashMap<>();
     private final CoreGraphStorageBoundary coreGraphStorage = new CoreGraphStorageBoundary();
+    private final Map<AssetTransactionCoordinator.AssetKey, ResidentCoreGraph> coreGraphs = new LinkedHashMap<>(16, 0.75f, true);
+    private long coreGraphBytes;
+    private ResidentCoreMetadata coreMetadata;
+
+    private record ResidentCoreMetadata(AssetTransactionCoordinator coordinator, long generation,
+            AssetTransactionCoordinator.ExpectedProject project, AssetTransactionCoordinator.AssetMutationId lineage,
+            CoreProjectMetadata metadata) {}
+
+    private record ResidentCoreGraph(AssetTransactionCoordinator coordinator, long generation,
+            AssetTransactionCoordinator.CommittedAsset stamp, CoreGraphStorageBoundary.Decoded source, long bytes) {}
     private final Map<String, GuiDefinition> guiCache = new ConcurrentHashMap<>();
     private final Map<String, ScoreboardDefinition> scoreboardCache = new ConcurrentHashMap<>();
     private final Map<String, TabDefinition> tabCache = new ConcurrentHashMap<>();
@@ -455,6 +466,10 @@ public class FlowStorage {
         return type.isBlank() ? null : getGraph(type, safeId);
     }
 
+    public boolean hasCoreGraphAuthority() {
+        return serverId != null;
+    }
+
     public synchronized Optional<CoreGraphStorageBoundary.Decoded> getCoreGraph(String type, String id) {
         try (AssetPersistenceGate.MutationLease ignored = requirePersistenceReadOpen()) {
             if (serverId == null) {
@@ -468,10 +483,38 @@ public class FlowStorage {
                 return Optional.empty();
             }
             try {
+                AssetTransactionCoordinator coordinator = requireAssetTransactions();
+                AssetTransactionCoordinator.AssetKey key = assetKey(type, safeId);
+                AssetTransactionCoordinator.CommittedAsset stamp = coordinator.committedAsset(key).orElse(null);
+                synchronized (coreGraphs) {
+                    ResidentCoreGraph resident = coreGraphs.get(key);
+                    if (resident != null && resident.coordinator() == coordinator && resident.generation() == persistenceGeneration
+                        && resident.stamp().equals(stamp) && stamp.state() instanceof AssetTransactionCoordinator.Live) {
+                        return Optional.of(resident.source());
+                    }
+                    removeResidentCoreGraph(key);
+                }
                 CoreProjectMetadata metadata = readCoreProjectMetadata();
                 CoreStoredState state = readCoreStoredState(type, safeId, coreResource(type, safeId), metadata.snapshot());
-                requireCoordinatedCoreState(requireAssetTransactions(), type, safeId, state);
-                return state.kind() == CoreStateKind.LIVE ? Optional.of(state.decoded()) : Optional.empty();
+                requireCoordinatedCoreState(coordinator, type, safeId, state);
+                if (state.kind() != CoreStateKind.LIVE) {
+                    return Optional.empty();
+                }
+                AssetTransactionCoordinator.CommittedAsset verified = coordinator.committedAsset(key).orElseThrow();
+                if (!verified.equals(stamp) || !(verified.state() instanceof AssetTransactionCoordinator.Live)) {
+                    throw new IllegalStateException("Core Graph Authority Changed During Source Admission");
+                }
+                long bytes = Math.multiplyExact(Files.size(state.liveFiles().getFirst()), 4L);
+                synchronized (coreGraphs) {
+                    if (bytes <= 32L * 1024 * 1024) {
+                        coreGraphs.put(key, new ResidentCoreGraph(coordinator, persistenceGeneration, verified, state.decoded(), bytes));
+                        coreGraphBytes += bytes;
+                        while (coreGraphs.size() > 128 || coreGraphBytes > 32L * 1024 * 1024) {
+                            removeResidentCoreGraph(coreGraphs.keySet().iterator().next());
+                        }
+                    }
+                }
+                return Optional.of(state.decoded());
             } catch (IOException | RuntimeException exception) {
                 throw new IllegalStateException("Failed to load Core graph " + type + ':' + safeId, exception);
             }
@@ -1185,8 +1228,7 @@ public class FlowStorage {
         }
         GraphDocument document = graph != null ? graph : source.graph();
         boolean active = activationState == ResourceActivationState.ACTIVE;
-        FlowGraph candidate = TypedCommandGraphAdapter.materialize(document, source, active, mutationId.toString());
-        TypedCommandGraphAdapter.read(candidate);
+        TypedCommandGraphAdapter.CommandBinding candidate = TypedCommandGraphAdapter.read(document, active);
         if (active) {
             ensureCommandLabelAvailable(candidate, id);
         }
@@ -2088,16 +2130,17 @@ public class FlowStorage {
         logBlockedLegacyOperation(operation);
     }
 
-    public synchronized FlowGraph reloadGraph(String id) {
-        String safeId = safeId(id, "reload flow");
-        if (safeId == null) {
-            throw new IllegalArgumentException("Invalid flow id");
-        }
-        String type = resolveStoredGraphType(safeId);
-        return type.isBlank() ? null : reloadGraph(type, safeId);
+    public FlowGraph reloadGraph(String id) {
+        return reloadGraph("", id);
     }
 
-    public synchronized FlowGraph reloadGraph(String type, String id) {
+    public FlowGraph reloadGraph(String type, String id) {
+        ReloadedGraph reloaded = reloadGraphState(type, id);
+        publishGraphChange(reloaded.change());
+        return reloaded.graph();
+    }
+
+    private synchronized ReloadedGraph reloadGraphState(String type, String id) {
         String safeId = safeId(id, "reload flow");
         if (safeId == null) {
             throw new IllegalArgumentException("Invalid flow id");
@@ -2108,7 +2151,7 @@ public class FlowStorage {
         }
         if (requestedType.isBlank()) {
             String resolvedType = resolveStoredGraphType(safeId);
-            return resolvedType.isBlank() ? null : reloadGraph(resolvedType, safeId);
+            return resolvedType.isBlank() ? new ReloadedGraph(null, null) : reloadGraphState(resolvedType, safeId);
         }
         PersistenceGeneration generation = capturePersistenceGeneration();
         for (int attempt = 0; attempt < 2; attempt++) {
@@ -2119,8 +2162,7 @@ public class FlowStorage {
                 throw new IllegalStateException("Failed to reload flow: " + safeId, exception);
             }
             if (loaded.graph() == null) {
-                notifyGraphChanged(requestedType, safeId);
-                return null;
+                return new ReloadedGraph(null, new GraphChange(requestedType, safeId));
             }
             requireValidGraph(loaded.graph());
             if (!isCurrentPersistenceGeneration(generation)) {
@@ -2138,27 +2180,34 @@ public class FlowStorage {
                 graphCache.remove(assetIndexKey(loaded.type(), safeId));
             }
             cacheGraphIfCurrent(generation, loaded.type(), safeId, loaded.revision(), loaded.mutationId(), loaded.graph());
-            notifyGraphChanged(loaded.type(), safeId);
-            return loaded.graph().copy();
+            return new ReloadedGraph(loaded.graph().copy(), new GraphChange(loaded.type(), safeId));
         }
         throw new IllegalStateException("Flow graph changed while validating the graph");
     }
 
-    public synchronized void saveGraph(FlowGraph graph) {
-        if (graph == null) {
-            throw new IllegalArgumentException("Flow is required");
+    public void saveGraph(FlowGraph graph) {
+        GraphChange change;
+        synchronized (this) {
+            if (graph == null) {
+                throw new IllegalArgumentException("Flow is required");
+            }
+            RuntimeObservation validation = validateGraphForMutation(graph);
+            Long expectedRevision = graph.getResourceRevision() > 0L ? graph.getResourceRevision() : null;
+            change = saveGraph(graph, UUID.randomUUID(), expectedRevision, false, validation);
         }
-        RuntimeObservation validation = validateGraphForMutation(graph);
-        Long expectedRevision = graph != null && graph.getResourceRevision() > 0L ? graph.getResourceRevision() : null;
-        saveGraph(graph, UUID.randomUUID(), expectedRevision, false, validation);
+        publishGraphChange(change);
     }
 
-    public synchronized void saveGraph(FlowGraph graph, UUID mutationId, long expectedRevision) {
-        if (graph == null) {
-            throw new IllegalArgumentException("Flow is required");
+    public void saveGraph(FlowGraph graph, UUID mutationId, long expectedRevision) {
+        GraphChange change;
+        synchronized (this) {
+            if (graph == null) {
+                throw new IllegalArgumentException("Flow is required");
+            }
+            RuntimeObservation validation = validateGraphForMutation(graph);
+            change = saveGraph(graph, mutationId, expectedRevision, true, validation);
         }
-        RuntimeObservation validation = validateGraphForMutation(graph);
-        saveGraph(graph, mutationId, expectedRevision, true, validation);
+        publishGraphChange(change);
     }
 
     public void saveGraph(FlowGraph graph, long expectedRevision, UUID mutationId) {
@@ -2201,18 +2250,22 @@ public class FlowStorage {
         }
     }
 
-    public synchronized void reclassifyGraph(FlowGraph graph, String targetType) {
-        if (!Set.of("flow", "function", "command").contains(targetType)) {
-            throw new IllegalArgumentException("Unsupported graph type: " + targetType);
+    public void reclassifyGraph(FlowGraph graph, String targetType) {
+        List<GraphChange> changes;
+        synchronized (this) {
+            if (!Set.of("flow", "function", "command").contains(targetType)) {
+                throw new IllegalArgumentException("Unsupported graph type: " + targetType);
+            }
+            if (graph == null) {
+                throw new IllegalArgumentException("Flow is required");
+            }
+            RuntimeObservation validation = validateGraphForMutation(graph);
+            changes = reclassifyGraphAsset(graph, targetType, UUID.randomUUID(), validation);
         }
-        if (graph == null) {
-            throw new IllegalArgumentException("Flow is required");
-        }
-        RuntimeObservation validation = validateGraphForMutation(graph);
-        reclassifyGraphAsset(graph, targetType, UUID.randomUUID(), validation);
+        changes.forEach(this::publishGraphChange);
     }
 
-    private synchronized void reclassifyGraphAsset(FlowGraph graph, String targetType, UUID mutationId,
+    private synchronized List<GraphChange> reclassifyGraphAsset(FlowGraph graph, String targetType, UUID mutationId,
                                                    RuntimeObservation validation) {
         String safeId = safeId(graph.getId(), "reclassify flow");
         if (safeId == null) {
@@ -2220,7 +2273,7 @@ public class FlowStorage {
         }
         String sourceType = graphResourceType(graph);
         if (targetType.equals(sourceType)) {
-            return;
+            return List.of();
         }
         PersistenceGeneration generation = capturePersistenceGeneration();
         long committedRevision = -1L;
@@ -2322,21 +2375,26 @@ public class FlowStorage {
             throw new IllegalStateException("Failed to reclassify flow: " + safeId, exception);
         }
         cacheGraphIfCurrent(generation, targetType, safeId, committedRevision, committedMutation, graph);
-        notifyGraphChanged(sourceType, safeId);
-        notifyGraphChanged(targetType, safeId);
+        return List.of(new GraphChange(sourceType, safeId), new GraphChange(targetType, safeId));
     }
 
-    public synchronized void restoreGraph(FlowGraph graph) {
-        if (graph == null || graph.getId() == null) {
-            return;
+    public void restoreGraph(FlowGraph graph) {
+        GraphChange change;
+        synchronized (this) {
+            if (graph == null || graph.getId() == null) {
+                return;
+            }
+            FlowGraph current = getGraph(graphResourceType(graph), graph.getId());
+            graph.setResourceRevision(current != null ? current.getResourceRevision() : 0L);
+            graph.setResourceMutationId("");
+            RuntimeObservation validation = validateGraphForMutation(graph);
+            Long expectedRevision = graph.getResourceRevision() > 0L ? graph.getResourceRevision() : null;
+            change = saveGraph(graph, UUID.randomUUID(), expectedRevision, false, validation);
         }
-        FlowGraph current = getGraph(graphResourceType(graph), graph.getId());
-        graph.setResourceRevision(current != null ? current.getResourceRevision() : 0L);
-        graph.setResourceMutationId("");
-        saveGraph(graph);
+        publishGraphChange(change);
     }
 
-    private synchronized void saveGraph(FlowGraph graph, UUID mutationId, Long expectedRevision,
+    private synchronized GraphChange saveGraph(FlowGraph graph, UUID mutationId, Long expectedRevision,
                                         boolean enforceExpectedRevision, RuntimeObservation validation) {
         if (graph == null) {
             throw new IllegalArgumentException("Flow is required");
@@ -2405,14 +2463,14 @@ public class FlowStorage {
                     throw new IllegalStateException("Mutation ID was already committed with a different graph payload: " + mutationId);
                 }
                 applyCurrentIdentity(graph, current);
-                return;
+                return null;
             }
             if (enforceExpectedRevision && expectedRevision != currentRevision) {
                 throw new ResourceRevisionConflictException(safeId, expectedRevision, currentRevision);
             }
             if (storedLive && (enforceExpectedRevision ? sameGraphPayload(graph, current, type) : sameGraphContent(graph, current))) {
                 applyCurrentIdentity(graph, current);
-                return;
+                return null;
             }
             requireValidationCurrent(validation);
             if (!enforceExpectedRevision && currentRevision > 0L && graph.getResourceRevision() > 0L
@@ -2459,7 +2517,7 @@ public class FlowStorage {
             throw new IllegalStateException("Failed to save flow: " + safeId, e);
         }
         cacheGraphIfCurrent(generation, committedType, safeId, committedRevision, committedMutation, graph);
-        notifyGraphChanged(committedType, safeId);
+        return new GraphChange(committedType, safeId);
     }
 
     private void requireGraphSaveLineageType(FlowGraph graph, String requestedType, String id,
@@ -2588,15 +2646,19 @@ public class FlowStorage {
         }
     }
 
-    public synchronized void deleteGraph(String id) {
-        UUID mutationId = UUID.randomUUID();
-        String safeId = safeId(id, "delete flow");
-        if (safeId == null) {
-            throw new IllegalArgumentException("Invalid flow id");
+    public void deleteGraph(String id) {
+        GraphChange change;
+        synchronized (this) {
+            UUID mutationId = UUID.randomUUID();
+            String safeId = safeId(id, "delete flow");
+            if (safeId == null) {
+                throw new IllegalArgumentException("Invalid flow id");
+            }
+            String type = resolveStoredGraphType(safeId);
+            requireFunctionNotReferenced(type, safeId);
+            change = deleteGraphFiles(type.isBlank() ? "flow" : type, safeId, mutationId, null, false);
         }
-        String type = resolveStoredGraphType(safeId);
-        requireFunctionNotReferenced(type, safeId);
-        deleteGraphFiles(type.isBlank() ? "flow" : type, safeId, mutationId, null, false);
+        publishGraphChange(change);
     }
 
     public void deleteGraph(String id, UUID mutationId, long expectedRevision) {
@@ -2612,23 +2674,31 @@ public class FlowStorage {
         deleteGraph(id, parseMutationId(mutationId), expectedRevision);
     }
 
-    public synchronized void deleteGraph(String type, String id) {
-        UUID mutationId = UUID.randomUUID();
-        String safeId = safeId(id, "delete flow");
-        if (safeId == null || type == null || !Set.of("flow", "function", "command").contains(type)) {
-            throw new IllegalArgumentException("Invalid flow identity");
+    public void deleteGraph(String type, String id) {
+        GraphChange change;
+        synchronized (this) {
+            UUID mutationId = UUID.randomUUID();
+            String safeId = safeId(id, "delete flow");
+            if (safeId == null || type == null || !Set.of("flow", "function", "command").contains(type)) {
+                throw new IllegalArgumentException("Invalid flow identity");
+            }
+            requireFunctionNotReferenced(type, safeId);
+            change = deleteGraphFiles(type, safeId, mutationId, null, false);
         }
-        requireFunctionNotReferenced(type, safeId);
-        deleteGraphFiles(type, safeId, mutationId, null, false);
+        publishGraphChange(change);
     }
 
-    public synchronized void deleteGraph(String type, String id, UUID mutationId, long expectedRevision) {
-        String safeId = safeId(id, "delete flow");
-        if (safeId == null || type == null || !GRAPH_TYPES.contains(type)) {
-            throw new IllegalArgumentException("Invalid flow identity");
+    public void deleteGraph(String type, String id, UUID mutationId, long expectedRevision) {
+        GraphChange change;
+        synchronized (this) {
+            String safeId = safeId(id, "delete flow");
+            if (safeId == null || type == null || !GRAPH_TYPES.contains(type)) {
+                throw new IllegalArgumentException("Invalid flow identity");
+            }
+            requireFunctionNotReferenced(type, safeId);
+            change = deleteGraphFiles(type, safeId, mutationId, expectedRevision, true);
         }
-        requireFunctionNotReferenced(type, safeId);
-        deleteGraphFiles(type, safeId, mutationId, expectedRevision, true);
+        publishGraphChange(change);
     }
 
     public void deleteGraph(String type, String id, long expectedRevision, UUID mutationId) {
@@ -2643,13 +2713,17 @@ public class FlowStorage {
         deleteGraph(type, id, parseMutationId(mutationId), expectedRevision);
     }
 
-    public synchronized void forceDeleteGraph(String id) {
-        String safeId = safeId(id, "delete flow");
-        if (safeId == null) {
-            throw new IllegalArgumentException("Invalid flow id");
+    public void forceDeleteGraph(String id) {
+        GraphChange change;
+        synchronized (this) {
+            String safeId = safeId(id, "delete flow");
+            if (safeId == null) {
+                throw new IllegalArgumentException("Invalid flow id");
+            }
+            String type = resolveStoredGraphType(safeId);
+            change = deleteGraphFiles(type.isBlank() ? "flow" : type, safeId, UUID.randomUUID(), null, false);
         }
-        String type = resolveStoredGraphType(safeId);
-        deleteGraphFiles(type.isBlank() ? "flow" : type, safeId, UUID.randomUUID(), null, false);
+        publishGraphChange(change);
     }
 
     public synchronized List<FlowFunctionReference> findFunctionReferences(String functionId) {
@@ -2707,7 +2781,7 @@ public class FlowStorage {
         }
     }
 
-    private synchronized void deleteGraphFiles(String type, String safeId, UUID mutationId, Long expectedRevision,
+    private synchronized GraphChange deleteGraphFiles(String type, String safeId, UUID mutationId, Long expectedRevision,
                                                 boolean enforceExpectedRevision) {
         PersistenceGeneration generation = capturePersistenceGeneration();
         try (AssetPersistenceGate.MutationLease ignored = requirePersistenceMutationOpen()) {
@@ -2729,7 +2803,7 @@ public class FlowStorage {
                     }
                     quarantineLegacyGraphAfterCommit(type, safeId, verifiedLegacyGraphDeleteSource(type, safeId));
                     graphCache.remove(assetIndexKey(type, safeId));
-                    return;
+                    return null;
                 }
                 throw new IllegalStateException("Mutation ID was already committed for graph save: " + mutationId);
             }
@@ -2794,9 +2868,16 @@ public class FlowStorage {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to delete flow: " + safeId, e);
         }
-        if (isCurrentPersistenceGeneration(generation)) {
-            notifyGraphChanged(type, safeId);
+        return isCurrentPersistenceGeneration(generation) ? new GraphChange(type, safeId) : null;
+    }
+
+    private void publishGraphChange(GraphChange change) {
+        if (change != null) {
+            notifyGraphChanged(change.type(), change.id());
         }
+    }
+
+    private record ReloadedGraph(FlowGraph graph, GraphChange change) {
     }
 
     private void notifyGraphChanged(String graphType, String graphId) {
@@ -4134,6 +4215,42 @@ public class FlowStorage {
         }
     }
 
+    public CommittedGraphIds readCommittedGraphIds(String resourceType) {
+        if (!hasCoreGraphAuthority() || !GRAPH_TYPES.contains(resourceType)) {
+            throw new IllegalArgumentException("Committed graph inventory requires an authoritative graph resource type");
+        }
+        RuntimeObservation observation = observeRuntime()
+            .orElseThrow(() -> new IllegalStateException("Flow committed graph inventory is unavailable"));
+        AssetTransactionCoordinator.Snapshot snapshot = observation.coordinator().committedSnapshot();
+        Path root = assetsDir.toPath().toAbsolutePath().normalize();
+        if (snapshot.rootSequence() != observation.committedSequence()
+            || !root.equals(observation.coordinator().canonicalRoot())) {
+            throw new IllegalStateException("Flow committed graph inventory authority changed");
+        }
+        List<String> ids = snapshot.states().entrySet().stream()
+            .filter(entry -> resourceType.equals(entry.getKey().type())
+                && entry.getValue() instanceof AssetTransactionCoordinator.Live)
+            .filter(entry -> {
+                Path path = snapshot.paths().get(entry.getKey());
+                return path != null && path.toAbsolutePath().normalize().startsWith(root)
+                    && !isDurabilityInternalPath(root, path) && safeId(entry.getKey().id(), "list committed graph") != null;
+            })
+            .map(entry -> entry.getKey().id())
+            .sorted(String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder()))
+            .toList();
+        if (!isRuntimeObservationCurrent(observation)) {
+            throw new IllegalStateException("Flow committed graph inventory authority changed");
+        }
+        return new CommittedGraphIds(observation, ids);
+    }
+
+    public record CommittedGraphIds(RuntimeObservation observation, List<String> ids) {
+        public CommittedGraphIds {
+            Objects.requireNonNull(observation, "Committed graph inventory observation is required");
+            ids = List.copyOf(Objects.requireNonNull(ids, "Committed graph IDs are required"));
+        }
+    }
+
     private List<String> listGraphIds(String resourceType, Map<String, Path> index) {
         if (!Set.of("flow", "function", "command").contains(resourceType)) {
             throw new IllegalArgumentException("Unknown graph resource type: " + resourceType);
@@ -4144,20 +4261,33 @@ public class FlowStorage {
 
     public synchronized TypedCommandGraphAdapter.Snapshot typedCommandGraphSnapshot() {
         try (AssetPersistenceGate.MutationLease ignored = requirePersistenceReadOpen()) {
-            Map<String, FlowGraph> graphs = new LinkedHashMap<>();
-            Map<String, String> failures = new LinkedHashMap<>();
+            List<TypedCommandGraphAdapter.CommandBinding> bindings = new ArrayList<>();
+            List<TypedCommandGraphAdapter.Rejection> failures = new ArrayList<>();
             for (String graphId : listGraphIds("command")) {
-                FlowGraph graph = getCommandGraph(graphId);
-                if (graph == null) {
-                    failures.put(graphId, "The typed command graph could not be loaded or failed its integrity check");
-                } else if (!graphId.equals(graph.getId())) {
-                    failures.put(graphId, "The typed command graph ID does not match its typed storage identity");
-                } else {
-                    graphs.put(graphId, graph);
+                try {
+                    TypedCommandGraphAdapter.CommandBinding binding = readCommandBinding(graphId);
+                    if (binding == null || !graphId.equals(binding.graphId())) {
+                        throw new IllegalStateException("The command header does not match its committed storage identity");
+                    }
+                    bindings.add(binding);
+                } catch (RuntimeException invalid) {
+                    failures.add(new TypedCommandGraphAdapter.Rejection(graphId, "", "COMMAND_GRAPH_UNAVAILABLE",
+                        invalid.getMessage() == null ? "The typed command header could not be loaded" : invalid.getMessage()));
                 }
             }
-            return TypedCommandGraphAdapter.index(graphs, failures);
+            return TypedCommandGraphAdapter.indexBindings(bindings, failures);
         }
+    }
+
+    private TypedCommandGraphAdapter.CommandBinding readCommandBinding(String id) {
+        if (serverId == null) {
+            FlowGraph graph = getCommandGraph(id);
+            return graph == null ? null : TypedCommandGraphAdapter.read(graph);
+        }
+        CoreGraphStorageBoundary.Decoded source = getCoreGraph("command", id).orElse(null);
+        return source == null ? null : TypedCommandGraphAdapter.read(
+            Objects.requireNonNull(source.graphDocument(), "Core command graph document is required"),
+            source.envelope().assetActivationState() == ResourceActivationState.ACTIVE);
     }
 
     public TypedCommandGraphAdapter.Snapshot getTypedCommandGraphSnapshot() {
@@ -4611,6 +4741,11 @@ public class FlowStorage {
     }
 
     public synchronized void clearCache() {
+        coreMetadata = null;
+        synchronized (coreGraphs) {
+            coreGraphs.clear();
+            coreGraphBytes = 0;
+        }
         graphCache.clear();
         guiCache.clear();
         scoreboardCache.clear();
@@ -4986,23 +5121,29 @@ public class FlowStorage {
     }
 
     private void ensureCommandLabelAvailable(FlowGraph candidate, String candidateId) {
-        Map<String, FlowGraph> graphs = new LinkedHashMap<>();
-        Map<String, String> failures = new LinkedHashMap<>();
+        ensureCommandLabelAvailable(TypedCommandGraphAdapter.read(candidate), candidateId);
+    }
+
+    private void ensureCommandLabelAvailable(TypedCommandGraphAdapter.CommandBinding candidate, String candidateId) {
+        List<TypedCommandGraphAdapter.CommandBinding> bindings = new ArrayList<>();
+        List<TypedCommandGraphAdapter.Rejection> failures = new ArrayList<>();
         for (String graphId : listGraphIds("command")) {
             if (candidateId.equals(graphId)) {
                 continue;
             }
-            FlowGraph graph = getGraph("command", graphId);
-            if (graph == null) {
-                failures.put(graphId, "The typed command graph could not be loaded or failed its integrity check");
-            } else if (!graphId.equals(graph.getId())) {
-                failures.put(graphId, "The typed command graph ID does not match its typed storage identity");
-            } else {
-                graphs.put(graphId, graph);
+            try {
+                TypedCommandGraphAdapter.CommandBinding binding = readCommandBinding(graphId);
+                if (binding == null || !graphId.equals(binding.graphId())) {
+                    throw new IllegalStateException("The command header does not match its committed storage identity");
+                }
+                bindings.add(binding);
+            } catch (RuntimeException invalid) {
+                failures.add(new TypedCommandGraphAdapter.Rejection(graphId, "", "COMMAND_GRAPH_UNAVAILABLE",
+                    invalid.getMessage() == null ? "The typed command header could not be loaded" : invalid.getMessage()));
             }
         }
-        graphs.put(candidateId, candidate);
-        TypedCommandGraphAdapter.Snapshot snapshot = TypedCommandGraphAdapter.index(graphs, failures);
+        bindings.add(candidate);
+        TypedCommandGraphAdapter.Snapshot snapshot = TypedCommandGraphAdapter.indexBindings(bindings, failures);
         boolean rejectedCandidate = snapshot.rejections().stream().anyMatch(rejection -> candidateId.equals(rejection.graphId()));
         if (rejectedCandidate) {
             throw new IllegalArgumentException(snapshot.rejections().stream()
@@ -5015,6 +5156,16 @@ public class FlowStorage {
 
     private void evictGraphCache(String id) {
         Set.of("flow", "function", "command").forEach(type -> graphCache.remove(assetIndexKey(type, id)));
+        synchronized (coreGraphs) {
+            Set.of("flow", "function", "command").forEach(type -> removeResidentCoreGraph(assetKey(type, id)));
+        }
+    }
+
+    private void removeResidentCoreGraph(AssetTransactionCoordinator.AssetKey key) {
+        ResidentCoreGraph previous = coreGraphs.remove(key);
+        if (previous != null) {
+            coreGraphBytes -= previous.bytes();
+        }
     }
 
     private Path assetResourceFile(ResourceEntrySnapshot resource) {
@@ -5076,8 +5227,16 @@ public class FlowStorage {
         return serializeProjectMetadata(metadata);
     }
 
-    private CoreProjectMetadata readCoreProjectMetadata() throws IOException {
-        String json = requireAssetTransactions().read(snapshot -> snapshot.metadata().serializedJson());
+    private synchronized CoreProjectMetadata readCoreProjectMetadata() throws IOException {
+        AssetTransactionCoordinator coordinator = requireAssetTransactions();
+        long generation = persistenceGeneration;
+        AssetTransactionCoordinator.Snapshot stamp = coordinator.read(Function.identity());
+        ResidentCoreMetadata resident = coreMetadata;
+        if (resident != null && resident.coordinator() == coordinator && resident.generation() == generation
+            && resident.project().equals(stamp.project()) && Objects.equals(resident.lineage(), stamp.projectLineage())) {
+            return resident.metadata();
+        }
+        String json = stamp.metadata().serializedJson();
         try {
             String canonicalJson = canonicalProjectMetadataJson(json);
             JsonElement parsed = JsonParser.parseString(canonicalJson);
@@ -5088,7 +5247,14 @@ public class FlowStorage {
             if (metadata == null) {
                 throw new IllegalArgumentException("Core project metadata is empty");
             }
-            return new CoreProjectMetadata(metadata, canonicalJson);
+            metadata.folders = Collections.unmodifiableList(new ArrayList<>(metadata.folders()));
+            metadata.resources = Collections.unmodifiableList(new ArrayList<>(metadata.resources()));
+            CoreProjectMetadata admitted = new CoreProjectMetadata(metadata, canonicalJson);
+            if (coordinator != requireAssetTransactions() || generation != persistenceGeneration) {
+                throw new IllegalStateException("Core Project Authority Changed During Metadata Admission");
+            }
+            coreMetadata = new ResidentCoreMetadata(coordinator, generation, stamp.project(), stamp.projectLineage(), admitted);
+            return admitted;
         } catch (RuntimeException exception) {
             throw new IOException("Malformed Core project metadata", exception);
         }
@@ -5096,7 +5262,7 @@ public class FlowStorage {
 
     private String coreMetadataWithResourcePath(CoreProjectMetadata current, String type, String id,
                                                  String folder, boolean reclassifying) {
-        ProjectMetadataSnapshot metadata = current.snapshot();
+        ProjectMetadataSnapshot metadata = current.snapshot().copy();
         if (reclassifying) {
             metadata.mutableResources().removeIf(resource -> resource != null && id.equals(resource.id)
                 && GRAPH_TYPES.contains(resource.type) && !type.equals(resource.type));
@@ -5108,7 +5274,7 @@ public class FlowStorage {
 
     private String metadataWithPresentation(CoreProjectMetadata current, String type, String id,
                                             ResourcePresentationIntent presentation) {
-        ProjectMetadataSnapshot metadata = current.snapshot();
+        ProjectMetadataSnapshot metadata = current.snapshot().copy();
         if (metadata.findExactResource(type, id) != null) {
             throw new IllegalStateException("Aggregate create project metadata identity already exists: "
                 + type + ':' + id);
@@ -5157,7 +5323,7 @@ public class FlowStorage {
     }
 
     private String coreMetadataWithoutResource(CoreProjectMetadata current, String type, String id) {
-        ProjectMetadataSnapshot metadata = current.snapshot();
+        ProjectMetadataSnapshot metadata = current.snapshot().copy();
         if (!metadata.mutableResources().removeIf(resource -> resource != null && type.equals(resource.type)
             && id.equals(resource.id))) {
             return current.json();
@@ -8402,6 +8568,38 @@ public class FlowStorage {
         private String serverId = "project";
         private List<FolderEntrySnapshot> folders = new ArrayList<>();
         private List<ResourceEntrySnapshot> resources = new ArrayList<>();
+
+        private ProjectMetadataSnapshot copy() {
+            ProjectMetadataSnapshot copy = new ProjectMetadataSnapshot();
+            copy.serverId = serverId;
+            for (FolderEntrySnapshot source : folders()) {
+                if (source == null) {
+                    copy.folders.add(null);
+                    continue;
+                }
+                FolderEntrySnapshot folder = new FolderEntrySnapshot();
+                folder.path = source.path;
+                folder.parentPath = source.parentPath;
+                folder.name = source.name;
+                folder.sortOrder = source.sortOrder;
+                folder.collapsed = source.collapsed;
+                copy.folders.add(folder);
+            }
+            for (ResourceEntrySnapshot source : resources()) {
+                if (source == null) {
+                    copy.resources.add(null);
+                    continue;
+                }
+                ResourceEntrySnapshot resource = new ResourceEntrySnapshot();
+                resource.type = source.type;
+                resource.id = source.id;
+                resource.displayName = source.displayName;
+                resource.path = source.path;
+                resource.sortOrder = source.sortOrder;
+                copy.resources.add(resource);
+            }
+            return copy;
+        }
 
         private List<FolderEntrySnapshot> folders() {
             return folders != null ? folders : List.of();

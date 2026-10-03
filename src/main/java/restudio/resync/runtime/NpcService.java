@@ -589,8 +589,11 @@ public class NpcService implements Listener {
         if (playerNpcRuntime == null) {
             return "Player NPC runtime unavailable";
         }
+        if (playerNpcRuntime.available()) {
+            return "";
+        }
         String reason = playerNpcRuntime.unavailableReason();
-        return reason == null || reason.isBlank() ? "Player NPC packet runtime failed to create the NPC" : reason;
+        return reason == null || reason.isBlank() ? "Player NPC runtime unavailable" : reason;
     }
 
     public String spawnFailureReason(String id) {
@@ -602,7 +605,8 @@ public class NpcService implements Listener {
             return "NPC definition is disabled";
         }
         if (playerEntityType(definition)) {
-            return playerNpcUnavailableReason();
+            String reason = playerNpcUnavailableReason();
+            return reason.isBlank() ? "Player NPC packet runtime failed to create the NPC" : reason;
         }
         return spawnEntityType(definition) == null ? "NPC entity type is unavailable" : "Server failed to create the NPC entity";
     }

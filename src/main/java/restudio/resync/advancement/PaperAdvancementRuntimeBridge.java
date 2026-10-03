@@ -66,10 +66,19 @@ public class PaperAdvancementRuntimeBridge implements AdvancementRuntimeBridge {
             applyAdvancements(nextJson);
             loadedKeys = new LinkedHashSet<>(nextJson.keySet());
             loadedDefinitions = nextDefinitions;
-        } catch (RuntimeException failure) {
-            applyAdvancements(previousJson);
-            loadedKeys = previousKeys;
-            loadedDefinitions = nativeDefinitionsFromKeys(previousKeys, previousJson);
+        } catch (RuntimeException | Error failure) {
+            Set<NamespacedKey> recoveryKeys = new LinkedHashSet<>(previousKeys);
+            recoveryKeys.addAll(nextJson.keySet());
+            loadedKeys = recoveryKeys;
+            try {
+                applyAdvancements(previousJson, recoveryKeys);
+                loadedKeys = new LinkedHashSet<>(previousJson.keySet());
+                loadedDefinitions = nativeDefinitionsFromKeys(loadedKeys, previousJson);
+            } catch (RuntimeException | Error recoveryFailure) {
+                if (failure != recoveryFailure) {
+                    failure.addSuppressed(recoveryFailure);
+                }
+            }
             throw failure;
         }
     }
@@ -95,8 +104,12 @@ public class PaperAdvancementRuntimeBridge implements AdvancementRuntimeBridge {
     }
 
     private void applyAdvancements(Map<NamespacedKey, String> definitions) {
-        if (!loadedKeys.isEmpty()) {
-            for (NamespacedKey key : loadedKeys) {
+        applyAdvancements(definitions, loadedKeys);
+    }
+
+    private void applyAdvancements(Map<NamespacedKey, String> definitions, Set<NamespacedKey> removalKeys) {
+        if (!removalKeys.isEmpty()) {
+            for (NamespacedKey key : removalKeys) {
                 PaperUnsafe.removeAdvancement(key);
             }
             Bukkit.reloadData();

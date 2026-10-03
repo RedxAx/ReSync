@@ -18,6 +18,9 @@ permissions:
   resync.command:
     description: Allows use of /resync command
     default: op
+  resync.qa:
+    description: Allows inspecting resources, running flows, and dispatching event fixtures
+    default: op
   resync.authority.export:
     description: Allows exporting the production authority bundle
     default: false
@@ -33,4 +36,4 @@ permissions:
 commands:
   resync:
     description: Manage ReSync systems
-    usage: /resync <status|network|authority|scoreboard|tab|world|portal|flow|item|resource|npc|trade|metadata> ...
+    usage: /resync <status|qa|network|authority|scoreboard|tab|world|portal|flow|item|resource|npc|trade|metadata> ...

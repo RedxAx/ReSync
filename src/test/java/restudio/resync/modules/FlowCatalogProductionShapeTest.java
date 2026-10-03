@@ -281,7 +281,7 @@ class FlowCatalogProductionShapeTest {
 
         assertTrue(result.accepted(), result.diagnostics().toString());
         CatalogNodeDescriptor node = contributions.getFirst().definitions().getFirst();
-        assertEquals("Runs the Asdg custom Function with its declared inputs and outputs.", node.description());
+        assertEquals("Calls Asdg and continues when it finishes. Takes no inputs. Returns no values.", node.description());
         assertEquals("Starts this custom Function call.", node.pins().getFirst().description());
         assertEquals("Continues after this custom Function returns.", node.pins().get(1).description());
     }

@@ -8,6 +8,7 @@ import restudio.flow.data.FlowTypeRef;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.catalog.CatalogBindingProof;
+import restudio.resync.flow.catalog.CatalogFunctionShape;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.flow.handler.generic.CustomFunctionCallHandler;
@@ -85,7 +86,8 @@ class FlowModuleQualifiedTypeRuntimeDescriptorTest {
         NodeDefinition definition = CustomFunctionNodeDefinitions.buildDefinition(function);
         RuntimeOperationDescriptor requirement = FlowModule.runtimeOperationDescriptor(definition, handlers);
 
-        assertEquals("custom_function_call", requirement.operation().id().value());
+        assertEquals(CatalogFunctionShape.operation(requirement.pins()), requirement.operation().id());
+        assertEquals(CustomFunctionCallHandler.OPERATION, definition.getHandlerConfig().get("operation"));
         assertEquals(List.of("flow", "message", "target"), definition.getInputs().stream()
             .map(NodeDefinition.PinDefinition::getRuntimeName).sorted().toList());
         assertEquals(TypeReference.of("builtin", "string"), namedInput(definition, requirement, "message").reference());

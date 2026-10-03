@@ -5,11 +5,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
-import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
-import org.java_websocket.server.WebSocketServer;
 import restudio.resync.commands.ReSyncCommand;
 import restudio.resync.bridge.ReSyncPluginMessageBridge;
 import restudio.resync.network.paper.NetworkPathSynchronizer;
+import restudio.resync.network.paper.NetworkSettings;
 import restudio.resync.network.paper.NetworkPersistenceDrainController;
 import restudio.resync.network.paper.NetworkResourceSynchronizer;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
@@ -24,12 +23,12 @@ import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
 import restudio.resync.server.ReSyncConfig;
+import restudio.resync.server.ReSyncWebSocketListener;
 import restudio.resync.server.ReSyncTlsIdentity;
 import restudio.resync.contract.diagnostic.DiagnosticCodeCatalogFiles;
 import restudio.resync.upgrade.AssetCoordinatorMigration;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -41,13 +40,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ReSync extends JavaPlugin {
     private static final ReSyncDataFixer DATA_FIXER = new ReSyncDataFixer(1, List.of());
     private static ReSync instance;
-    private WebSocketServer wsServer;
+    private ReSyncWebSocketListener wsServer;
     private ReSyncTlsIdentity.Prepared tlsIdentity;
     private volatile boolean webSocketApiReady;
     private ReSyncServer server;
@@ -107,6 +108,7 @@ public class ReSync extends JavaPlugin {
                 throw new IOException("ReSync Data Root Has No Parent");
             }
             Path coordinationRoot = pluginRoot.resolve(".resync-coordination");
+            NetworkSettings.prepareBootstrap(originalDataRoot, coordinationRoot);
             LegacyInstallBoundary.Result legacy = LegacyInstallBoundary.prepare(originalDataRoot, coordinationRoot);
             if (legacy.archived()) {
                 Log.warn("Pre-rewrite ReSync data was archived at " + legacy.dataBackup() + ". ReSync will start with clean data.");
@@ -178,7 +180,7 @@ public class ReSync extends JavaPlugin {
             pluginMessageBridge.register();
             interactiveSelectionManager = new InteractiveSelectionManager(this);
             interactiveSelectionManager.start();
-            wsServer = new WebSocketServer(new InetSocketAddress(config.getBindHost(), config.getPort())) {
+            wsServer = new ReSyncWebSocketListener(config, tlsIdentity == null ? null : tlsIdentity.sslContext()) {
                 @Override
                 public void onOpen(WebSocket conn, ClientHandshake handshake) {
                     if (!webSocketApiReady) {
@@ -251,10 +253,6 @@ public class ReSync extends JavaPlugin {
                     }
                 }
             };
-
-            if (tlsIdentity != null) {
-                wsServer.setWebSocketFactory(new DefaultSSLWebSocketServerFactory(tlsIdentity.sslContext()));
-            }
 
             try {
                 wsServer.start();
@@ -374,7 +372,15 @@ public class ReSync extends JavaPlugin {
             reloadAttempt.completeExceptionally(new IllegalStateException("ReSync Is Shutting Down"));
         }
         cleanupPluginOwnedResources();
-        continueShutdown(reloadReady);
+        try {
+            continueShutdown(reloadReady).toCompletableFuture().get(
+                NetworkPersistenceDrainController.DEFAULT_DRAIN_TIMEOUT.toMillis() * 3, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            Log.error("ReSync Shutdown Was Interrupted Before Persistence Closed", exception);
+        } catch (ExecutionException | TimeoutException exception) {
+            Log.error("ReSync Shutdown Did Not Finish Before Plugin Unload", exception);
+        }
         if (!reloadReady) {
             Log.warn("ReSync network state reload retained physical work during disable; finalization will retry without Bukkit scheduling");
         }
@@ -428,7 +434,7 @@ public class ReSync extends JavaPlugin {
                 }
             }
         }
-        WebSocketServer currentWebSocketServer = wsServer;
+        ReSyncWebSocketListener currentWebSocketServer = wsServer;
         if (!webSocketServerCleaned.get()) {
             if (currentWebSocketServer == null) {
                 webSocketServerCleaned.set(true);
@@ -451,7 +457,7 @@ public class ReSync extends JavaPlugin {
         pluginOwnedResourcesCleaned.set(allCleaned && complete);
     }
 
-    private void continueShutdown(boolean reloadReady) {
+    private CompletionStage<Void> continueShutdown(boolean reloadReady) {
         ReSyncServer current = server;
         if (current == null) {
             cleanupPluginOwnedResources();
@@ -465,7 +471,7 @@ public class ReSync extends JavaPlugin {
                     }
                 }
             }
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         CompletionStage<Void> continuation;
         try {
@@ -473,7 +479,7 @@ public class ReSync extends JavaPlugin {
         } catch (RuntimeException exception) {
             continuation = CompletableFuture.failedFuture(exception);
         }
-        continuation.whenComplete((unused, failure) -> {
+        return continuation.whenComplete((unused, failure) -> {
             if (failure == null) {
                 cleanupPluginOwnedResources();
                 if (pluginOwnedResourcesCleaned.get()) {

@@ -101,6 +101,7 @@ public class ReSyncNetworkAgent {
     private final NetworkPersistenceDrainController.Registration transferRecoveryRegistration;
     private final NetworkPersistenceDrainController.Registration producerRegistration;
     private final AtomicBoolean stopping = new AtomicBoolean();
+    private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean shutdownDrainInProgress = new AtomicBoolean();
     private final AtomicBoolean shutdownFinalized = new AtomicBoolean();
     private final AtomicBoolean persistenceQuiesced = new AtomicBoolean();
@@ -283,12 +284,21 @@ public class ReSyncNetworkAgent {
 
     public void start() {
         requirePrimaryThread();
-        if (!config.enabled() || persistenceQuiesced.get()) {
+        if (!config.enabled() || stopping.get() || persistenceQuiesced.get() || !started.compareAndSet(false, true)) {
             return;
         }
-        stateReconciler.start();
-        heartbeatTask = Bukkit.getScheduler().runTaskTimer(plugin, this::sendPresence, config.heartbeatIntervalTicks(), config.heartbeatIntervalTicks());
-        connect();
+        try {
+            stateReconciler.start();
+            heartbeatTask = Bukkit.getScheduler().runTaskTimer(plugin, this::sendPresence, config.heartbeatIntervalTicks(), config.heartbeatIntervalTicks());
+            connect();
+        } catch (RuntimeException exception) {
+            started.set(false);
+            if (heartbeatTask != null) {
+                heartbeatTask.cancel();
+                heartbeatTask = null;
+            }
+            throw exception;
+        }
     }
 
     public CompletionStage<ShutdownResult> shutdown() {
@@ -932,7 +942,7 @@ public class ReSyncNetworkAgent {
     }
 
     private void connect() {
-        if (stopping.get() || persistenceQuiesced.get()) {
+        if (!started.get() || stopping.get() || persistenceQuiesced.get()) {
             return;
         }
         reconnectScheduled.set(false);
@@ -1734,7 +1744,7 @@ public class ReSyncNetworkAgent {
         refreshPlayerDataAdmission();
         playerDataAdmission.resume();
         persistenceQuiesced.set(false);
-        if (config.enabled()) {
+        if (started.get() && config.enabled()) {
             if (!connected()) {
                 connect();
             }

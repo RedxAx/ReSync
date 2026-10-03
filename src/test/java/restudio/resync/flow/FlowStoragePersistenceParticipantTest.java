@@ -293,7 +293,7 @@ class FlowStoragePersistenceParticipantTest {
     }
 
     @Test
-    void guiScoreboardAndTabCacheHitsRejectCoordinatorFileChanges() throws Exception {
+    void warmResourcesReuseCommittedValuesAndColdReadsRejectChangedBytes() throws Exception {
         AssetTransactionCoordinator coordinator = coordinator(tempDir.resolve("assets"));
         FlowStorage storage = new FlowStorage(tempDir.toFile(), coordinator);
         storage.saveGui(new GuiDefinition("cache-gui", "Original", 3));
@@ -307,6 +307,13 @@ class FlowStoragePersistenceParticipantTest {
         tamperResource(coordinator, "gui", "cache-gui", "title", "Changed");
         tamperResource(coordinator, "scoreboard", "cache-scoreboard", "title", "Changed");
         tamperResource(coordinator, "tab", "cache-tab", "header", "Changed");
+
+        assertEquals("Original", storage.getGui("cache-gui").getTitle());
+        assertEquals("Original", storage.getScoreboard("cache-scoreboard").getTitle());
+        assertEquals("Original", storage.getTab("cache-tab").getHeader());
+        assertThrows(IOException.class, coordinator::healthCheck);
+
+        storage.clearCache();
 
         assertThrows(IllegalStateException.class, () -> storage.getGui("cache-gui"));
         assertThrows(IllegalStateException.class, () -> storage.getScoreboard("cache-scoreboard"));

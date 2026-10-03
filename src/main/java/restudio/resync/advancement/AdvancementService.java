@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -48,6 +49,16 @@ public class AdvancementService {
     public boolean complete(Player player, String treeId, String nodeId) {
         AdvancementProgress progress = progress(player, treeId, nodeId);
         return progress != null && progress.isDone();
+    }
+
+    public Map<String, Object> inspect(Player player, String treeId, String nodeId) {
+        AdvancementProgress progress = progress(player, treeId, nodeId);
+        if (progress == null) {
+            return Map.of("registered", false, "complete", false, "awarded", List.of(), "remaining", List.of());
+        }
+        return Map.of("registered", true, "complete", progress.isDone(),
+            "awarded", progress.getAwardedCriteria().stream().sorted().toList(),
+            "remaining", progress.getRemainingCriteria().stream().sorted().toList());
     }
 
     public Map<UUID, Map<NamespacedKey, Set<String>>> snapshot(Collection<? extends Player> players) {

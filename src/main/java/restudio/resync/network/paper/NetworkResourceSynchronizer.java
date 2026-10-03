@@ -59,6 +59,7 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     private final Object lifecycleMonitor = new Object();
     private final AtomicBoolean synchronizing = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean persistenceQuiesced = new AtomicBoolean();
     private final AtomicLong localGeneration = new AtomicLong();
     private final AtomicInteger synchronizationFailures = new AtomicInteger();
@@ -121,7 +122,7 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
 
     public void start() {
         requirePrimaryThread();
-        if (!policy.enabled()) {
+        if (!policy.enabled() || closed.get() || !started.compareAndSet(false, true)) {
             return;
         }
         try {
@@ -755,6 +756,9 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
             return;
         }
         persistenceQuiesced.set(false);
+        if (!started.get()) {
+            return;
+        }
         if (registry != null) {
             registry.setMutationListener(this);
         }

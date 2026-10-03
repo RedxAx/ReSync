@@ -67,6 +67,7 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     private final AtomicBoolean synchronizing = new AtomicBoolean();
     private final AtomicBoolean scanning = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean persistenceQuiesced = new AtomicBoolean();
     private volatile boolean ready;
     private volatile String startupFailure;
@@ -114,6 +115,8 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
         protectedPaths.add(normalizedDataDirectory.resolve("config.properties"));
         protectedPaths.add(normalizedOperatorDataDirectory.resolve("network"));
         protectedPaths.add(normalizedOperatorDataDirectory.resolve("resync.properties"));
+        protectedPaths.add(normalizedOperatorDataDirectory.resolveSibling(NetworkSettings.FILE_NAME));
+        protectedPaths.add(normalizedOperatorDataDirectory.resolveSibling(NetworkSettings.LEGACY_FILE_NAME));
         protectedPaths.add(normalizedOperatorDataDirectory.resolve("nodes"));
         if (config != null && config.credentialFile() != null) {
             protectedPaths.add(config.credentialFile().toAbsolutePath().normalize());
@@ -166,7 +169,7 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
 
     public void start() {
         requirePrimaryThread();
-        if (!policy.enabled()) {
+        if (!policy.enabled() || closed.get() || !started.compareAndSet(false, true)) {
             return;
         }
         try {
@@ -806,6 +809,9 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
             return;
         }
         persistenceQuiesced.set(false);
+        if (!started.get()) {
+            return;
+        }
         if (agent == null) {
             return;
         }

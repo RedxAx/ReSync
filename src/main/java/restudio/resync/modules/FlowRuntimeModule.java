@@ -39,6 +39,7 @@ import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.CustomEventManager;
 import restudio.resync.flow.CompiledCoreFlowExecutionBridge;
 import restudio.resync.flow.CompiledFunctionExecutionBridge;
+import restudio.resync.flow.CompiledGraphFunctionProvider;
 import restudio.resync.flow.CompiledGraphMetadata;
 import restudio.resync.flow.CompiledGraphMetadataProvider;
 import restudio.resync.flow.CompiledTriggerExecution;
@@ -162,6 +163,7 @@ import restudio.resync.migration.ReplacementActivationRecord;
 import restudio.resync.migration.ReSyncPersistenceCoordinator;
 import restudio.resync.flow.runtime.RuntimeBindingRegistry;
 import restudio.resync.flow.runtime.RuntimeAuthority;
+import restudio.resync.qa.QaExecutionAdapter;
 import restudio.resync.flow.runtime.RuntimePrincipal;
 import restudio.resync.flow.runtime.RuntimePrincipalAuthority;
 import restudio.resync.flow.runtime.ReplacementRuntimeProviderAuthority;
@@ -204,6 +206,7 @@ import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.structure.StructureLibrary;
 import restudio.resync.resources.ReSyncManagedResource;
+import restudio.resync.world.WorldExternalPersistenceCapability;
 import restudio.resync.world.WorldManagementService;
 import restudio.resync.world.WorldManagementListener;
 import restudio.resync.worldgen.WorldGenProjectStorage;
@@ -236,6 +239,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -253,6 +257,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -281,6 +286,9 @@ public class FlowRuntimeModule implements Module {
     private FlowDebugService debugService;
     private BukkitTask tickTask;
     private ModuleContext moduleContext;
+    private final Object primaryRefreshFence = new Object();
+    private final Set<PrimaryRefresh> primaryRefreshes = new LinkedHashSet<>();
+    private boolean primaryRefreshAdmissionClosed;
     private ReSyncJsonResourceStorage jsonResourceStorage;
     private OptionCatalogRegistry optionCatalogRegistry;
     private RuntimeDataRegistry runtimeDataRegistry;
@@ -537,9 +545,10 @@ public class FlowRuntimeModule implements Module {
         debugService = new FlowDebugService(traceService);
         executor = new FlowExecutor(handlerRegistry, nodeDefinitionRegistry, typeAdapterRegistry, new HashMap<>(), legacyRuntimeGate);
         startupAdmissionFence = executor.fenceAdmissions();
-        compiledFunctionBridge = new CompiledFunctionExecutionBridge(
-            typedFunctionSourceProvider, typedFunctionCapabilityProvider);
-        executor.configureCompiledFunctionBridge(compiledFunctionBridge);
+        if (typedFunctionSourceProvider != null || typedFunctionCapabilityProvider != null) {
+            compiledFunctionBridge = new CompiledFunctionExecutionBridge(typedFunctionSourceProvider, typedFunctionCapabilityProvider);
+            executor.configureCompiledFunctionBridge(compiledFunctionBridge);
+        }
         if (runtimePrincipalAuthority != null) {
             executor.configureCompiledFunctionRuntime(runtimeAuthority, runtimePrincipalAuthority,
                 runtimeBindingRegistry.receiptStore(), serverId, runtimePrincipal, runtimeBindingRegistry.auditBoundary());
@@ -570,7 +579,7 @@ public class FlowRuntimeModule implements Module {
                 return context.getPlugin();
             }
         };
-        globalTriggers = new GlobalTriggers(storage, executor, triggerRegistry, context.getRequiredService(ReTextService.class), false);
+        globalTriggers = new GlobalTriggers(storage, executor, triggerRegistry, context.getRequiredService(ReTextService.class), false, this::runLiveRefresh);
         networkFlowBridge = new NetworkFlowBridge(context.getPlugin());
         flowEventRegistry = new FlowEventRegistry(globalTriggers.getTriggerDispatcher(), typeAdapterRegistry);
         flowEventRegistry.registerFromJson(new ArrayList<>(startupDefinitions.values()));
@@ -635,6 +644,11 @@ public class FlowRuntimeModule implements Module {
             compiledPlanRepository);
         compiledPlanRepository.bindTemplateCompiler(compiledBridge::prepare);
         compiledPlanRepository.bindMetadataCompiler(compiledMetadataProvider::provide);
+        if (typedFunctionSourceProvider == null && typedFunctionCapabilityProvider == null) {
+            compiledFunctionBridge = new CompiledFunctionExecutionBridge(new CompiledGraphFunctionProvider(
+                compiledPlanRepository, compiledBridge));
+            executor.configureCompiledFunctionBridge(compiledFunctionBridge);
+        }
         executor.setCompiledExecutionAuthority((graph, metadata) -> metadata.resource().id().equals(graph.getId())
             && metadata.resource().resourceType().value().equals(graph.getResourceType())
             && compiledPlanRepository.isExecutionAuthorized(metadata, graph.getResourceRevision(), graph.getResourceHash()));
@@ -1208,6 +1222,15 @@ public class FlowRuntimeModule implements Module {
                 metadata.catalogBinding().catalogChecksum(),
                 metadata.catalogBinding().bindingManifestHash()),
             bridge);
+    }
+
+    public QaExecutionAdapter createQaExecutionAdapter() {
+        if (moduleContext == null || stopped || stopPending || fatalActivationFault != null) {
+            throw new IllegalStateException("Flow runtime QA is unavailable");
+        }
+        return new QaExecutionAdapter(moduleContext.getPlugin(), serverId, storage, executor, compiledTriggerExecution,
+            compiledBridge, compiledFunctionBridge, moduleContext.getRequiredService(RuntimeAuthority.class),
+            runtimePrincipalAuthority, globalTriggers.getTriggerDispatcher());
     }
 
     public void reloadNodeDefinitions() {
@@ -2435,7 +2458,7 @@ public class FlowRuntimeModule implements Module {
     }
 
     private void registerNodeHandlers(HandlerRegistry handlerRegistry) {
-        new AbilityEffectHandler(automationTasks).registerTo(handlerRegistry);
+        new AbilityEffectHandler(automationTasks, () -> moduleContext.getRequiredService(WorldExternalPersistenceCapability.class)).registerTo(handlerRegistry);
         new GenericMathHandler().registerTo(handlerRegistry);
         new GenericStringHandler().registerTo(handlerRegistry);
         new GenericListHandler().registerTo(handlerRegistry);
@@ -2536,6 +2559,7 @@ public class FlowRuntimeModule implements Module {
         if (Bukkit.getServer() != null && !Bukkit.isPrimaryThread()) {
             throw new IllegalStateException("Flow runtime shutdown requires the Bukkit primary thread");
         }
+        closeLiveRefreshAdmission();
         stopPending = true;
         FlowExecutor runtimeExecutor = executor;
         FlowExecutor.AdmissionFence admissionFence = runtimeExecutor != null ? runtimeExecutor.fenceAdmissions() : null;
@@ -2845,11 +2869,20 @@ public class FlowRuntimeModule implements Module {
             refresh.run();
             return;
         }
+        PrimaryRefresh pending = new PrimaryRefresh(refresh);
+        synchronized (primaryRefreshFence) {
+            if (primaryRefreshAdmissionClosed) {
+                throw new IllegalStateException("Live resource refresh admission is closed");
+            }
+            primaryRefreshes.add(pending);
+        }
         try {
-            Bukkit.getScheduler().callSyncMethod(moduleContext.getPlugin(), () -> {
-                refresh.run();
-                return null;
-            }).get(10, TimeUnit.SECONDS);
+            pending.scheduled(Bukkit.getScheduler().runTask(moduleContext.getPlugin(), pending::run));
+        } catch (RuntimeException | Error failure) {
+            pending.cancel(failure);
+        }
+        try {
+            pending.await(10, TimeUnit.SECONDS);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Live resource refresh was interrupted", exception);
@@ -2860,6 +2893,116 @@ public class FlowRuntimeModule implements Module {
             throw new IllegalStateException("Live resource refresh failed", exception.getCause());
         } catch (TimeoutException exception) {
             throw new IllegalStateException("Live resource refresh timed out", exception);
+        }
+    }
+
+    public void closeLiveRefreshAdmission() {
+        if (Bukkit.getServer() != null && !Bukkit.isPrimaryThread()) {
+            throw new IllegalStateException("Live resource refresh shutdown requires the Bukkit primary thread");
+        }
+        if (globalTriggers != null) globalTriggers.shutdownRuntimeCommands();
+        List<PrimaryRefresh> pending;
+        synchronized (primaryRefreshFence) {
+            primaryRefreshAdmissionClosed = true;
+            pending = List.copyOf(primaryRefreshes);
+        }
+        pending.forEach(PrimaryRefresh::run);
+    }
+
+    private final class PrimaryRefresh {
+        private final Runnable refresh;
+        private final CompletableFuture<Void> completion = new CompletableFuture<>();
+        private BukkitTask task;
+        private boolean started;
+        private boolean finished;
+
+        private PrimaryRefresh(Runnable refresh) {
+            this.refresh = Objects.requireNonNull(refresh, "Live resource refresh is required");
+        }
+
+        private void scheduled(BukkitTask task) {
+            boolean cancel;
+            synchronized (primaryRefreshFence) {
+                this.task = task;
+                cancel = finished;
+            }
+            if (cancel) cancelTask(task);
+        }
+
+        private void run() {
+            synchronized (primaryRefreshFence) {
+                if (started || finished) return;
+                started = true;
+            }
+            Throwable failure = null;
+            try {
+                refresh.run();
+            } catch (Throwable error) {
+                failure = error;
+            } finally {
+                BukkitTask queued;
+                synchronized (primaryRefreshFence) {
+                    finished = true;
+                    primaryRefreshes.remove(this);
+                    queued = task;
+                }
+                cancelTask(queued);
+                if (failure == null) completion.complete(null);
+                else completion.completeExceptionally(failure);
+            }
+        }
+
+        private boolean cancel(Throwable failure) {
+            BukkitTask queued;
+            synchronized (primaryRefreshFence) {
+                if (started || finished) return false;
+                finished = true;
+                primaryRefreshes.remove(this);
+                queued = task;
+            }
+            cancelTask(queued);
+            completion.completeExceptionally(failure);
+            return true;
+        }
+
+        private void await(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+            try {
+                completion.get(timeout, unit);
+            } catch (TimeoutException failure) {
+                if (cancel(failure)) throw failure;
+                awaitPhysical();
+            } catch (InterruptedException failure) {
+                try {
+                    if (!cancel(failure)) awaitPhysical();
+                } finally {
+                    Thread.currentThread().interrupt();
+                }
+                throw failure;
+            }
+        }
+
+        private void awaitPhysical() throws ExecutionException {
+            boolean interrupted = false;
+            try {
+                for (;;) {
+                    try {
+                        completion.get();
+                        return;
+                    } catch (InterruptedException failure) {
+                        interrupted = true;
+                    }
+                }
+            } finally {
+                if (interrupted) Thread.currentThread().interrupt();
+            }
+        }
+
+        private void cancelTask(BukkitTask task) {
+            if (task == null) return;
+            try {
+                task.cancel();
+            } catch (RuntimeException ignored) {
+            }
         }
     }
 
@@ -3251,8 +3394,7 @@ public class FlowRuntimeModule implements Module {
                                               WorldGenProjectStorage worldGenStorage, WorldManagementService worldManagementService) {
         registerResourceCatalog(registry, ReSyncResourceCatalog.FLOW, OptionCatalogProvider.CaptureAffinity.IO,
             () -> flowStorage.listGraphIds(ReSyncResourceCatalog.FLOW));
-        registerResourceCatalog(registry, ReSyncResourceCatalog.FUNCTION, OptionCatalogProvider.CaptureAffinity.IO,
-            () -> flowStorage.listGraphIds(ReSyncResourceCatalog.FUNCTION));
+        registerFunctionCatalog(registry, flowStorage);
         registerResourceCatalog(registry, ReSyncResourceCatalog.COMMAND, OptionCatalogProvider.CaptureAffinity.IO,
             () -> flowStorage.listGraphIds(ReSyncResourceCatalog.COMMAND));
         registerResourceCatalog(registry, ReSyncResourceCatalog.GUI, OptionCatalogProvider.CaptureAffinity.IO, flowStorage::listGuiIds);
@@ -3321,6 +3463,82 @@ public class FlowRuntimeModule implements Module {
                 return resourceCatalogItems(type, values());
             }
         });
+    }
+
+    private void registerFunctionCatalog(OptionCatalogRegistry registry, FlowStorage flowStorage) {
+        if (flowStorage.hasCoreGraphAuthority()) {
+            registry.register(new FunctionCatalogProvider(flowStorage));
+        } else {
+            registerResourceCatalog(registry, ReSyncResourceCatalog.FUNCTION, OptionCatalogProvider.CaptureAffinity.IO,
+                () -> flowStorage.listGraphIds(ReSyncResourceCatalog.FUNCTION));
+        }
+    }
+
+    private final class FunctionCatalogProvider implements OptionCatalogRegistry.PreparedCaptureProvider {
+        private final FlowStorage storage;
+        private final AtomicReference<PreparedFunctionCatalog> prepared = new AtomicReference<>();
+
+        private FunctionCatalogProvider(FlowStorage storage) {
+            this.storage = Objects.requireNonNull(storage, "Function catalog storage is required");
+        }
+
+        @Override
+        public String sourceId() {
+            return "server:resync:function";
+        }
+
+        @Override
+        public CaptureAffinity captureAffinity() {
+            return CaptureAffinity.IO;
+        }
+
+        @Override
+        public OptionCatalogCapture capture(OptionCatalogQuery query) {
+            return preparedCapture(query);
+        }
+
+        @Override
+        public OptionCatalogCapture preparedCapture(OptionCatalogQuery query) {
+            for (int attempt = 0; attempt < 2; attempt++) {
+                if (stopped || stopPending) {
+                    throw new IllegalStateException("Function option catalog admission is closed");
+                }
+                PreparedFunctionCatalog current = prepared.get();
+                if (current != null && storage.isRuntimeObservationCurrent(current.source().observation())
+                    && !stopped && !stopPending) {
+                    return current.capture();
+                }
+                FlowStorage.CommittedGraphIds source = storage.readCommittedGraphIds(ReSyncResourceCatalog.FUNCTION);
+                OptionCatalogCapture capture = new OptionCatalogCapture(resourceCatalogRevision(ReSyncResourceCatalog.FUNCTION, source.ids()),
+                    resourceCatalogItems(ReSyncResourceCatalog.FUNCTION, source.ids()), "available", "");
+                PreparedFunctionCatalog candidate = new PreparedFunctionCatalog(source, capture);
+                if (!stopped && !stopPending && storage.isRuntimeObservationCurrent(source.observation())
+                    && prepared.compareAndSet(current, candidate)) {
+                    if (storage.isRuntimeObservationCurrent(source.observation()) && !stopped && !stopPending) {
+                        return capture;
+                    }
+                }
+            }
+            throw new IllegalStateException("Function option catalog authority changed during capture");
+        }
+
+        @Override
+        public String revision() {
+            return preparedCapture(new OptionCatalogQuery(sourceId(), Map.of())).revision();
+        }
+
+        @Override
+        public List<String> values() {
+            return preparedCapture(new OptionCatalogQuery(sourceId(), Map.of())).values();
+        }
+
+        @Override
+        public List<OptionCatalogItem> items() {
+            return preparedCapture(new OptionCatalogQuery(sourceId(), Map.of())).items();
+        }
+    }
+
+    private record PreparedFunctionCatalog(FlowStorage.CommittedGraphIds source, OptionCatalogCapture capture) {
     }
 
     private List<OptionCatalogItem> resourceCatalogItems(String type, List<String> ids) {

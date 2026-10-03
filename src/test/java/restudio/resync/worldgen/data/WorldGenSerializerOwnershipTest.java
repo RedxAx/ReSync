@@ -72,20 +72,23 @@ class WorldGenSerializerOwnershipTest {
     void fullObjectOwnershipIsScopedToTheMatchingPath() {
         JsonObject existing = JsonParser.parseString("""
             {
-              "graphA": {"future": "keep"},
-              "graphB": {"known": {"old": true}}
+              "graphA": {"version": 1, "future": "keep"},
+              "graphB": {"future": "keep", "known": {"old": true}}
             }
             """).getAsJsonObject();
         JsonObject serialized = JsonParser.parseString("""
             {
-              "graphA": {},
+              "graphA": {"version": 2},
               "graphB": {"known": {"new": true}}
             }
             """).getAsJsonObject();
 
-        JsonObject merged = JsonAssetStore.mergePayload(existing, serialized, Set.of("graphA", "graphB", "graphB.known"));
+        JsonObject merged = JsonAssetStore.mergePayload(existing, serialized,
+            Set.of("graphA", "graphA.version", "graphB", "graphB.known"));
 
+        assertEquals(2, merged.getAsJsonObject("graphA").get("version").getAsInt());
         assertTrue(merged.getAsJsonObject("graphA").has("future"));
+        assertEquals("keep", merged.getAsJsonObject("graphB").get("future").getAsString());
         assertTrue(merged.getAsJsonObject("graphB").getAsJsonObject("known").get("new").getAsBoolean());
         assertFalse(merged.getAsJsonObject("graphB").getAsJsonObject("known").has("old"));
     }

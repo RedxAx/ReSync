@@ -3,7 +3,6 @@ package restudio.resync;
 import org.bukkit.Bukkit;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
-import org.java_websocket.server.WebSocketServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
@@ -17,19 +16,23 @@ import restudio.resync.network.paper.state.NetworkPlayerStateCoordinator;
 import restudio.resync.network.paper.state.NetworkPlayerStateProfile;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.migration.MigrationFence;
+import restudio.resync.server.ReSyncConfig;
+import restudio.resync.server.ReSyncWebSocketListener;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -80,15 +83,15 @@ class ReSyncDisableLifecycleTest {
         setField(plugin, "interactiveSelectionManager", selection);
         CountingExpansion expansion = new CountingExpansion();
         setField(plugin, "placeholderExpansion", expansion);
-        CountingWebSocketServer webSocket = new CountingWebSocketServer();
+        CountingWebSocketListener webSocket = new CountingWebSocketListener();
         setField(plugin, "wsServer", webSocket);
-        ((java.util.concurrent.atomic.AtomicBoolean) getField(plugin, "networkStateReloadInProgress")).set(true);
+        ((AtomicBoolean) getField(plugin, "networkStateReloadInProgress")).set(true);
         setField(plugin, "networkStateReloadAttempt", reloadResult);
 
-        Class<?> workType = java.util.Arrays.stream(ReSync.class.getDeclaredClasses())
+        Class<?> workType = Arrays.stream(ReSync.class.getDeclaredClasses())
             .filter(type -> type.getSimpleName().equals("NetworkStateReloadWork"))
             .findFirst().orElseThrow();
-        Constructor<?> constructor = java.util.Arrays.stream(workType.getDeclaredConstructors())
+        Constructor<?> constructor = Arrays.stream(workType.getDeclaredConstructors())
             .filter(value -> value.getParameterCount() == 7)
             .findFirst().orElseThrow();
         constructor.setAccessible(true);
@@ -134,7 +137,7 @@ class ReSyncDisableLifecycleTest {
         CountingSelection selection = new CountingSelection(plugin, true);
         selection.start();
         CountingExpansion expansion = new CountingExpansion();
-        CountingWebSocketServer webSocket = new CountingWebSocketServer();
+        CountingWebSocketListener webSocket = new CountingWebSocketListener();
         setField(plugin, "pluginMessageBridge", bridge);
         setField(plugin, "interactiveSelectionManager", selection);
         setField(plugin, "placeholderExpansion", expansion);
@@ -239,11 +242,18 @@ class ReSyncDisableLifecycleTest {
         }
     }
 
-    private static final class CountingWebSocketServer extends WebSocketServer {
+    private static final class CountingWebSocketListener extends ReSyncWebSocketListener {
         private final AtomicInteger stopCount = new AtomicInteger();
 
-        private CountingWebSocketServer() {
-            super(new InetSocketAddress("127.0.0.1", 0));
+        private CountingWebSocketListener() {
+            super(configuration(), null);
+        }
+
+        private static ReSyncConfig configuration() {
+            ReSyncConfig config = new ReSyncConfig();
+            config.setBindHost("127.0.0.1");
+            config.setPort(0);
+            return config;
         }
 
         @Override
@@ -261,6 +271,10 @@ class ReSyncDisableLifecycleTest {
 
         @Override
         public void onMessage(WebSocket conn, String message) {
+        }
+
+        @Override
+        public void onMessage(WebSocket conn, ByteBuffer message) {
         }
 
         @Override

@@ -97,7 +97,7 @@ public class ReSyncCommand implements TabExecutor {
             }
             return List.of();
         });
-        register("network", "Network Control", this::handleNetwork, args -> args.length == 2 ? filter(List.of("reload"), args[1]) : List.of());
+        register("network", "Network Control", this::handleNetwork, args -> args.length == 2 ? filter(List.of("status", "reconnect", "reload"), args[1]) : List.of());
         register("scoreboard", "Scoreboards", this::handleScoreboard, this::tabCompleteScoreboard);
         register("tab", "Player Lists", this::handleTab, this::tabCompleteTab);
         register("world", "Worlds And Groups", this::handleWorld, this::tabCompleteWorld);
@@ -164,14 +164,29 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private boolean handleNetwork(CommandSender sender, String[] args) {
+        if (args.length == 2 && ("status".equalsIgnoreCase(args[1]) || "reconnect".equalsIgnoreCase(args[1]))) {
+            var agent = plugin.getNetworkAgent();
+            if (agent == null) {
+                sendError(sender, "Network Agent Is Unavailable");
+                return true;
+            }
+            if ("reconnect".equalsIgnoreCase(args[1])) agent.reconnect();
+            var status = agent.status();
+            sendSuccess(sender, "Network " + (!status.enabled() ? "Disabled" : status.connected() ? "Connected" : "Disconnected"));
+            if (status.enabled()) {
+                sender.sendMessage("Node: " + status.nodeId() + " | Hub: " + status.hubUrl());
+                sender.sendMessage("Retries: " + status.retries() + (status.failure().isBlank() ? "" : " | Last Failure: " + status.failure()));
+            }
+            return true;
+        }
         if (args.length != 2 || !"reload".equalsIgnoreCase(args[1])) {
-            sendError(sender, "Usage", "/resync network reload");
+            sendError(sender, "Usage", "/resync network <status|reconnect|reload>");
             return true;
         }
         try {
             plugin.reloadNetworkState().whenComplete((unused, failure) -> {
                 if (failure == null) {
-                    sendSuccess(sender, "Network Sync Reloaded");
+                    sendSuccess(sender, "Player Sync Settings Reloaded. Restart To Apply Connection Or TLS Changes");
                 } else {
                     Throwable cause = failure;
                     while (cause.getCause() != null && cause.getCause() != cause) {
@@ -3892,7 +3907,7 @@ public class ReSyncCommand implements TabExecutor {
             return;
         }
         List<String> actions = switch (normalized) {
-            case "network" -> List.of("reload");
+            case "network" -> List.of("status", "reconnect", "reload");
             case "authority" -> List.of("export", "export-anchor", "grant");
             case "scoreboard" -> List.of("list", "show", "hide", "default");
             case "tab" -> List.of("list", "apply", "clear", "default", "interval");

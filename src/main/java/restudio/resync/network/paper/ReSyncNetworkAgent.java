@@ -3,10 +3,12 @@ package restudio.resync.network.paper;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitTask;
 import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.network.NetworkChannels;
+import restudio.resync.network.NetworkCredentials;
 import restudio.resync.network.NetworkEvent;
 import restudio.resync.network.NetworkEventCodec;
 import restudio.resync.network.NetworkEventPublish;
@@ -69,7 +71,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import javax.net.ssl.SSLSocketFactory;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -85,6 +91,7 @@ import java.util.function.Supplier;
 public class ReSyncNetworkAgent {
     private static final int PROTOCOL_VERSION = 1;
     private static final long REQUEST_TIMEOUT_SECONDS = 10;
+    private static final int CONNECT_TIMEOUT_MILLIS = 15_000;
     private static final int MAX_HELD_TRANSFER_EVENTS = 1_024;
     private static final long MAX_HELD_TRANSFER_BYTES = 4L * 1024L * 1024L;
     private final ReSync plugin;
@@ -125,6 +132,15 @@ public class ReSyncNetworkAgent {
     private final ThreadLocal<Boolean> replayingTransferEvents = ThreadLocal.withInitial(() -> false);
     private final Set<Listener> listeners = new CopyOnWriteArraySet<>();
     private final Object lifecycleMonitor = new Object();
+    private final ThreadPoolExecutor connections = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(64), work -> {
+            Thread thread = new Thread(work, "ReSync-Network-Connection");
+            thread.setDaemon(true);
+            return thread;
+        });
+    private SSLSocketFactory socketFactory;
+    private volatile String connectionFailure = "";
+    private boolean retryEnrollment;
     private volatile Client client;
     private final AtomicBoolean authorized = new AtomicBoolean();
     private volatile String credential;
@@ -143,6 +159,7 @@ public class ReSyncNetworkAgent {
     private long heldTransferBytes;
     private int transferCallbackAdmissions;
     private BukkitTask heartbeatTask;
+    private BukkitTask connectionTask;
     private CompletableFuture<ShutdownResult> shutdownAttempt;
 
     public ReSyncNetworkAgent(ReSync plugin, ReSyncNetworkAgentConfig config) {
@@ -290,9 +307,15 @@ public class ReSyncNetworkAgent {
         try {
             stateReconciler.start();
             heartbeatTask = Bukkit.getScheduler().runTaskTimer(plugin, this::sendPresence, config.heartbeatIntervalTicks(), config.heartbeatIntervalTicks());
+            connectionTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> enqueueConnection(this::checkConnection), 20, 20);
+            Log.info("ReSync network connecting node " + config.nodeId() + " to " + config.hubUrl());
             connect();
         } catch (RuntimeException exception) {
             started.set(false);
+            if (connectionTask != null) {
+                connectionTask.cancel();
+                connectionTask = null;
+            }
             if (heartbeatTask != null) {
                 heartbeatTask.cancel();
                 heartbeatTask = null;
@@ -326,6 +349,10 @@ public class ReSyncNetworkAgent {
                 if (heartbeatTask != null) {
                     heartbeatTask.cancel();
                     heartbeatTask = null;
+                }
+                if (connectionTask != null) {
+                    connectionTask.cancel();
+                    connectionTask = null;
                 }
                 failPending(new IllegalStateException("ReSync Network Agent Stopped"));
                 transferReadiness.values().forEach(future -> future.completeExceptionally(new IllegalStateException("ReSync Network Agent Stopped")));
@@ -429,6 +456,7 @@ public class ReSyncNetworkAgent {
                     if (current != null) {
                         current.close();
                     }
+                    connections.shutdownNow();
                     setTransferHandler(null);
                     listeners.clear();
                     presence.clear();
@@ -501,6 +529,27 @@ public class ReSyncNetworkAgent {
     public boolean connected() {
         Client current = client;
         return authorized.get() && current != null && current.isOpen();
+    }
+
+    public Status status() {
+        return new Status(config.enabled(), connected(), config.nodeId(), config.hubUrl(), connectionFailure, reconnectFailures.get());
+    }
+
+    public void requireConnectionSettings(Path operatorRoot) throws IOException {
+        ReSyncNetworkAgentConfig candidate = ReSyncNetworkAgentConfig.load(operatorRoot, credentialStore.file().getParent().getParent());
+        if (!connectionSettingsMatch(candidate)) throw new IOException("Network Connection Settings Changed. Restart This Server To Apply Them");
+    }
+
+    public boolean connectionSettingsMatch(ReSyncNetworkAgentConfig other) {
+        return config.enabled() == other.enabled() && config.networkId().equals(other.networkId())
+            && config.nodeId().equals(other.nodeId()) && config.hubUrl().equals(other.hubUrl())
+            && config.enrollmentToken().equals(other.enrollmentToken()) && config.tls().equals(other.tls())
+            && config.maximumFrameBytes() == other.maximumFrameBytes() && config.maximumPayloadBytes() == other.maximumPayloadBytes()
+            && config.heartbeatIntervalTicks() == other.heartbeatIntervalTicks() && config.reconnectDelayTicks() == other.reconnectDelayTicks()
+            && config.capacity() == other.capacity();
+    }
+
+    public record Status(boolean enabled, boolean connected, String nodeId, String hubUrl, String failure, int retries) {
     }
 
     public boolean hasActiveTransfers() {
@@ -942,23 +991,77 @@ public class ReSyncNetworkAgent {
     }
 
     private void connect() {
+        enqueueConnection(this::connectNow);
+    }
+
+    private void enqueueConnection(Runnable work) {
+        try {
+            connections.execute(work);
+        } catch (RejectedExecutionException failure) {
+            if (stopping.get() || shutdownFinalized.get()) return;
+            Client current = client;
+            if (current != null) current.close(1008, "Network Work Queue Full");
+            reportUnavailable("Network Work Queue Full");
+            scheduleReconnect();
+        }
+    }
+
+    private void checkConnection() {
+        Client current = client;
+        if (stopping.get() || persistenceQuiesced.get() || current == null) return;
+        if (!authorized.get() && System.nanoTime() - current.startedAt >= TimeUnit.MILLISECONDS.toNanos(CONNECT_TIMEOUT_MILLIS)) {
+            disconnectAuthorized();
+            client = null;
+            current.closeConnection(1001, "Network Authentication Timed Out");
+            failPending(new IllegalStateException("Network Authentication Timed Out"));
+            reportUnavailable("Network Authentication Timed Out");
+            scheduleReconnect();
+        } else if (authorized.get() && System.nanoTime() - current.lastInbound >= TimeUnit.MILLISECONDS.toNanos(Math.max(CONNECT_TIMEOUT_MILLIS, config.heartbeatIntervalTicks() * 150))) {
+            disconnectAuthorized();
+            client = null;
+            current.closeConnection(1001, "Network Hub Heartbeat Timed Out");
+            failPending(new IllegalStateException("Network Hub Heartbeat Timed Out"));
+            reportUnavailable("Network Hub Heartbeat Timed Out");
+            scheduleReconnect();
+        } else if (current.isClosed()) {
+            disconnectAuthorized();
+            failPending(new IllegalStateException("Network Connection Closed"));
+            scheduleReconnect();
+        }
+    }
+
+    private void connectNow() {
         if (!started.get() || stopping.get() || persistenceQuiesced.get()) {
             return;
         }
         reconnectScheduled.set(false);
+        Client previous = client;
+        if (previous != null && !previous.isClosed()) return;
+        disconnectAuthorized();
+        failPending(new IllegalStateException("Network Connection Replaced"));
         try {
+            boolean enrolling = credential.isBlank() || retryEnrollment;
+            retryEnrollment = false;
+            if (credential.isBlank()) {
+                try (NetworkPersistenceDrainController.Lease ignored = persistenceDrain.acquire("credential-enrollment-prepare")) {
+                    credentialStore.save(NetworkCredentials.generate());
+                    credential = credentialStore.value();
+                }
+            }
             Map<String, String> headers = new LinkedHashMap<>();
             headers.put("X-ReSync-Network", config.networkId());
             headers.put("X-ReSync-Node", config.nodeId());
-            if (credential.isBlank()) {
+            if (!enrolling) headers.put("X-ReSync-Credential", credential);
+            if (!config.enrollmentToken().isBlank()) {
                 headers.put("X-ReSync-Enrollment", config.enrollmentToken());
-            } else {
-                headers.put("X-ReSync-Credential", credential);
+                headers.put("X-ReSync-Enrollment-Credential", credential);
             }
             Client next = new Client(URI.create(config.hubUrl()), headers);
             if (config.tls().enabled()) {
-                next.setSocketFactory(ReSyncNetworkTls.create(config.tls()).getSocketFactory());
+                if (socketFactory == null) socketFactory = ReSyncNetworkTls.create(config.tls()).getSocketFactory();
+                next.setSocketFactory(socketFactory);
             }
+            if (stopping.get() || persistenceQuiesced.get()) return;
             client = next;
             next.connect();
         } catch (Exception exception) {
@@ -1049,8 +1152,9 @@ public class ReSyncNetworkAgent {
             boolean connected = authorized.compareAndSet(false, true);
             reconnectFailures.set(0);
             unavailableReported.set(false);
+            connectionFailure = "";
             Log.info("ReSync network node enrolled as " + config.nodeId());
-            sendPresence();
+            Bukkit.getScheduler().runTask(plugin, () -> { if (!stopping.get()) sendPresence(); });
             if (connected) {
                 notifyConnected();
             }
@@ -1060,8 +1164,9 @@ public class ReSyncNetworkAgent {
             boolean connected = authorized.compareAndSet(false, true);
             reconnectFailures.set(0);
             unavailableReported.set(false);
+            connectionFailure = "";
             Log.info("ReSync network node connected as " + config.nodeId());
-            sendPresence();
+            Bukkit.getScheduler().runTask(plugin, () -> { if (!stopping.get()) sendPresence(); });
             if (connected) {
                 notifyConnected();
             }
@@ -1702,8 +1807,10 @@ public class ReSyncNetworkAgent {
     }
 
     private void reportUnavailable(String reason) {
+        connectionFailure = reason == null || reason.isBlank() ? "Connection Closed" : reason;
         if (unavailableReported.compareAndSet(false, true)) {
-            Log.warn("ReSync network unavailable; retrying in background: " + reason);
+            Log.warn("ReSync network unavailable at " + config.hubUrl() + " for node " + config.nodeId() + ": " + connectionFailure
+                + ". Check The Velocity Proxy, ReSyncVelocity Hub, And Hub Address. Use /resync network status For Current Details");
         }
     }
 
@@ -1884,14 +1991,20 @@ public class ReSyncNetworkAgent {
     }
 
     private final class Client extends WebSocketClient {
+        private final long startedAt = System.nanoTime();
+        private volatile long lastInbound = startedAt;
+
         private Client(URI uri, Map<String, String> headers) {
-            super(uri, headers);
+            super(uri, new Draft_6455(), headers, CONNECT_TIMEOUT_MILLIS);
             setConnectionLostTimeout(15);
         }
 
         @Override
         public void onOpen(ServerHandshake handshake) {
-            authorized.set(false);
+            enqueueConnection(() -> {
+                if (client == this && !stopping.get()) authorized.set(false);
+                else close(1000, "Connection Replaced");
+            });
         }
 
         @Override
@@ -1901,38 +2014,40 @@ public class ReSyncNetworkAgent {
 
         @Override
         public void onMessage(ByteBuffer message) {
+            if (message.remaining() > config.maximumFrameBytes()) {
+                close(1009, "Network Frame Too Large");
+                return;
+            }
             byte[] encoded = new byte[message.remaining()];
             message.get(encoded);
-            try {
-                handle(codec.decode(encoded));
-            } catch (RuntimeException exception) {
-                Log.warn("ReSync network frame failed: " + rootMessage(exception));
-                close(1008, "Invalid Network Frame");
-            }
+            enqueueConnection(() -> {
+                if (client != this) return;
+                try {
+                    handle(codec.decode(encoded));
+                    lastInbound = System.nanoTime();
+                } catch (RuntimeException exception) {
+                    reportUnavailable(rootMessage(exception));
+                    close(1008, "Invalid Network Frame");
+                }
+            });
         }
 
         @Override
         public void onClose(int code, String reason, boolean remote) {
+            enqueueConnection(() -> closed(reason));
+        }
+
+        private void closed(String reason) {
             if (client != this) {
                 return;
             }
             disconnectAuthorized();
             failPending(new IllegalStateException("ReSync Network Disconnected: " + reason));
             if (!stopping.get()) {
+                retryEnrollment = "Network Credential Rejected".equals(reason) && !config.enrollmentToken().isBlank();
                 if (reconnectRequested.compareAndSet(true, false)) {
                     scheduleConnect();
                     return;
-                }
-                if ("Network Credential Rejected".equals(reason) && !credential.isBlank() && !config.enrollmentToken().isBlank()) {
-                    try {
-                        try (NetworkPersistenceDrainController.Lease ignored = persistenceDrain.acquire("credential-reset")) {
-                            credentialStore.clear();
-                            credential = credentialStore.value();
-                        }
-                        Log.warn("ReSync network credential was rejected; retrying enrollment");
-                    } catch (Exception exception) {
-                        Log.warn("ReSync network credential reset failed: " + rootMessage(exception));
-                    }
                 }
                 reportUnavailable(reason);
                 scheduleReconnect();
@@ -1941,10 +2056,13 @@ public class ReSyncNetworkAgent {
 
         @Override
         public void onError(Exception exception) {
-            if (client == this && !stopping.get()) {
-                reportUnavailable(rootMessage(exception));
-                scheduleReconnect();
-            }
+            enqueueConnection(() -> {
+                if (client == this && !stopping.get()) {
+                    reportUnavailable(rootMessage(exception));
+                    closeConnection(1011, "Network Transport Failed");
+                    scheduleReconnect();
+                }
+            });
         }
     }
 }

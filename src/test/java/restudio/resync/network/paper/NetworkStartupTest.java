@@ -13,11 +13,19 @@ import restudio.resync.ReSync;
 import restudio.resync.migration.MigrationFence;
 import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.network.NetworkResourcePage;
+import restudio.resync.network.NetworkCredentials;
 import restudio.resync.network.NetworkResourceQuery;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
+import restudio.resync.network.NetworkFrame;
+import restudio.resync.network.NetworkFrameCodec;
+import restudio.resync.network.NetworkFrameType;
+import restudio.resync.network.NetworkRequestContext;
+import restudio.resync.network.NetworkChannels;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -108,6 +116,42 @@ class NetworkStartupTest {
         }
     }
 
+    @Test
+    void refusedConnectionRecoversAgainstAnOlderHubWithoutDeletingTheSavedCredential() throws Exception {
+        TestReSync plugin = plugin();
+        int port;
+        try (ServerSocket socket = new ServerSocket(0)) { port = socket.getLocalPort(); }
+        Path credential = temporary.resolve("network/node.credential");
+        ReSyncNetworkAgentConfig config = new ReSyncNetworkAgentConfig(true, ReSyncNetworkAgentConfig.ChatPolicy.disabled(),
+            ReSyncNetworkAgentConfig.ResourcePolicy.disabled(), List.of(), "test-network", "test-backend", "Test",
+            "ws://127.0.0.1:" + port, "token", "", 0, 1_048_576, 500_000, 100, 20,
+            ReSyncNetworkAgentConfig.Tls.disabled(), credential);
+        ReSyncNetworkAgent agent = new ReSyncNetworkAgent(plugin, config, new MigrationFence());
+        Hub hub = new Hub(port, credential);
+        try {
+            agent.start();
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (agent.status().failure().isBlank() && System.nanoTime() < deadline) Thread.sleep(10);
+            assertTrue(agent.status().failure().contains("refused"));
+            assertTrue(Files.exists(credential));
+            hub.start();
+            assertTrue(hub.ready.await(5, TimeUnit.SECONDS));
+            agent.reconnect();
+            MockBukkit.getMock().getScheduler().performTicks(2);
+            deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (!agent.connected() && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+                MockBukkit.getMock().getScheduler().performTicks(20);
+            }
+            assertTrue(agent.connected(), agent.status().failure());
+            assertTrue(agent.status().failure().isBlank());
+        } finally {
+            agent.prepareForShutdown();
+            assertTrue(agent.shutdownAfterPreparation(() -> CompletableFuture.completedFuture(null)).toCompletableFuture().get(5, TimeUnit.SECONDS).completed());
+            hub.stop(1_000);
+        }
+    }
+
     public static class TestReSync extends ReSync {
         @Override
         public void onEnable() {
@@ -174,8 +218,14 @@ class NetworkStartupTest {
         private final CountDownLatch ready = new CountDownLatch(1);
         private final ArrayBlockingQueue<WebSocket> connections = new ArrayBlockingQueue<>(4);
 
-        private Hub() {
-            super(new InetSocketAddress("127.0.0.1", 0));
+        private final Path credential;
+        private String issued = "";
+
+        private Hub() { this(0, null); }
+
+        private Hub(int port, Path credential) {
+            super(new InetSocketAddress("127.0.0.1", port));
+            this.credential = credential;
         }
 
         @Override
@@ -186,6 +236,23 @@ class NetworkStartupTest {
         @Override
         public void onOpen(WebSocket connection, ClientHandshake handshake) {
             connections.add(connection);
+            if (credential != null) {
+                try {
+                    String authenticated = handshake.getFieldValue("X-ReSync-Credential");
+                    if (!authenticated.isBlank() && !authenticated.equals(issued)) {
+                        connection.close(1008, "Network Credential Rejected");
+                        return;
+                    }
+                    String saved = Files.readString(credential).trim();
+                    if (!saved.equals(handshake.getFieldValue("X-ReSync-Enrollment-Credential"))) {
+                        connection.close(1008, "Credential Was Not Saved Before Enrollment");
+                        return;
+                    }
+                    issued = NetworkCredentials.generate();
+                    NetworkRequestContext context = new NetworkRequestContext(1, "test-network", "proxy", "session", System.currentTimeMillis() + 10_000, Set.of("node.heartbeat"));
+                    connection.send(new NetworkFrameCodec(1_048_576, 500_000).encode(new NetworkFrame(context, NetworkChannels.CONTROL, NetworkFrameType.ENROLL_ACK, issued.getBytes(StandardCharsets.UTF_8))));
+                } catch (IOException failure) { connection.close(1011, failure.getMessage()); }
+            }
         }
 
         @Override

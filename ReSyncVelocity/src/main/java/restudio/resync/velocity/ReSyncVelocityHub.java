@@ -75,6 +75,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -104,6 +105,8 @@ public class ReSyncVelocityHub extends WebSocketServer {
     private static final long MAXIMUM_SNAPSHOT_UPLOAD_MILLIS = TimeUnit.MINUTES.toMillis(2);
     private static final long MAXIMUM_MANUAL_RESTORE_MILLIS = TimeUnit.MINUTES.toMillis(15);
     private static final int RECONCILIATION_BATCH_SIZE = 5_000;
+    private final Object sessionMonitor = new Object();
+    private final CompletableFuture<Void> listening = new CompletableFuture<>();
     private final VelocityNetworkConfig config;
     private final Logger logger;
     private final ProxyServer proxyServer;
@@ -129,6 +132,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
 
     public ReSyncVelocityHub(VelocityNetworkConfig config, Logger logger, ProxyServer proxyServer) {
         super(new InetSocketAddress(config.bindHost(), config.port()));
+        setReuseAddr(true);
         this.config = config;
         this.logger = logger;
         this.proxyServer = proxyServer;
@@ -143,7 +147,8 @@ public class ReSyncVelocityHub extends WebSocketServer {
 
             @Override
             public boolean connected(String nodeId) {
-                return connectionsByNode.containsKey(nodeId);
+                WebSocket connection = connectionsByNode.get(nodeId);
+                return connection != null && connection.isOpen() && sessions.containsKey(connection);
             }
 
             @Override
@@ -195,6 +200,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
             setWebSocketFactory(new DefaultSSLWebSocketServerFactory(VelocityNetworkTls.create(config.tls())));
         }
         start();
+        listening.get(15, TimeUnit.SECONDS);
         heartbeatExecutor.scheduleWithFixedDelay(this::maintainRuntime, config.heartbeatTimeoutMillis(), Math.max(1000, config.heartbeatTimeoutMillis() / 3), TimeUnit.MILLISECONDS);
     }
 
@@ -265,12 +271,17 @@ public class ReSyncVelocityHub extends WebSocketServer {
         }
         String credential = header(handshake, "X-ReSync-Credential");
         String enrollment = header(handshake, "X-ReSync-Enrollment");
+        String offered = header(handshake, "X-ReSync-Enrollment-Credential");
+        if (!offered.isBlank() && !validCredential(offered)) {
+            connection.close(CloseFrame.POLICY_VALIDATION, "Invalid Enrollment Credential");
+            return;
+        }
         if (!credential.isBlank()) {
-            authenticate(connection, node, credential);
+            authenticate(connection, node, credential, enrollment, offered);
             return;
         }
         if (!enrollment.isBlank()) {
-            enroll(connection, node, enrollment);
+            enroll(connection, node, enrollment, offered);
             return;
         }
         connection.close(CloseFrame.POLICY_VALIDATION, "Network Credential Required");
@@ -278,22 +289,24 @@ public class ReSyncVelocityHub extends WebSocketServer {
 
     @Override
     public void onClose(WebSocket connection, int code, String reason, boolean remote) {
-        Session session = removeSession(connection, "Network Session Closed");
-        if (session == null || !connectionsByNode.remove(session.nodeId(), connection)) {
-            return;
-        }
-        pendingReconciliations.entrySet().removeIf(entry -> {
-            if (!entry.getValue().nodeId().equals(session.nodeId())) {
-                return false;
+        synchronized (sessionMonitor) {
+            Session session = removeSession(connection, "Network Session Closed");
+            if (session == null || !connectionsByNode.remove(session.nodeId(), connection)) {
+                return;
             }
-            entry.getValue().result().completeExceptionally(new IllegalStateException("ReSync Backend Disconnected During State Reconciliation"));
-            return true;
-        });
-        long now = Instant.now().toEpochMilli();
-        store.updateNodeStatus(config.networkId(), session.nodeId(), NetworkNodeStatus.OFFLINE, now).thenAccept(node -> publishPresence(presence(node, NetworkNodeStatus.OFFLINE, now))).exceptionally(throwable -> {
-            logger.warn("Failed to mark network node {} offline", session.nodeId(), throwable);
-            return null;
-        });
+            pendingReconciliations.entrySet().removeIf(entry -> {
+                if (!entry.getValue().nodeId().equals(session.nodeId())) {
+                    return false;
+                }
+                entry.getValue().result().completeExceptionally(new IllegalStateException("ReSync Backend Disconnected During State Reconciliation"));
+                return true;
+            });
+            long now = Instant.now().toEpochMilli();
+            store.updateNodeStatus(config.networkId(), session.nodeId(), NetworkNodeStatus.OFFLINE, now).thenAccept(node -> publishPresence(presence(node, NetworkNodeStatus.OFFLINE, now))).exceptionally(throwable -> {
+                logger.warn("Failed to mark network node {} offline", session.nodeId(), throwable);
+                return null;
+            });
+        }
     }
 
     @Override
@@ -303,8 +316,12 @@ public class ReSyncVelocityHub extends WebSocketServer {
 
     @Override
     public void onMessage(WebSocket connection, ByteBuffer message) {
+        if (message.remaining() > config.maximumFrameBytes()) {
+            connection.close(CloseFrame.TOOBIG, "Network Frame Too Large");
+            return;
+        }
         Session session = sessions.get(connection);
-        if (session == null) {
+        if (session == null || !isActiveSession(connection, session)) {
             connection.close(CloseFrame.POLICY_VALIDATION, "Network Authentication Pending");
             return;
         }
@@ -436,89 +453,116 @@ public class ReSyncVelocityHub extends WebSocketServer {
 
     @Override
     public void onError(WebSocket connection, Exception exception) {
+        if (connection == null) listening.completeExceptionally(exception);
         logger.warn("ReSync network hub transport error", exception);
     }
 
     @Override
     public void onStart() {
+        listening.complete(null);
         logger.info("ReSync network hub listening on {}:{}{}", config.bindHost(), config.port(), config.tls().enabled() ? " with TLS" : "");
     }
 
-    private void authenticate(WebSocket connection, VelocityNetworkConfig.EnrollmentNode node, String credential) {
+    private static boolean validCredential(String credential) {
+        try {
+            return credential.length() == 43 && Base64.getUrlDecoder().decode(credential).length == 32;
+        } catch (IllegalArgumentException failure) {
+            return false;
+        }
+    }
+
+    private void authenticate(WebSocket connection, VelocityNetworkConfig.EnrollmentNode node, String credential, String enrollment, String offered) {
         store.authenticateNode(config.networkId(), node.nodeId(), NetworkCredentials.hash(credential)).whenComplete((authenticated, throwable) -> {
-            if (throwable != null || !authenticated) {
+            if (!connection.isOpen()) return;
+            if (throwable != null) {
+                connection.close(CloseFrame.UNEXPECTED_CONDITION, "Network Credential Storage Unavailable");
+            } else if (Boolean.TRUE.equals(authenticated)) {
+                authorize(connection, node, "", NetworkFrameType.RESPONSE);
+            } else if (!enrollment.isBlank() && credential.equals(offered)) {
+                enroll(connection, node, enrollment, offered);
+            } else {
                 connection.close(CloseFrame.POLICY_VALIDATION, "Network Credential Rejected");
-                return;
             }
-            authorize(connection, node, "", NetworkFrameType.RESPONSE);
         });
     }
 
-    private void enroll(WebSocket connection, VelocityNetworkConfig.EnrollmentNode node, String enrollment) {
-        String credential = NetworkCredentials.generate();
+    private void enroll(WebSocket connection, VelocityNetworkConfig.EnrollmentNode node, String enrollment, String offered) {
+        String credential = offered.isBlank() ? NetworkCredentials.generate() : offered;
         store.enrollNode(config.networkId(), node.nodeId(), NetworkCredentials.hash(enrollment), NetworkCredentials.hash(credential), Instant.now().toEpochMilli()).whenComplete((enrolled, throwable) -> {
-            if (throwable != null || !enrolled) {
+            if (!connection.isOpen()) return;
+            if (throwable != null) {
+                connection.close(CloseFrame.UNEXPECTED_CONDITION, "Network Enrollment Storage Unavailable");
+            } else if (!Boolean.TRUE.equals(enrolled)) {
                 connection.close(CloseFrame.POLICY_VALIDATION, "Enrollment Token Rejected");
-                return;
+            } else {
+                authorize(connection, node, credential, NetworkFrameType.ENROLL_ACK);
             }
-            authorize(connection, node, credential, NetworkFrameType.ENROLL_ACK);
         });
     }
 
     private void authorize(WebSocket connection, VelocityNetworkConfig.EnrollmentNode node, String credential, NetworkFrameType responseType) {
-        long now = Instant.now().toEpochMilli();
-        Set<String> scopes = scopes(node.capabilities());
-        Session session = new Session(node.nodeId(), scopes);
-        WebSocket previous = connectionsByNode.put(node.nodeId(), connection);
-        sessions.put(connection, session);
-        if (previous != null && previous != connection) {
-            removeSession(previous, "Network Session Replaced");
-            previous.close(CloseFrame.NORMAL, "Network Node Reconnected");
+        synchronized (sessionMonitor) {
+            if (!connection.isOpen()) return;
+            long now = Instant.now().toEpochMilli();
+            Set<String> scopes = scopes(node.capabilities());
+            Session session = new Session(node.nodeId(), scopes);
+            WebSocket previous = connectionsByNode.put(node.nodeId(), connection);
+            sessions.put(connection, session);
+            latestMetrics.remove(node.nodeId());
+            if (previous != null && previous != connection) {
+                removeSession(previous, "Network Session Replaced");
+                previous.close(CloseFrame.NORMAL, "Network Node Reconnected");
+            }
+            NetworkNodeStatus status = nodeModes.getOrDefault(node.nodeId(), NetworkNodeStatus.ONLINE);
+            store.updateNodeStatus(config.networkId(), node.nodeId(), status, now).whenComplete((updated, throwable) -> {
+                if (throwable != null) {
+                    removeSession(connection, "Network Session Registration Failed");
+                    connectionsByNode.remove(node.nodeId(), connection);
+                    connection.close(CloseFrame.UNEXPECTED_CONDITION, "Node Registration Failed");
+                    return;
+                }
+                if (!isActiveSession(connection, session)) {
+                    return;
+                }
+                send(connection, responseType, NetworkChannels.CONTROL, "session", credential.getBytes(StandardCharsets.UTF_8), scopes);
+                if (scopes.contains("presence.read")) {
+                    sendPresenceSnapshot(connection);
+                }
+                if (scopes.contains("events.consume")) {
+                    events.deliver(node.nodeId());
+                }
+                if (scopes.contains("state.transfer")) {
+                    recoverTransfers(node.nodeId());
+                    recoverOwnership(node.nodeId());
+                }
+            });
         }
-        NetworkNodeStatus status = nodeModes.getOrDefault(node.nodeId(), NetworkNodeStatus.ONLINE);
-        store.updateNodeStatus(config.networkId(), node.nodeId(), status, now).whenComplete((updated, throwable) -> {
-            if (throwable != null) {
-                removeSession(connection, "Network Session Registration Failed");
-                connectionsByNode.remove(node.nodeId(), connection);
-                connection.close(CloseFrame.UNEXPECTED_CONDITION, "Node Registration Failed");
-                return;
-            }
-            if (!isActiveSession(connection, session)) {
-                return;
-            }
-            send(connection, responseType, NetworkChannels.CONTROL, "session", credential.getBytes(StandardCharsets.UTF_8), scopes);
-            if (scopes.contains("presence.read")) {
-                sendPresenceSnapshot(connection);
-            }
-            if (scopes.contains("events.consume")) {
-                events.deliver(node.nodeId());
-            }
-            if (scopes.contains("state.transfer")) {
-                recoverTransfers(node.nodeId());
-                recoverOwnership(node.nodeId());
-            }
-        });
     }
 
     private void heartbeat(WebSocket connection, Session session, NetworkFrame request, NetworkNodeMetrics metrics) {
-        long now = Instant.now().toEpochMilli();
-        NetworkNodeStatus status = nodeModes.getOrDefault(session.nodeId(), NetworkNodeStatus.ONLINE);
-        CompletableFuture<?> update = store.updateNodeStatus(config.networkId(), session.nodeId(), status, now);
-        if (metrics != null) {
-            update = update.thenCompose(node -> store.updateNodeMetrics(new NetworkNodeMetrics(config.networkId(), session.nodeId(), metrics.players(), metrics.capacity(), metrics.tps(), metrics.mspt(), metrics.heapUsed(), metrics.heapMaximum(), now)));
-        }
-        update.whenComplete((unused, throwable) -> {
-            if (throwable != null) {
-                sendError(connection, request.context().requestId(), rootMessage(throwable));
-                return;
-            }
+        synchronized (sessionMonitor) {
+            if (!isActiveSession(connection, session)) return;
+            session.lastHeartbeat = System.nanoTime();
+            long now = Instant.now().toEpochMilli();
+            NetworkNodeStatus status = nodeModes.getOrDefault(session.nodeId(), NetworkNodeStatus.ONLINE);
+            CompletableFuture<?> update = store.updateNodeStatus(config.networkId(), session.nodeId(), status, now);
             if (metrics != null) {
-                NetworkNodeMetrics observed = new NetworkNodeMetrics(config.networkId(), session.nodeId(), metrics.players(), metrics.capacity(), metrics.tps(), metrics.mspt(), metrics.heapUsed(), metrics.heapMaximum(), now);
-                latestMetrics.put(session.nodeId(), observed);
-                publishPresence(new NetworkNodePresence(config.networkId(), session.nodeId(), status, observed.players(), observed.capacity(), observed.tps(), observed.mspt(), observed.heapUsed(), observed.heapMaximum(), observed.observedAt()));
+                update = update.thenCompose(node -> store.updateNodeMetrics(new NetworkNodeMetrics(config.networkId(), session.nodeId(), metrics.players(), metrics.capacity(), metrics.tps(), metrics.mspt(), metrics.heapUsed(), metrics.heapMaximum(), now)));
             }
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, request.context().requestId(), new byte[0], sessionScopes(session));
-        });
+            update.whenComplete((unused, throwable) -> {
+                if (!isActiveSession(connection, session)) return;
+                if (throwable != null) {
+                    sendError(connection, request.context().requestId(), rootMessage(throwable));
+                    return;
+                }
+                if (metrics != null) {
+                    NetworkNodeMetrics observed = new NetworkNodeMetrics(config.networkId(), session.nodeId(), metrics.players(), metrics.capacity(), metrics.tps(), metrics.mspt(), metrics.heapUsed(), metrics.heapMaximum(), now);
+                    latestMetrics.put(session.nodeId(), observed);
+                    publishPresence(new NetworkNodePresence(config.networkId(), session.nodeId(), status, observed.players(), observed.capacity(), observed.tps(), observed.mspt(), observed.heapUsed(), observed.heapMaximum(), observed.observedAt()));
+                }
+                send(connection, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, request.context().requestId(), new byte[0], sessionScopes(session));
+            });
+        }
     }
 
     private void validateSession(NetworkFrame frame, Session session) {
@@ -553,19 +597,16 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private void expireHeartbeats() {
-        long now = Instant.now().toEpochMilli();
-        long staleBefore = now - config.heartbeatTimeoutMillis();
-        store.listNodes(config.networkId()).thenAccept(nodes -> nodes.stream().filter(node -> !node.nodeId().equals(config.nodeId()) && node.status() != NetworkNodeStatus.OFFLINE && node.status() != NetworkNodeStatus.REVOKED && node.heartbeatAt() < staleBefore).forEach(node -> {
-            WebSocket connection = connectionsByNode.remove(node.nodeId());
-            if (connection != null) {
-                removeSession(connection, "Network Session Heartbeat Timed Out");
-                connection.close(CloseFrame.GOING_AWAY, "Heartbeat Timeout");
+        synchronized (sessionMonitor) {
+            long now = System.nanoTime();
+            for (Map.Entry<String, WebSocket> entry : connectionsByNode.entrySet()) {
+                Session session = sessions.get(entry.getValue());
+                if (session != null && now - session.lastHeartbeat >= TimeUnit.MILLISECONDS.toNanos(config.heartbeatTimeoutMillis())) {
+                    entry.getValue().close(CloseFrame.GOING_AWAY, "Heartbeat Timeout");
+                    onClose(entry.getValue(), CloseFrame.GOING_AWAY, "Heartbeat Timeout", false);
+                }
             }
-            store.updateNodeStatus(config.networkId(), node.nodeId(), NetworkNodeStatus.OFFLINE, now).thenAccept(updated -> publishPresence(presence(updated, NetworkNodeStatus.OFFLINE, now)));
-        })).exceptionally(throwable -> {
-            logger.warn("Failed to expire network heartbeats", throwable);
-            return null;
-        });
+        }
     }
 
     private Set<String> scopes(Set<String> capabilities) {
@@ -888,7 +929,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private boolean isActiveSession(WebSocket connection, Session session) {
-        return sessions.get(connection) == session && connectionsByNode.get(session.nodeId()) == connection;
+        return connection.isOpen() && sessions.get(connection) == session && connectionsByNode.get(session.nodeId()) == connection;
     }
 
     private Session removeSession(WebSocket connection, String reason) {
@@ -1707,10 +1748,11 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private void sendPresenceSnapshot(WebSocket connection) {
-        store.listNodes(config.networkId()).thenCombine(store.listNodeMetrics(config.networkId()), (nodes, metrics) -> {
-            metrics.forEach(value -> latestMetrics.put(value.nodeId(), value));
-            return nodes;
-        }).thenAccept(nodes -> nodes.forEach(node -> send(connection, NetworkFrameType.PRESENCE_SNAPSHOT, NetworkChannels.PRESENCE, "presence-snapshot", NetworkNodePresenceCodec.encode(presence(node, node.status(), node.heartbeatAt())), Set.of("presence.read")))).exceptionally(throwable -> {
+        Session session = sessions.get(connection);
+        store.listNodes(config.networkId()).thenAccept(nodes -> {
+            if (session == null || !isActiveSession(connection, session)) return;
+            nodes.forEach(node -> send(connection, NetworkFrameType.PRESENCE_SNAPSHOT, NetworkChannels.PRESENCE, "presence-snapshot", NetworkNodePresenceCodec.encode(presence(node, node.status(), node.heartbeatAt())), Set.of("presence.read")));
+        }).exceptionally(throwable -> {
             logger.warn("Failed to send network presence snapshot", throwable);
             return null;
         });
@@ -1727,6 +1769,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
 
     private NetworkNodePresence presence(NetworkNode node, NetworkNodeStatus status, long observedAt) {
         NetworkNodeMetrics metrics = latestMetrics.get(node.nodeId());
+        if (status == NetworkNodeStatus.ONLINE || status == NetworkNodeStatus.MAINTENANCE) observedAt = metrics == null ? 0 : metrics.observedAt();
         if (metrics == null) {
             return new NetworkNodePresence(config.networkId(), node.nodeId(), status, 0, 0, -1, -1, 0, 0, observedAt);
         }
@@ -1758,7 +1801,18 @@ public class ReSyncVelocityHub extends WebSocketServer {
         return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
     }
 
-    private record Session(String nodeId, Set<String> scopes) {
+    private static final class Session {
+        private final String nodeId;
+        private final Set<String> scopes;
+        private volatile long lastHeartbeat = System.nanoTime();
+
+        private Session(String nodeId, Set<String> scopes) {
+            this.nodeId = nodeId;
+            this.scopes = Set.copyOf(scopes);
+        }
+
+        private String nodeId() { return nodeId; }
+        private Set<String> scopes() { return scopes; }
     }
 
     private record PendingReconciliation(String nodeId, CompletableFuture<Void> result) {

@@ -44,6 +44,10 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
                 throw new IllegalArgumentException("ReSync Network Enrollment Is Required");
             }
             URI hub = URI.create(hubUrl);
+            if (hub.getHost() == null || hub.getHost().isBlank() || hub.getPort() == 0 || hub.getPort() < -1 || hub.getPort() > 65535
+                    || hub.getUserInfo() != null || hub.getRawQuery() != null || hub.getRawFragment() != null) {
+                throw new IllegalArgumentException("ReSync Network Hub URL Must Contain A Host And Valid Port Without Credentials, Query, Or Fragment");
+            }
             if ("ws".equalsIgnoreCase(hub.getScheme()) && !loopbackHub(hub)) {
                 throw new IllegalArgumentException("Cross-Host ReSync Network Connections Require WSS");
             }
@@ -230,7 +234,7 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
     }
 
     private static boolean loopbackHub(URI hub) {
-        String host = normalize(hub.getHost()).toLowerCase();
+        String host = normalize(hub.getHost()).toLowerCase(Locale.ROOT);
         return host.equals("127.0.0.1") || host.equals("localhost") || host.equals("::1") || host.equals("[::1]") || host.equals("0:0:0:0:0:0:0:1") || host.equals("[0:0:0:0:0:0:0:1]");
     }
 

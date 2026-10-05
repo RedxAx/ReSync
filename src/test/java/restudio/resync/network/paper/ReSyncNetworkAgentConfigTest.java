@@ -19,6 +19,14 @@ class ReSyncNetworkAgentConfigTest {
     Path directory;
 
     @Test
+    void rejectsAmbiguousOrInvalidHubEndpoints() throws Exception {
+        for (String endpoint : new String[]{"ws:///hub", "ws://127.0.0.1:0", "ws://127.0.0.1:70000", "ws://user:secret@127.0.0.1:12442", "ws://127.0.0.1:12442?token=value", "ws://127.0.0.1:12442#hub"}) {
+            Files.writeString(directory.resolve("resync.properties"), "network.enabled=true\nnetwork.id=test\nnetwork.node-id=backend\nnetwork.enrollment-token=token\nnetwork.hub-url=" + endpoint + "\n");
+            assertThrows(IllegalArgumentException.class, () -> ReSyncNetworkAgentConfig.load(directory), endpoint);
+        }
+    }
+
+    @Test
     void loadsLoopbackEnrollmentConfigurationAndPersistsCredential() throws Exception {
         Files.writeString(directory.resolve("resync.properties"), """
             network.enabled=true

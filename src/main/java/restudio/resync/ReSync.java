@@ -574,6 +574,7 @@ public class ReSync extends JavaPlugin {
         if (dataRoot == null) {
             throw new IllegalStateException("ReSync Operator Data Root Is Unavailable");
         }
+        networkAgent.requireConnectionSettings(dataRoot);
         NetworkPlayerStateConfig config = NetworkPlayerStateConfig.load(dataRoot);
         if (networkStateReloadAttempt != null && !networkStateReloadAttempt.isDone()) {
             return networkStateReloadAttempt;

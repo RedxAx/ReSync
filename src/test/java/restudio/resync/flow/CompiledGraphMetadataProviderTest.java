@@ -19,14 +19,21 @@ import restudio.resync.flow.function.FunctionLocator;
 import restudio.resync.flow.function.FunctionRevision;
 import restudio.resync.flow.function.FunctionSignature;
 import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.graph.BranchBinding;
+import restudio.resync.flow.graph.BranchCase;
 import restudio.resync.flow.graph.GraphConnection;
+import restudio.resync.flow.graph.InspectorState;
 import restudio.resync.flow.graph.GraphDocument;
 import restudio.resync.flow.graph.GraphEndpoint;
 import restudio.resync.flow.graph.GraphNode;
 import restudio.resync.flow.graph.OpaqueData;
+import restudio.resync.flow.graph.PinValue;
+import restudio.resync.flow.identity.BranchId;
+import restudio.resync.flow.identity.CaseId;
 import restudio.resync.flow.identity.CapabilityId;
 import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.ConnectionId;
+import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.NodeId;
@@ -39,6 +46,14 @@ import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.identity.ServerId;
 import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.inspector.InspectorFallback;
+import restudio.resync.flow.runtime.FlowRuntimeExecutionBoundary;
+import restudio.resync.flow.runtime.CompiledRuntimeContext;
+import restudio.resync.flow.runtime.RuntimeAuditBoundary;
+import restudio.resync.flow.runtime.RuntimeExecutionContext;
+import restudio.resync.flow.runtime.RuntimeAuthority;
+import restudio.resync.flow.runtime.RuntimeBindingKey;
+import restudio.resync.flow.runtime.RuntimeReceiptStore;
+import restudio.resync.flow.runtime.RuntimeSecurityBoundary;
 import restudio.resync.flow.runtime.RuntimeBinding;
 import restudio.resync.flow.runtime.RuntimeBindingManifest;
 import restudio.resync.flow.runtime.RuntimeBindingRegistry;
@@ -47,13 +62,17 @@ import restudio.resync.flow.runtime.RuntimeOperationDescriptor;
 import restudio.resync.flow.runtime.RuntimeProviderDescriptor;
 import restudio.resync.flow.runtime.RuntimeResult;
 import restudio.resync.flow.runtime.RuntimeSemantics;
+import restudio.resync.flow.type.TypedValue;
 import restudio.resync.flow.type.TypeExpr;
 import restudio.resync.flow.type.TypeReference;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -256,47 +275,106 @@ class CompiledGraphMetadataProviderTest {
     }
 
     @Test
-    void acceptsCoreGraphWithPersistedStableNodeAndConnectionIdentities() {
-        RuntimeBindingRegistry registry = new RuntimeBindingRegistry();
+    void acceptsCoreGraphWithPersistedStableNodeAndConnectionIdentities() throws Exception {
+        RuntimeAuthority authority = new RuntimeAuthority("core-branch-test");
+        RuntimeSecurityBoundary security = new RuntimeSecurityBoundary() {
+            @Override
+            public boolean authorize(RuntimeAuthority requested, ContractRef<CapabilityId> capability) {
+                return authority.equals(requested) && OWNER.equals(capability.owner());
+            }
+
+            @Override
+            public boolean confirm(RuntimeAuthority requested, RuntimeBindingKey binding, RuntimeSemantics.Confirmation confirmation) {
+                return authority.equals(requested) && confirmation == RuntimeSemantics.Confirmation.NONE;
+            }
+        };
+        RuntimeBindingRegistry registry = new RuntimeBindingRegistry(security, RuntimeAuditBoundary.unavailable(),
+            new FlowRuntimeExecutionBoundary(Runnable::run, Runnable::run, () -> true), RuntimeReceiptStore.inMemory(false));
         ContractRef<ProviderId> provider = ContractRef.of(OWNER, ProviderId.of("provider"));
-        RuntimeOperationDescriptor operation = operationWithPins();
-        RuntimeOperationDescriptor targetOperation = operationWithTargetPins();
-        registry.activate(new RuntimeProviderDescriptor(provider, "1.0.0", 0, 0, RuntimeSemantics.UnloadPolicy.DRAIN),
-            List.of(
-                RuntimeBinding.available(operation, provider, "1.0.0", ignored -> CompletableFuture.completedFuture(RuntimeResult.success())),
-                RuntimeBinding.available(targetOperation, provider, "1.0.0", ignored -> CompletableFuture.completedFuture(RuntimeResult.success()))));
-        CatalogSnapshot catalog = catalogWithDistinctNodeDefinitions(registry, operation, targetOperation);
+        TypeExpr execution = TypeExpr.named(TypeReference.of("builtin", "execution"));
+        TypedValue token = TypedValue.value(execution, true);
+        TypedValue configured = TypedValue.value(TypeExpr.named(TypeReference.of("builtin", "string")), "Selected Value");
+        RuntimeOperationDescriptor operation = new RuntimeOperationDescriptor(CAPABILITY, OPERATION, List.of(
+            new RuntimeOperationDescriptor.Pin("input", RuntimeOperationDescriptor.Direction.INPUT, configured.type()),
+            new RuntimeOperationDescriptor.Pin("output", RuntimeOperationDescriptor.Direction.OUTPUT, execution)),
+            semantics(Set.of("selected", "other")));
+        RuntimeOperationDescriptor targetOperation = new RuntimeOperationDescriptor(CAPABILITY, TARGET_OPERATION, List.of(
+            new RuntimeOperationDescriptor.Pin("target-input", RuntimeOperationDescriptor.Direction.INPUT, execution)), semantics());
         NodeInstanceId sourceId = NodeInstanceId.deterministic("core-source");
         NodeInstanceId targetId = NodeInstanceId.deterministic("core-target");
+        NodeInstanceId otherId = NodeInstanceId.deterministic("core-other");
+        GraphEndpoint targetEndpoint = new GraphEndpoint(targetId, PinId.of("target-input"), null, BranchId.of("failed"));
+        List<Map<GraphEndpoint, TypedValue>> invoked = new ArrayList<>();
+        registry.activate(new RuntimeProviderDescriptor(provider, "1.0.0", 0, 0, RuntimeSemantics.UnloadPolicy.DRAIN),
+            List.of(
+                RuntimeBinding.available(operation, provider, "1.0.0", invocation -> {
+                    assertEquals(configured, invocation.inputs().get(PinId.of("input")));
+                    return CompletableFuture.completedFuture(RuntimeResult.success(Map.of(PinId.of("output"), token), "selected"));
+                }),
+                RuntimeBinding.available(targetOperation, provider, "1.0.0", invocation -> {
+                    invoked.add(invocation.routedInputs());
+                    return CompletableFuture.completedFuture(RuntimeResult.success());
+                })));
+        CatalogSnapshot catalog = catalogWithDistinctNodeDefinitions(registry, operation, targetOperation);
+        BranchBinding selected = new BranchBinding(BranchId.of("selected"), CaseId.of("result"),
+            List.of(new BranchCase(CaseId.of("result"), Map.of(PinId.of("input"), new PinValue(PinId.of("input"), configured)))));
+        BranchBinding other = new BranchBinding(BranchId.of("other"), CaseId.of("result"),
+            List.of(new BranchCase(CaseId.of("result"), Map.of())));
+        BranchBinding failed = new BranchBinding(BranchId.of("failed"), CaseId.of("failure"),
+            List.of(new BranchCase(CaseId.of("failure"), Map.of())));
+        GraphNode source = new GraphNode(sourceId, ContractRef.of(OWNER, NodeId.of("source")), 1, null, Map.of(), Map.of(),
+            List.of(selected, other), List.of(), InspectorState.empty(), 0, 0, OpaqueData.empty());
+        GraphNode target = new GraphNode(targetId, ContractRef.of(OWNER, NodeId.of("target")), 1, null, Map.of(), Map.of(),
+            List.of(failed), List.of(), InspectorState.empty(), 0, 0, OpaqueData.empty());
         ConnectionId connectionId = ConnectionId.deterministic("core-connection");
-        GraphNode source = new GraphNode(sourceId, ContractRef.of(OWNER, NodeId.of("source")), 1, Map.of());
-        GraphNode target = new GraphNode(targetId, ContractRef.of(OWNER, NodeId.of("target")), 1, Map.of());
-        GraphDocument graph = coreGraph(catalog, "flow", "core-stable", 4, List.of(source, target), List.of(
-            new GraphConnection(connectionId, new GraphEndpoint(sourceId, PinId.of("output")),
-                new GraphEndpoint(targetId, PinId.of("target-input")))));
+        GraphConnection selectedConnection = new GraphConnection(connectionId,
+            new GraphEndpoint(sourceId, PinId.of("output"), null, selected.branchId()), targetEndpoint);
+        GraphConnection otherConnection = new GraphConnection(ConnectionId.deterministic("core-other-connection"),
+            new GraphEndpoint(sourceId, PinId.of("output"), null, other.branchId()), targetEndpoint);
+        GraphConnection inactiveConnection = new GraphConnection(ConnectionId.deterministic("core-inactive-connection"),
+            otherConnection.source(), new GraphEndpoint(otherId, PinId.of("target-input")));
+        GraphDocument graph = coreGraph(catalog, "flow", "core-stable", 4, List.of(source, target,
+            new GraphNode(otherId, target.definition(), 1, Map.of())), List.of(selectedConnection, otherConnection, inactiveConnection));
 
-        CompiledGraphMetadataProvider.Result result = new CompiledGraphMetadataProvider(
-            () -> catalog,
-            () -> registry.snapshot().manifest(),
-            CORE_SERVER,
-            new FlowValueCodecRegistry()).provide(graph, null);
-
+        CompiledGraphMetadataProvider metadataProvider = new CompiledGraphMetadataProvider(() -> catalog,
+            () -> registry.snapshot().manifest(), CORE_SERVER, new FlowValueCodecRegistry());
+        CompiledGraphMetadataProvider.Result result = metadataProvider.provide(graph, null);
         assertTrue(result.accepted(), result.diagnostics()::toString);
         assertEquals(graph.resource(), result.metadata().resource());
         assertEquals(graph.catalogBinding(), result.metadata().catalogBinding());
         assertEquals(sourceId, result.metadata().nodeInstances().get(sourceId.canonicalText()));
         assertEquals(targetId, result.metadata().nodeInstances().get(targetId.canonicalText()));
-        assertEquals(connectionId, result.metadata().connections().values().stream().findFirst().orElseThrow());
+        assertEquals(connectionId, result.metadata().connections().get(
+            CompiledGraphMetadata.ConnectionAddress.of(selectedConnection.source(), targetEndpoint)));
+        assertEquals(3, result.metadata().connections().size());
+        assertEquals(configured, result.metadata().inputValues().get(new CompiledGraphMetadata.PinAddress(sourceId.canonicalText(), "input")));
+        assertEquals(selectedConnection, result.mappingContext().connectionMappings().get(connectionId));
+        assertTrue(result.mappingContext().validationFailure(graph, sourceId.canonicalText()).isEmpty());
+        FlowGraph shell = new FlowGraph();
+        shell.setId(graph.resource().id());
+        shell.setResourceType(graph.resource().resourceType().canonicalText());
+        shell.setResourceRevision(graph.revision());
+        FlowExecutionBridge.Context context = new FlowExecutionBridge.Context(shell, sourceId.canonicalText(), null, null, Map.of(),
+            result.mappingContext(), result.metadata(), CompiledRuntimeContext.empty(), CorrelationId.random(),
+            RuntimeExecutionContext.NO_DEADLINE, graph);
+        FlowExecutionBridge.Result executed = new CompiledCoreFlowExecutionBridge(() -> catalog,
+            () -> registry.snapshot().manifest(), registry, authority).execute(context).toCompletableFuture().get(5, TimeUnit.SECONDS);
+        assertEquals(FlowExecutionBridge.Status.EXECUTED, executed.status());
+        assertEquals(List.of(Map.of(targetEndpoint, token)), invoked);
+
+        BranchBinding conflicting = new BranchBinding(other.branchId(), other.selectedCaseId(), List.of(new BranchCase(CaseId.of("result"),
+            Map.of(PinId.of("input"), new PinValue(PinId.of("input"), TypedValue.value(configured.type(), "Other Value"))))));
+        GraphNode conflict = new GraphNode(sourceId, source.definition(), 1, null, Map.of(), Map.of(), List.of(selected, conflicting),
+            List.of(), InspectorState.empty(), 0, 0, OpaqueData.empty());
+        CompiledGraphMetadataProvider.Result rejected = metadataProvider.provide(
+            coreGraph(catalog, "flow", "core-stable", 4, List.of(conflict), List.of()), null);
+        assertFalse(rejected.accepted());
+        assertTrue(rejected.diagnostics().stream().anyMatch(value -> value.code().equals("GRAPH.BRANCH_INPUT_AMBIGUOUS")));
 
         GraphDocument changed = new GraphDocument(graph.schemaVersion(), graph.resource(), graph.revision(),
             graph.catalogBinding(), graph.requiredCapabilities(), graph.nodes(), graph.connections(), graph.variables(),
             graph.functions(), OpaqueData.of(Map.of("future", Map.of("preserved", true))));
-        CompiledGraphMetadataProvider.Result changedResult = new CompiledGraphMetadataProvider(
-            () -> catalog,
-            () -> registry.snapshot().manifest(),
-            CORE_SERVER,
-            new FlowValueCodecRegistry()).provide(changed, null);
-
+        CompiledGraphMetadataProvider.Result changedResult = metadataProvider.provide(changed, null);
         assertTrue(changedResult.accepted(), changedResult.diagnostics()::toString);
         assertNotEquals(result.metadata().snapshotId(), changedResult.metadata().snapshotId());
     }
@@ -452,8 +530,8 @@ class CompiledGraphMetadataProviderTest {
 
     private static CompiledGraphMetadataProvider provider(Object catalog, Object manifest) {
         return new CompiledGraphMetadataProvider(
-            () -> (restudio.resync.flow.catalog.CatalogSnapshot) catalog,
-            () -> (restudio.resync.flow.runtime.RuntimeBindingManifest) manifest,
+            () -> (CatalogSnapshot) catalog,
+            () -> (RuntimeBindingManifest) manifest,
             ServerId.deterministic("provider-test"),
             new FlowValueCodecRegistry());
     }
@@ -544,7 +622,9 @@ class CompiledGraphMetadataProviderTest {
                 "Provides the configured value for this test pin.",
                 CatalogNodeDescriptor.Requirement.OPTIONAL,
                 CAPABILITY)).toList())
-            .branches(List.of(failure))
+            .branches(Stream.concat(Stream.of(failure), operation.semantics().successBranches().stream().sorted().map(branch ->
+                new CatalogNodeDescriptor.Branch(branch, branch, "Selects this runtime result.",
+                    List.of(new CatalogNodeDescriptor.Case("result", "Result", "Uses this result."))))).toList())
             .handler(new CatalogNodeDescriptor.Handler(capability, handlerOperation))
             .semantics(operation.semantics())
             .requiredCapabilities(Set.of(capability))
@@ -588,6 +668,10 @@ class CompiledGraphMetadataProviderTest {
     }
 
     private static RuntimeSemantics semantics() {
+        return semantics(Set.of());
+    }
+
+    private static RuntimeSemantics semantics(Set<String> successBranches) {
         TypeExpr string = TypeExpr.named(TypeReference.of("builtin", "string"));
         return new RuntimeSemantics(
             RuntimeSemantics.Effect.PURE,
@@ -604,7 +688,7 @@ class CompiledGraphMetadataProviderTest {
             RuntimeSemantics.Confirmation.NONE,
             RuntimeSemantics.SensitiveData.NONE,
             RuntimeSemantics.Determinism.DETERMINISTIC,
-            Set.of(),
+            successBranches,
             Set.of("failed"),
             Set.of(),
             new RuntimeFailureContract(string, Set.of("RUNTIME.FAILURE"), Set.of("failed"), RuntimeFailureContract.CommitBoundary.NO_MUTATION),

@@ -109,12 +109,13 @@ final class ReSyncDataFixerTest {
         AssetAdoptionArtifactProducer.Result artifact = AssetAdoptionArtifactProducer.produceEmptyUnconsumed(
             coordination, provenance);
 
-        coordinator.prepareDataFixes(new ReSyncDataFixer(1, List.of()), true);
+        coordinator.prepareDataFixes(new ReSyncDataFixer(2, List.of(fix("one-to-two", 1, "two"))), true);
         AssetAdoptionArtifactProducer.Result resumed = AssetAdoptionArtifactProducer.produceEmptyUnconsumed(
             coordination, provenance);
         provenance.consume(resumed.artifactHash());
 
         assertEquals(artifact.artifactHash(), resumed.artifactHash());
+        assertEquals(2, ReSyncDataFixer.installedVersion(prepared.activeRoot()).orElseThrow());
         FreshRootProvenance.verifyConsumed(coordination, prepared.activeRoot(), provenance.proofHash(),
             artifact.artifactHash());
     }

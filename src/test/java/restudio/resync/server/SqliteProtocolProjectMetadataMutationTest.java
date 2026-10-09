@@ -10,6 +10,8 @@ import com.google.gson.JsonPrimitive;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
+import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.resync.core.ConnectionInfo;
@@ -58,6 +60,7 @@ import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.ProjectMetadataLineage;
 import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.worldgen.WorldGenProjectStorage;
+import restudio.resync.worldgen.WorldGenGeneratedRebuildRecipe;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenSerializer;
 
@@ -484,6 +487,141 @@ class SqliteProtocolProjectMetadataMutationTest {
     }
 
     @Test
+    void recoversMixedAdminHistoryWithNeutralSavesAndExactReceipts(@TempDir Path directory) throws Exception {
+        Path assets = directory.resolve("assets");
+        Path runtime = directory.resolve("runtime");
+        try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(assets, new Gson())) {
+            FlowStorage storage = storage(directory, coordinator);
+            storage.saveProjectMetadata("""
+                {"serverId":"project","folders":[
+                {"path":"Content","parentPath":"","name":"Content","sortOrder":0,"collapsed":false},
+                {"path":"Content/Items","parentPath":"Content","name":"Items","sortOrder":0,"collapsed":false}],
+                "resources":[{"type":"custom_content","id":"ultimateGem","path":"Content/Items/ultimateGem.json"}]}
+                """, UUID.randomUUID(), 0L);
+            try (JsonAssetStore<JsonObject> custom = legacyAdminStore(assets, directory, ReSyncResourceCatalog.CUSTOM_CONTENT, coordinator);
+                 JsonAssetStore<JsonObject> recipe = legacyAdminStore(assets, directory, ReSyncResourceCatalog.RECIPE_DEFINITION, coordinator)) {
+                FlowResourceRegistry registry = registry(storage);
+                registry.unregister(ReSyncResourceCatalog.CUSTOM_CONTENT);
+                registry.unregister(ReSyncResourceCatalog.RECIPE_DEFINITION);
+                registerLegacyAdapter(registry, ReSyncResourceCatalog.CUSTOM_CONTENT, custom);
+                registerLegacyAdapter(registry, ReSyncResourceCatalog.RECIPE_DEFINITION, recipe);
+                List<UUID> mutations = new ArrayList<>();
+                UUID gemCreate = UUID.randomUUID();
+                try (SqliteProtocolResourceMutationAuthority observed = authority(registry, runtime)) {
+                    AssetTransactionCoordinator.Snapshot baseline = coordinator.read(snapshot -> snapshot);
+                    coordinator.transact(new AssetTransactionCoordinator.TransactionRequest(UUID.randomUUID(), baseline.project(),
+                        List.of(AssetTransactionCoordinator.AssetDelta.write(
+                            new AssetTransactionCoordinator.AssetKey("worldgen-generated-rebuild-recipe", "v1"),
+                            assets.resolve(".durability/worldgen-generated-rebuild-recipe.v1"),
+                            AssetTransactionCoordinator.Missing.INSTANCE, WorldGenGeneratedRebuildRecipe.capture(List.of()).encodedBytes())), List.of()));
+                    JsonObject gem = resourcePayload("ultimateGem", "Content/Items");
+                    custom.save(gem, gemCreate, 0L);
+                    mutations.add(gemCreate);
+                    assertEquals(1L, storage.readProjectMetadataIdentity(SERVER.canonicalText()).revision(),
+                        () -> coordinator.read(snapshot -> snapshot.metadata().serializedJson()));
+                    ContractRef<ResourceTypeId> customType = ContractRef.of(new OwnerId("restudio.resync"),
+                        new ResourceTypeId(ReSyncResourceCatalog.CUSTOM_CONTENT));
+                    assertEquals(gemCreate, observed.list(SERVER, customType, "").getFirst().mutationId());
+                    assertEquals(0L, legacyReceiptCount(runtime.resolve("resource.db")));
+                }
+                UUID gemSave = UUID.randomUUID();
+                JsonObject updatedGem = resourcePayload("ultimateGem", "Content/Items");
+                updatedGem.addProperty("value", "Updated Gem");
+                custom.save(updatedGem, gemSave, 1L);
+                mutations.add(gemSave);
+                String commandId = "server-menu";
+                FlowGraph command = new FlowGraph(commandId, Map.of("entry", new FlowNode("event.resync.command", 0, 0,
+                    Map.of("label", "menu"))), List.of(), List.of());
+                command.setResourceType("command");
+                command.setOpaqueProperties(Map.of("displayName", new JsonPrimitive("Open Menu")));
+                UUID commandCreate = UUID.randomUUID();
+                storage.saveGraph(command, commandCreate, 0L);
+                mutations.add(commandCreate);
+                command.setEnabled(false);
+                command.setOpaqueProperties(Map.of("displayName", new JsonPrimitive("Server Menu")));
+                UUID commandSave = UUID.randomUUID();
+                storage.saveGraph(command, commandSave, 1L);
+                mutations.add(commandSave);
+                UUID guiCreate = UUID.randomUUID();
+                storage.saveGui(new GuiDefinition("newGui", "New Menu", 3), guiCreate, 0L);
+                mutations.add(guiCreate);
+                UUID guiDelete = UUID.randomUUID();
+                storage.deleteGui("newGui", guiDelete, 1L);
+                mutations.add(guiDelete);
+                JsonObject first = resourcePayload("newRecipe", "Recipes");
+                first.addProperty("value", "First");
+                UUID recipeCreate = UUID.randomUUID();
+                recipe.save(first, recipeCreate, 0L);
+                mutations.add(recipeCreate);
+                JsonObject second = first.deepCopy();
+                second.addProperty("value", "Second");
+                UUID recipeSave = UUID.randomUUID();
+                recipe.save(second, recipeSave, 1L);
+                mutations.add(recipeSave);
+                JsonObject last = second.deepCopy();
+                last.addProperty("value", "Last");
+                last.addProperty("path", "Recipes/Moved");
+                UUID recipeMove = UUID.randomUUID();
+                recipe.save(last, recipeMove, 2L);
+                mutations.add(recipeMove);
+                long sequence = coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence);
+                long revision = storage.readProjectMetadataIdentity(SERVER.canonicalText()).revision();
+                Path recipeFile = recipe.coordinatorSnapshot().path(new AssetTransactionCoordinator.AssetKey(
+                    ReSyncResourceCatalog.RECIPE_DEFINITION, "newRecipe")).orElseThrow();
+                byte[] retained = Files.readAllBytes(recipeFile);
+                Path commandFile = coordinator.read(snapshot -> snapshot.path(new AssetTransactionCoordinator.AssetKey(
+                    "command", commandId)).orElseThrow());
+                byte[] retainedCommand = Files.readAllBytes(commandFile);
+                CoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER);
+                Files.writeString(recipeFile, "{}");
+                assertThrows(IllegalStateException.class, () -> authority(registry, runtime, core));
+                assertEquals(0L, legacyReceiptCount(runtime.resolve("resource.db")));
+                Files.write(recipeFile, retained);
+                for (int reopen = 0; reopen < 2; reopen++) {
+                    try (SqliteProtocolResourceMutationAuthority recovered = authority(registry, runtime, core)) {
+                        assertEquals(revision, recovered.list(SERVER, TYPE, "").getFirst().revision());
+                        assertEquals("Last", recipe.get("newRecipe").get("value").getAsString());
+                        assertTrue(storage.readResourceIdentity(ReSyncResourceCatalog.GUI, "newGui").deleted());
+                        assertEquals(gemSave, custom.readStamp("ultimateGem").mutationId());
+                        FlowGraph preserved = storage.getGraph("command", commandId);
+                        assertFalse(preserved.isEnabled());
+                        assertEquals("Server Menu", preserved.getOpaqueProperties().get("displayName").getAsString());
+                        assertEquals("menu", preserved.getNodes().get("entry").getInputValues().get("label"));
+                        assertEquals(2L, storage.readGraphIdentity("command", commandId).revision());
+                        assertEquals(commandSave.toString(), storage.readGraphIdentity("command", commandId).mutationId());
+                        assertArrayEquals(retainedCommand, Files.readAllBytes(commandFile));
+                    }
+                    assertEquals(sequence, coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence));
+                    assertEquals(mutations.size(), legacyReceiptCount(runtime.resolve("resource.db")));
+                }
+                try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + runtime.resolve("resource.db"));
+                     var receipt = connection.prepareStatement("SELECT result_hash FROM resource_mutation_receipt WHERE mutation_id = ?")) {
+                    List<JsonObject> versions = List.of(first, second, last);
+                    List<UUID> saves = List.of(recipeCreate, recipeSave, recipeMove);
+                    for (int index = 0; index < saves.size(); index++) {
+                        receipt.setString(1, saves.get(index).toString());
+                        try (var result = receipt.executeQuery()) {
+                            assertTrue(result.next());
+                            assertEquals(hash(canonicalJson(versions.get(index))).canonicalText(), result.getString(1));
+                        }
+                    }
+                    try (PreparedStatement commands = connection.prepareStatement("SELECT COUNT(*), "
+                        + "SUM(CASE WHEN status = 'APPLIED' AND result_deleted = 0 THEN 1 ELSE 0 END) "
+                        + "FROM resource_mutation_receipt WHERE response_resource = ?")) {
+                        commands.setString(1, new ServerResourceLocator(SERVER,
+                            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("command")), commandId).canonicalText());
+                        try (var result = commands.executeQuery()) {
+                            assertTrue(result.next());
+                            assertEquals(2L, result.getLong(1));
+                            assertEquals(2L, result.getLong(2));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     void exactProtocolImportsCoordinatorProvenLegacyAdminChainOnce(@TempDir Path directory) throws Exception {
         verifyCoordinatorProvenLegacyAdminChain(directory, false, true);
     }
@@ -494,7 +632,7 @@ class SqliteProtocolProjectMetadataMutationTest {
     }
 
     @Test
-    void exactProtocolRejectsDisposableLegacyCoreOutsideTheProbeScope(@TempDir Path directory) throws Exception {
+    void exactProtocolPreservesLegacyCoreOutsideTheProbeScope(@TempDir Path directory) throws Exception {
         verifyCoordinatorProvenLegacyAdminChain(directory, true, false);
     }
 
@@ -554,6 +692,9 @@ class SqliteProtocolProjectMetadataMutationTest {
                     assertTrue(created.handled(), created.code() + ": " + created.message());
                     ProtocolEnvelopeDispatchResult saved = mutate(authority, saveCore(neutralFlow, neutralSave, boundary, 1L));
                     assertTrue(saved.handled(), saved.code() + ": " + saved.message());
+                    ProtocolEnvelopeDispatchResult savedAgain = mutate(authority,
+                        saveCore(neutralFlow, UUID.fromString("99999999-aaaa-4bbb-8ccc-eeeeeeeeeeee"), boundary, 2L));
+                    assertTrue(savedAgain.handled(), savedAgain.code() + ": " + savedAgain.message());
                 }
 
                 text.save(resourcePayload(id, "Text/Templates"), textCreate, 0L);
@@ -600,10 +741,55 @@ class SqliteProtocolProjectMetadataMutationTest {
                 registry.addCoreMutationListener(ignored -> {
                 });
                 if (legacyCore && !eligibleLegacyCore) {
-                    assertThrows(IllegalStateException.class, () -> authority(registry, runtime,
-                        new FlowStorageCoreGraphResourceAuthority(storage, SERVER)));
-                    assertEquals(0L, legacyReceiptCount(runtime.resolve("resource.db")));
-                    assertTrue(storage.getGraph(id) != null);
+                    ServerResourceLocator flow = new ServerResourceLocator(SERVER,
+                        ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("flow")), id);
+                    AssetTransactionCoordinator.AssetKey key = new AssetTransactionCoordinator.AssetKey("flow", id);
+                    Path source = coordinator.read(snapshot -> snapshot.path(key).orElseThrow());
+                    byte[] retained = Files.readAllBytes(source);
+                    long sequence = coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence);
+                    CoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER);
+                    ServerResourceLocator neutralFlow = new ServerResourceLocator(SERVER,
+                        ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("flow")), "receipted-neutral-flow");
+                    CatalogBinding target = core.activeCatalogBinding().orElseThrow();
+                    UUID catalogMutation = CoreCatalogCompatibilityRebind.mutationId(neutralFlow,
+                        core.load(neutralFlow).orElseThrow(), target);
+                    for (int reopen = 0; reopen < 2; reopen++) {
+                        try (SqliteProtocolResourceMutationAuthority authority = authority(registry, runtime, core)) {
+                            assertEquals(9L, authority.list(SERVER, TYPE, "").getFirst().revision());
+                            assertEquals(id, storage.getGraph(id).getId());
+                            assertArrayEquals(retained, Files.readAllBytes(source));
+                            CoreGraphStorageBoundary.Decoded rebound = core.load(neutralFlow).orElseThrow();
+                            assertEquals(4L, rebound.envelope().assetRevision());
+                            assertEquals(target, rebound.graphDocument().catalogBinding());
+                            assertEquals(catalogMutation.toString(), rebound.envelope().assetMutationId());
+                        }
+                        assertEquals(sequence + 1L, coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence));
+                        assertEquals(7L, legacyReceiptCount(runtime.resolve("resource.db")));
+                    }
+                    CoreGraphResourceAuthority.LegacyCoreRecoverySource proof = core.coordinatedRawGraphSource(flow).orElseThrow();
+                    assertThrows(IllegalStateException.class,
+                        () -> core.recoverLegacyDelete(flow, flowCreate, 1L, proof.assetHash(), UUID.randomUUID()));
+                    assertArrayEquals(retained, Files.readAllBytes(source));
+                    assertEquals(sequence + 1L, coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence));
+                    try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + runtime.resolve("resource.db"));
+                         PreparedStatement receipt = connection.prepareStatement("SELECT actor_id, status, "
+                             + "expected_revision, result_revision, result_deleted FROM resource_mutation_receipt WHERE mutation_id = ?")) {
+                        receipt.setString(1, catalogMutation.toString());
+                        try (var result = receipt.executeQuery()) {
+                            assertTrue(result.next());
+                            assertEquals(CoreCatalogCompatibilityRebind.PROOF_ACTOR, result.getString(1));
+                            assertEquals("APPLIED", result.getString(2));
+                            assertEquals(3L, result.getLong(3));
+                            assertEquals(4L, result.getLong(4));
+                            assertEquals(0, result.getInt(5));
+                        }
+                        try (Statement statement = connection.createStatement();
+                             var result = statement.executeQuery("SELECT COUNT(*) FROM resource_mutation_receipt "
+                                 + "WHERE actor_id = 'legacy-admin-recovery'")) {
+                            assertTrue(result.next());
+                            assertEquals(0L, result.getLong(1));
+                        }
+                    }
                     return;
                 }
 
@@ -740,12 +926,31 @@ class SqliteProtocolProjectMetadataMutationTest {
                 ResourceDocument<Map<String, Object>> metadata = authority.list(SERVER, TYPE, "").getFirst();
                 assertEquals(2L, metadata.revision());
                 assertEquals(sourceMutation, metadata.mutationId());
+                WorldGenProject disposable = new WorldGenProject();
+                disposable.setId("disposable-lineage");
+                UUID createMutation = UUID.fromString("91919191-9191-4191-8191-919191919191");
+                UUID deleteMutation = UUID.fromString("92929292-9292-4292-8292-929292929292");
+                worldGen.saveProject(disposable, createMutation, 0L, worldGenScope(disposable, createMutation));
+                AssetTransactionCoordinator.Snapshot saved = coordinator.read(snapshot -> snapshot);
+                coordinator.transact(new AssetTransactionCoordinator.TransactionRequest(UUID.randomUUID(), saved.project(),
+                    List.of(AssetTransactionCoordinator.AssetDelta.write(new AssetTransactionCoordinator.AssetKey("test.note", "neutral"),
+                        assets.resolve("neutral.txt"), AssetTransactionCoordinator.Missing.INSTANCE, new byte[]{1})), List.of()));
+                worldGen.deleteProject(disposable.getId(), deleteMutation, 1L,
+                    worldGenDeleteScope(disposable.getId(), deleteMutation, deleteMutation, 1L));
+                assertEquals(metadata.payloadHash().canonicalText(),
+                    storage.readProjectMetadataIdentity(SERVER.canonicalText()).payloadHash());
                 worldGen.closePersistence();
             }
+            long committedSequence = coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence);
             try (SqliteProtocolResourceMutationAuthority authority = authority(registry, directory)) {
                 ResourceDocument<Map<String, Object>> replay = authority.list(SERVER, TYPE, "").getFirst();
-                assertEquals(2L, replay.revision());
-                assertEquals(UUID.fromString("90909090-9090-4090-8090-909090909090"), replay.mutationId());
+                assertEquals(4L, replay.revision());
+                assertEquals(UUID.fromString("92929292-9292-4292-8292-929292929292"), replay.mutationId());
+                assertEquals(committedSequence, coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence));
+                assertEquals("preserved", JsonAssetStore.logicalPayload(JsonParser.parseString(
+                    Files.readString(coordinator.read(snapshot -> snapshot.path(
+                        new AssetTransactionCoordinator.AssetKey(ReSyncResourceCatalog.WORLDGEN, "atomic-lineage")).orElseThrow())))
+                    .getAsJsonObject()).get("futureOpaqueField").getAsString());
             }
         }
     }

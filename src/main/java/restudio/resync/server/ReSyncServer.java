@@ -251,6 +251,7 @@ public class ReSyncServer {
     private final ScheduledExecutorService scheduler;
     private final ExecutorService handshakeExecutor;
     private final OptionCatalogCaptureExecutor.Bounded optionCatalogExecutor;
+    private final Set<ConnectionInfo> networkConnections = ConcurrentHashMap.newKeySet();
     private final Map<ConnectionInfo, BridgeHandshake> bridgeHandshakes = new ConcurrentHashMap<>();
     private final Map<ConnectionInfo, CompletableFuture<Boolean>> authoringHandshakes = new ConcurrentHashMap<>();
     private final Semaphore handshakeProbes = new Semaphore(2);
@@ -288,6 +289,8 @@ public class ReSyncServer {
     private final AtomicBoolean protocolShutdownAwaiting = new AtomicBoolean();
     private final AtomicBoolean coreShutdownFinalized = new AtomicBoolean();
     private final AtomicBoolean coreShutdownAwaitingModules = new AtomicBoolean();
+    private final AtomicBoolean extensionShutdownAwaiting = new AtomicBoolean();
+    private long extensionShutdownDeadline;
     private final CompletableFuture<Void> coreShutdownCompletion = new CompletableFuture<>();
     private final ReSyncShutdownCoordinator shutdownCoordinator;
     private final Object shutdownRetryMonitor = new Object();
@@ -358,6 +361,7 @@ public class ReSyncServer {
         PaperPlayerDataMutationAdmission admission = PaperPlayerDataMutationAdmission.forBukkitWorlds();
         this.playerDataAdmission = admission;
         PaperPlayerDataMutationAdmission.Installation admissionInstallation = null;
+        List<Runnable> startupCleanup = new ArrayList<>();
         long startupStarted = System.nanoTime();
         long modulesInitialized = startupStarted;
         long persistencePrepared = startupStarted;
@@ -391,8 +395,13 @@ public class ReSyncServer {
                     null, null, null, null, authorityEpoch.current(), null), "outcome", "enabled",
                     "property", TemporaryLifecycleDiagnostics.PROPERTY, "environment", TemporaryLifecycleDiagnostics.ENVIRONMENT));
             this.authorityIssuer = new ProductionAuthorityIssuer(initialIdentity);
+            this.playerTrackingManager = new PlayerTrackingManager(dataRoot);
+            this.structureLibrary = StructureLibrary.get(plugin, dataRoot);
+            startupCleanup.add(this::closeStructures);
             this.connectionManager = new ConnectionManager(30, 60);
+            startupCleanup.add(connectionManager::shutdown);
             this.compressionPool = new CompressionPool(config.getCompression().getLevel(), 10);
+            startupCleanup.add(compressionPool::close);
             this.codec = new Codec(compressionPool, config.getMaxEncodedFrameBytes(), config.getMaxDecompressedPayloadBytes());
             this.channelMuxer = new ChannelMuxer();
             this.moduleRegistry = new ModuleRegistry();
@@ -401,27 +410,34 @@ public class ReSyncServer {
                 config.getQueue().getMaxRequestsPerClient(),
                 4
             );
+            startupCleanup.add(requestQueue::shutdown);
             this.memoryMonitor = new MemoryMonitor(config.getMemory().getSessionMemoryRatio());
+            startupCleanup.add(memoryMonitor::shutdown);
             this.sessionManager = new SessionManager(memoryMonitor, 300, config.getMemory().getMaxMemoryPerSession());
+            startupCleanup.add(sessionManager::shutdown);
             this.rateLimiter = new RateLimiter(1000, 10, 1000);
             this.clientAuthorizer = new ClientAuthorizer(config);
             this.protocolEnvelopeDispatch = new ProtocolEnvelopeDispatchBoundary(authorityEpoch, protocolEnvelopeHandler);
             this.protocolEnvelopeMailbox = new ProtocolEnvelopeMailbox(protocolEnvelopeDispatch,
                 ProtocolEnvelopeMailbox.Limits.standard(config.getQueue().getMaxRequestsPerClient(),
                     config.getQueue().getMaxGlobalRequests(), config.getMaxDecompressedPayloadBytes()));
+            startupCleanup.add(protocolEnvelopeMailbox::close);
             this.scheduler = Executors.newScheduledThreadPool(2);
+            startupCleanup.add(scheduler::shutdownNow);
             this.handshakeExecutor = new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(2), runnable -> {
                     Thread thread = new Thread(runnable, "ReSync-Handshake");
                     thread.setDaemon(true);
                     return thread;
                 }, new ThreadPoolExecutor.AbortPolicy());
+            startupCleanup.add(handshakeExecutor::shutdownNow);
             this.optionCatalogExecutor = OptionCatalogCaptureExecutor.bounded(2, Duration.ofSeconds(10),
                 Bukkit::isPrimaryThread, runnable -> Bukkit.getScheduler().runTask(plugin, runnable), runnable -> {
                     Thread thread = new Thread(runnable, "ReSync-Option-Catalog");
                     thread.setDaemon(true);
                     return thread;
                 });
+            startupCleanup.add(optionCatalogExecutor::close);
             this.moduleContext = new ModuleContext(
                 plugin,
                 this,
@@ -440,14 +456,13 @@ public class ReSyncServer {
             moduleContext.registerService(PaperPlayerDataMutationAdmission.class, playerDataAdmission);
             moduleContext.registerService(ServerIdentityStore.class, initialIdentity);
             moduleContext.registerService(AuthorityEpoch.class, authorityEpoch);
-            this.playerTrackingManager = new PlayerTrackingManager(dataRoot);
-            this.structureLibrary = StructureLibrary.get(plugin, dataRoot);
             this.shutdownCoordinator = new ReSyncShutdownCoordinator(
                 () -> shutdownNetworkAfterPreparation().thenApply(result -> result != null && result.completed()),
                 this::retryPreparedShutdown,
                 this::finishCoreShutdown,
                 this::coreShutdownCompletion);
         } catch (IOException exception) {
+            closeStartup(startupCleanup, exception);
             try {
                 admission.close();
             } catch (RuntimeException cleanupFailure) {
@@ -459,6 +474,7 @@ public class ReSyncServer {
             TemporaryLifecycleDiagnostics.close(lifecycleDiagnosticSink);
             throw new IllegalStateException("ReSync startup persistence could not be loaded: " + exception.getMessage(), exception);
         } catch (RuntimeException failure) {
+            closeStartup(startupCleanup, failure);
             try {
                 admission.close();
             } catch (RuntimeException cleanupFailure) {
@@ -605,6 +621,15 @@ public class ReSyncServer {
                     Map.of("stageName", "flow", "outcome", "complete"));
                 readinessProof = completeStartupAuthorityActivation(registration, readinessProof);
                 registration = persistenceRegistration;
+                if (resourceRegistry != null && resourceMutationAuthority != null) {
+                    SqliteProtocolResourceMutationAuthority networkAuthority = resourceMutationAuthority;
+                    resourceRegistry.bindNetworkCoreMutations(() -> {
+                        if (resourceMutationAuthority != networkAuthority) {
+                            throw new IllegalStateException("Network resource mutation authority is unavailable");
+                        }
+                        return networkAuthority.networkCoreMutations();
+                    });
+                }
                 authorityReady = System.nanoTime();
                 TemporaryLifecycleDiagnostics.event("startup_stage", flowReady,
                     Map.of("stageName", "authority", "outcome", "complete"));
@@ -1011,6 +1036,7 @@ public class ReSyncServer {
             }
             MigrationFence fence = moduleContext.getRequiredService(MigrationFence.class);
             ReSyncNetworkAgent preparedAgent = new ReSyncNetworkAgent(plugin, loaded, fence, playerDataAdmission);
+            preparedAgent.connectEditors(this);
             NetworkResourceSynchronizer preparedResource = null;
             List<NetworkPathSynchronizer> preparedPaths = new ArrayList<>();
             NetworkPlayerStateCoordinator preparedPlayerState = null;
@@ -2288,19 +2314,26 @@ public class ReSyncServer {
     }
 
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        int current = openConnections.incrementAndGet();
-        if (config.getMaxConnections() > 0 && current > config.getMaxConnections()) {
-            openConnections.decrementAndGet();
-            conn.close(1013, "Max connections reached");
-            return;
+        synchronized (openConnections) {
+            if (config.getMaxConnections() > 0 && openConnections.get() >= config.getMaxConnections()) {
+                conn.close(1013, "Max connections reached");
+                return;
+            }
+            if (connectionManager.getConnection(conn) != null) return;
+            connectionManager.createConnection(conn);
+            openConnections.incrementAndGet();
         }
-        connectionManager.createConnection(conn);
         Log.fine("Client connected: " + conn.getRemoteSocketAddress());
     }
 
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-        openConnections.updateAndGet(value -> Math.max(0, value - 1));
-        ConnectionInfo connection = connectionManager.getConnection(conn);
+        ConnectionInfo connection;
+        synchronized (openConnections) {
+            connection = connectionManager.getConnection(conn);
+            if (connection == null) return;
+            connectionManager.removeConnection(conn);
+            openConnections.updateAndGet(value -> Math.max(0, value - 1));
+        }
         CompletableFuture<Boolean> authoringHandshake = connection != null ? authoringHandshakes.remove(connection) : null;
         if (authoringHandshake != null) {
             authoringHandshake.cancel(false);
@@ -2318,8 +2351,111 @@ public class ReSyncServer {
             moduleRegistry.cleanupSession(session);
         }
         sessionManager.removeSession(conn);
-        connectionManager.removeConnection(conn);
         Log.fine("Client disconnected: " + conn.getRemoteSocketAddress());
+    }
+
+    public ConnectionInfo onNetworkOpen(FrameSender sender) {
+        synchronized (openConnections) {
+            if (sender == null || networkConnections.size() >= 32 || coreShutdownPrepared.get() || shutdownStarted.get()) return null;
+            if (config.getMaxConnections() > 0 && openConnections.get() >= config.getMaxConnections()) return null;
+            ConnectionInfo info = connectionManager.createVirtualConnection(sender);
+            networkConnections.add(info);
+            openConnections.incrementAndGet();
+            return info;
+        }
+    }
+
+    public void onNetworkClose(ConnectionInfo info) {
+        synchronized (openConnections) {
+            if (info == null || !networkConnections.remove(info)) return;
+            openConnections.updateAndGet(value -> Math.max(0, value - 1));
+        }
+        synchronized (info) {
+            CompletableFuture<Boolean> handshake = authoringHandshakes.remove(info);
+            if (handshake != null) handshake.cancel(false);
+            info.clearProtocolSession();
+            info.setState(ConnectionState.CLOSING);
+            protocolEnvelopeMailbox.retire(info);
+            Session session = sessionManager.getSession(info);
+            try {
+                if (session != null) {
+                    ProviderOptionQueryService optionQueries = providerOptionQueryService;
+                    if (optionQueries != null) optionQueries.resetSession(session);
+                    moduleRegistry.cleanupSession(session);
+                }
+            } finally {
+                sessionManager.removeSession(info);
+                connectionManager.removeVirtualConnection(info);
+            }
+        }
+    }
+
+    public boolean onNetworkMessage(ConnectionInfo info, byte[] data) {
+        if (info == null) return false;
+        synchronized (info) {
+            if (!networkConnections.contains(info) || !info.isOpen() || data == null) return false;
+            if (data.length == 0 || data.length > Math.min(codec.getMaxEncodedFrameBytes(), info.getMaxEncodedFrameBytes())) {
+                info.getFrameSender().close(1009, "Editor Frame Too Large");
+                return false;
+            }
+            MessageType messageType = identifyMessageType(data);
+            ProtocolIngress protocolIngress = messageType == MessageType.PROTOCOL_ENVELOPE
+                ? captureProtocolIngress(info)
+                : null;
+            try {
+                FrameHeader outerHeader = clientHeader(info, data);
+                messageType = outerHeader.getMessageType();
+                String clientId = info.getClientId() != null ? info.getClientId() : "network-" + info.getConnectionId();
+                if (!rateLimiter.tryConsume("global", 1, config.getQueue().getMaxGlobalRequests(), config.getQueue().getMaxGlobalRequests(), 1000)) {
+                    if (messageType == MessageType.PROTOCOL_ENVELOPE) {
+                        sendProtocolTransportError(info, protocolIngress, 429, "Global rate limit exceeded");
+                    } else {
+                        sendError(info, 429, "Global rate limit exceeded");
+                    }
+                    return false;
+                }
+                if (!rateLimiter.tryConsume(clientId, 1, config.getQueue().getMaxRequestsPerClient(), config.getQueue().getMaxRequestsPerClient(), 1000)) {
+                    if (messageType == MessageType.PROTOCOL_ENVELOPE) {
+                        sendProtocolTransportError(info, protocolIngress, 429, "Rate limit exceeded");
+                    } else {
+                        sendError(info, 429, "Rate limit exceeded");
+                    }
+                    return false;
+                }
+                if (messageType == MessageType.PROTOCOL_ENVELOPE) {
+                    if (protocolIngress == null) return false;
+                    Session session = protocolIngress.session();
+                    ProtocolEnvelopeMailbox.Admission admission = protocolEnvelopeMailbox.admitEncoded(info, session, data,
+                        this::decodeProtocolEnvelopeFrame, this::currentProtocolSession,
+                        (result, dispatchAuthorityEpoch) -> prepareProtocolDelivery(info, session, result, dispatchAuthorityEpoch, () -> true));
+                    if (!admission.accepted()) {
+                        sendRejectedAdmission(info, protocolIngress, admission.rejection());
+                    }
+                    return admission.accepted();
+                }
+                Codec.Frame frame = codec.decodeFrame(data);
+                messageType = frame.header.getMessageType();
+                if (frame.header.getMessageType() == MessageType.DATA && !info.acceptInboundDataSequence(frame.header.getSequence())) {
+                    sendError(info, 409, "Stale data frame");
+                    return false;
+                }
+                Message payload = codec.decodePayload(frame);
+                handlePayload(info, payload, frame.header, protocolIngress);
+                return info.isOpen() && networkConnections.contains(info);
+            } catch (Exception e) {
+                if (messageType == MessageType.PROTOCOL_ENVELOPE) {
+                    sendProtocolResult(info, protocolIngress, ProtocolEnvelopeDispatchResult.rejected(
+                        ProtocolRejectionCode.INVALID_PAYLOAD, "Protocol envelope message is malformed"));
+                    return false;
+                }
+                String reason = e.getMessage();
+                if (reason == null || reason.isBlank()) {
+                    reason = e.getClass().getSimpleName();
+                }
+                Log.warn("Error handling network message: " + reason);
+                return false;
+            }
+        }
     }
 
     public ConnectionInfo onBridgeOpen(FrameSender sender) {
@@ -2370,6 +2506,8 @@ public class ReSyncServer {
             ? captureProtocolIngress(info)
             : null;
         try {
+            FrameHeader outerHeader = clientHeader(info, data);
+            messageType = outerHeader.getMessageType();
             String clientId = info.getClientId() != null ? info.getClientId() : player.getUniqueId().toString();
             if (!rateLimiter.tryConsume("global", 1, config.getQueue().getMaxGlobalRequests(), config.getQueue().getMaxGlobalRequests(), 1000)) {
                 if (messageType == MessageType.PROTOCOL_ENVELOPE) {
@@ -2387,8 +2525,6 @@ public class ReSyncServer {
                 }
                 return;
             }
-            FrameHeader outerHeader = new FrameHeader(data);
-            messageType = outerHeader.getMessageType();
             if (messageType == MessageType.PROTOCOL_ENVELOPE) {
                 if (!hasBridgeAccess(player)) {
                     sendProtocolResult(info, protocolIngress, ProtocolEnvelopeDispatchResult.rejected(
@@ -2428,6 +2564,10 @@ public class ReSyncServer {
             return;
         }
 
+        if (message.remaining() < 12 || message.remaining() > codec.getMaxEncodedFrameBytes()) {
+            conn.close(1009, "Frame Size Is Invalid");
+            return;
+        }
         byte[] data = new byte[message.remaining()];
         message.get(data);
 
@@ -2436,6 +2576,8 @@ public class ReSyncServer {
             ? captureProtocolIngress(info)
             : null;
         try {
+            FrameHeader outerHeader = clientHeader(info, data);
+            messageType = outerHeader.getMessageType();
             String clientId = info.getClientId() != null ? info.getClientId() : conn.getRemoteSocketAddress().toString();
             if (!rateLimiter.tryConsume("global", 1, config.getQueue().getMaxGlobalRequests(), config.getQueue().getMaxGlobalRequests(), 1000)) {
                 if (messageType == MessageType.PROTOCOL_ENVELOPE) {
@@ -2451,6 +2593,10 @@ public class ReSyncServer {
                 } else {
                     sendError(info, 429, "Rate limit exceeded");
                 }
+                return;
+            }
+            if (messageType == MessageType.PROTOCOL_ENVELOPE) {
+                handleEncodedProtocolEnvelope(info, data, this::decodeProtocolEnvelopeFrame, protocolIngress);
                 return;
             }
             Codec.Frame frame = codec.decodeFrame(data);
@@ -2473,6 +2619,19 @@ public class ReSyncServer {
             }
             Log.warn("Error handling message: " + reason);
         }
+    }
+
+    private FrameHeader clientHeader(ConnectionInfo info, byte[] data) {
+        FrameHeader header = codec.decodeHeader(data);
+        if (!Codec.isClientMessage(header.getMessageType())) {
+            info.getFrameSender().close(1008, "Client Message Required");
+            throw new SecurityException("Server Message Cannot Enter Client Ingress");
+        }
+        if (info.getState() != ConnectionState.AUTHENTICATED && header.getMessageType() != MessageType.HANDSHAKE_REQUEST) {
+            info.getFrameSender().close(1008, "Handshake Required");
+            throw new SecurityException("Handshake Required");
+        }
+        return header;
     }
 
     private void handlePayload(ConnectionInfo info, Message payload, FrameHeader header,
@@ -2522,8 +2681,7 @@ public class ReSyncServer {
             (result, dispatchAuthorityEpoch) ->
                 prepareProtocolDelivery(info, session, result, dispatchAuthorityEpoch, () -> true));
         if (!admission.accepted()) {
-            ProtocolEnvelopeDispatchResult rejection = correlateMailboxRejection(encodedPayload, payloadDecoder,
-                admission.rejection());
+            ProtocolEnvelopeDispatchResult rejection = admission.rejection();
             TemporaryLifecycleDiagnostics.event("response_dispatch_decision", started,
                 TemporaryLifecycleDiagnostics.with(ingressIdentity, "outcome", admission.status(),
                     "mailboxGeneration", admission.generation(), "requestBytes", encodedPayload.length));
@@ -3420,17 +3578,6 @@ public class ReSyncServer {
         }
     }
 
-    private ProtocolEnvelopeDispatchResult correlateMailboxRejection(byte[] encodedPayload,
-                                                                      ProtocolEnvelopeMailbox.PayloadDecoder payloadDecoder,
-                                                                      ProtocolEnvelopeDispatchResult rejection) {
-        try {
-            byte[] payload = payloadDecoder.decode(encodedPayload.clone());
-            return protocolEnvelopeDispatch.rejectPayload(payload, rejection.rejectionCode(), rejection.message());
-        } catch (RuntimeException exception) {
-            return rejection;
-        }
-    }
-
     private void sendRejectedAdmission(ConnectionInfo info, ProtocolIngress protocolIngress,
                                        ProtocolEnvelopeDispatchResult result) {
         if (info == null || protocolIngress == null || result == null) {
@@ -3600,6 +3747,24 @@ public class ReSyncServer {
         return result != null && result.completed();
     }
 
+    private static void closeStartup(List<Runnable> cleanup, Throwable failure) {
+        for (int index = cleanup.size() - 1; index >= 0; index--) {
+            try {
+                cleanup.get(index).run();
+            } catch (RuntimeException cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+        }
+    }
+
+    private void closeStructures() {
+        try {
+            structureLibrary.close();
+        } catch (IOException failure) {
+            throw new IllegalStateException("Structure shutdown remains incomplete", failure);
+        }
+    }
+
     public synchronized void prepareCoreShutdown() {
         if (!coreShutdownPrepared.compareAndSet(false, true)) {
             return;
@@ -3615,15 +3780,8 @@ public class ReSyncServer {
         if (Bukkit.getServer() == null || Bukkit.isPrimaryThread()) {
             FlowRuntimeModule runtime = moduleContext.getService(FlowRuntimeModule.class);
             if (runtime != null) runtime.closeLiveRefreshAdmission();
-            try {
-                protocolEnvelopeMailbox.whenIdle().get(NetworkPersistenceDrainController.DEFAULT_DRAIN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            } catch (InterruptedException failure) {
-                Thread.currentThread().interrupt();
-                Log.warn("Protocol shutdown was interrupted; active resource authority remains retained");
-            } catch (ExecutionException | TimeoutException failure) {
-                Log.warn("Protocol shutdown is still draining; active resource authority remains retained");
-            }
         }
+        extensionShutdownDeadline = System.nanoTime() + NetworkPersistenceDrainController.DEFAULT_DRAIN_TIMEOUT.toNanos();
         prepareCoreShutdownAfterProtocolDrain();
     }
 
@@ -3637,24 +3795,35 @@ public class ReSyncServer {
             }
             return;
         }
-        if (Bukkit.getServer() != null && !Bukkit.isPrimaryThread() && !moduleContext.getPlugin().isEnabled()) {
-            Log.warn("Core shutdown requires retained primary preparation after resource drain");
+        if (Bukkit.getServer() != null && !Bukkit.isPrimaryThread()) {
+            scheduleExtensionShutdown();
+            return;
+        }
+        if (coreShutdownPipelineStarted.get()) {
+            return;
+        }
+        ReSyncPersistenceCoordinator persistence = this.persistence;
+        if (resourceMutationAuthority != null) {
+            resourceMutationAuthority.closeMutationAdmission();
+        }
+        try {
+            if (extensionManager != null) {
+                extensionManager.shutdown();
+            }
+            if (extensionManager != null && extensionManager.isShutdownPending()) {
+                scheduleExtensionShutdown();
+                return;
+            }
+        } catch (RuntimeException exception) {
+            Log.error("ReSync extension shutdown failed", exception);
+            scheduleExtensionShutdown();
             return;
         }
         if (!coreShutdownPipelineStarted.compareAndSet(false, true)) {
             return;
         }
-        ReSyncPersistenceCoordinator persistence = moduleContext.getService(ReSyncPersistenceCoordinator.class);
-        if (resourceMutationAuthority != null) {
-            resourceMutationAuthority.closeMutationAdmission();
-        }
         if (persistence != null) {
             persistence.beginShutdown();
-        }
-        try {
-            extensionManager.shutdown();
-        } catch (RuntimeException exception) {
-            Log.error("ReSync extension shutdown failed", exception);
         }
         try {
             coreModuleShutdown = moduleRegistry.shutdownModulesAsync(moduleContext);
@@ -3667,6 +3836,22 @@ public class ReSyncServer {
             Log.error("ReSync shutdown failed: " + GSON.toJson(diagnostic), exception);
         }
         coreModuleShutdown.whenComplete((unused, failure) -> finishCoreShutdown());
+    }
+
+    private void scheduleExtensionShutdown() {
+        if (!plugin.isEnabled() || System.nanoTime() >= extensionShutdownDeadline
+            || !extensionShutdownAwaiting.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                extensionShutdownAwaiting.set(false);
+                prepareCoreShutdownAfterProtocolDrain();
+            }, 1L);
+        } catch (RuntimeException failure) {
+            extensionShutdownAwaiting.set(false);
+            Log.warn("Extension shutdown requires a retained primary retry: " + failure.getMessage());
+        }
     }
 
     public synchronized void finishCoreShutdown() {
@@ -3698,7 +3883,7 @@ public class ReSyncServer {
             }
             return;
         }
-        ReSyncPersistenceCoordinator persistence = moduleContext.getService(ReSyncPersistenceCoordinator.class);
+        ReSyncPersistenceCoordinator persistence = this.persistence;
         if (persistence != null) {
             try {
                 PersistenceShutdownStatus status = persistence.shutdownStatus().state() == PersistenceShutdownStatus.State.FAILED
@@ -3714,6 +3899,12 @@ public class ReSyncServer {
             }
         }
         SqliteProtocolResourceMutationAuthority authority = resourceMutationAuthority;
+        try {
+            closeStructures();
+        } catch (RuntimeException failure) {
+            Log.error("ReSync structure shutdown remains incomplete", failure);
+            return;
+        }
         if (authority != null) {
             try {
                 authority.close();
@@ -3725,14 +3916,11 @@ public class ReSyncServer {
         if (!closePlayerDataAdmission()) {
             return;
         }
-        if (!coreShutdownFinalized.compareAndSet(false, true)) {
-            return;
-        }
         resourceMutationAuthority = null;
         ProviderOptionQueryService optionQueries = providerOptionQueryService;
-        providerOptionQueryService = null;
         if (optionQueries != null) {
             optionQueries.close();
+            providerOptionQueryService = null;
         }
         protocolEnvelopeMailbox.shutdown();
         OptionCatalogCaptureExecutor.ShutdownResult optionCaptureShutdown = optionCatalogExecutor.shutdown(Duration.ofMillis(100));
@@ -3751,6 +3939,7 @@ public class ReSyncServer {
         shutdownStarted.set(true);
         TemporaryLifecycleDiagnostics.flush();
         TemporaryLifecycleDiagnostics.close(lifecycleDiagnosticSink);
+        coreShutdownFinalized.set(true);
         coreShutdownCompletion.complete(null);
     }
 
@@ -3766,7 +3955,7 @@ public class ReSyncServer {
     }
 
     public CompletionStage<Void> coreShutdownCompletion() {
-        return coreShutdownCompletion;
+        return coreShutdownCompletion.minimalCompletionStage();
     }
 
     public CompletionStage<Void> retryCoreShutdown() {
@@ -3800,11 +3989,15 @@ public class ReSyncServer {
                     attempt.completeExceptionally(rootCause(failure));
                     return;
                 }
-                finishCoreShutdown();
-                if (coreShutdownFinalized.get()) {
-                    attempt.complete(null);
-                } else {
-                    attempt.completeExceptionally(new IllegalStateException("ReSync Core Shutdown Remains Retained"));
+                try {
+                    finishCoreShutdown();
+                    if (coreShutdownFinalized.get()) {
+                        attempt.complete(null);
+                    } else {
+                        attempt.completeExceptionally(new IllegalStateException("ReSync Core Shutdown Remains Retained"));
+                    }
+                } catch (RuntimeException exception) {
+                    attempt.completeExceptionally(exception);
                 }
             });
             return attempt;
@@ -3827,8 +4020,7 @@ public class ReSyncServer {
                 return CompletableFuture.failedFuture(new IllegalStateException(
                     result == null ? "ReSync Network Shutdown Did Not Complete" : result.detail()));
             }
-            finishCoreShutdown();
-            return coreShutdownCompletion;
+            return retryCoreShutdown();
         });
     }
 
@@ -3842,11 +4034,15 @@ public class ReSyncServer {
             }
             if (!coreShutdownPrepared.get()) {
                 prepareCoreShutdown();
+            } else if (!coreShutdownPipelineStarted.get() && (Bukkit.getServer() == null || Bukkit.isPrimaryThread())) {
+                extensionShutdownAwaiting.set(false);
+                extensionShutdownDeadline = System.nanoTime() + NetworkPersistenceDrainController.DEFAULT_DRAIN_TIMEOUT.toNanos();
+                prepareCoreShutdownAfterProtocolDrain();
             }
         } catch (RuntimeException exception) {
             return CompletableFuture.failedFuture(exception);
         }
-        return continuePreparedShutdown(false);
+        return retryPreparedShutdown();
     }
 
     static PersistenceShutdownStatus shutdownModulesBeforePersistence(ModuleRegistry moduleRegistry,
@@ -3963,6 +4159,11 @@ public class ReSyncServer {
         snapshot.put("queueMaxRequestsPerClient", config.getQueue().getMaxRequestsPerClient());
         snapshot.put("sessionMemoryBytes", sessionManager.getTotalSessionMemory());
         snapshot.put("sessionMemoryLimitBytes", memoryMonitor.getMaxMemoryForSessions());
+        Path activeRoot = persistence.authorityEpochStore().boundRoot();
+        snapshot.put("activeDataFolder", activeRoot == null ? "Unavailable" : activeRoot.toString());
+        snapshot.put("recoveryFolder", persistence.coordinationRoot().toString());
+        NetworkResourceSynchronizer resources = networkResourceSynchronizer;
+        snapshot.put("blockedNetworkResources", resources == null ? Map.of() : resources.blockedResources());
         return snapshot;
     }
 

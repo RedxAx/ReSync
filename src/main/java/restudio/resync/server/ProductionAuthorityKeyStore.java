@@ -88,6 +88,8 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
     private static final Map<Path, Object> JVM_LOCKS = new ConcurrentHashMap<>();
     private static final Map<LoadKey, CompletableFuture<AuthorityMaterial>> JVM_LOADS = new ConcurrentHashMap<>();
     private static final int MAXIMUM_RESERVATION_ATTEMPTS = 128;
+    private static final int MAXIMUM_PEER_KEYS = 128;
+    private static final int MAXIMUM_PEER_KEY_BYTES = 4096;
     private static final DirectoryForce SYSTEM_DIRECTORY_FORCE = ProductionAuthorityKeyStore::forceDirectorySystem;
     private static final InitialLoadObserver NO_INITIAL_LOAD_OBSERVER = new InitialLoadObserver() {
     };
@@ -279,7 +281,9 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
                 return loaded.pair();
             }
             if (inventory.temporaryFiles().isEmpty()) {
-                throw new MigrationException("Production Authority Key And Trust Anchor Are Incomplete");
+                LoadedPrivateKey recovered = recoverPeerPrivateKey(anchor, inventory.peerKeys());
+                keyFileState = recovered.state();
+                return recovered.pair();
             }
             LoadedPrivateKey recovered = recoverMissingPrivateKey(anchor, inventory.temporaryFiles());
             keyFileState = recovered.state();
@@ -368,6 +372,55 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
         return recovered;
     }
 
+    private LoadedPrivateKey recoverPeerPrivateKey(ProductionAuthorityTrustAnchor anchor,
+                                                   List<Path> peerKeys) throws IOException {
+        List<Candidate> matching = new ArrayList<>();
+        for (Path peer : peerKeys) {
+            LoadedPrivateKey loaded = readPrivateKey(peer, anchor, true);
+            try {
+                validatePair(anchor, loaded.pair().getPublic(), loaded.pair().getPrivate());
+                matching.add(new Candidate(peer, loaded));
+            } catch (MigrationException exception) {
+                if (!isKeyMismatch(exception)) {
+                    throw exception;
+                }
+            }
+        }
+        if (matching.isEmpty()) {
+            throw new MigrationException("Production Authority Key And Trust Anchor Are Incomplete");
+        }
+        Set<String> hashes = matching.stream().map(candidate -> candidate.loaded().state().contentHash())
+            .collect(Collectors.toUnmodifiableSet());
+        if (hashes.size() != 1) {
+            throw new MigrationException("Production Authority Signing Key Recovery Candidates Conflict");
+        }
+        for (Candidate candidate : matching) {
+            LoadedPrivateKey current = readPrivateKey(candidate.path(), anchor, true);
+            if (!candidate.loaded().state().contentHash().equals(current.state().contentHash())
+                || !sameFileIdentity(candidate.loaded().state().stamp(), current.state().stamp())) {
+                throw new MigrationException("Production Authority Peer Signing Key Changed During Recovery");
+            }
+            validatePair(anchor, current.pair().getPublic(), current.pair().getPrivate());
+        }
+        ensureIdentityStable();
+        if (!anchor.canonical().equals(readTrustAnchor().canonical())) {
+            throw new MigrationException("Production Authority Trust Anchor Changed During Key Recovery");
+        }
+        Candidate winner = matching.getFirst();
+        KeyFileState published = writePrivateKey(winner.loaded().pair().getPrivate());
+        if (!winner.loaded().state().contentHash().equals(published.contentHash())) {
+            throw new MigrationException("Production Authority Recovered Signing Key Bytes Differ");
+        }
+        ProductionAuthorityTrustAnchor currentAnchor = readTrustAnchor();
+        if (!anchor.canonical().equals(currentAnchor.canonical())) {
+            throw new MigrationException("Production Authority Trust Anchor Changed During Key Recovery");
+        }
+        LoadedPrivateKey recovered = readPrivateKey(privateKeyPath, currentAnchor);
+        validatePair(currentAnchor, recovered.pair().getPublic(), recovered.pair().getPrivate());
+        verifyKeyState(recovered.state());
+        return recovered;
+    }
+
     private void quarantineStaleTemporaryFiles(List<Path> temporaryFiles,
                                                ProductionAuthorityTrustAnchor anchor) throws IOException {
         if (temporaryFiles.isEmpty()) {
@@ -452,7 +505,12 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
     }
 
     private LoadedPrivateKey readPrivateKey(Path path, ProductionAuthorityTrustAnchor anchor) throws IOException {
-        StableFile file = readStableFile(path, "Production Authority Signing Key");
+        return readPrivateKey(path, anchor, false);
+    }
+
+    private LoadedPrivateKey readPrivateKey(Path path, ProductionAuthorityTrustAnchor anchor,
+                                          boolean peer) throws IOException {
+        StableFile file = readStableFile(path, "Production Authority Signing Key", peer);
         String content = decodeUtf8(file.bytes(), "Production Authority Signing Key");
         String[] lines = content.split("\\n", -1);
         if (lines.length != 4 || !lines[3].isEmpty() || !PRIVATE_FORMAT.trim().equals(lines[0])
@@ -472,6 +530,9 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
             }
             PrivateKey privateKey = KeyFactory.getInstance(ProductionAuthorityBundle.SIGNATURE_ALGORITHM)
                 .generatePrivate(new PKCS8EncodedKeySpec(privateBytes));
+            if (peer && !Arrays.equals(privateBytes, privateKey.getEncoded())) {
+                throw new MigrationException("Production Authority Peer Signing Key Encoding Is Not Canonical");
+            }
             PublicKey publicKey = parsePublicKey(anchor.publicKey());
             return new LoadedPrivateKey(new KeyPair(publicKey, privateKey), file.state());
         } catch (GeneralSecurityException | IllegalArgumentException exception) {
@@ -778,10 +839,12 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
         TrustAnchorInventory anchorInventory = inspectTrustAnchorInventory();
         boolean evidencePresent = validateQuarantine();
         List<Path> temporaryFiles = new ArrayList<>();
+        List<Path> peerKeys = new ArrayList<>();
         boolean privatePresent = false;
         try (var stream = Files.list(secretRoot)) {
-            List<Path> entries = stream.sorted(Comparator.comparing(path -> path.getFileName().toString())).toList();
-            for (Path entry : entries) {
+            var entries = stream.iterator();
+            while (entries.hasNext()) {
+                Path entry = entries.next();
                 String name = entry.getFileName().toString();
                 if (Files.isSymbolicLink(entry)) {
                     throw new MigrationException("Production Authority Secrets Root Contains A Symbolic Link");
@@ -803,6 +866,10 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
                 }
                 if (isCanonicalPrivateKeyName(name)) {
                     requireProtectedPrivateKeyFile(entry, "Production Authority Peer Signing Key");
+                    if (peerKeys.size() == MAXIMUM_PEER_KEYS) {
+                        throw new MigrationException("Production Authority Peer Signing Key Inventory Is Too Large");
+                    }
+                    peerKeys.add(entry);
                     continue;
                 }
                 if (isCanonicalTemporaryName(name)) {
@@ -817,8 +884,11 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
                 throw new MigrationException("Production Authority Secrets Root Contains An Unknown Artifact");
             }
         }
+        Comparator<Path> order = Comparator.comparing(path -> path.getFileName().toString());
+        temporaryFiles.sort(order);
+        peerKeys.sort(order);
         return new StartupInventory(privatePresent, List.copyOf(temporaryFiles), evidencePresent,
-            anchorInventory.anchorPresent(), anchorInventory.temporaryFiles());
+            anchorInventory.anchorPresent(), anchorInventory.temporaryFiles(), List.copyOf(peerKeys));
     }
 
     private TrustAnchorInventory inspectTrustAnchorInventory() throws IOException {
@@ -1074,11 +1144,33 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
     }
 
     private StableFile readStableFile(Path path, String description) throws IOException {
-        requirePrivateKeyFile(path, description);
+        return readStableFile(path, description, false);
+    }
+
+    private StableFile readStableFile(Path path, String description, boolean peer) throws IOException {
+        if (peer) {
+            MigrationPaths.requireNoSymlinkTraversal(secretRoot, path);
+            requireProtectedPrivateKeyFile(path, description);
+        } else {
+            requirePrivateKeyFile(path, description);
+        }
         FileStamp before = readFileStamp(path, description);
         byte[] bytes;
         try {
-            bytes = Files.readAllBytes(path);
+            if (peer) {
+                if (before.size() > MAXIMUM_PEER_KEY_BYTES) {
+                    throw new MigrationException(description + " Is Too Large");
+                }
+                try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
+                    bytes = input.readNBytes(MAXIMUM_PEER_KEY_BYTES + 1);
+                }
+                if (bytes.length > MAXIMUM_PEER_KEY_BYTES) {
+                    throw new MigrationException(description + " Is Too Large");
+                }
+                requireProtectedPrivateKeyFile(path, description);
+            } else {
+                bytes = Files.readAllBytes(path);
+            }
         } catch (IOException exception) {
             throw new IOException(description + " Is Unavailable", exception);
         }
@@ -1403,7 +1495,7 @@ final class ProductionAuthorityKeyStore implements ProductionAuthoritySigner {
     }
 
     private record StartupInventory(boolean privatePresent, List<Path> temporaryFiles, boolean evidencePresent,
-                                    boolean anchorPresent, List<Path> trustAnchorTemporaryFiles) {
+                                    boolean anchorPresent, List<Path> trustAnchorTemporaryFiles, List<Path> peerKeys) {
     }
 
     private record TrustAnchorInventory(boolean anchorPresent, List<Path> temporaryFiles) {

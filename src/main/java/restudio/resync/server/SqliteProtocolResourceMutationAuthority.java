@@ -12,6 +12,7 @@ import restudio.resync.core.ConnectionInfo;
 import restudio.resync.core.Session;
 import restudio.resync.contract.identity.IdentityCodec;
 import restudio.resync.flow.CoreGraphStorageBoundary;
+import restudio.resync.flow.CoreGraphTransfer;
 import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.function.FunctionLocator;
 import restudio.resync.flow.function.FunctionParameterContract;
@@ -61,6 +62,7 @@ import restudio.resync.modules.flow.FlowResourceMutationStamp;
 import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.resources.AssetFileFormat;
+import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.protocol.ReSyncProtocolContract;
 import restudio.resync.storage.StorageSafety;
 import restudio.resync.storage.AssetTransactionCoordinator;
@@ -92,7 +94,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 public final class SqliteProtocolResourceMutationAuthority implements ProtocolResourceMutationAuthority, AutoCloseable {
     static final String SCHEMA = "resource-mutation-authority-v8";
@@ -106,6 +107,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     static final String LEGACY_ACTOR = "legacy-unattributed";
     private static final String LEGACY_ADMIN_RECOVERY_ACTOR = "legacy-admin-recovery";
     private static final String CORE_REVISION_REPAIR_ACTOR = "core-revision-repair";
+    private static final String NETWORK_ACTOR = "network-sync";
     private static final String LEGACY_CORE_PAYLOAD_KIND = "legacy-flow-graph-v3";
     static final String ACTOR_CONFLICT_CODE = ProtocolRejectionCode.RESOURCE_MUTATION_ACTOR_CONFLICT.legacyValue();
     private static final OwnerId PROTOCOL_OWNER = new OwnerId("restudio.resync");
@@ -113,8 +115,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     private static final String PROJECT_METADATA_TYPE = "project_metadata";
     private static final String PROJECT_METADATA_LINEAGE_TYPE = "project_metadata.lineage";
     private static final String PROJECT_METADATA_LINEAGE_ID = "project";
-    private static final int MAX_LEGACY_ADMIN_CHAIN = 32;
-    private static final int MAX_COORDINATOR_BINDINGS = 4096;
+    private static final int MAX_LEGACY_ADMIN_CHAIN = 4096;
     private static final ContentHash UNAVAILABLE_CORE_HASH = new ContentHash("0".repeat(64));
     private static final Gson PRETTY_LINEAGE_GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final ContractRef<ResourceTypeId> DOCUMENT_TYPE = ContractRef.of(PROTOCOL_OWNER, new ResourceTypeId("resource.document"));
@@ -140,6 +141,8 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
     private final ResourcePayloadCodec<Map<String, Object>> payloadCodec = ResourcePayloadCodecs.json();
     private final Map<UUID, State> coupledProjectMetadataRepairs = new LinkedHashMap<>();
     private ProjectMetadataCache projectMetadataCache;
+    private NetworkCoreCache networkCoreCache;
+    private long networkGeneration;
     private boolean recoveryBlocked;
     private String recoveryReason = "";
     private boolean mutationAdmissionClosed;
@@ -321,6 +324,95 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 "Local operator resource admission was already consumed");
         }
         return mutateAdmitted(grant.actorId(), null, envelope, operation, TemporaryLifecycleDiagnostics.start());
+    }
+
+    public synchronized FlowResourceRegistry.NetworkCoreMutations networkCoreMutations() {
+        requireReadable();
+        requireCoreReadable();
+        long epoch = authorityEpoch.current();
+        if (networkCoreCache != null && networkCoreCache.epoch() == epoch
+            && networkCoreCache.connection() == connection && networkCoreCache.generation() == networkGeneration) {
+            return networkCoreCache.mutations();
+        }
+        Connection boundConnection = connection;
+        long generation = networkGeneration;
+        FlowResourceRegistry.NetworkCoreMutations mutations = new FlowResourceRegistry.NetworkCoreMutations() {
+            @Override
+            public void save(ServerResourceLocator resource, CoreGraphStorageBoundary.Decoded source) {
+                saveNetworkCore(resource, source, epoch, boundConnection, generation);
+            }
+
+            @Override
+            public void delete(ServerResourceLocator resource) {
+                deleteNetworkCore(resource, epoch, boundConnection, generation);
+            }
+        };
+        networkCoreCache = new NetworkCoreCache(epoch, boundConnection, generation, mutations);
+        return mutations;
+    }
+
+    private synchronized void saveNetworkCore(ServerResourceLocator resource, CoreGraphStorageBoundary.Decoded source,
+                                               long epoch, Connection boundConnection, long generation) {
+        requireNetworkCore(resource, epoch, boundConnection, generation);
+        Objects.requireNonNull(source, "Shared Core graph is required");
+        CoreState current = synchronizeCore(resource);
+        if (current != null && !current.deleted()
+            && CoreGraphTransfer.serialize(current.decoded()).equals(CoreGraphTransfer.serialize(source))) {
+            return;
+        }
+        long revision = current == null ? 0L : current.revision();
+        UUID mutationId = UUID.randomUUID();
+        CatalogBinding binding = coreAuthority.activeCatalogBinding()
+            .orElseThrow(() -> new IllegalStateException("Shared Core resource catalog is unavailable"));
+        CoreGraphStorageBoundary.Decoded candidate = CoreGraphTransfer.bind(source, resource, resultRevision(revision), mutationId, binding);
+        CanonicalPayload<Map<String, Object>> payload = payloadCodec.canonicalize(corePayload(candidate));
+        ResourceOperation operation = current == null || current.deleted()
+            ? new ResourceCreateRequest<>(resource, payload, mutationId)
+            : new ResourceSaveRequest<>(resource, revision, payload, mutationId);
+        mutateNetworkCore(resource, operation, revision, mutationId, payload.checksum(), epoch);
+    }
+
+    private synchronized void deleteNetworkCore(ServerResourceLocator resource, long epoch, Connection boundConnection, long generation) {
+        requireNetworkCore(resource, epoch, boundConnection, generation);
+        CoreState current = synchronizeCore(resource);
+        if (current == null || current.deleted()) {
+            return;
+        }
+        UUID mutationId = UUID.randomUUID();
+        ResourceOperation operation = new ResourceDeleteRequest(resource, current.revision(), mutationId);
+        mutateNetworkCore(resource, operation, current.revision(), mutationId, null, epoch);
+    }
+
+    private void requireNetworkCore(ServerResourceLocator resource, long epoch, Connection boundConnection, long generation) {
+        requireReadable();
+        requireCoreReadable();
+        if (mutationAdmissionClosed || !authorityEpoch.acceptsTyped(epoch)
+            || connection != boundConnection || networkGeneration != generation
+            || resource == null || !serverId.equals(resource.serverId()) || !isCoreResource(resource)) {
+            throw new IllegalStateException("Shared Core resource authority is unavailable or changed");
+        }
+    }
+
+    private void invalidateNetworkCore() {
+        networkCoreCache = null;
+        networkGeneration++;
+    }
+
+    private void mutateNetworkCore(ServerResourceLocator resource, ResourceOperation operation, long revision,
+                                   UUID mutationId, ContentHash payloadHash, long epoch) {
+        long expectedRevision = operation instanceof ResourceCreateRequest<?> ? 0L : revision;
+        ProtocolEnvelope<Map<String, Object>> envelope = new ProtocolEnvelope<>(ProtocolEnvelope.Kind.REQUEST,
+            ReSyncProtocolContract.GENERIC_RESOURCE_CONTRACT_VERSION, UUID.randomUUID(), UUID.randomUUID(),
+            UUID.randomUUID(), UUID.randomUUID(), serverId, resource, expectedRevision, epoch, mutationId,
+            ContractRef.of(PROTOCOL_OWNER, new OperationId("resource." + operation.kind().name().toLowerCase(Locale.ROOT))),
+            Set.of(ContractRef.of(PROTOCOL_OWNER, new CapabilityId("resources")), ReSyncProtocolContract.RESOURCE_ACTIVATION_CAPABILITY),
+            DOCUMENT_TYPE, null, payloadHash, false, null, null, null, null, null, 0L,
+            ProtocolEnvelope.Status.ACCEPTED, List.of(), Map.of(), new ProtocolBody.ResourceRequest(operation));
+        ProtocolEnvelopeDispatchResult result = mutateAdmitted(NETWORK_ACTOR, null, envelope, operation,
+            TemporaryLifecycleDiagnostics.start());
+        if (!result.handled()) {
+            throw new IllegalStateException(result.message());
+        }
     }
 
     private ProtocolEnvelopeDispatchResult mutateAdmitted(String clientId, Integer connectionId,
@@ -723,6 +815,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         if (persistenceState == PersistenceState.CLOSED) {
             return;
         }
+        invalidateNetworkCore();
         projectMetadataCache = null;
         if (connection == null) {
             persistenceState = PersistenceState.CLOSED;
@@ -786,6 +879,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             return;
         }
         flushPersistence();
+        invalidateNetworkCore();
         coreReadAuthorityReady = false;
         persistenceState = PersistenceState.QUIESCED;
         publishDurability();
@@ -850,6 +944,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         requireRegularDatabase(candidateDatabase);
 
         Connection previousConnection = connection;
+        invalidateNetworkCore();
         projectMetadataCache = null;
         Path previousDatabase = databasePath;
         Path previousScope = activeScopeRoot;
@@ -4997,8 +5092,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         boolean baselinePayloadDrift = current.revision() == persisted.revision()
             && current.mutationId().equals(persisted.mutationId())
             && !current.payloadHash().equals(persisted.payloadHash());
-        boolean committedRepair = current.revision() == revision
-            && !current.payloadHash().equals(persisted.payloadHash());
+        boolean committedRepair = current.revision() > persisted.revision();
         if (!baselinePayloadDrift && !committedRepair) {
             return null;
         }
@@ -5010,7 +5104,8 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         FlowResourceMutationStamp published = readStamp(persisted.resource(), adapter);
         Object value = adapter.get(persisted.resource().id());
         if (published == null || published.deleted() || recovered.deleted() || value == null
-            || recovered.revision() != revision || published.revision() != revision
+            || recovered.revision() <= persisted.revision() || published.revision() != recovered.revision()
+            || recovered.revision() != (baselinePayloadDrift ? revision : current.revision())
             || !published.mutationId().equals(recovered.mutationId())
             || !published.payloadHash().equals(recovered.payloadHash())) {
             throw new IllegalStateException("Unreceipted project metadata lineage recovery is not authoritative");
@@ -5020,7 +5115,7 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         if (!hash.equals(recovered.payloadHash())) {
             throw new IllegalStateException("Unreceipted project metadata lineage recovery payload is not canonical");
         }
-        return new State(persisted.resource(), revision, recovered.mutationId(), hash, false,
+        return new State(persisted.resource(), recovered.revision(), recovered.mutationId(), hash, false,
             canonicalInput(canonical), activationState(canonical.value(), ResourceActivationState.ACTIVE));
     }
 
@@ -5051,14 +5146,13 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             if (baseline == null || baseline.result().project().revision() >= snapshot.project().revision()) {
                 return rejectLegacyAdminRecovery("baseline", persisted.mutationId(), snapshot.rootSequence());
             }
-            List<AssetTransactionCoordinator.MutationView> history = coordinatorHistory(coordinator, bindingRoot);
-            LegacyAdminChain chain = legacyAdminChain(baseline, history, snapshot, lineageKey, persisted, current);
+            LegacyAdminChain chain = legacyAdminChain(coordinator, baseline, snapshot, lineageKey, persisted, current);
             if (chain == null) {
                 return rejectLegacyAdminRecovery("chain", current.mutationId(), snapshot.rootSequence());
             }
             legacyAdminRecoveryEvent("validated", current.mutationId(), snapshot.rootSequence(),
                 "transitionCount", chain.transitions().size());
-            importLegacyAdminChain(chain, current);
+            importLegacyAdminChain(chain, current, coordinator, snapshot.rootSequence());
             if (!recoverCommittedCoreTransitions().isEmpty()) {
                 throw new IllegalStateException("Recovered legacy Core resource transition could not be published");
             }
@@ -5066,134 +5160,195 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 "transitionCount", chain.transitions().size());
             return current;
         } catch (IOException | SQLException exception) {
-            throw new IllegalStateException("Failed To Recover Legacy Admin Resource Mutations", exception);
+            throw new IllegalStateException("Failed To Recover Committed Resource History For " + serverId.canonicalText()
+                + " From Revision " + persisted.revision() + " To " + current.revision() + ": " + exception.getMessage(), exception);
         }
     }
 
-    private List<AssetTransactionCoordinator.MutationView> coordinatorHistory(AssetTransactionCoordinator coordinator,
-                                                                               Path bindingRoot) throws IOException {
-        List<Path> bindings;
-        try (Stream<Path> stream = Files.list(bindingRoot)) {
-            bindings = stream.sorted().limit(MAX_COORDINATOR_BINDINGS + 1L).toList();
-        }
-        if (bindings.size() > MAX_COORDINATOR_BINDINGS) {
-            throw new IOException("Asset coordinator binding inventory exceeds the recovery bound");
-        }
-        List<AssetTransactionCoordinator.MutationView> history = new ArrayList<>();
-        for (Path binding : bindings) {
-            String name = binding.getFileName().toString();
-            if (!Files.isRegularFile(binding, LinkOption.NOFOLLOW_LINKS) || !name.endsWith(".json")) {
-                throw new IOException("Asset coordinator binding inventory is not canonical");
-            }
-            UUID mutationId = uuid(name.substring(0, name.length() - ".json".length())).orElse(null);
-            if (mutationId == null) {
-                throw new IOException("Asset coordinator binding identity is invalid");
-            }
-            AssetTransactionCoordinator.MutationView mutation = coordinator.mutation(mutationId)
-                .orElseThrow(() -> new IOException("Asset coordinator binding has no validated mutation"));
-            history.add(mutation);
-        }
-        return history;
-    }
-
-    private LegacyAdminChain legacyAdminChain(AssetTransactionCoordinator.MutationView baseline,
-                                               List<AssetTransactionCoordinator.MutationView> history,
+    private LegacyAdminChain legacyAdminChain(AssetTransactionCoordinator coordinator,
+                                               AssetTransactionCoordinator.MutationView baseline,
                                                AssetTransactionCoordinator.Snapshot snapshot,
                                                AssetTransactionCoordinator.AssetKey lineageKey,
                                                State persisted, State current) throws IOException {
-        AssetTransactionCoordinator.ExpectedProject previousProject = baseline.result().project();
         AssetTransactionCoordinator.ExpectedState previousLineage = baseline.result().states().get(lineageKey);
         if (!(previousLineage instanceof AssetTransactionCoordinator.Live baselineLineage)
             || !matchesProjectMetadataLineageHash(baselineLineage.hash(), persisted.revision(), persisted.mutationId(),
             persisted.payloadHash())) {
             return rejectLegacyAdminRecovery("baseline_lineage", persisted.mutationId(), baseline.result().rootSequence());
         }
-        Map<String, Object> metadata = gson.fromJson(persisted.payload(), Map.class);
-        if (metadata == null) {
-            return rejectLegacyAdminRecovery("baseline_metadata", persisted.mutationId(), baseline.result().rootSequence());
-        }
+        List<CoordinatedResourceHistory.Entry> history = CoordinatedResourceHistory.read(coordinator, baseline, snapshot,
+            type -> CORE_RESOURCE_TYPES.contains(type) || !type.contains(":") && adapter(new ServerResourceLocator(serverId,
+                ContractRef.of(PROTOCOL_OWNER, new ResourceTypeId(type)), "recovery")) != null);
         List<LegacyAdminTransition> transitions = new ArrayList<>();
-        long metadataRevision = persisted.revision();
-        String sharedId = null;
-        Map<String, Boolean> liveTypes = new LinkedHashMap<>();
-        Map<String, Integer> transitionCounts = new LinkedHashMap<>();
+        Map<ServerResourceLocator, State> states = new LinkedHashMap<>();
+        Map<ServerResourceLocator, State> observed = new LinkedHashMap<>();
+        long revision = persisted.revision();
+        UUID metadataMutation = persisted.mutationId();
         String survivingCoreType = null;
-        long previousSequence = baseline.result().rootSequence();
-        long baselineSequence = previousSequence;
-        List<AssetTransactionCoordinator.MutationView> ordered = history.stream()
-            .filter(mutation -> mutation.result().rootSequence() > baselineSequence
-                && mutation.result().rootSequence() <= snapshot.rootSequence())
-            .sorted(Comparator.comparingLong(mutation -> mutation.result().rootSequence()))
-            .toList();
-        for (AssetTransactionCoordinator.MutationView mutation : ordered) {
-            if (mutation.result().rootSequence() != Math.addExact(previousSequence, 1L)) {
-                return rejectLegacyAdminRecovery("sequence_gap", mutation.mutationId(), mutation.result().rootSequence());
+        for (CoordinatedResourceHistory.Entry entry : history) {
+            AssetTransactionCoordinator.MutationView mutation = entry.mutation();
+            ServerResourceLocator resource = new ServerResourceLocator(serverId,
+                ContractRef.of(PROTOCOL_OWNER, new ResourceTypeId(entry.key().type())), entry.key().id());
+            if (hasPendingMutation(resource)) {
+                throw new IOException("Resource recovery is owned by a pending mutation: " + resource.canonicalText());
             }
-            if (mutation.result().project().equals(previousProject)
-                && !mutation.result().states().containsKey(lineageKey)) {
-                if (!exactMetadataNeutralMutation(mutation, previousProject)) {
-                    return rejectLegacyAdminRecovery("neutral_mutation", mutation.mutationId(), mutation.result().rootSequence());
-                }
-                previousSequence = mutation.result().rootSequence();
-                continue;
-            }
-            if (transitions.size() >= MAX_LEGACY_ADMIN_CHAIN || !exactProjectBaseline(mutation, previousProject)
-                || !mutation.result().states().containsKey(lineageKey)) {
-                return rejectLegacyAdminRecovery("transition_baseline", mutation.mutationId(), mutation.result().rootSequence());
-            }
-            LegacyAdminTransition transition = legacyAdminTransition(mutation, lineageKey, previousLineage,
-                metadata, Math.addExact(metadataRevision, 1L));
-            if (transition == null) {
-                return rejectLegacyAdminRecovery("transition_shape", mutation.mutationId(), mutation.result().rootSequence());
-            }
-            if (sharedId == null) {
-                sharedId = transition.resource().id();
-            } else if (!sharedId.equals(transition.resource().id())) {
-                return rejectLegacyAdminRecovery("resource_identity", mutation.mutationId(), mutation.result().rootSequence());
-            }
-            String type = transition.resource().resourceType().value();
-            transitionCounts.merge(type, 1, Integer::sum);
-            boolean live = liveTypes.getOrDefault(type, false);
-            if ("CREATE".equals(transition.operation())) {
-                if (live) {
-                    return rejectLegacyAdminRecovery("duplicate_create", mutation.mutationId(), mutation.result().rootSequence());
-                }
-                liveTypes.put(type, true);
-                if (CORE_RESOURCE_TYPES.contains(type)) {
-                    if (survivingCoreType != null) {
-                        return rejectLegacyAdminRecovery("multiple_core", mutation.mutationId(), mutation.result().rootSequence());
+            State historical = recoveredResourceState(entry, resource);
+            State previous = states.get(resource);
+            if (previous == null) {
+                previous = state(resource);
+                if (previous != null && previous.revision() != entry.expected().revision()) {
+                    if (previous.revision() < historical.revision()) {
+                        throw new IOException("Resource recovery baseline differs from durable resource state: " + resource.canonicalText());
                     }
-                    survivingCoreType = type;
+                    observed.put(resource, previous);
+                    previous = null;
                 }
-            } else {
-                if (!live || CORE_RESOURCE_TYPES.contains(type)) {
-                    return rejectLegacyAdminRecovery("invalid_delete", mutation.mutationId(), mutation.result().rootSequence());
-                }
-                liveTypes.put(type, false);
             }
-            transitions.add(transition);
-            previousSequence = mutation.result().rootSequence();
-            previousProject = mutation.result().project();
-            previousLineage = mutation.result().states().get(lineageKey);
-            metadataRevision++;
+            MutationRow existing = mutation(mutation.mutationId());
+            String precondition = previous == null ? existing == null ? "" : existing.preconditionHash() : previous.payloadHash();
+            if (historical.deleted()) {
+                if (previous != null && !previous.payloadHash().equals(historical.payloadHash())) {
+                    throw new IOException("Resource recovery tombstone differs from its prior payload: " + resource.canonicalText());
+                }
+                precondition = historical.payloadHash();
+            }
+            states.put(resource, historical);
+            if (entry.metadataChanged()) {
+                revision = Math.addExact(revision, 1L);
+                metadataMutation = mutation.mutationId();
+                JsonObject metadata = mutation.projectAfter().document();
+                String supplied = string(metadata, "serverId");
+                if (supplied != null && !"project".equals(supplied) && !serverId.canonicalText().equals(supplied)) {
+                    throw new IOException("Resource recovery project belongs to another server");
+                }
+                metadata.addProperty("serverId", serverId.canonicalText());
+                String hash = canonical(gson.toJson(metadata)).checksum().canonicalText();
+                AssetTransactionCoordinator.ExpectedState result = mutation.result().states().get(lineageKey);
+                JsonObject lineageAsset = mutation.intent().getAsJsonArray("assets").asList().stream()
+                    .filter(JsonElement::isJsonObject).map(JsonElement::getAsJsonObject)
+                    .filter(asset -> lineageKey.type().equals(string(asset, "type")) && lineageKey.id().equals(string(asset, "id")))
+                    .findFirst().orElse(null);
+                if (!(previousLineage instanceof AssetTransactionCoordinator.Live before)
+                    || !(result instanceof AssetTransactionCoordinator.Live after) || lineageAsset == null
+                    || after.revision() != Math.addExact(before.revision(), 1L)
+                    || !exactLineageAsset(lineageAsset, before, after, after.hash())
+                    || !matchesProjectMetadataLineageHash(after.hash(), revision, metadataMutation, hash)) {
+                    throw new IOException("Resource recovery project lineage is not exact at sequence " + mutation.result().rootSequence());
+                }
+                previousLineage = result;
+            }
+            if (isCoreResource(resource) && !historical.deleted()) {
+                survivingCoreType = resource.resourceType().value();
+            }
+            transitions.add(new LegacyAdminTransition(mutation, resource, entry.operation(), entry.expected().revision(),
+                entry.result(), historical, precondition, isCoreResource(resource)
+                    && LEGACY_CORE_PAYLOAD_KIND.equals(historical.corePayloadKind())));
         }
-        if (transitions.size() != current.revision() - persisted.revision()
-            || !previousProject.equals(snapshot.project()) || survivingCoreType == null
-            || !current.mutationId().equals(transitions.getLast().mutation().mutationId())) {
+        for (Map.Entry<ServerResourceLocator, State> entry : observed.entrySet()) {
+            State observation = entry.getValue();
+            LegacyAdminTransition transition = transitions.stream()
+                .filter(value -> value.resource().equals(entry.getKey())
+                    && sameResourceState(observation, value.historical())
+                    && Objects.equals(observation.assetHash(), value.historical().assetHash())
+                    && Objects.equals(observation.corePayloadHash(), value.historical().corePayloadHash())
+                    && Objects.equals(observation.corePayloadKind(), value.historical().corePayloadKind()))
+                .findFirst().orElse(null);
+            if (transition == null) {
+                throw new IOException("Persisted resource observation is absent from committed recovery history: "
+                    + entry.getKey().canonicalText() + " at revision " + observation.revision()
+                    + " mutation " + observation.mutationId());
+            }
+            MutationRow receipt = mutation(observation.mutationId());
+            if (receipt != null && !exactRecoveredReceipt(receipt, transition)) {
+                throw new IOException("Persisted resource observation conflicts with its durable receipt: "
+                    + entry.getKey().canonicalText() + " mutation " + observation.mutationId());
+            }
+        }
+        if (transitions.isEmpty() || revision != current.revision() || !metadataMutation.equals(current.mutationId())
+            || !previousLineage.equals(snapshot.state(lineageKey).orElse(null))) {
             return rejectLegacyAdminRecovery("chain_summary", current.mutationId(), snapshot.rootSequence());
         }
-        for (Map.Entry<String, Boolean> entry : liveTypes.entrySet()) {
-            int expectedTransitions = CORE_RESOURCE_TYPES.contains(entry.getKey()) ? 1 : 2;
-            if (entry.getValue() != CORE_RESOURCE_TYPES.contains(entry.getKey())
-                || transitionCounts.getOrDefault(entry.getKey(), 0) != expectedTransitions) {
-                return rejectLegacyAdminRecovery("type_balance", current.mutationId(), snapshot.rootSequence());
-            }
-        }
-        CanonicalPayload<Map<String, Object>> canonical = payloadCodec.canonicalize(metadata);
-        if (!canonical.checksum().canonicalText().equals(current.payloadHash())) {
+        JsonObject metadata = snapshot.metadata().document();
+        metadata.addProperty("serverId", serverId.canonicalText());
+        if (!canonical(gson.toJson(metadata)).checksum().canonicalText().equals(current.payloadHash())) {
             return rejectLegacyAdminRecovery("canonical_metadata", current.mutationId(), snapshot.rootSequence());
         }
         return new LegacyAdminChain(List.copyOf(transitions), survivingCoreType, persisted);
+    }
+
+    private State recoveredResourceState(CoordinatedResourceHistory.Entry entry, ServerResourceLocator resource) throws IOException {
+        JsonObject primary = entry.primaryPayload();
+        UUID mutationId = entry.mutation().mutationId();
+        long revision = entry.result().revision();
+        if (isCoreResource(resource)) {
+            if (entry.result() instanceof AssetTransactionCoordinator.Deleted) {
+                throw new IOException("Unreceipted Core deletion requires its existing durable recovery owner");
+            }
+            if (primary.has(CoreGraphStorageBoundary.CORE_PAYLOAD_KIND)) {
+                State state = corePersistedState(coreState(coreBoundary.decodeText(gson.toJson(primary), resource)));
+                if (state.revision() != revision || !state.mutationId().equals(mutationId)) {
+                    throw new IOException("Recovered Core payload identity differs from committed history");
+                }
+                return state;
+            }
+            if (!resource.id().equals(string(primary, "id"))
+                || !resource.resourceType().value().equals(string(primary, AssetFileFormat.RESOURCE_TYPE))
+                || rawGraphNumber(primary, AssetFileFormat.FORMAT_VERSION) != AssetFileFormat.CURRENT_FORMAT_VERSION
+                || rawGraphNumber(primary, AssetFileFormat.REVISION) != revision
+                || rawGraphNumber(primary, "resourceRevision") != revision
+                || !mutationId.toString().equals(string(primary, AssetFileFormat.MUTATION_ID))
+                || !mutationId.toString().equals(string(primary, "resourceMutationId"))
+                || !primary.has("function") || !primary.get("function").isJsonPrimitive()
+                || !primary.get("function").getAsJsonPrimitive().isBoolean()
+                || primary.get("function").getAsBoolean() != "function".equals(resource.resourceType().value())
+                || !primary.has("enabled") || !primary.get("enabled").isJsonPrimitive()
+                || !primary.get("enabled").getAsJsonPrimitive().isBoolean()
+                || !primary.has("nodes") || !primary.get("nodes").isJsonObject()
+                || !primary.has("connections") || !primary.get("connections").isJsonArray()
+                || !primary.has("localVariables") || !primary.get("localVariables").isJsonArray()
+                || !AssetFileFormat.verify(primary)) {
+                throw new IOException("Recovered raw graph identity differs from committed history: " + resource.canonicalText());
+            }
+            String payloadHash = string(primary, AssetFileFormat.CONTENT_HASH);
+            if (payloadHash == null || !payloadHash.matches("[0-9a-f]{64}")) {
+                throw new IOException("Recovered raw graph has no exact content hash: " + resource.canonicalText());
+            }
+            return legacyCoreState(new CoreGraphResourceAuthority.LegacyCoreRecoverySource(resource, revision,
+                mutationId, new ContentHash(entry.result().hash()), new ContentHash(payloadHash), LEGACY_CORE_PAYLOAD_KIND));
+        }
+        if (entry.result() instanceof AssetTransactionCoordinator.Deleted) {
+            String hash = string(primary, "payloadHash");
+            if (hash == null) {
+                throw new IOException("Recovered resource tombstone has no prior payload hash");
+            }
+            new ContentHash(hash);
+            return new State(resource, revision, mutationId, hash, true, null, null);
+        }
+        if (!resource.resourceType().value().equals(string(primary, AssetFileFormat.RESOURCE_TYPE))
+            || AssetFileFormat.revisionOf(primary) != revision
+            || !mutationId.toString().equals(string(primary, AssetFileFormat.MUTATION_ID)) || !AssetFileFormat.verify(primary)) {
+            throw new IOException("Recovered resource payload identity differs from committed history");
+        }
+        FlowResourceAdapter<Object> resourceAdapter = adapter(resource);
+        Object value = resourceAdapter.deserialize(gson.toJson(JsonAssetStore.logicalPayload(primary)));
+        if (value == null || !resource.id().equals(resourceAdapter.id(value))) {
+            throw new IOException("Recovered resource payload has a different typed identity");
+        }
+        CanonicalPayload<Map<String, Object>> payload = canonical(resourceAdapter.serialize(value));
+        return new State(resource, revision, mutationId, payload.checksum().canonicalText(), false,
+            canonicalInput(payload), activationState(payload.value(), ResourceActivationState.ACTIVE));
+    }
+
+    private long rawGraphNumber(JsonObject payload, String field) throws IOException {
+        JsonElement value = payload.get(field);
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+            throw new IOException("Recovered raw graph has an invalid " + field);
+        }
+        try {
+            return value.getAsBigDecimal().longValueExact();
+        } catch (ArithmeticException exception) {
+            throw new IOException("Recovered raw graph has an inexact " + field, exception);
+        }
     }
 
     private <T> T rejectLegacyAdminRecovery(String reason, UUID mutationId, long sequence) {
@@ -5218,212 +5373,6 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
                 authorityEpoch, null), fields.toArray()));
     }
 
-    private boolean exactMetadataNeutralMutation(AssetTransactionCoordinator.MutationView mutation,
-                                                 AssetTransactionCoordinator.ExpectedProject previous) {
-        JsonObject intent = mutation.intent();
-        if (!intent.has("expectedProject") || !intent.get("expectedProject").isJsonObject()) {
-            return false;
-        }
-        JsonObject expected = intent.getAsJsonObject("expectedProject");
-        JsonArray deltas = intent.has("projectDeltas") && intent.get("projectDeltas").isJsonArray()
-            ? intent.getAsJsonArray("projectDeltas") : null;
-        if (!expected.has("revision") || !expected.has("hash") || deltas == null || !deltas.isEmpty()
-            || expected.get("revision").getAsLong() != previous.revision()
-            || !expected.get("hash").getAsString().equals(previous.hash())) {
-            return false;
-        }
-        MutationRow receipt = mutation(mutation.mutationId());
-        if (receipt == null || receipt.status() != Status.APPLIED || !"SAVE".equals(receipt.operation())
-            || !mutation.mutationId().toString().equals(receipt.resultMutationId())) {
-            return false;
-        }
-        ServerResourceLocator resource = locator(receipt.responseResource());
-        if (!isCoreResource(resource)) {
-            return false;
-        }
-        AssetTransactionCoordinator.AssetKey key = new AssetTransactionCoordinator.AssetKey(
-            resource.resourceType().value(), resource.id());
-        AssetTransactionCoordinator.ExpectedState state = mutation.result().states().get(key);
-        boolean assetProof = state instanceof AssetTransactionCoordinator.Live live
-            && exactNeutralCoreAsset(intent, resource, receipt, live);
-        CoreState core = synchronizeCore(resource);
-        boolean coreProof = state instanceof AssetTransactionCoordinator.Live live && core != null
-            && matchesCoreOutcome(core, receipt)
-            && live.hash().equals(StorageSafety.sha256(coreBoundary.encode(core.decoded())));
-        boolean exact = mutation.result().states().size() == 1 && state instanceof AssetTransactionCoordinator.Live live
-            && receipt.resultRevision() == live.revision() && assetProof && coreProof;
-        return exact;
-    }
-
-    private boolean exactNeutralCoreAsset(JsonObject intent, ServerResourceLocator resource, MutationRow receipt,
-                                          AssetTransactionCoordinator.Live live) {
-        if (!intent.has("assets") || !intent.get("assets").isJsonArray()) {
-            return false;
-        }
-        JsonArray assets = intent.getAsJsonArray("assets");
-        if (assets.size() != 1 || !assets.get(0).isJsonObject()) {
-            return false;
-        }
-        JsonObject asset = assets.get(0).getAsJsonObject();
-        JsonObject expected = asset.has("expected") && asset.get("expected").isJsonObject()
-            ? asset.getAsJsonObject("expected") : null;
-        boolean exact = expected != null && "WRITE".equals(string(asset, "operation"))
-            && resource.resourceType().value().equals(string(asset, "type"))
-            && resource.id().equals(string(asset, "id")) && "LIVE".equals(string(expected, "kind"))
-            && live.hash().equals(string(asset, "payloadHash"))
-            && expected.has("revision") && expected.get("revision").getAsLong() == receipt.expectedRevision()
-            && expected.has("hash") && !expected.get("hash").getAsString().isBlank()
-            && receipt.preconditionAssetHash() != null && !receipt.preconditionAssetHash().isBlank();
-        return exact;
-    }
-
-    private boolean exactProjectBaseline(AssetTransactionCoordinator.MutationView mutation,
-                                         AssetTransactionCoordinator.ExpectedProject previous) {
-        JsonObject intent = mutation.intent();
-        if (intent.has("scope") || !intent.has("expectedProject") || !intent.get("expectedProject").isJsonObject()) {
-            return false;
-        }
-        JsonObject expected = intent.getAsJsonObject("expectedProject");
-        return expected.has("revision") && expected.has("hash")
-            && expected.get("revision").getAsLong() == previous.revision()
-            && expected.get("hash").getAsString().equals(previous.hash())
-            && mutation.result().project().revision() == previous.revision() + 1L;
-    }
-
-    private LegacyAdminTransition legacyAdminTransition(AssetTransactionCoordinator.MutationView mutation,
-                                                        AssetTransactionCoordinator.AssetKey lineageKey,
-                                                        AssetTransactionCoordinator.ExpectedState previousLineage,
-                                                        Map<String, Object> metadata,
-                                                        long metadataRevision) throws IOException {
-        JsonObject intent = mutation.intent();
-        if (!intent.has("projectDeltas") || !intent.get("projectDeltas").isJsonArray()) {
-            return null;
-        }
-        JsonArray deltas = intent.getAsJsonArray("projectDeltas");
-        if (deltas.size() != 1 || !deltas.get(0).isJsonObject()) {
-            return null;
-        }
-        JsonObject delta = deltas.get(0).getAsJsonObject();
-        if (!"SET".equals(string(delta, "operation")) || !delta.has("path") || !delta.get("path").isJsonArray()
-            || delta.getAsJsonArray("path").size() != 1
-            || !"resources".equals(delta.getAsJsonArray("path").get(0).getAsString())
-            || !delta.has("value") || !delta.get("value").isJsonArray()) {
-            return null;
-        }
-        metadata.put("resources", gson.fromJson(delta.get("value"), List.class));
-        String payloadHash = payloadCodec.canonicalize(metadata).checksum().canonicalText();
-        AssetTransactionCoordinator.ExpectedState resultLineage = mutation.result().states().get(lineageKey);
-        if (!(previousLineage instanceof AssetTransactionCoordinator.Live previousLive)
-            || !(resultLineage instanceof AssetTransactionCoordinator.Live resultLive)
-            || resultLive.revision() != previousLive.revision() + 1L
-            || !matchesProjectMetadataLineageHash(resultLive.hash(), metadataRevision, mutation.mutationId(), payloadHash)) {
-            return null;
-        }
-        String lineageHash = resultLive.hash();
-        JsonArray assets = intent.has("assets") && intent.get("assets").isJsonArray()
-            ? intent.getAsJsonArray("assets") : new JsonArray();
-        JsonObject primary = null;
-        boolean exactLineage = false;
-        List<JsonObject> sidecars = new ArrayList<>();
-        for (JsonElement element : assets) {
-            if (!element.isJsonObject()) {
-                return null;
-            }
-            JsonObject asset = element.getAsJsonObject();
-            String type = string(asset, "type");
-            String id = string(asset, "id");
-            if (lineageKey.type().equals(type) && lineageKey.id().equals(id)) {
-                exactLineage = exactLineageAsset(asset, previousLive, resultLive, lineageHash);
-                continue;
-            }
-            if (type != null && (type.endsWith(".intent") || type.endsWith(".tombstone")
-                || type.startsWith("tombstone:"))) {
-                sidecars.add(asset);
-                continue;
-            }
-            if (primary != null) {
-                return null;
-            }
-            primary = asset;
-        }
-        if (!exactLineage || primary == null) {
-            return null;
-        }
-        String type = string(primary, "type");
-        String id = string(primary, "id");
-        if (type == null || id == null || type.isBlank() || id.isBlank() || PROJECT_METADATA_TYPE.equals(type)) {
-            return null;
-        }
-        AssetTransactionCoordinator.AssetKey key = new AssetTransactionCoordinator.AssetKey(type, id);
-        AssetTransactionCoordinator.ExpectedState result = mutation.result().states().get(key);
-        JsonObject expected = primary.has("expected") && primary.get("expected").isJsonObject()
-            ? primary.getAsJsonObject("expected") : null;
-        if (expected == null || result == null) {
-            return null;
-        }
-        String expectedKind = string(expected, "kind");
-        long expectedRevision = expected.has("revision") ? expected.get("revision").getAsLong() : -1L;
-        String operation;
-        if ("WRITE".equals(string(primary, "operation")) && "MISSING".equals(expectedKind)
-            && expectedRevision == 0L && result instanceof AssetTransactionCoordinator.Live live && live.revision() == 1L) {
-            operation = "CREATE";
-        } else if ("DELETE".equals(string(primary, "operation")) && "LIVE".equals(expectedKind)
-            && expectedRevision > 0L && result instanceof AssetTransactionCoordinator.Deleted deleted
-            && deleted.revision() == expectedRevision + 1L) {
-            operation = "DELETE";
-        } else {
-            return null;
-        }
-        if (!exactLegacyAdminSidecars(sidecars, type, id, operation)) {
-            return null;
-        }
-        ServerResourceLocator resource = new ServerResourceLocator(serverId,
-            ContractRef.of(PROTOCOL_OWNER, new ResourceTypeId(type)), id);
-        return new LegacyAdminTransition(mutation, resource, operation, expectedRevision, result);
-    }
-
-    private boolean exactLegacyAdminSidecars(List<JsonObject> sidecars, String type, String id, String operation) {
-        if (CORE_RESOURCE_TYPES.contains(type)) {
-            return sidecars.isEmpty() && "CREATE".equals(operation);
-        }
-        if (ReSyncResourceCatalog.SCOREBOARD.equals(type)) {
-            if ("CREATE".equals(operation)) {
-                return sidecars.isEmpty();
-            }
-            if (sidecars.size() != 1) {
-                return false;
-            }
-            JsonObject tombstone = sidecars.getFirst();
-            JsonObject expected = tombstone.has("expected") && tombstone.get("expected").isJsonObject()
-                ? tombstone.getAsJsonObject("expected") : null;
-            return expected != null && ("tombstone:" + type).equals(string(tombstone, "type"))
-                && id.equals(string(tombstone, "id")) && "WRITE".equals(string(tombstone, "operation"))
-                && "MISSING".equals(string(expected, "kind"));
-        }
-        int expected = "CREATE".equals(operation) ? 1 : 2;
-        if (sidecars.size() != expected) {
-            return false;
-        }
-        boolean intent = false;
-        boolean tombstone = false;
-        for (JsonObject sidecar : sidecars) {
-            if (!id.equals(string(sidecar, "id")) || !"WRITE".equals(string(sidecar, "operation"))
-                || !sidecar.has("expected") || !sidecar.get("expected").isJsonObject()) {
-                return false;
-            }
-            String sidecarType = string(sidecar, "type");
-            String expectedKind = string(sidecar.getAsJsonObject("expected"), "kind");
-            if ((type + ".intent").equals(sidecarType)) {
-                intent = !intent && ("CREATE".equals(operation) ? "MISSING" : "LIVE").equals(expectedKind);
-            } else if ((type + ".tombstone").equals(sidecarType)) {
-                tombstone = !tombstone && "DELETE".equals(operation) && "MISSING".equals(expectedKind);
-            } else {
-                return false;
-            }
-        }
-        return intent && ("CREATE".equals(operation) || tombstone);
-    }
-
     private boolean exactLineageAsset(JsonObject asset, AssetTransactionCoordinator.Live expected,
                                       AssetTransactionCoordinator.Live result, String payloadHash) {
         if (!"WRITE".equals(string(asset, "operation")) || !payloadHash.equals(string(asset, "payloadHash"))
@@ -5436,7 +5385,8 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             && expected.hash().equals(string(value, "hash")) && result.hash().equals(payloadHash);
     }
 
-    private void importLegacyAdminChain(LegacyAdminChain chain, State current) throws SQLException {
+    private void importLegacyAdminChain(LegacyAdminChain chain, State current, AssetTransactionCoordinator coordinator,
+                                       long sequence) throws SQLException {
         Map<UUID, LegacyAdminImport> imports = new LinkedHashMap<>();
         Map<String, LegacyAdminTransition> terminal = new LinkedHashMap<>();
         for (LegacyAdminTransition transition : chain.transitions()) {
@@ -5445,85 +5395,124 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         for (LegacyAdminTransition transition : terminal.values()) {
             CoreResourceMutationTransition coreTransition = null;
             State state;
-            if (isCoreResource(transition.resource())) {
+            boolean preserveRaw = false;
+            if (transition.raw()) {
+                ServerResourceLocator resource = transition.resource();
+                boolean disposable = "flow".equals(resource.resourceType().value())
+                    && resource.id().startsWith("codex_runtime_probe_") && transition.result().revision() == 1L
+                    && legacyAdminRecoveryProfile(chain);
+                CoreGraphResourceAuthority.LegacyCoreRecoverySource source = disposable
+                    ? coreAuthority.legacyRecoverySource(resource, transition.mutation().mutationId(),
+                        transition.result().revision(), new ContentHash(transition.result().hash())).orElse(null)
+                    : coreAuthority.coordinatedRawGraphSource(resource).orElse(null);
+                state = source == null ? null : legacyCoreState(source);
+                preserveRaw = !disposable;
+                if (preserveRaw) {
+                    requireRawRecoveryUnowned(resource);
+                }
+            } else if (isCoreResource(transition.resource())) {
                 AssetTransactionCoordinator.ExpectedState result = transition.result();
-                CoreGraphResourceAuthority.LegacyCoreRecoverySource source =
-                    result instanceof AssetTransactionCoordinator.Live live
-                        ? coreAuthority.legacyRecoverySource(transition.resource(), transition.mutation().mutationId(),
-                            live.revision(), new ContentHash(live.hash())).orElse(null) : null;
-                if (source != null) {
-                    state = legacyCoreState(source);
+                CoreState core = synchronizeCore(transition.resource());
+                if (core != null && result instanceof AssetTransactionCoordinator.Live live
+                    && live.revision() == core.revision()
+                    && live.hash().equals(StorageSafety.sha256(coreBoundary.encode(core.decoded())))) {
+                    state = corePersistedState(core);
+                    coreTransition = coreTransition(core, LEGACY_ACTOR);
                 } else {
-                    CoreState core = synchronizeCore(transition.resource());
-                    if (core != null && result instanceof AssetTransactionCoordinator.Live live
-                        && live.revision() == core.revision()
-                        && live.hash().equals(StorageSafety.sha256(coreBoundary.encode(core.decoded())))) {
-                        state = corePersistedState(core);
-                        coreTransition = coreTransition(core, LEGACY_ACTOR);
-                    } else {
-                        state = null;
-                    }
+                    state = null;
                 }
             } else {
                 state = currentState(transition.resource());
             }
             if (exactLegacyTerminalState(transition, state)) {
-                imports.put(transition.mutation().mutationId(), new LegacyAdminImport(transition, state, coreTransition));
+                imports.put(transition.mutation().mutationId(), new LegacyAdminImport(transition, state, coreTransition, preserveRaw));
             }
         }
-        long currentMatches = imports.values().stream().filter(value -> value.state().mutationId().equals(current.mutationId())).count();
-        long liveCoreMatches = imports.values().stream().filter(value -> !value.state().deleted()
-            && CORE_RESOURCE_TYPES.contains(value.state().resource().resourceType().value())).count();
-        if (imports.size() != terminal.size() || currentMatches != 1L || liveCoreMatches != 1L
-            || imports.values().stream().noneMatch(value -> value.state().resource().resourceType().value().equals(chain.survivingCoreType()))) {
-            throw new IllegalStateException("Legacy admin resource recovery does not match current authority: imports="
-                + imports.size() + ", terminal=" + terminal.size() + ", current=" + currentMatches + ", core=" + liveCoreMatches
-                + ", survivingCore=" + chain.survivingCoreType() + ", importedKeys=" + imports.keySet()
-                + ", terminalKeys=" + terminal.keySet());
+        if (imports.size() != terminal.size()) {
+            throw new IllegalStateException("Recovered resource history does not match current typed authority");
         }
         for (LegacyAdminTransition transition : chain.transitions()) {
-            if (mutation(transition.mutation().mutationId()) != null) {
-                throw new IllegalStateException("Legacy admin resource mutation was already admitted");
+            MutationRow receipt = mutation(transition.mutation().mutationId());
+            if (receipt != null && !exactRecoveredReceipt(receipt, transition)) {
+                throw new IllegalStateException("Recovered resource history conflicts with an existing durable receipt");
             }
         }
         LegacyAdminImport coreImport = imports.values().stream()
-            .filter(value -> isCoreResource(value.state().resource())).findFirst()
-            .orElseThrow(() -> new IllegalStateException("Legacy admin Core recovery source is unavailable"));
-        boolean recoverLegacyCore = LEGACY_CORE_PAYLOAD_KIND.equals(coreImport.state().corePayloadKind());
-        if (recoverLegacyCore && !legacyAdminRecoveryProfile(chain)) {
+            .filter(value -> !value.preserveRaw() && LEGACY_CORE_PAYLOAD_KIND.equals(value.state().corePayloadKind()))
+            .findFirst().orElse(null);
+        boolean recoverLegacyCore = coreImport != null;
+        if (recoverLegacyCore && (imports.values().stream()
+            .filter(value -> !value.preserveRaw() && LEGACY_CORE_PAYLOAD_KIND.equals(value.state().corePayloadKind())).count() != 1L
+            || !legacyAdminRecoveryProfile(chain))) {
             throw new IllegalStateException("Legacy admin Core recovery does not match the disposable probe profile");
         }
         MutationRow pendingRecovery = recoverLegacyCore
             ? legacyAdminRecoveryPending(coreImport.state(), legacyAdminRecoveryMutationId(chain, current, coreImport)) : null;
-        try {
-            connection.setAutoCommit(false);
-            if (!sameResourceState(state(current.resource()), chain.baseline())) {
-                throw new IllegalStateException("Legacy admin resource recovery baseline changed during admission");
+        coordinator.read(snapshot -> {
+            if (snapshot.rootSequence() != sequence) {
+                throw new IllegalStateException("Committed resource history advanced before recovery settlement");
             }
-            for (LegacyAdminTransition transition : chain.transitions()) {
-                LegacyAdminTransition terminalTransition = terminal.get(transition.resource().canonicalText());
-                LegacyAdminImport terminalImport = imports.get(terminalTransition.mutation().mutationId());
-                writeMutation(legacyAdminReceipt(transition, terminalImport.state()), false);
-            }
-            for (LegacyAdminImport value : imports.values()) {
-                writeState(value.state());
-                if (value.coreTransition() != null) {
-                    writeCoreTransitionOutbox(value.transition().mutation().mutationId(), value.coreTransition());
+            try {
+                connection.setAutoCommit(false);
+                if (!sameResourceState(state(current.resource()), chain.baseline())) {
+                    throw new IllegalStateException("Legacy admin resource recovery baseline changed during admission");
                 }
+                for (LegacyAdminTransition transition : chain.transitions()) {
+                    if (hasPendingMutation(transition.resource())) {
+                        throw new IllegalStateException("Resource recovery is owned by a pending mutation: "
+                            + transition.resource().canonicalText());
+                    }
+                    MutationRow receipt = mutation(transition.mutation().mutationId());
+                    if (receipt != null && !exactRecoveredReceipt(receipt, transition)) {
+                        throw new IllegalStateException("Recovered resource history conflicts with an existing durable receipt");
+                    }
+                    if (receipt == null) {
+                        writeMutation(legacyAdminReceipt(transition), false);
+                    }
+                }
+                for (LegacyAdminImport value : imports.values()) {
+                    if (value.preserveRaw()) {
+                        requireRawRecoveryUnowned(value.state().resource());
+                    } else {
+                        writeState(value.state());
+                    }
+                    if (value.coreTransition() != null && mutation(value.transition().mutation().mutationId()).actorId().equals(LEGACY_ACTOR)) {
+                        writeCoreTransitionOutbox(value.transition().mutation().mutationId(), value.coreTransition());
+                    }
+                }
+                writeState(current);
+                if (pendingRecovery != null) {
+                    writeMutation(pendingRecovery, false);
+                }
+                connection.commit();
+            } catch (RuntimeException | SQLException exception) {
+                rollback();
+                throw new IllegalStateException("Failed To Settle Committed Resource History", exception);
+            } finally {
+                resetAutoCommit();
             }
-            writeState(current);
-            if (pendingRecovery != null) {
-                writeMutation(pendingRecovery, false);
-            }
-            connection.commit();
-        } catch (RuntimeException | SQLException exception) {
-            rollback();
-            throw exception;
-        } finally {
-            resetAutoCommit();
-        }
+            return null;
+        });
         if (pendingRecovery != null) {
             recoverLegacyAdminCore(pendingRecovery);
+        }
+    }
+
+    private void requireRawRecoveryUnowned(ServerResourceLocator resource) throws SQLException {
+        if (state(resource) != null || hasPendingMutation(resource)) {
+            throw new IllegalStateException("Raw graph recovery conflicts with durable resource ownership: " + resource.canonicalText());
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+            SELECT 1 FROM resource_mutation_receipt
+            WHERE response_resource = ? AND (transition_envelope IS NOT NULL OR transition_hash IS NOT NULL)
+            LIMIT 1
+            """)) {
+            statement.setString(1, resource.canonicalText());
+            try (ResultSet result = statement.executeQuery()) {
+                if (result.next()) {
+                    throw new IllegalStateException("Raw graph recovery conflicts with a Core publication: " + resource.canonicalText());
+                }
+            }
         }
     }
 
@@ -5542,7 +5531,10 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
             ReSyncResourceCatalog.SCOREBOARD + ":DELETE",
             ReSyncResourceCatalog.MOTD_PROFILE + ":DELETE",
             ReSyncResourceCatalog.TEXT_TEMPLATE + ":DELETE");
-        List<String> actual = chain.transitions().stream().map(transition ->
+        List<String> actual = chain.transitions().stream().filter(transition -> {
+            MutationRow receipt = mutation(transition.mutation().mutationId());
+            return receipt == null || LEGACY_ACTOR.equals(receipt.actorId());
+        }).map(transition ->
             transition.resource().resourceType().value() + ':' + transition.operation()).toList();
         return "flow".equals(chain.survivingCoreType()) && actual.equals(expected);
     }
@@ -5626,7 +5618,12 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         return state != null && state.resource().equals(transition.resource())
             && state.mutationId().equals(transition.mutation().mutationId())
             && state.revision() == result.revision()
-            && state.deleted() == (result instanceof AssetTransactionCoordinator.Deleted);
+            && state.deleted() == (result instanceof AssetTransactionCoordinator.Deleted)
+            && state.payloadHash().equals(transition.historical().payloadHash())
+            && Objects.equals(state.assetHash(), transition.historical().assetHash())
+            && Objects.equals(state.corePayloadHash(), transition.historical().corePayloadHash())
+            && Objects.equals(state.corePayloadKind(), transition.historical().corePayloadKind())
+            && (!isCoreResource(transition.resource()) || Objects.equals(state.activationState(), transition.historical().activationState()));
     }
 
     private boolean matchesProjectMetadataLineageHash(String hash, long revision, UUID mutationId, String payloadHash) {
@@ -5647,14 +5644,27 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         return lineage;
     }
 
-    private MutationRow legacyAdminReceipt(LegacyAdminTransition transition, State authoritative) {
+    private boolean exactRecoveredReceipt(MutationRow row, LegacyAdminTransition transition) {
+        State state = transition.historical();
+        return row.status() == Status.APPLIED && transition.operation().equals(row.operation())
+            && transition.resource().canonicalText().equals(row.responseResource())
+            && row.expectedRevision() == transition.expectedRevision() && row.resultRevision() == state.revision()
+            && state.mutationId().toString().equals(row.resultMutationId()) && state.payloadHash().equals(row.resultHash())
+            && state.deleted() == row.resultDeleted() && Objects.equals(state.assetHash(), row.resultAssetHash())
+            && Objects.equals(state.corePayloadHash(), row.resultCorePayloadHash())
+            && Objects.equals(state.corePayloadKind(), row.resultCorePayloadKind())
+            && (!isCoreResource(transition.resource()) || Objects.equals(state.activationState(), row.resultActivationState()));
+    }
+
+    private MutationRow legacyAdminReceipt(LegacyAdminTransition transition) {
+        State authoritative = transition.historical();
         AssetTransactionCoordinator.ExpectedState result = transition.result();
         boolean deleted = result instanceof AssetTransactionCoordinator.Deleted;
         boolean core = isCoreResource(transition.resource());
         long now = Instant.now().toEpochMilli();
         return new MutationRow(transition.mutation().mutationId(), LEGACY_ACTOR, transition.mutation().intentHash(),
             transition.operation(), transition.resource().canonicalText(), transition.resource().canonicalText(), null,
-            transition.resource().canonicalText(), null, transition.expectedRevision(), deleted ? authoritative.payloadHash() : "",
+            transition.resource().canonicalText(), null, transition.expectedRevision(), transition.preconditionHash(),
             Status.APPLIED, result.revision(), transition.mutation().mutationId().toString(),
             authoritative.payloadHash(), deleted,
             core && !deleted ? authoritative.activationState() : null, null, nextSequence(), "", "", now, now,
@@ -6701,6 +6711,10 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
         }
     }
 
+    private record NetworkCoreCache(long epoch, Connection connection, long generation,
+                                    FlowResourceRegistry.NetworkCoreMutations mutations) {
+    }
+
     private record ProjectMetadataCache(FlowResourceAdapter<Object> adapter,
                                         FlowResourceAdapter.MutationObservation observation, State state) {
     }
@@ -6710,11 +6724,11 @@ public final class SqliteProtocolResourceMutationAuthority implements ProtocolRe
 
     private record LegacyAdminTransition(AssetTransactionCoordinator.MutationView mutation,
                                          ServerResourceLocator resource, String operation,
-                                         long expectedRevision, AssetTransactionCoordinator.ExpectedState result) {
+                                         long expectedRevision, AssetTransactionCoordinator.ExpectedState result, State historical, String preconditionHash, boolean raw) {
     }
 
     private record LegacyAdminImport(LegacyAdminTransition transition, State state,
-                                     CoreResourceMutationTransition coreTransition) {
+                                     CoreResourceMutationTransition coreTransition, boolean preserveRaw) {
     }
 
     private record MutationRow(UUID mutationId, String actorId, String fingerprint, String operation, String requestedResource, String responseResource,

@@ -62,6 +62,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public final class CompiledGraphMetadataProvider {
     private static final OwnerId RESOURCE_OWNER = OwnerId.of("restudio.resync");
@@ -287,7 +288,7 @@ public final class CompiledGraphMetadataProvider {
             for (FunctionBoundaryPins.EffectivePin pin : pinsById.values()) {
                 pins.put(new CompiledGraphMetadata.PinAddress(nodeKey, pin.id().canonicalText()), pin.id());
             }
-            for (PinValue pinValue : node.values().values()) {
+            for (PinValue pinValue : node.configuredValues().values()) {
                 FunctionBoundaryPins.EffectivePin pin = pinsById.get(pinValue.pinId());
                 if (pin == null || pin.direction() != CatalogNodeDescriptor.Direction.INPUT) {
                     continue;
@@ -309,16 +310,7 @@ public final class CompiledGraphMetadataProvider {
         for (GraphConnection connection : graph.connections()) {
             GraphEndpoint source = connection.source();
             GraphEndpoint target = connection.target();
-            if (source.elementId() != null || source.branchId() != null || target.elementId() != null || target.branchId() != null) {
-                diagnostics.add(coreDiagnostic("GRAPH.OPAQUE_UNAVAILABLE", graph, null, null,
-                    "Structural connection endpoint metadata cannot be projected into the compiled compatibility mapping", Map.of(
-                        "field", "connections",
-                        "connectionId", connection.connectionId().canonicalText())));
-                continue;
-            }
-            CompiledGraphMetadata.ConnectionAddress address = new CompiledGraphMetadata.ConnectionAddress(
-                source.nodeId().canonicalText(), source.pinId().canonicalText(),
-                target.nodeId().canonicalText(), target.pinId().canonicalText());
+            CompiledGraphMetadata.ConnectionAddress address = CompiledGraphMetadata.ConnectionAddress.of(source, target);
             if (!seenConnections.add(address)) {
                 diagnostics.add(coreDiagnostic("GRAPH.OPAQUE_UNAVAILABLE", graph, null, null,
                     "Duplicate Core graph connection endpoints cannot be projected deterministically", Map.of(
@@ -340,7 +332,8 @@ public final class CompiledGraphMetadataProvider {
             Map<String, PinId> pinMappings = new LinkedHashMap<>();
             pins.forEach((address, pin) -> pinMappings.put(FlowExecutionBridge.MappingContext.pinMappingKey(address.nodeId(), address.pin()), pin));
             mappingContext = new FlowExecutionBridge.MappingContext(graph.resource(), binding, snapshotId,
-                nodeMappings, pinMappings, List.of());
+                nodeMappings, pinMappings, List.of(), graph.connections().stream()
+                    .collect(Collectors.toUnmodifiableMap(GraphConnection::connectionId, connection -> connection)));
         } catch (RuntimeException failure) {
             diagnostics.add(coreDiagnostic("GRAPH.OPAQUE_UNAVAILABLE", graph, null, null,
                 "The complete Core mapping context could not be constructed without losing persisted identities", Map.of(

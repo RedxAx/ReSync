@@ -268,7 +268,7 @@ class ReSyncServerProtocolDeliveryTest {
     }
 
     @Test
-    void saturatedIngressReturnsCorrelatedRejectionWithoutClosingTheTransport() throws Exception {
+    void saturatedIngressReturnsTransportRejectionWithoutClosingTheTransport() throws Exception {
         RecordingSender sender = new RecordingSender();
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -288,14 +288,10 @@ class ReSyncServerProtocolDeliveryTest {
 
             assertEquals(1, sender.attempts.get());
             assertEquals(0, sender.closes.get());
-            ProtocolEnvelopeMessage message = (ProtocolEnvelopeMessage) fixture.codec.decodePayload(
+            ErrorMessage rejection = (ErrorMessage) fixture.codec.decodePayload(
                 fixture.codec.decodeFrame(sender.lastFrame.get()));
-            ProtocolEnvelope<Map<String, Object>> rejection = new ProtocolEnvelopeBoundary().decode(message.getPayload());
-            assertEquals(ProtocolEnvelope.Status.REJECTED, rejection.status());
-            assertEquals(request.requestId(), rejection.requestId());
-            assertEquals(request.correlationId(), rejection.correlationId());
-            assertEquals(ProtocolRejectionCode.RESOURCE_READ_UNAVAILABLE.wireValue(),
-                ((ProtocolBody.ControlResponse) rejection.body()).values().get("rejectionCode"));
+            assertEquals(ProtocolRejectionCode.RESOURCE_READ_UNAVAILABLE.transportCode(), rejection.getErrorCode());
+            assertTrue(rejection.getErrorText().contains(ProtocolRejectionCode.RESOURCE_READ_UNAVAILABLE.wireValue()));
         } finally {
             release.countDown();
         }

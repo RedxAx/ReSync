@@ -39,6 +39,10 @@ public interface CoreGraphResourceAuthority {
 
     Optional<CoreGraphResourceState> state(ServerResourceLocator resource);
 
+    default Optional<LegacyCoreRecoverySource> coordinatedRawGraphSource(ServerResourceLocator resource) {
+        return Optional.empty();
+    }
+
     default Optional<LegacyCoreRecoverySource> legacyRecoverySource(ServerResourceLocator resource,
                                                                      UUID sourceMutationId, long sourceRevision,
                                                                      ContentHash sourceAssetHash) {

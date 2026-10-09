@@ -11,6 +11,12 @@ import restudio.resync.core.ConnectionInfo;
 import restudio.resync.core.ConnectionState;
 import restudio.resync.core.Session;
 import restudio.resync.flow.CoreGraphStorageBoundary;
+import restudio.resync.flow.CoreGraphTransfer;
+import restudio.resync.flow.catalog.CatalogActivationAuthority;
+import restudio.resync.flow.catalog.CatalogCanonicalizer;
+import restudio.resync.flow.catalog.CatalogRuntimeActivation;
+import restudio.resync.flow.catalog.CatalogSnapshot;
+import restudio.resync.flow.runtime.RuntimeRegistrySnapshot;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.catalog.CatalogVersion;
@@ -268,6 +274,67 @@ class SqliteProtocolCoreGraphRoundTripRegressionTest {
             assertEquals(3L, replay.resource().revision());
             assertEquals(mutation, replay.projectMetadata().mutationId());
             assertEquals(committedSequence, coordinator.read(snapshot -> snapshot.rootSequence()).longValue());
+        }
+    }
+
+    @Test
+    void networkCoreMutationsPreserveLocalCatalogAndDurableDeletion(@TempDir Path directory) throws Exception {
+        FlowStorage storage = storage(directory);
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        registerProjectMetadata(registry, storage);
+        registry.addCoreMutationListener(ignored -> {
+        });
+        RuntimeRegistrySnapshot runtime = RuntimeRegistrySnapshot.empty();
+        CatalogSnapshot base = CatalogSnapshot.empty(new CatalogVersion(1, 0));
+        String canonical = CatalogCanonicalizer.canonicalSnapshotContent(3L, base.contractVersion(), base.contributions(),
+            base.minimumClientCapabilities(), base.diagnostics(), runtime.bindingManifestHash());
+        CatalogSnapshot catalog = new CatalogSnapshot(3L, base.contractVersion(), base.contentChecksum(), runtime.bindingManifestHash(),
+            base.minimumClientCapabilities(), base.contributions(), base.definitions(), base.types(), base.conversions(), base.categories(),
+            base.inspectors(), base.capabilities(), base.runtimeRequirements(), base.optionSources(), base.validators(), base.editors(),
+            base.previews(), base.migrations(), base.provenance(), base.diagnostics(), canonical, runtime.bindingManifestHash());
+        FlowStorageCoreGraphResourceAuthority core = new FlowStorageCoreGraphResourceAuthority(storage, SERVER,
+            new CoreGraphMutationValidator(SERVER, new CatalogRuntimeActivation(catalog, runtime), CatalogActivationAuthority.freshInstall()));
+        registry.bindCoreGraphResourceAuthority(core);
+        CatalogBinding local = core.activeCatalogBinding().orElseThrow();
+        CatalogBinding foreign = new CatalogBinding(2L, local.catalogChecksum(), local.bindingManifestHash());
+        ServerResourceLocator resource = resource("flow", "shared-core");
+        ServerResourceLocator origin = new ServerResourceLocator(ServerId.deterministic("shared-core-origin"), resource.key());
+        UUID saved;
+        UUID deleted;
+        try (SqliteProtocolResourceMutationAuthority authority = new SqliteProtocolResourceMutationAuthority(registry, SERVER,
+            directory.resolve("resource.db"), core, ProtocolResourceAuthorizer.serverGranted(), AuthorityEpoch.fixed(1L), registry)) {
+            FlowResourceRegistry.NetworkCoreMutations mutations = authority.networkCoreMutations();
+            for (long revision : List.of(9L, 10L)) {
+                GraphDocument graph = new GraphDocument(new CatalogVersion(1, 0), origin, revision, foreign, Set.of(),
+                    List.of(), List.of(), List.of(), List.of(), OpaqueData.of(Map.of("shared", revision)));
+                CoreGraphStorageBoundary.Decoded source = BOUNDARY.decode(BOUNDARY.encode(graph,
+                    new CoreGraphStorageBoundary.AssetMetadata("flow", revision, UUID.randomUUID(), ResourceActivationState.INACTIVE), origin));
+                CoreGraphStorageBoundary.Decoded portable = CoreGraphTransfer.decode(CoreGraphTransfer.serialize(source), "flow", resource.id());
+                assertEquals(1L, portable.graphDocument().catalogBinding().generation());
+                mutations.save(resource, portable);
+                assertEquals(revision - 8L, authority.load(resource).revision());
+                assertEquals(local, storage.getCoreGraph("flow", resource.id()).orElseThrow().graphDocument().catalogBinding());
+                assertEquals("APPLIED", receiptStatus(directory, authority.load(resource).mutationId()));
+                mutations.save(resource, portable);
+                assertEquals(revision - 8L, authority.load(resource).revision());
+            }
+            saved = authority.load(resource).mutationId();
+            authority.quiescePersistence();
+            assertThrows(IllegalStateException.class, () -> mutations.delete(resource));
+            authority.resumePersistence();
+            assertThrows(IllegalStateException.class, () -> mutations.delete(resource));
+            authority.networkCoreMutations().delete(resource);
+            ResourceDocument<Map<String, Object>> tombstone = authority.load(resource);
+            assertTrue(tombstone.deleted());
+            assertEquals(3L, tombstone.revision());
+            deleted = tombstone.mutationId();
+        }
+        try (SqliteProtocolResourceMutationAuthority authority = new SqliteProtocolResourceMutationAuthority(registry, SERVER,
+            directory.resolve("resource.db"), core, ProtocolResourceAuthorizer.serverGranted(), AuthorityEpoch.fixed(1L), registry)) {
+            assertTrue(authority.load(resource).deleted());
+            assertEquals(deleted, authority.load(resource).mutationId());
+            assertEquals("APPLIED", receiptStatus(directory, saved));
+            assertEquals("APPLIED", receiptStatus(directory, deleted));
         }
     }
 

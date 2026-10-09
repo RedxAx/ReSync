@@ -105,6 +105,9 @@ public final class FlowStorageCoreGraphResourceAuthority implements CoreGraphRes
                 throw new IllegalStateException("Core graph list contains duplicate resource ID: " + type + ':' + id);
             }
             ServerResourceLocator resource = resource(type, id);
+            if (storage.coordinatedRawGraphSource(resource).isPresent()) {
+                continue;
+            }
             storage.getCoreGraph(type, id)
                 .map(decoded -> canonicalDecoded(resource, decoded))
                 .map(CoreGraphResourceState::live)
@@ -116,6 +119,14 @@ public final class FlowStorageCoreGraphResourceAuthority implements CoreGraphRes
     @Override
     public Optional<CoreGraphResourceState> state(ServerResourceLocator resource) {
         return load(resource).map(CoreGraphResourceState::live);
+    }
+
+    @Override
+    public Optional<LegacyCoreRecoverySource> coordinatedRawGraphSource(ServerResourceLocator resource) {
+        requireResource(resource);
+        return storage.coordinatedRawGraphSource(resource)
+            .map(source -> new LegacyCoreRecoverySource(resource, source.revision(), source.mutationId(),
+                source.assetHash(), source.payloadHash(), source.payloadKind()));
     }
 
     @Override

@@ -135,17 +135,27 @@ public final class FreshRootProvenance {
 
     public static void verifyConsumed(Path coordinationRoot, Path expectedActiveRoot, String expectedOriginHash,
                                       String expectedArtifactHash) throws IOException {
-        Path coordination = MigrationPaths.requireDirectory(coordinationRoot, "coordinationRoot");
         Path active = MigrationPaths.requireDirectory(expectedActiveRoot, "activeRoot");
+        Path genesis = verifyConsumedInstallation(coordinationRoot, expectedOriginHash, expectedArtifactHash);
+        if (!genesis.equals(active) || !genesis.toRealPath().equals(active.toRealPath())) {
+            throw new MigrationException("Consumed Fresh Root Provenance Does Not Match The Active Root And Artifact");
+        }
+    }
+
+    public static Path verifyConsumedInstallation(Path coordinationRoot, String expectedOriginHash,
+                                                   String expectedArtifactHash) throws IOException {
+        Path coordination = MigrationPaths.requireDirectory(coordinationRoot, "coordinationRoot");
         String origin = requireHash(expectedOriginHash, "originHash");
         String artifact = requireHash(expectedArtifactHash, "artifactHash");
         Path proof = coordination.resolve(FILE_NAME).toAbsolutePath().normalize();
         FreshRootProvenance current = read(proof);
-        if (!current.proofPath.equals(proof) || current.phase != Phase.CONSUMED || !current.activeRoot.equals(active)
-            || !current.activeRoot.toRealPath().equals(active.toRealPath()) || !current.sourceHash.equals(current.activeHash)
+        if (!current.proofPath.equals(proof) || current.phase != Phase.CONSUMED || !current.sourceHash.equals(current.activeHash)
             || !current.originHash.equals(origin) || !current.artifactHash.equals(artifact)) {
             throw new MigrationException("Consumed Fresh Root Provenance Does Not Match The Active Root And Artifact");
         }
+        Path genesis = MigrationPaths.requireDirectory(current.activeRoot, "Fresh installation root");
+        MigrationPaths.requireNoSymlinkTraversal(coordination, genesis);
+        return genesis;
     }
 
     public static boolean recordsCurrentInstallation(Path coordinationRoot, Path expectedSourceRoot) throws IOException {
@@ -224,7 +234,7 @@ public final class FreshRootProvenance {
             }
         }
         if (!Files.exists(versionDirectory, LinkOption.NOFOLLOW_LINKS)) return;
-        if (ReSyncDataFixer.installedVersion(directory).orElse(-1) != 1) {
+        if (ReSyncDataFixer.installedVersion(directory).isEmpty()) {
             throw new MigrationException("Fresh ReSync Active Root Has Invalid Migration Data");
         }
         try (var versionEntries = Files.list(versionDirectory)) {

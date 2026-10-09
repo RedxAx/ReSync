@@ -422,10 +422,10 @@ class TemporaryLifecycleDiagnosticsTest {
         assertEquals(DiagnosticSink.State.FAILED, status.state());
         assertTrue(status.reason().contains("unconfirmed="));
         assertFalse(status.reason().contains("lost="));
+        sink.close();
         assertEquals(1, warnings.size());
         assertTrue(warnings.get(0).contains("unconfirmedSequence="));
         assertFalse(warnings.get(0).contains("lostSequence="));
-        sink.close();
     }
 
     @Test
@@ -493,10 +493,10 @@ class TemporaryLifecycleDiagnosticsTest {
         DiagnosticSink.Status status = sink.status();
         assertEquals(DiagnosticSink.State.FAILED, status.state());
         assertTrue(status.reason().contains("unconfirmed=1-" + (LifecycleDiagnosticPolicy.CRITICAL_CAPACITY + 1L)));
+        sink.close();
         assertTrue(warnings.stream().anyMatch(line -> line.contains("droppedSequence=1-1")));
         assertTrue(warnings.stream().anyMatch(line -> line.contains("unconfirmedSequence=1-"
             + (LifecycleDiagnosticPolicy.CRITICAL_CAPACITY + 1L))));
-        sink.close();
     }
 
     @Test

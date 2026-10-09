@@ -1,5 +1,8 @@
 package restudio.resync.flow;
 
+import restudio.resync.flow.graph.GraphEndpoint;
+import restudio.resync.flow.identity.BranchId;
+import restudio.resync.flow.identity.RepeatableElementId;
 import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.ConnectionId;
 import restudio.resync.flow.identity.ContractRef;
@@ -240,7 +243,11 @@ public record CompiledGraphMetadata(
         String sourceNodeId,
         String sourcePin,
         String targetNodeId,
-        String targetPin
+        String targetPin,
+        RepeatableElementId sourceElementId,
+        BranchId sourceBranchId,
+        RepeatableElementId targetElementId,
+        BranchId targetBranchId
     ) implements Comparable<ConnectionAddress> {
         public ConnectionAddress {
             requireText(sourceNodeId, "Connection Metadata Source Node IDs");
@@ -249,8 +256,23 @@ public record CompiledGraphMetadata(
             requireText(targetPin, "Connection Metadata Target Pins");
         }
 
+        public ConnectionAddress(String sourceNodeId, String sourcePin, String targetNodeId, String targetPin) {
+            this(sourceNodeId, sourcePin, targetNodeId, targetPin, null, null, null, null);
+        }
+
+        public static ConnectionAddress of(GraphEndpoint source, GraphEndpoint target) {
+            return new ConnectionAddress(source.nodeId().canonicalText(), source.pinId().canonicalText(),
+                target.nodeId().canonicalText(), target.pinId().canonicalText(), source.elementId(), source.branchId(),
+                target.elementId(), target.branchId());
+        }
+
         public String canonicalText() {
-            return sourceNodeId + "\u0000" + sourcePin + "\u0000" + targetNodeId + "\u0000" + targetPin;
+            String base = sourceNodeId + "\u0000" + sourcePin + "\u0000" + targetNodeId + "\u0000" + targetPin;
+            return sourceElementId == null && sourceBranchId == null && targetElementId == null && targetBranchId == null
+                ? base : base + "\u0000" + (sourceElementId == null ? "" : sourceElementId.canonicalText())
+                    + "\u0000" + (sourceBranchId == null ? "" : sourceBranchId.canonicalText())
+                    + "\u0000" + (targetElementId == null ? "" : targetElementId.canonicalText())
+                    + "\u0000" + (targetBranchId == null ? "" : targetBranchId.canonicalText());
         }
 
         @Override

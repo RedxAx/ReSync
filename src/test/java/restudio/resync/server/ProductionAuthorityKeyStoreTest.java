@@ -342,6 +342,46 @@ class ProductionAuthorityKeyStoreTest {
         assertEquals(peerProtection, protection(peerKey));
         assertFalse(Files.exists(first.secretRoot().resolve(ProductionAuthorityKeyStore.QUARANTINE_DIRECTORY),
             LinkOption.NOFOLLOW_LINKS));
+
+        Path movedRoot = Files.createDirectory(temporary.resolve("moved"));
+        for (String name : List.of(ServerIdentityStore.FILE_NAME, ServerIdentityStore.INSTALL_SIGNAL_FILE,
+            ServerIdentityStore.AUTHORITY_FILE)) {
+            Files.copy(firstRoot.resolve(name), movedRoot.resolve(name));
+        }
+        Path movedAnchor = movedRoot.resolve(ProductionAuthorityKeyStore.TRUST_ANCHOR_RELATIVE_PATH);
+        Files.createDirectories(movedAnchor.getParent());
+        byte[] anchorBytes = Files.readAllBytes(first.trustAnchorPath());
+        Files.write(movedAnchor, anchorBytes);
+        ServerIdentityStore movedIdentity = ServerIdentityStore.open(movedRoot.resolve(ServerIdentityStore.FILE_NAME));
+        ProductionAuthorityKeyStore moved = supportedStore(movedIdentity);
+        assertFalse(Files.exists(moved.privateKeyPath(), LinkOption.NOFOLLOW_LINKS));
+
+        assertEquals(firstPublicKey, moved.signingPublicKey());
+        assertEquals(firstPublicKey, supportedStore(movedIdentity).signingPublicKey());
+        assertArrayEquals(peerBytes, Files.readAllBytes(moved.privateKeyPath()));
+        assertArrayEquals(peerBytes, Files.readAllBytes(peerKey));
+        assertEquals(peerModified, Files.getLastModifiedTime(peerKey, LinkOption.NOFOLLOW_LINKS));
+        assertEquals(peerProtection, protection(peerKey));
+        assertArrayEquals(anchorBytes, Files.readAllBytes(movedAnchor));
+
+        Files.writeString(moved.privateKeyPath(), "invalid");
+        assertThrows(IOException.class, () -> supportedStore(movedIdentity).signingPublicKey());
+        assertEquals("invalid", Files.readString(moved.privateKeyPath()));
+        assertArrayEquals(peerBytes, Files.readAllBytes(peerKey));
+
+        byte[] unrelatedBytes = Files.readAllBytes(second.privateKeyPath());
+        FileTime unrelatedModified = Files.getLastModifiedTime(second.privateKeyPath(), LinkOption.NOFOLLOW_LINKS);
+        Object unrelatedProtection = protection(second.privateKeyPath());
+        Files.delete(peerKey);
+        Files.delete(moved.privateKeyPath());
+        assertThrows(IOException.class, () -> supportedStore(movedIdentity).signingPublicKey());
+        assertFalse(Files.exists(moved.privateKeyPath(), LinkOption.NOFOLLOW_LINKS));
+        assertArrayEquals(unrelatedBytes, Files.readAllBytes(second.privateKeyPath()));
+        assertEquals(unrelatedModified, Files.getLastModifiedTime(second.privateKeyPath(), LinkOption.NOFOLLOW_LINKS));
+        assertEquals(unrelatedProtection, protection(second.privateKeyPath()));
+        assertArrayEquals(anchorBytes, Files.readAllBytes(movedAnchor));
+        assertFalse(Files.exists(first.secretRoot().resolve(ProductionAuthorityKeyStore.QUARANTINE_DIRECTORY),
+            LinkOption.NOFOLLOW_LINKS));
     }
 
     @Test

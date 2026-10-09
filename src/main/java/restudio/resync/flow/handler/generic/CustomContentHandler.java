@@ -2,6 +2,7 @@ package restudio.resync.flow.handler.generic;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.Inventory;
 import restudio.flow.data.CustomContentGraphAdapter;
 import restudio.flow.data.FlowNode;
 import restudio.resync.customcontent.CustomContentAccess;
@@ -21,6 +22,7 @@ public class CustomContentHandler implements NodeHandler {
 
     public CustomContentHandler() {
         operations.put("give_content", (ctx, node) -> {
+            ctx.setOutput(node, "item", null);
             Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
             String contentId = ctx.getInputValue(node, "content_id", String.class, "");
             Integer amount = ctx.getInputValue(node, "amount", Integer.class, 1);
@@ -28,10 +30,18 @@ public class CustomContentHandler implements NodeHandler {
             if (player != null && service != null && contentId != null && !contentId.isBlank()) {
                 ItemStack item = service.createItem(contentId, amount != null ? amount : 1);
                 if (item != null) {
-                    playerDataAdmission.mutatePlayer("flow-custom-content-give:" + player.getUniqueId(), player,
-                        () -> player.getInventory().addItem(item));
-                    ctx.setOutput(node, "item", item);
-                    ctx.setOutput(node, "success", true);
+                    boolean given = playerDataAdmission.mutatePlayer("flow-custom-content-give:" + player.getUniqueId(), player, () -> {
+                        if (!hasSpace(player.getInventory(), item)) {
+                            return false;
+                        }
+                        Map<Integer, ItemStack> remaining = player.getInventory().addItem(item.clone());
+                        if (!remaining.isEmpty()) {
+                            throw new IllegalStateException("Player inventory capacity changed while giving custom content");
+                        }
+                        return true;
+                    });
+                    ctx.setOutput(node, "item", given ? item : null);
+                    ctx.setOutput(node, "success", given);
                 } else {
                     ctx.setOutput(node, "success", false);
                 }
@@ -111,6 +121,22 @@ public class CustomContentHandler implements NodeHandler {
             ctx.setOutput(node, "trigger", state.trigger());
             ctx.triggerOutput(state.ready() ? "ready" : "cooldown");
         });
+    }
+
+    private static boolean hasSpace(Inventory inventory, ItemStack item) {
+        int remaining = item.getAmount();
+        int limit = Math.min(inventory.getMaxStackSize(), item.getMaxStackSize());
+        for (ItemStack stored : inventory.getStorageContents()) {
+            if (stored == null || stored.getType().isAir()) {
+                remaining -= limit;
+            } else if (stored.isSimilar(item)) {
+                remaining -= Math.max(0, limit - stored.getAmount());
+            }
+            if (remaining <= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void registerTo(HandlerRegistry registry) {

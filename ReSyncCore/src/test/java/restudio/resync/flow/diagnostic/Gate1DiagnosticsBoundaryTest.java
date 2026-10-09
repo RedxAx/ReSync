@@ -49,7 +49,7 @@ class Gate1DiagnosticsBoundaryTest {
     void frozenCatalogResolvesDefinitionsAndRejectsUnknownCodes() throws Exception {
         DiagnosticCodeCatalog catalog = DiagnosticCodeCatalog.defaultCatalog();
 
-        assertEquals(267, catalog.size());
+        assertEquals(269, catalog.size());
         DiagnosticCodeCatalog.Definition loopCycle = catalog.require("GRAPH.LOOP_CYCLE");
         assertEquals(DiagnosticSeverity.ERROR, loopCycle.severity());
         assertEquals(DiagnosticPhase.SEMANTIC, loopCycle.phase());
@@ -95,11 +95,11 @@ class Gate1DiagnosticsBoundaryTest {
             bytes = stream.readAllBytes();
         }
 
-        assertEquals("fd7de157afb4b93c6be9764de4d388c17dd59d4dd204a0440f4792fcd33f8b6f",
+        assertEquals("2293c87308144be62c6d7c6fc67c0d1b70dacfb3f5f07b97fb38ae1df6bdb3a5",
             DiagnosticCodeCatalog.FROZEN_SOURCE_SHA256);
         assertEquals(DiagnosticCodeCatalog.FROZEN_SOURCE_SHA256, CanonicalHash.rawSha256(bytes));
         DiagnosticCodeCatalog catalog = DiagnosticCodeCatalog.fromBytes(bytes);
-        assertEquals("19e024994aea764ada91e8c927d45906bff84445e4913c3f6e9678aaf56f684f", catalog.sourceHash());
+        assertEquals("014ab72de45fcef0ba18e83483ff3acbad50bf4d75ddc26d60f3d3fb3271e879", catalog.sourceHash());
         assertArrayEquals(CanonicalCodec.decodePermissive(bytes).canonicalBytes(), catalog.canonicalBytes());
         assertEquals(CanonicalHash.sha256(CanonicalCodec.decodePermissive(bytes)), catalog.sourceHash());
 

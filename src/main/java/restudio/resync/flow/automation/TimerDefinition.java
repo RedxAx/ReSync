@@ -43,6 +43,11 @@ public record TimerDefinition(String id, String name, String description, Automa
         }
     }
 
+    @Override
+    public Kind kind() {
+        return Kind.TIMER;
+    }
+
     public static TimerDefinition from(JsonObject json, String fallbackId) {
         JsonObject value = json != null ? json : new JsonObject();
         String id = string(value, "id", fallbackId);

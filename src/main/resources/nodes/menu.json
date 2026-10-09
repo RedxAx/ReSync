@@ -11,7 +11,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "MENU",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": [
       "menu.create"
@@ -44,7 +44,7 @@
         "name": "menu_id",
         "pinType": "DATA",
         "direction": "input",
-        "dataType": "gui_id",
+        "dataType": "string",
         "description": "Sets the stable ID used to save and open the new menu."
       },
       {
@@ -85,7 +85,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {
@@ -190,7 +190,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "description": "Selects the material displayed in the slot."
       },
       {
@@ -345,7 +345,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "description": "Selects the material displayed in the first empty slot."
       },
       {
@@ -1204,7 +1204,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "description": "Selects the material displayed in the slot."
       },
       {
@@ -1868,7 +1868,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "description": "Selects the material placed in every slot."
       },
       {
@@ -2232,7 +2232,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "MENU",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": [
       "menu.duplicate"
@@ -2276,7 +2276,7 @@
         "name": "new_menu_id",
         "pinType": "DATA",
         "direction": "input",
-        "dataType": "gui_id",
+        "dataType": "string",
         "description": "Sets the stable ID for the copied menu."
       }
     ],
@@ -2293,7 +2293,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {

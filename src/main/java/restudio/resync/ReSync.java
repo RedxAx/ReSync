@@ -19,6 +19,7 @@ import restudio.resync.migration.FreshRootProvenance;
 import restudio.resync.migration.LegacyInstallBoundary;
 import restudio.resync.migration.ReSyncDataFixer;
 import restudio.resync.migration.ReSyncPersistenceCoordinator;
+import restudio.resync.migration.RewriteGraphsV2;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
@@ -46,7 +47,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ReSync extends JavaPlugin {
-    private static final ReSyncDataFixer DATA_FIXER = new ReSyncDataFixer(1, List.of());
+    private static final ReSyncDataFixer DATA_FIXER = new ReSyncDataFixer(2, List.of(new RewriteGraphsV2()));
     private static ReSync instance;
     private ReSyncWebSocketListener wsServer;
     private ReSyncTlsIdentity.Prepared tlsIdentity;
@@ -142,6 +143,8 @@ public class ReSync extends JavaPlugin {
                 + " [Activation " + elapsedMillis(bootstrapStarted, activationReady) + " ms"
                 + ", Asset Migration " + elapsedMillis(activationReady, assetMigrationReady) + " ms"
                 + ", Config " + elapsedMillis(assetMigrationReady, configReady) + " ms]");
+            Log.info("Active Data Folder: " + persistence.authorityEpochStore().boundRoot());
+            Log.info("Recovery Folder: " + persistence.coordinationRoot());
         } catch (IOException | RuntimeException exception) {
             closeBootstrap(persistence, exception);
             throw new IllegalStateException("ReSync Persistence Bootstrap Failed", exception);
@@ -181,6 +184,8 @@ public class ReSync extends JavaPlugin {
             interactiveSelectionManager = new InteractiveSelectionManager(this);
             interactiveSelectionManager.start();
             wsServer = new ReSyncWebSocketListener(config, tlsIdentity == null ? null : tlsIdentity.sslContext()) {
+                private final ConcurrentHashMap<WebSocket, ReSyncServer> owners = new ConcurrentHashMap<>();
+
                 @Override
                 public void onOpen(WebSocket conn, ClientHandshake handshake) {
                     if (!webSocketApiReady) {
@@ -189,13 +194,21 @@ public class ReSync extends JavaPlugin {
                     }
                     ReSyncServer current = activeServer();
                     if (current != null) {
-                        current.onOpen(conn, handshake);
+                        owners.put(conn, current);
+                        try {
+                            current.onOpen(conn, handshake);
+                        } catch (RuntimeException exception) {
+                            owners.remove(conn, current);
+                            current.onClose(conn, 1011, "ReSync Connection Failed", false);
+                            conn.close(1011, "ReSync Connection Failed");
+                            throw exception;
+                        }
                     }
                 }
 
                 @Override
                 public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-                    ReSyncServer current = activeServer();
+                    ReSyncServer current = owners.remove(conn);
                     if (current != null) {
                         current.onClose(conn, code, reason, remote);
                     }
@@ -207,7 +220,7 @@ public class ReSync extends JavaPlugin {
                         conn.close(1013, "ReSync WebSocket API Is Unavailable");
                         return;
                     }
-                    ReSyncServer current = activeServer();
+                    ReSyncServer current = owners.get(conn);
                     if (current != null) {
                         current.onMessage(conn, ByteBuffer.wrap(message.getBytes()));
                     }
@@ -219,7 +232,7 @@ public class ReSync extends JavaPlugin {
                         conn.close(1013, "ReSync WebSocket API Is Unavailable");
                         return;
                     }
-                    ReSyncServer current = activeServer();
+                    ReSyncServer current = owners.get(conn);
                     if (current != null) {
                         current.onMessage(conn, message);
                     }

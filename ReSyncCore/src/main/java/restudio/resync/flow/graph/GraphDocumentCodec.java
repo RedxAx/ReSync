@@ -120,13 +120,10 @@ public final class GraphDocumentCodec implements CanonicalCodec<GraphDocument> {
         List<GraphVariable> variables = optionalList(object, "variables", GraphDocumentCodec::decodeVariable);
         List<FunctionBinding> functions = optionalList(object, "functions", GraphDocumentCodec::decodeFunction);
         Set<ServerResourceLocator> functionIds = new HashSet<>();
-        Set<FunctionParameterId> parameterIds = new HashSet<>();
         for (FunctionBinding function : functions) {
             if (!functionIds.add(function.function())) {
                 throw new IllegalArgumentException("Duplicate function binding identity: " + function.function());
             }
-            function.inputs().forEach(parameter -> addParameterId(parameterIds, parameter));
-            function.outputs().forEach(parameter -> addParameterId(parameterIds, parameter));
         }
         return new GraphDocument(schemaVersion, resource, revision, catalogBinding, requiredCapabilities, nodes, connections,
             passthroughs, variables, functions, OpaqueData.of(unknown(object, GRAPH_FIELDS)));

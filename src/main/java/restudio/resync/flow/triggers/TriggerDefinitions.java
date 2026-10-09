@@ -3,6 +3,7 @@ package restudio.resync.flow.triggers;
 import org.bukkit.entity.Damageable;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.*;
 import org.bukkit.event.entity.*;
@@ -206,16 +207,16 @@ public class TriggerDefinitions {
         vars.put("event.amount", event.getAmount());
     }
 
-    @FlowTrigger(eventType = "projectile_launch", eventClass = ProjectileLaunchEvent.class, playerEvent = true)
+    @FlowTrigger(eventType = "projectile_launch", eventClass = ProjectileLaunchEvent.class, playerExtractor = "launchPlayer")
     public void onProjectileLaunch(ProjectileLaunchEvent event, Map<String, Object> vars) {
-        if (!(event.getEntity().getShooter() instanceof Player)) return;
         vars.put("event.projectile", event.getEntity());
+        vars.put("event.player", shooter(event.getEntity()));
     }
 
-    @FlowTrigger(eventType = "projectile_hit", eventClass = ProjectileHitEvent.class, playerEvent = true)
+    @FlowTrigger(eventType = "projectile_hit", eventClass = ProjectileHitEvent.class, playerExtractor = "hitPlayer")
     public void onProjectileHit(ProjectileHitEvent event, Map<String, Object> vars) {
-        if (!(event.getEntity().getShooter() instanceof Player)) return;
         vars.put("event.projectile", event.getEntity());
+        vars.put("event.player", shooter(event.getEntity()));
         vars.put("event.hit_entity", event.getHitEntity());
     }
 
@@ -489,6 +490,18 @@ public class TriggerDefinitions {
     @FlowTrigger(eventType = "server_command", nodeType = "event:server_command", eventClass = ServerCommandEvent.class, playerEvent = false, aliases = {"console_command"})
     public void onServerCommand(ServerCommandEvent event, Map<String, Object> vars) {
         vars.putAll(GlobalTriggers.commandEventVariables(event.getSender(), event.getCommand(), event.isCancelled()));
+    }
+
+    public Player launchPlayer(ProjectileLaunchEvent event) {
+        return shooter(event.getEntity());
+    }
+
+    public Player hitPlayer(ProjectileHitEvent event) {
+        return shooter(event.getEntity());
+    }
+
+    private Player shooter(Projectile projectile) {
+        return projectile.getShooter() instanceof Player player ? player : null;
     }
 
     public Player extractCraftPlayer(CraftItemEvent event) {

@@ -4,11 +4,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TriggerRegistryCompatibilityTest {
     @TempDir
@@ -28,6 +30,15 @@ class TriggerRegistryCompatibilityTest {
         assertEquals(1, registry.getBindings(TriggerType.COMMAND).size());
         assertTrue(registry.getBindings().stream().anyMatch(binding -> "flow:event".equals(binding.getId())));
         assertTrue(registry.getBindings().stream().anyMatch(binding -> "flow:command".equals(binding.getId())));
+    }
+
+    @Test
+    void invalidPersistedBindingsCannotBeReplacedWithAnEmptyRegistry() throws Exception {
+        Path file = tempDir.resolve("invalid-triggers.json");
+        Files.writeString(file, "{invalid");
+
+        assertThrows(IllegalStateException.class, () -> new TriggerRegistry(file.toFile()));
+        assertEquals("{invalid", Files.readString(file));
     }
 
     @Test

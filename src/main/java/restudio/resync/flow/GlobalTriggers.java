@@ -285,6 +285,11 @@ public class GlobalTriggers implements Listener {
     }
 
     public void registerTrigger(String eventType, String flowId) {
+        if (systemEventListener != null && systemEventListener.isSystemEvent(eventType)) {
+            systemEventListener.registerTrigger(eventType, flowId);
+            return;
+        }
+
         if (!storage.hasCoreGraphAuthority()) {
             FlowGraph graph = storage.getGraph("flow", flowId);
             if (graph == null || !graph.isEnabled()) {

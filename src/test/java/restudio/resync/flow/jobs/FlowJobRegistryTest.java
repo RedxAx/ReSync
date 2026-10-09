@@ -266,6 +266,24 @@ class FlowJobRegistryTest {
     }
 
     @Test
+    void shutdownRetriesAfterTimedOutPhysicalWorkActuallyTerminates() {
+        FlowJobRegistry registry = new FlowJobRegistry(16, Duration.ofMinutes(1), Duration.ofMillis(40));
+        FlowJobReference<Void> job = registry.create("physical", "flow:test");
+        registry.start(job);
+        CompletableFuture<Void> termination = new CompletableFuture<>();
+        registry.bind(job, () -> { }, termination);
+
+        assertThrows(CompletionException.class, () -> registry.shutdownAsync().join());
+        assertEquals(1, registry.physicalTaskCount());
+        assertThrows(IllegalStateException.class, registry::resume);
+        termination.complete(null);
+        registry.shutdownAsync().join();
+        assertEquals(0, registry.physicalTaskCount());
+        assertTrue(registry.health().failures().isEmpty());
+        assertFalse(registry.admissionsOpen());
+    }
+
+    @Test
     void launchCannotBypassClosedAdmission() {
         FlowJobRegistry registry = new FlowJobRegistry();
         FlowJobReference<Void> job = registry.create("launch", "flow:test");

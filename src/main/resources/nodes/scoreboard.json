@@ -11,7 +11,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.create"],
     "tags": ["scoreboard", "objective", "create"],
@@ -20,7 +20,7 @@
     "handlerConfig": {"operation": "scoreboard_create"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts objective creation."},
-      {"id": "objective_id", "displayName": "Objective ID", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "constraints": {"max": 128}, "description": "Sets the stable ID of the new objective."},
+      {"id": "objective_id", "displayName": "Objective ID", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "constraints": {"max": 128}, "description": "Sets the stable ID of the new objective."},
       {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "Objective", "description": "Sets the display name shown for the objective."},
       {"id": "criteria", "displayName": "Criteria", "name": "criteria", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "dummy", "description": "Sets the Bukkit scoreboard criteria used by the objective."}
     ],
@@ -29,7 +29,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -52,7 +52,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.set.display"],
     "tags": ["scoreboard", "objective", "display"],
@@ -61,7 +61,7 @@
     "handlerConfig": {"operation": "scoreboard_set_display"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the objective display slot."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to display."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective to display."},
       {"id": "display_slot", "displayName": "Display Slot", "name": "display_slot", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "DROPDOWN", "options": ["sidebar", "list", "player_list", "below_name", "belowname"], "defaultValue": "sidebar", "description": "Selects where the objective is displayed."}
     ],
     "outputs": [
@@ -69,7 +69,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -91,7 +91,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.set.score"],
     "tags": ["scoreboard", "score", "set"],
@@ -100,7 +100,7 @@
     "handlerConfig": {"operation": "scoreboard_set_score"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the score update."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective to update."},
       {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should change. The current Flow player is used when omitted."},
       {"id": "score", "displayName": "Score", "name": "score", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 0, "description": "Sets the player's score."}
     ],
@@ -109,7 +109,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -132,7 +132,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.reset.score"],
     "tags": ["scoreboard", "score", "reset"],
@@ -141,7 +141,7 @@
     "handlerConfig": {"operation": "scoreboard_reset_score"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts resetting the score."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective to update."},
       {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should be reset. The current Flow player is used when omitted."}
     ],
     "outputs": [
@@ -149,7 +149,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -171,7 +171,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "QUERY",
     "legacyIds": ["scoreboard.get.score"],
     "tags": ["scoreboard", "score", "query"],
@@ -180,7 +180,7 @@
     "handlerConfig": {"operation": "scoreboard_get_score"},
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {
@@ -201,7 +201,7 @@
       ]
     },
     "inputs": [
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to inspect."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective to inspect."},
       {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should be read. The current Flow player is used when omitted."}
     ],
     "outputs": [
@@ -220,7 +220,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.remove"],
     "tags": ["scoreboard", "objective", "remove"],
@@ -229,14 +229,14 @@
     "handlerConfig": {"operation": "scoreboard_remove"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts removing the objective."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to unregister."}
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective to unregister."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the objective is removed."}
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -257,7 +257,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.add.score"],
     "tags": ["scoreboard", "score", "add"],
@@ -266,7 +266,7 @@
     "handlerConfig": {"operation": "scoreboard_add_score"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts increasing the score."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective to update."},
       {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should increase. The current Flow player is used when omitted."},
       {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 1, "description": "Sets the exact number of points to add."}
     ],
@@ -275,7 +275,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -298,7 +298,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.remove.score"],
     "tags": ["scoreboard", "score", "remove"],
@@ -307,7 +307,7 @@
     "handlerConfig": {"operation": "scoreboard_remove_score"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts decreasing the score."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective to update."},
       {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should decrease. The current Flow player is used when omitted."},
       {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 1, "description": "Sets the exact number of points to remove."}
     ],
@@ -316,7 +316,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -375,7 +375,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.set.name"],
     "tags": ["scoreboard", "objective", "name"],
@@ -384,7 +384,7 @@
     "handlerConfig": {"operation": "scoreboard_set_name"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the objective name."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective to update."},
       {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "Objective", "description": "Sets the new display name."}
     ],
     "outputs": [
@@ -392,7 +392,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -414,7 +414,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.set.render.type"],
     "tags": ["scoreboard", "objective", "render"],
@@ -423,7 +423,7 @@
     "handlerConfig": {"operation": "scoreboard_set_render_type"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the render type."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective to update."},
       {"id": "render_type", "displayName": "Render Type", "name": "render_type", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "DROPDOWN", "options": ["integer", "hearts"], "defaultValue": "integer", "description": "Selects the objective's score rendering style."}
     ],
     "outputs": [
@@ -431,7 +431,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -453,7 +453,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.set.sidebar.line"],
     "tags": ["scoreboard", "sidebar", "line", "placeholder"],
@@ -463,7 +463,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the sidebar line."},
       {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose scoreboard should change. The current Flow player is used when omitted."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the sidebar objective on the player's scoreboard."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the sidebar objective on the player's scoreboard."},
       {"id": "title", "displayName": "Text", "name": "title", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Sets the line text after placeholder expansion."},
       {"id": "line", "displayName": "Line", "name": "line", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 0, "description": "Sets the logical line number."},
       {"id": "score", "displayName": "Score", "name": "score", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 0, "description": "Sets the numeric score shown for this entry."},
@@ -474,7 +474,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -500,7 +500,7 @@
     "inspectorIntent": "generic",
     "owner": "restudio.resync",
     "category": "SCOREBOARD",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "legacyIds": ["scoreboard.clear.sidebar"],
     "tags": ["scoreboard", "sidebar", "clear"],
@@ -509,14 +509,14 @@
     "handlerConfig": {"operation": "scoreboard_clear_sidebar"},
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts clearing the active display slot."},
-      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective whose display slot should be cleared."}
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:scoreboard_objective", "description": "Selects the objective whose display slot should be cleared."}
     ],
     "outputs": [
       {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the active display slot is cleared."}
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},

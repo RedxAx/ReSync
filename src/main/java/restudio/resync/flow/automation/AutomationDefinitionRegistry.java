@@ -4,15 +4,23 @@ import com.google.gson.JsonObject;
 import restudio.flow.data.FlowResourceReference;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.resources.JsonAssetStore.AssetStamp;
+import restudio.resync.storage.AssetTransactionCoordinator.AssetKey;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 
 public final class AutomationDefinitionRegistry {
     private final ReSyncJsonResourceStorage storage;
+    private final Map<AssetKey, Resident> definitions = new ConcurrentHashMap<>();
 
     public AutomationDefinitionRegistry(ReSyncJsonResourceStorage storage) {
         this.storage = storage;
+        if (storage != null) {
+            storage.addListener((type, id, value, deleted) -> definitions.remove(new AssetKey(type, id)));
+        }
     }
 
     public VariableDefinition variable(String id) {
@@ -20,11 +28,11 @@ public final class AutomationDefinitionRegistry {
     }
 
     public TimerDefinition timer(String id) {
-        return TimerDefinition.from(require(ReSyncResourceCatalog.TIMER_DEFINITION, id), id);
+        return (TimerDefinition) definition(ReSyncResourceCatalog.TIMER_DEFINITION, id, TimerDefinition::from);
     }
 
     public ScheduleDefinition schedule(String id) {
-        return ScheduleDefinition.from(require(ReSyncResourceCatalog.SCHEDULE_DEFINITION, id), id);
+        return (ScheduleDefinition) definition(ReSyncResourceCatalog.SCHEDULE_DEFINITION, id, ScheduleDefinition::from);
     }
 
     public List<VariableDefinition> variables() {
@@ -51,6 +59,39 @@ public final class AutomationDefinitionRegistry {
             "scope", definition.scope().name().toLowerCase(),
             "persistent", definition.persistent()
         ));
+    }
+
+    private AutomationDefinition definition(String type, String id, BiFunction<JsonObject, String, AutomationDefinition> reader) {
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("Automation definition is required");
+        }
+        AssetKey key = new AssetKey(type, id);
+        for (int attempt = 0; attempt < 3; attempt++) {
+            long generation = storage.snapshotGeneration();
+            AssetStamp stamp = storage.readAssetStamp(type, id);
+            if (stamp == null || stamp.deleted()) {
+                definitions.remove(key);
+                throw new IllegalArgumentException("Automation definition not found: " + id);
+            }
+            Resident resident = definitions.get(key);
+            if (resident != null && resident.generation() == generation && resident.stamp().equals(stamp)) {
+                if (storage.snapshotGeneration() == generation) {
+                    return resident.definition();
+                }
+                continue;
+            }
+            definitions.remove(key);
+            AutomationDefinition definition = reader.apply(require(type, id), id);
+            if (storage.snapshotGeneration() != generation || !stamp.equals(storage.readAssetStamp(type, id))) {
+                continue;
+            }
+            definitions.put(key, new Resident(generation, stamp, definition));
+            return definition;
+        }
+        throw new IllegalStateException("Automation definition changed during admission: " + type + "/" + id);
+    }
+
+    private record Resident(long generation, AssetStamp stamp, AutomationDefinition definition) {
     }
 
     private JsonObject require(String type, String id) {

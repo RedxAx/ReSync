@@ -1,12 +1,14 @@
 package restudio.resync.flow.automation;
 
 import org.bukkit.Bukkit;
+import org.bukkit.event.Event;
 import org.bukkit.plugin.Plugin;
 import restudio.flow.data.FlowResourceReference;
 import restudio.resync.Log;
 import restudio.resync.flow.automation.event.ScheduledTaskEvent;
 import restudio.resync.flow.automation.event.TimerEvent;
 import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.flow.runtime.RuntimeCancellationToken;
 import restudio.resync.migration.MigrationPaths;
 
 import java.io.IOException;
@@ -52,6 +54,19 @@ public final class AutomationTaskService {
     }
 
     public record StartResult(boolean started, boolean keptExisting, TaskSnapshot task) {
+    }
+
+    public record Invocation(TaskSnapshot task, RuntimeCancellationToken cancellation, long epoch) {
+    }
+
+    @FunctionalInterface
+    public interface InvocationSupplier extends Supplier<CompletableFuture<Object>> {
+        CompletableFuture<Object> invoke(Invocation invocation);
+
+        @Override
+        default CompletableFuture<Object> get() {
+            throw new IllegalStateException("Schedule invocation admission is required");
+        }
     }
 
     public record TaskSnapshot(String taskId, Kind kind, String definitionId, AutomationScope scope, String ownerId,
@@ -174,6 +189,7 @@ public final class AutomationTaskService {
     private final List<PersistentTask> pendingRestoration;
     private final Object persistenceLock = new Object();
     private volatile PersistenceState persistenceState = PersistenceState.OPEN;
+    private long persistenceGeneration;
 
     public AutomationTaskService(Plugin plugin, AutomationDefinitionRegistry definitions) {
         this(plugin, definitions, Clock.systemUTC(), Executors.newSingleThreadScheduledExecutor(new AutomationThreadFactory()),
@@ -211,7 +227,7 @@ public final class AutomationTaskService {
             requireWritablePersistence();
             now = clock.millis();
             long deadline = Math.addExact(now, duration);
-            AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), owner.id());
+            AutomationInstanceKey key = new AutomationInstanceKey(definition.kind(), definition.id(), definition.scope(), owner.id());
             entry = replace(key, Kind.TIMER, definition.persistent(), owner, duration, 0L, null, null, null);
             entry.timer = definition;
             entry.tickInterval = Math.max(0L, tickInterval);
@@ -238,7 +254,7 @@ public final class AutomationTaskService {
         synchronized (persistenceLock) {
             requireWritablePersistence();
             long deadline = Math.addExact(clock.millis(), request.firstDelay());
-            AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), request.owner().id());
+            AutomationInstanceKey key = new AutomationInstanceKey(definition.kind(), definition.id(), definition.scope(), request.owner().id());
             TaskEntry existing = instances.get(key);
             if (existing != null && active(existing)) {
                 if (definition.existingTaskPolicy() == ScheduleDefinition.ExistingTaskPolicy.KEEP) {
@@ -361,6 +377,25 @@ public final class AutomationTaskService {
             if (entry == null) {
                 return inactive(key);
             }
+        }
+        return cancelTask(entry);
+    }
+
+    public TaskSnapshot cancel(String taskId) {
+        TaskEntry entry;
+        synchronized (persistenceLock) {
+            requireWritablePersistence();
+            entry = tasks.get(taskId);
+        }
+        return entry != null ? cancelTask(entry) : null;
+    }
+
+    private TaskSnapshot cancelTask(TaskEntry entry) {
+        synchronized (persistenceLock) {
+            requireWritablePersistence();
+            if (!current(entry, entry.generation)) {
+                return snapshot(entry);
+            }
             terminate(entry, State.CANCELLED);
         }
         if (entry.kind == Kind.TIMER) {
@@ -371,20 +406,30 @@ public final class AutomationTaskService {
         return snapshot(entry);
     }
 
-    public TaskSnapshot cancel(String taskId) {
-        TaskEntry entry = tasks.get(taskId);
-        return entry != null ? cancel(entry.key) : null;
+    public boolean canInvoke(String taskId, long generation) {
+        synchronized (persistenceLock) {
+            TaskEntry entry = tasks.get(taskId);
+            return persistenceWritable() && entry != null && current(entry, generation) && active(entry);
+        }
+    }
+
+    public boolean canInvoke(Invocation invocation) {
+        synchronized (persistenceLock) {
+            return invocation.epoch() == persistenceGeneration && !invocation.cancellation().isCancelled()
+                && canInvoke(invocation.task().taskId(), invocation.task().generation());
+        }
     }
 
     public CompletableFuture<Object> runNow(AutomationInstanceKey key) {
+        TaskEntry entry;
         synchronized (persistenceLock) {
             requireWritablePersistence();
-            TaskEntry entry = require(key);
+            entry = require(key);
             if (entry.kind != Kind.SCHEDULE) {
                 throw new IllegalArgumentException("Run Now requires a Schedule");
             }
-            return invoke(entry);
         }
+        return invoke(entry);
     }
 
     public static Object waitForOwner() {
@@ -401,95 +446,101 @@ public final class AutomationTaskService {
     }
 
     void restorePersistentTimers(Function<String, TimerDefinition> resolver) {
-        requireWritablePersistence();
-        List<PersistentTask> restored = pendingRestoration.stream().filter(state -> state.kind() == Kind.TIMER).toList();
-        for (PersistentTask state : restored) {
-            try {
-                TimerDefinition definition = resolver.apply(state.definitionId());
-                AutomationOwner owner = new AutomationOwner(state.ownerId(), state.ownerId());
-                AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), owner.id());
-                long generation = generations.computeIfAbsent(key, ignored -> new AtomicLong()).updateAndGet(value -> Math.max(value + 1L, state.generation()));
-                TaskEntry entry = restoredEntry(state, key, definition.persistent(), owner, generation, null, null, null);
-                entry.timer = definition;
-                entry.tickInterval = state.tickInterval();
-                if (state.state() == State.PAUSED) {
-                    entry.state = State.PAUSED;
-                    entry.remainingAtPause = state.remaining();
-                } else if (state.deadline() <= clock.millis()) {
-                    entry.state = State.FINISHED;
-                    publishTimer(entry, TimerEvent.Type.FINISHED);
-                    pendingRestoration.remove(state);
-                    continue;
-                } else {
-                    entry.deadline = state.deadline();
-                    long remaining = entry.deadline - clock.millis();
-                    long delay = entry.tickInterval > 0L ? Math.min(entry.tickInterval, remaining) : remaining;
-                    entry.nextRun = Math.addExact(clock.millis(), Math.max(0L, delay));
-                    register(entry);
-                    schedule(entry, delay);
-                    pendingRestoration.remove(state);
-                    continue;
-                }
-                register(entry);
-                pendingRestoration.remove(state);
-            } catch (RuntimeException failure) {
-                Log.warn("Failed to restore Timer " + state.definitionId() + ": " + failureMessage(failure));
-            }
-        }
-        persist();
-    }
-
-    public void restorePersistentSchedules(Function<PersistentTask, ScheduleRequest> restorer) {
-        requireWritablePersistence();
-        List<PersistentTask> restored = pendingRestoration.stream().filter(state -> state.kind() == Kind.SCHEDULE).toList();
-        for (PersistentTask state : restored) {
-            try {
-                validatePersistedTargetState(state);
-                ScheduleRequest request = restorer.apply(state);
-                if (request == null) {
-                    continue;
-                }
-                validateScheduleRequestTarget(request);
-                validateRestoredTargetRequest(state, request);
-                ScheduleDefinition definition = request.definition();
-                AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), request.owner().id());
-                long generation = generations.computeIfAbsent(key, ignored -> new AtomicLong()).updateAndGet(value -> Math.max(value + 1L, state.generation()));
-                TaskEntry entry = restoredEntry(state, key, definition.persistent(), request.owner(), generation, definition,
-                    request.nextDelay(), request.invocation());
-                entry.arguments = request.arguments();
-                entry.signatureVersion = request.signatureVersion();
-                entry.targetLocator = request.targetLocator() != null
-                    ? request.targetLocator() : persistedTargetLocator(state);
-                register(entry);
-                if (state.state() == State.PAUSED) {
-                    entry.state = State.PAUSED;
-                    entry.remainingAtPause = state.remaining();
-                } else {
-                    boolean missed = state.nextRun() <= clock.millis();
-                    boolean pendingInvocation = state.invocationPending();
-                    if (!pendingInvocation && missed && (definition.missedRunPolicy() == ScheduleDefinition.MissedRunPolicy.CANCEL
-                        || (definition.missedRunPolicy() == ScheduleDefinition.MissedRunPolicy.SKIP && request.nextDelay() == null))) {
-                        terminate(entry, State.CANCELLED);
+        List<TaskEntry> finished = new ArrayList<>();
+        synchronized (persistenceLock) {
+            requireWritablePersistence();
+            List<PersistentTask> restored = pendingRestoration.stream().filter(state -> state.kind() == Kind.TIMER).toList();
+            for (PersistentTask state : restored) {
+                try {
+                    TimerDefinition definition = resolver.apply(state.definitionId());
+                    AutomationOwner owner = new AutomationOwner(state.ownerId(), state.ownerId());
+                    AutomationInstanceKey key = new AutomationInstanceKey(definition.kind(), definition.id(), definition.scope(), owner.id());
+                    long generation = generations.computeIfAbsent(key, ignored -> new AtomicLong()).updateAndGet(value -> Math.max(value + 1L, state.generation()));
+                    TaskEntry entry = restoredEntry(state, key, definition.persistent(), owner, generation, null, null, null);
+                    entry.timer = definition;
+                    entry.tickInterval = state.tickInterval();
+                    if (state.state() == State.PAUSED) {
+                        entry.state = State.PAUSED;
+                        entry.remainingAtPause = state.remaining();
+                    } else if (state.deadline() <= clock.millis()) {
+                        entry.state = State.FINISHED;
+                        finished.add(entry);
+                        pendingRestoration.remove(state);
+                        continue;
+                    } else {
+                        entry.deadline = state.deadline();
+                        long remaining = entry.deadline - clock.millis();
+                        long delay = entry.tickInterval > 0L ? Math.min(entry.tickInterval, remaining) : remaining;
+                        entry.nextRun = Math.addExact(clock.millis(), Math.max(0L, delay));
+                        register(entry);
+                        schedule(entry, delay);
                         pendingRestoration.remove(state);
                         continue;
                     }
-                    long delay;
-                    if (pendingInvocation) {
-                        entry.nextRun = state.nextRun();
-                        delay = 0L;
-                    } else {
-                        delay = missed && definition.missedRunPolicy() == ScheduleDefinition.MissedRunPolicy.SKIP
-                            ? request.nextDelay().getAsLong() : Math.max(0L, state.nextRun() - clock.millis());
-                        entry.nextRun = Math.addExact(clock.millis(), delay);
-                    }
-                    schedule(entry, delay);
+                    register(entry);
+                    pendingRestoration.remove(state);
+                } catch (RuntimeException failure) {
+                    Log.warn("Failed to restore Timer " + state.definitionId() + ": " + failureMessage(failure));
                 }
-                pendingRestoration.remove(state);
-            } catch (RuntimeException failure) {
-                Log.warn("Failed to restore Schedule " + state.definitionId() + ": " + failureMessage(failure));
             }
+            persist();
         }
-        persist();
+        finished.forEach(entry -> publishTimer(entry, TimerEvent.Type.FINISHED));
+    }
+
+    public void restorePersistentSchedules(Function<PersistentTask, ScheduleRequest> restorer) {
+        synchronized (persistenceLock) {
+            requireWritablePersistence();
+            List<PersistentTask> restored = pendingRestoration.stream().filter(state -> state.kind() == Kind.SCHEDULE).toList();
+            for (PersistentTask state : restored) {
+                try {
+                    validatePersistedTargetState(state);
+                    ScheduleRequest request = restorer.apply(state);
+                    if (request == null) {
+                        continue;
+                    }
+                    validateScheduleRequestTarget(request);
+                    validateRestoredTargetRequest(state, request);
+                    ScheduleDefinition definition = request.definition();
+                    AutomationInstanceKey key = new AutomationInstanceKey(definition.kind(), definition.id(), definition.scope(), request.owner().id());
+                    long generation = generations.computeIfAbsent(key, ignored -> new AtomicLong()).updateAndGet(value -> Math.max(value + 1L, state.generation()));
+                    TaskEntry entry = restoredEntry(state, key, definition.persistent(), request.owner(), generation, definition,
+                        request.nextDelay(), request.invocation());
+                    entry.arguments = request.arguments();
+                    entry.signatureVersion = request.signatureVersion();
+                    entry.targetLocator = request.targetLocator() != null
+                        ? request.targetLocator() : persistedTargetLocator(state);
+                    register(entry);
+                    if (state.state() == State.PAUSED) {
+                        entry.state = State.PAUSED;
+                        entry.remainingAtPause = state.remaining();
+                    } else {
+                        boolean missed = state.nextRun() <= clock.millis();
+                        boolean pendingInvocation = state.invocationPending();
+                        if (!pendingInvocation && missed && (definition.missedRunPolicy() == ScheduleDefinition.MissedRunPolicy.CANCEL
+                            || (definition.missedRunPolicy() == ScheduleDefinition.MissedRunPolicy.SKIP && request.nextDelay() == null))) {
+                            terminate(entry, State.CANCELLED);
+                            pendingRestoration.remove(state);
+                            continue;
+                        }
+                        long delay;
+                        if (pendingInvocation) {
+                            entry.nextRun = state.nextRun();
+                            delay = 0L;
+                        } else {
+                            delay = missed && definition.missedRunPolicy() == ScheduleDefinition.MissedRunPolicy.SKIP
+                                ? request.nextDelay().getAsLong() : Math.max(0L, state.nextRun() - clock.millis());
+                            entry.nextRun = Math.addExact(clock.millis(), delay);
+                        }
+                        schedule(entry, delay);
+                    }
+                    pendingRestoration.remove(state);
+                } catch (RuntimeException failure) {
+                    Log.warn("Failed to restore Schedule " + state.definitionId() + ": " + failureMessage(failure));
+                }
+            }
+            persist();
+        }
     }
 
     public void shutdown() {
@@ -543,6 +594,7 @@ public final class AutomationTaskService {
         entry.creatorPrincipal = state.creatorPrincipal();
         entry.creatorSessionReference = state.creatorSessionReference();
         entry.invocationPending = state.invocationPending();
+        entry.pendingNextRun = state.nextRun();
         return entry;
     }
 
@@ -554,159 +606,289 @@ public final class AutomationTaskService {
     private void schedule(TaskEntry entry, long delay) {
         cancelFuture(entry);
         long expectedGeneration = entry.generation;
-        entry.future = scheduler.schedule(() -> fire(entry, expectedGeneration), Math.max(0L, delay), TimeUnit.MILLISECONDS);
+        long expectedWake = entry.wake;
+        entry.future = scheduler.schedule(() -> fire(entry, expectedGeneration, expectedWake), Math.max(0L, delay), TimeUnit.MILLISECONDS);
     }
 
-    private void fire(TaskEntry entry, long expectedGeneration) {
+    private void fire(TaskEntry entry, long expectedGeneration, long expectedWake) {
         boolean admitted;
         synchronized (persistenceLock) {
-            admitted = persistenceWritable() && current(entry, expectedGeneration) && entry.state == State.ACTIVE;
+            admitted = persistenceWritable() && current(entry, expectedGeneration) && entry.wake == expectedWake && entry.state == State.ACTIVE;
         }
         if (!admitted) {
             return;
         }
         if (entry.kind == Kind.TIMER) {
-            fireTimer(entry);
+            fireTimer(entry, expectedWake);
         } else {
-            fireSchedule(entry);
+            fireSchedule(entry, expectedWake);
         }
     }
 
-    private void fireTimer(TaskEntry entry) {
+    private void fireTimer(TaskEntry entry, long expectedWake) {
+        TimerEvent.Type event;
         synchronized (persistenceLock) {
-            if (!persistenceWritable() || entry.state != State.ACTIVE) {
+            if (!persistenceWritable() || !current(entry, entry.generation) || entry.wake != expectedWake || entry.state != State.ACTIVE) {
                 return;
             }
             long now = clock.millis();
             if (now >= entry.deadline) {
                 terminate(entry, State.FINISHED);
-                publishTimer(entry, TimerEvent.Type.FINISHED);
+                event = TimerEvent.Type.FINISHED;
+            } else {
+                long delay = entry.tickInterval > 0L ? Math.min(entry.tickInterval, entry.deadline - now) : entry.deadline - now;
+                entry.nextRun = Math.addExact(now, delay);
+                schedule(entry, delay);
+                event = TimerEvent.Type.TICK;
+            }
+        }
+        publishTimer(entry, event);
+    }
+
+    private void fireSchedule(TaskEntry entry, long expectedWake) {
+        TaskRun run;
+        synchronized (persistenceLock) {
+            if (!persistenceWritable() || !current(entry, entry.generation) || entry.wake != expectedWake || entry.state != State.ACTIVE) {
                 return;
             }
-            publishTimer(entry, TimerEvent.Type.TICK);
-            long delay = entry.tickInterval > 0L ? Math.min(entry.tickInterval, entry.deadline - now) : entry.deadline - now;
-            entry.nextRun = Math.addExact(now, delay);
-            schedule(entry, delay);
+            run = reserveInvocation(entry);
+        }
+        if (run == null) {
+            advanceSchedule(entry);
+            return;
+        }
+        startInvocation(run);
+        publishLifecycle(entry, ScheduledTaskEvent.Type.FIRED);
+        if (entry.nextDelay != null) {
+            advanceSchedule(entry);
+        } else {
+            run.completion.whenComplete((result, failure) -> finishSchedule(run, result, failure));
         }
     }
 
-    private void fireSchedule(TaskEntry entry) {
+    private void finishSchedule(TaskRun run, Object result, Throwable failure) {
+        TaskEntry entry = run.entry;
+        CompletableFuture<Void> physical;
         synchronized (persistenceLock) {
-            if (!persistenceWritable() || entry.state != State.ACTIVE) {
-                return;
+            physical = CompletableFuture.allOf(entry.invocations.stream()
+                .map(invocation -> invocation.completion).toArray(CompletableFuture[]::new));
+        }
+        physical.whenComplete((ignored, physicalFailure) -> {
+            synchronized (persistenceLock) {
+                if (!persistenceWritable() || run.epoch != persistenceGeneration || !current(entry, entry.generation)
+                    || run.cancellation.isCancelled() || !run.settled || !entry.invocations.isEmpty()) {
+                    return;
+                }
+                if (failure == null && result == WAIT_FOR_OWNER) {
+                    entry.nextRun = Math.addExact(clock.millis(), 1000L);
+                    persistLocked();
+                    schedule(entry, 1000L);
+                } else {
+                    terminate(entry, failure == null ? State.FINISHED : State.FAILED);
+                }
             }
-            boolean skip = entry.running != null && !entry.running.isDone()
-                && entry.schedule.overlapPolicy() == ScheduleDefinition.OverlapPolicy.SKIP;
-            if (skip) {
-                return;
-            }
-            if (!entry.invocationPending) {
-                entry.lastRun = clock.millis();
-                entry.runCount++;
-                entry.invocationPending = true;
+        });
+    }
+
+    private void advanceSchedule(TaskEntry entry) {
+        if (entry.nextDelay == null) {
+            return;
+        }
+        try {
+            synchronized (persistenceLock) {
+                if (!persistenceWritable() || !current(entry, entry.generation) || entry.state != State.ACTIVE) {
+                    return;
+                }
+                long delay = entry.nextDelay.getAsLong();
+                if (delay < 0L) {
+                    throw new IllegalArgumentException("Schedule delay must be non-negative");
+                }
+                entry.nextRun = Math.addExact(clock.millis(), delay);
                 persistLocked();
+                schedule(entry, delay);
+            }
+        } catch (RuntimeException failure) {
+            synchronized (persistenceLock) {
+                if (!persistenceWritable() || !current(entry, entry.generation)) {
+                    return;
+                }
+                entry.lastError = failureMessage(failure);
+                terminate(entry, State.FAILED);
+            }
+            publishLifecycle(entry, ScheduledTaskEvent.Type.FAILED);
+        }
+    }
+
+    private CompletableFuture<Object> invoke(TaskEntry entry) {
+        TaskRun run;
+        synchronized (persistenceLock) {
+            if (!persistenceWritable() || !current(entry, entry.generation) || !active(entry) || entry.invocation == null) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Scheduled task is inactive"));
+            }
+            run = reserveInvocation(entry);
+        }
+        if (run == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        startInvocation(run);
+        return run.completion.copy();
+    }
+
+    private TaskRun reserveInvocation(TaskEntry entry) {
+        CompletableFuture<Void> previous = CompletableFuture.completedFuture(null);
+        if (!entry.invocations.isEmpty()) {
+            switch (entry.schedule.overlapPolicy()) {
+                case SKIP -> {
+                    return null;
+                }
+                case QUEUE -> previous = CompletableFuture.allOf(entry.invocations.stream()
+                    .map(run -> run.completion).toArray(CompletableFuture[]::new));
+                case REPLACE -> entry.invocations.forEach(run -> run.cancellation.cancel());
+                case PARALLEL -> {
+                }
             }
         }
-        CompletableFuture<Object> execution = invoke(entry);
-        publishLifecycle(entry, ScheduledTaskEvent.Type.FIRED);
-        if (entry.nextDelay != null && entry.state == State.ACTIVE) {
+        if (entry.invocationPending && entry.invocations.stream().anyMatch(run -> run.epoch != persistenceGeneration)) {
+            previous = CompletableFuture.allOf(entry.invocations.stream()
+                .map(run -> run.completion).toArray(CompletableFuture[]::new));
+        }
+        TaskRun run = new TaskRun(entry, persistenceGeneration, previous);
+        entry.invocations.add(run);
+        return run;
+    }
+
+    private void startInvocation(TaskRun run) {
+        if (run.previous.isDone()) {
             try {
-                long delay = entry.nextDelay.getAsLong();
-                synchronized (persistenceLock) {
-                    if (!persistenceWritable() || !current(entry, entry.generation) || entry.state != State.ACTIVE) {
-                        return;
-                    }
-                    entry.nextRun = Math.addExact(clock.millis(), delay);
-                    schedule(entry, delay);
-                    persistLocked();
-                }
+                invokeDirect(run);
             } catch (RuntimeException failure) {
-                synchronized (persistenceLock) {
-                    if (!persistenceWritable() || !current(entry, entry.generation)) {
-                        return;
-                    }
-                    entry.lastError = failureMessage(failure);
-                    publishLifecycle(entry, ScheduledTaskEvent.Type.FAILED);
-                    terminate(entry, State.FAILED);
-                }
+                run.completion.completeExceptionally(failure);
+                throw failure;
             }
         } else {
-            execution.whenComplete((result, failure) -> {
-                synchronized (persistenceLock) {
-                    if (!persistenceWritable() || !current(entry, entry.generation)) {
-                        return;
-                    }
-                    if (failure == null && result == WAIT_FOR_OWNER) {
-                        entry.nextRun = Math.addExact(clock.millis(), 1000L);
-                        schedule(entry, 1000L);
-                        persistLocked();
-                    } else {
-                        terminate(entry, failure == null ? State.FINISHED : State.FAILED);
-                    }
+            run.previous.whenComplete((ignored, failure) -> {
+                try {
+                    invokeDirect(run);
+                } catch (RuntimeException admissionFailure) {
+                    run.completion.completeExceptionally(admissionFailure);
                 }
             });
         }
     }
 
-    private CompletableFuture<Object> invoke(TaskEntry entry) {
-        synchronized (entry) {
-            if (!active(entry) || entry.invocation == null) {
-                return CompletableFuture.failedFuture(new IllegalStateException("Scheduled task is inactive"));
-            }
-            if (entry.running != null && !entry.running.isDone()) {
-                switch (entry.schedule.overlapPolicy()) {
-                    case SKIP -> {
-                        return CompletableFuture.completedFuture(null);
-                    }
-                    case QUEUE -> {
-                        entry.running = entry.running.handle((value, failure) -> null).thenCompose(ignored -> invokeDirect(entry));
-                        return entry.running;
-                    }
-                    case REPLACE -> entry.running.cancel(true);
-                    case PARALLEL -> {
-                        return invokeDirect(entry);
-                    }
+    private void invokeDirect(TaskRun run) {
+        TaskEntry entry = run.entry;
+        Invocation admitted = null;
+        synchronized (persistenceLock) {
+            if (persistenceWritable() && run.epoch == persistenceGeneration && current(entry, entry.generation)
+                && active(entry) && !run.cancellation.isCancelled()) {
+                long previousRun = entry.lastRun;
+                long previousCount = entry.runCount;
+                boolean previousPending = entry.invocationPending;
+                long previousPendingRun = entry.pendingNextRun;
+                boolean replay = previousPending && entry.invocations.stream().noneMatch(other -> other.started);
+                if (!replay) {
+                    entry.lastRun = clock.millis();
+                    entry.runCount++;
+                    entry.pendingNextRun = entry.nextRun;
                 }
+                entry.invocationPending = true;
+                try {
+                    persistLocked();
+                } catch (RuntimeException failure) {
+                    entry.lastRun = previousRun;
+                    entry.runCount = previousCount;
+                    entry.invocationPending = previousPending;
+                    entry.pendingNextRun = previousPendingRun;
+                    entry.invocations.remove(run);
+                    entry.lastError = failureMessage(failure);
+                    schedule(entry, 1000L);
+                    throw failure;
+                }
+                run.started = true;
+                admitted = new Invocation(snapshot(entry, entry.pendingNextRun), run.cancellation, run.epoch);
+            } else {
+                entry.invocations.remove(run);
             }
-            entry.running = invokeDirect(entry);
-            return entry.running;
         }
+        if (admitted == null) {
+            run.completion.completeExceptionally(new IllegalStateException("Scheduled task is inactive"));
+            return;
+        }
+        if (!canInvoke(admitted)) {
+            completeInvocation(run, null, new IllegalStateException("Scheduled task is inactive"));
+            return;
+        }
+        CompletableFuture<Object> execution;
+        try {
+            execution = entry.invocation instanceof InvocationSupplier supplier
+                ? supplier.invoke(admitted) : entry.invocation.get();
+        } catch (RuntimeException failure) {
+            execution = CompletableFuture.failedFuture(failure);
+        }
+        if (execution == null) {
+            execution = CompletableFuture.completedFuture(null);
+        }
+        execution.whenComplete((result, failure) -> completeInvocation(run, result, failure));
     }
 
-    private CompletableFuture<Object> invokeDirect(TaskEntry entry) {
-        CompletableFuture<Object> invocation;
+    private void completeInvocation(TaskRun run, Object result, Throwable failure) {
+        TaskEntry entry = run.entry;
+        ScheduledTaskEvent.Type event = null;
+        Throwable outcome = failure;
         try {
-            invocation = entry.invocation.get();
-        } catch (RuntimeException failure) {
-            invocation = CompletableFuture.failedFuture(failure);
-        }
-        if (invocation == null) {
-            invocation = CompletableFuture.completedFuture(null);
-        }
-        return invocation.whenComplete((result, failure) -> {
             synchronized (persistenceLock) {
-                if (!persistenceWritable() || !current(entry, entry.generation)) {
-                    return;
-                }
-                if (failure == null) {
-                    if (result == WAIT_FOR_OWNER) {
-                        return;
+                entry.invocations.remove(run);
+                if (persistenceWritable() && run.epoch == persistenceGeneration && current(entry, entry.generation)) {
+                    Object previousResult = entry.lastResult;
+                    String previousError = entry.lastError;
+                    try {
+                        if (result != WAIT_FOR_OWNER) {
+                            entry.invocationPending = entry.invocations.stream().anyMatch(other -> other.started);
+                        }
+                        boolean stop = false;
+                        if (!run.cancellation.isCancelled() && result != WAIT_FOR_OWNER) {
+                            if (failure == null) {
+                                entry.lastResult = result;
+                                entry.lastError = "";
+                                event = ScheduledTaskEvent.Type.COMPLETED;
+                            } else {
+                                entry.lastError = failureMessage(failure);
+                                event = ScheduledTaskEvent.Type.FAILED;
+                                stop = entry.schedule.failurePolicy() == ScheduleDefinition.FailurePolicy.STOP;
+                            }
+                        }
+                        if (stop) {
+                            terminate(entry, State.FAILED);
+                        } else {
+                            persistLocked();
+                        }
+                        run.settled = true;
+                    } catch (RuntimeException persistenceFailure) {
+                        entry.invocationPending = true;
+                        entry.lastResult = previousResult;
+                        entry.lastError = previousError;
+                        if (entry.state == State.ACTIVE) {
+                            schedule(entry, 1000L);
+                        }
+                        throw persistenceFailure;
                     }
-                    entry.invocationPending = false;
-                    entry.lastResult = result;
-                    entry.lastError = "";
-                    publishLifecycle(entry, ScheduledTaskEvent.Type.COMPLETED);
-                } else {
-                    entry.invocationPending = false;
-                    entry.lastError = failureMessage(failure);
-                    publishLifecycle(entry, ScheduledTaskEvent.Type.FAILED);
-                    if (entry.schedule.failurePolicy() == ScheduleDefinition.FailurePolicy.STOP) {
-                        terminate(entry, State.FAILED);
-                    }
                 }
-                persistLocked();
             }
-        });
+            if (event != null) {
+                publishLifecycle(entry, event);
+            }
+        } catch (RuntimeException completionFailure) {
+            if (outcome != null) {
+                completionFailure.addSuppressed(outcome);
+            }
+            outcome = completionFailure;
+        }
+        if (outcome == null) {
+            run.completion.complete(result);
+        } else {
+            run.completion.completeExceptionally(outcome);
+        }
     }
 
     private void terminate(TaskEntry entry, State state) {
@@ -725,6 +907,7 @@ public final class AutomationTaskService {
                 restoreRuntimeState(entry, previous);
                 throw failure;
             }
+            entry.invocations.forEach(run -> run.cancellation.cancel());
             if (!scheduler.isShutdown()) {
                 scheduler.schedule(() -> tasks.remove(entry.taskId, entry), 5L, TimeUnit.MINUTES);
             }
@@ -785,6 +968,7 @@ public final class AutomationTaskService {
     }
 
     private void cancelFuture(TaskEntry entry) {
+        entry.wake++;
         ScheduledFuture<?> future = entry.future;
         if (future != null) {
             future.cancel(false);
@@ -793,13 +977,17 @@ public final class AutomationTaskService {
     }
 
     private TaskSnapshot snapshot(TaskEntry entry) {
+        return snapshot(entry, entry.nextRun);
+    }
+
+    private TaskSnapshot snapshot(TaskEntry entry, long nextRun) {
         long now = clock.millis();
         long remaining = entry.kind == Kind.TIMER ? remainingTimer(entry)
             : entry.state == State.PAUSED ? entry.remainingAtPause : Math.max(0L, entry.nextRun - now);
         long elapsed = entry.kind == Kind.TIMER ? Math.max(0L, entry.duration - remaining) : 0L;
         double progress = entry.kind == Kind.TIMER && entry.duration > 0L ? Math.clamp((double) elapsed / entry.duration, 0D, 1D) : 0D;
         return new TaskSnapshot(entry.taskId, entry.kind, entry.key.definitionId(), entry.key.scope(), entry.key.ownerId(), entry.owner.value(),
-            entry.persistent, entry.state, entry.generation, entry.createdAt, entry.nextRun, entry.lastRun, entry.runCount, entry.duration,
+            entry.persistent, entry.state, entry.generation, entry.createdAt, nextRun, entry.lastRun, entry.runCount, entry.duration,
             remaining, elapsed, progress, entry.lastResult, entry.lastError);
     }
 
@@ -811,7 +999,12 @@ public final class AutomationTaskService {
     }
 
     private TaskSnapshot inactive(AutomationInstanceKey key) {
-        return new TaskSnapshot("", Kind.TIMER, key.definitionId(), key.scope(), key.ownerId(), null, false, State.INACTIVE,
+        Kind kind = switch (key.kind()) {
+            case TIMER -> Kind.TIMER;
+            case SCHEDULE -> Kind.SCHEDULE;
+            case VARIABLE -> throw new IllegalArgumentException("Variables cannot identify automation tasks");
+        };
+        return new TaskSnapshot("", kind, key.definitionId(), key.scope(), key.ownerId(), null, false, State.INACTIVE,
             generations.getOrDefault(key, new AtomicLong()).get(), 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0D, null, "");
     }
 
@@ -834,7 +1027,7 @@ public final class AutomationTaskService {
             entry.targetLocator != null ? entry.targetLocator.id() : entry.schedule.targetId(), entry.lastResult, entry.lastError));
     }
 
-    private void publish(org.bukkit.event.Event event) {
+    private void publish(Event event) {
         if (plugin == null || Bukkit.getServer() == null) {
             return;
         }
@@ -875,9 +1068,16 @@ public final class AutomationTaskService {
             }
             try {
                 flushPersistenceLocked();
+                persistenceGeneration++;
                 persistenceState = PersistenceState.QUIESCED;
+                tasks.values().forEach(entry -> entry.invocations.forEach(run -> run.cancellation.cancel()));
             } catch (IOException | RuntimeException failure) {
                 persistenceState = PersistenceState.OPEN;
+                for (TaskEntry entry : instances.values()) {
+                    if (entry.state == State.ACTIVE) {
+                        schedule(entry, Math.max(1000L, entry.nextRun - clock.millis()));
+                    }
+                }
                 throw failure;
             }
         }
@@ -992,7 +1192,8 @@ public final class AutomationTaskService {
     private PersistentTask persistentState(TaskEntry entry) {
         TaskSnapshot snapshot = snapshot(entry);
         return new PersistentTask(entry.taskId, entry.kind, entry.key.definitionId(), entry.key.scope(), entry.key.ownerId(),
-            entry.state, entry.generation, entry.createdAt, entry.nextRun, entry.lastRun, entry.runCount, entry.duration,
+            entry.state, entry.generation, entry.createdAt, entry.invocationPending ? entry.pendingNextRun : entry.nextRun,
+            entry.lastRun, entry.runCount, entry.duration,
             entry.deadline, snapshot.remaining(), entry.tickInterval, entry.arguments, entry.signatureVersion, entry.lastResult,
             entry.lastError, entry.creatorPrincipal, entry.creatorSessionReference, entry.invocationPending,
             entry.targetLocator != null ? entry.targetLocator.canonicalText() : null,
@@ -1107,9 +1308,11 @@ public final class AutomationTaskService {
         private volatile String creatorPrincipal;
         private volatile String creatorSessionReference;
         private volatile boolean invocationPending;
+        private volatile long pendingNextRun;
         private volatile ServerResourceLocator targetLocator;
+        private volatile long wake;
         private volatile ScheduledFuture<?> future;
-        private volatile CompletableFuture<Object> running;
+        private final List<TaskRun> invocations = new ArrayList<>();
         private volatile TimerDefinition timer;
         private volatile Map<String, Object> arguments = Map.of();
         private volatile int signatureVersion;
@@ -1128,6 +1331,22 @@ public final class AutomationTaskService {
             this.interval = interval;
             this.schedule = schedule;
             this.invocation = invocation;
+        }
+    }
+
+    private static final class TaskRun {
+        private final TaskEntry entry;
+        private final long epoch;
+        private final CompletableFuture<Void> previous;
+        private final RuntimeCancellationToken cancellation = new RuntimeCancellationToken();
+        private final CompletableFuture<Object> completion = new CompletableFuture<>();
+        private boolean started;
+        private boolean settled;
+
+        private TaskRun(TaskEntry entry, long epoch, CompletableFuture<Void> previous) {
+            this.entry = entry;
+            this.epoch = epoch;
+            this.previous = previous;
         }
     }
 

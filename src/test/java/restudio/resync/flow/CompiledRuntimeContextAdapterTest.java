@@ -265,7 +265,7 @@ class CompiledRuntimeContextAdapterTest {
         player.teleport(new Location(world, 0, 65, 0));
         var npc = world.spawnEntity(new Location(world, 3, 65, 2), EntityType.VILLAGER);
         for (boolean packet : List.of(false, true)) {
-            FlowNpcHandle handle = new FlowNpcHandle("qa_npc", packet ? "" : npc.getUniqueId().toString(),
+            FlowNpcHandle handle = new FlowNpcHandle("qa_npc", packet ? "" : npc.getUniqueId().toString(), UUID.randomUUID().toString(),
                 packet, true, world.getName(), 3, 65, 2, 90, 15);
             Map<String, Object> variables = new LinkedHashMap<>();
             variables.put("npcId", "qa_npc");

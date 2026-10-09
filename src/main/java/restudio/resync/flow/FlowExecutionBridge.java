@@ -5,6 +5,8 @@ import org.bukkit.event.Event;
 import restudio.flow.data.FlowGraph;
 import restudio.resync.flow.diagnostic.Diagnostic;
 import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.graph.GraphConnection;
+import restudio.resync.flow.identity.ConnectionId;
 import restudio.resync.flow.identity.CanonicalText;
 import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.CorrelationId;
@@ -137,8 +139,15 @@ public interface FlowExecutionBridge {
         SnapshotId snapshotId,
         Map<String, NodeId> nodeMappings,
         Map<String, PinId> pinMappings,
-        List<TypeReference> conversionPolicyReferences
+        List<TypeReference> conversionPolicyReferences,
+        Map<ConnectionId, GraphConnection> connectionMappings
     ) {
+        public MappingContext(ServerResourceLocator resourceLocator, CatalogBinding catalogBinding, SnapshotId snapshotId,
+                              Map<String, NodeId> nodeMappings, Map<String, PinId> pinMappings,
+                              List<TypeReference> conversionPolicyReferences) {
+            this(resourceLocator, catalogBinding, snapshotId, nodeMappings, pinMappings, conversionPolicyReferences, Map.of());
+        }
+
         public MappingContext {
             resourceLocator = Objects.requireNonNull(resourceLocator, "Canonical Resource Locator Is Required");
             catalogBinding = Objects.requireNonNull(catalogBinding, "Catalog Binding Is Required");
@@ -146,6 +155,12 @@ public interface FlowExecutionBridge {
             nodeMappings = immutableMapping(nodeMappings, "Node Mapping", NodeId.class);
             pinMappings = immutableMapping(pinMappings, "Pin Mapping", PinId.class);
             conversionPolicyReferences = immutableConversionReferences(conversionPolicyReferences);
+            connectionMappings = Map.copyOf(Objects.requireNonNull(connectionMappings, "Connection Mappings Are Required"));
+            connectionMappings.forEach((id, connection) -> {
+                if (!id.equals(connection.connectionId())) {
+                    throw new IllegalArgumentException("Connection Mapping Must Preserve Its Persisted Identity");
+                }
+            });
         }
 
         public ServerResourceLocator resource() {
@@ -209,7 +224,15 @@ public interface FlowExecutionBridge {
             if (!nodes.contains(startNodeId) || !nodes.equals(nodeMappings.keySet())) {
                 return Optional.of("Node mappings must cover the typed graph and requested start node");
             }
+            if (!connectionMappings.isEmpty() && connectionMappings.size() != document.connections().size()) {
+                return Optional.of("Connection mappings must exactly cover the typed graph");
+            }
             for (var connection : document.connections()) {
+                boolean structural = connection.source().branchId() != null || connection.source().elementId() != null
+                    || connection.target().branchId() != null || connection.target().elementId() != null;
+                if ((structural || !connectionMappings.isEmpty()) && !connection.equals(connectionMappings.get(connection.connectionId()))) {
+                    return Optional.of("Connection mappings must preserve every typed endpoint and connection identity");
+                }
                 if (!pinMappings.containsKey(pinMappingKey(connection.source().nodeId().canonicalText(), connection.source().pinId().value()))
                     || !pinMappings.containsKey(pinMappingKey(connection.target().nodeId().canonicalText(), connection.target().pinId().value()))) {
                     return Optional.of("Connection pins must have typed pin mappings");

@@ -26,7 +26,7 @@ import restudio.resync.flow.diagnostic.DiagnosticSeverity;
 
 public final class DiagnosticCodeCatalog {
     public static final int SCHEMA_VERSION = 1;
-    public static final String FROZEN_SOURCE_SHA256 = "fd7de157afb4b93c6be9764de4d388c17dd59d4dd204a0440f4792fcd33f8b6f";
+    public static final String FROZEN_SOURCE_SHA256 = "2293c87308144be62c6d7c6fc67c0d1b70dacfb3f5f07b97fb38ae1df6bdb3a5";
     private static final Pattern CODE = Pattern.compile("^[A-Z][A-Z0-9_]{1,31}(?:\\.[A-Z][A-Z0-9_]{1,63})+$");
     private static final Pattern LOCAL_ID = Pattern.compile("^[a-z][a-z0-9]{0,31}(?:[._-][a-z0-9][a-z0-9]{0,31})*$");
     private static volatile DiagnosticCodeCatalog installed;

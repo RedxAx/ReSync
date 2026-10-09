@@ -101,6 +101,11 @@ public record ScheduleDefinition(String id, String name, String description, Tar
             ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of(targetResourceType())), targetId);
     }
 
+    @Override
+    public Kind kind() {
+        return Kind.SCHEDULE;
+    }
+
     public static ScheduleDefinition from(JsonObject json, String fallbackId) {
         JsonObject value = json != null ? json : new JsonObject();
         JsonObject timing = value.has("timing") && value.get("timing").isJsonObject() ? value.getAsJsonObject("timing") : value;
@@ -121,26 +126,23 @@ public record ScheduleDefinition(String id, String name, String description, Tar
     }
 
     private static String targetType(JsonObject value, JsonObject target) {
+        String nested = null;
         if (target != null && target.has("type") && target.get("type").isJsonObject()) {
             JsonObject type = target.getAsJsonObject("type");
             String ownerId = optionalString(type, "ownerId");
             if (ownerId != null && !"restudio.resync".equals(ownerId)) {
                 throw new IllegalArgumentException("Schedule target must belong to the Core graph owner");
             }
-            String localId = optionalString(type, "localId");
-            if (localId != null) {
-                String declared = optionalString(value, "targetType");
-                if (declared != null) {
-                    return declared;
-                }
-                return localId;
-            }
+            nested = optionalString(type, "localId");
+        } else {
+            nested = optionalString(target, "type");
         }
         String declared = optionalString(value, "targetType");
-        if (declared != null) {
-            return declared;
+        if (declared != null && nested != null
+            && enumeration(TargetType.class, declared) != enumeration(TargetType.class, nested)) {
+            throw new IllegalArgumentException("Schedule target type fields conflict");
         }
-        return string(target, "type", "function");
+        return declared != null ? declared : nested != null ? nested : "function";
     }
 
     private static String targetId(JsonObject value, JsonObject target) {

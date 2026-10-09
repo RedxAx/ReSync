@@ -298,7 +298,7 @@ public class TriggerRegistry {
             publishBindingObservation();
         } catch (IOException e) {
             invalidateBindingObservation();
-            Log.warn("Failed to load trigger bindings: " + e.getMessage());
+            throw new IllegalStateException("Failed to load trigger bindings: " + file, e);
         }
     }
 

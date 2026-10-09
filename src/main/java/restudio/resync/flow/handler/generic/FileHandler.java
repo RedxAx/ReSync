@@ -57,7 +57,7 @@ public class FileHandler implements NodeHandler {
             return new FileOutcome<>(deleted, Map.of("preview", preview, "would_delete", exists, "deleted", deleted),
                 Map.of("path", target, "preview", preview));
         }, Map.of("preview", false, "would_delete", false, "deleted", false)));
-        operations.put("file_exists", (ctx, node) -> executeSync(ctx, node, () -> {
+        operations.put("file_exists", (ctx, node) -> executeAsync(ctx, node, () -> {
             String path = ctx.getInputValue(node, "path", String.class, "");
             String target = capability.normalize(path);
             boolean exists = capability.exists(path);
@@ -91,7 +91,7 @@ public class FileHandler implements NodeHandler {
             return new FileOutcome<>(true, Map.of("created", !existed),
                 Map.of("path", directory, "created", !existed));
         }, Map.of("created", false)));
-        operations.put("file_get_size", (ctx, node) -> executeSync(ctx, node, () -> {
+        operations.put("file_get_size", (ctx, node) -> executeAsync(ctx, node, () -> {
             String path = ctx.getInputValue(node, "path", String.class, "");
             String target = capability.normalize(path);
             long size = capability.size(path);
@@ -119,11 +119,6 @@ public class FileHandler implements NodeHandler {
             Completion completion = perform(operation, failureOutputs);
             context.runSync(() -> complete(context, node, completion));
         });
-    }
-
-    private void executeSync(FlowContext context, FlowNode node, FileOperation<?> operation,
-                             Map<String, Object> failureOutputs) {
-        complete(context, node, perform(operation, failureOutputs));
     }
 
     private Completion perform(FileOperation<?> operation, Map<String, Object> failureOutputs) {

@@ -51,14 +51,22 @@ public class EntityActionHandler implements NodeHandler {
     public EntityActionHandler() {
         operations.put("entity_set_type", (ctx, node) -> {
             Entity entity = requireEntity(ctx, node);
+            if (entity instanceof Player) throw new IllegalArgumentException("Player entity type cannot be replaced");
             String typeName = ctx.getInputValue(node, "entity_type", String.class, "PIG");
             Location location = entity.getLocation();
             if (location.getWorld() == null) {
                 throw new IllegalArgumentException("Entity world is unavailable");
             }
             EntityType newType = entityType(typeName);
-            location.getWorld().spawnEntity(location, newType);
-            entity.remove();
+            if (!newType.isSpawnable()) throw new IllegalArgumentException("Entity type cannot be spawned: " + typeName);
+            Entity replacement = location.getWorld().spawnEntity(location, newType);
+            if (!replacement.isValid()) throw new IllegalStateException("Entity replacement was rejected");
+            try {
+                entity.remove();
+            } catch (RuntimeException exception) {
+                replacement.remove();
+                throw exception;
+            }
         });
 
         operations.put("entity_set_rotation", (ctx, node) -> {
@@ -563,8 +571,12 @@ public class EntityActionHandler implements NodeHandler {
             if (location == null || location.getWorld() == null) {
                 throw new IllegalArgumentException("Entity spawn world location is required");
             }
-            Entity entity = location.getWorld().spawnEntity(location, entityType(typeName));
+            location.checkFinite();
+            EntityType type = entityType(typeName);
+            if (!type.isSpawnable()) throw new IllegalArgumentException("Entity type cannot be spawned: " + typeName);
+            Entity entity = location.getWorld().spawnEntity(location, type);
             try {
+                if (!entity.isValid()) throw new IllegalStateException("Entity spawn was rejected");
                 EntityDataAccess.apply(ctx, entity, ctx.getInputValue(node, "data", Object.class, null));
             } catch (RuntimeException exception) {
                 entity.remove();
@@ -671,7 +683,7 @@ public class EntityActionHandler implements NodeHandler {
             ctx.setOutput(node, "world_name", location.getWorld() != null ? location.getWorld().getName() : "");
             ctx.setOutput(node, "ticks_lived", entity.getTicksLived());
             boolean valid = entity.isValid();
-            ctx.setOutput(node, "is_dead", entity.isDead() || !valid);
+            ctx.setOutput(node, "is_dead", entity.isDead());
             ctx.setOutput(node, "is_valid", valid);
         });
 
@@ -731,7 +743,14 @@ public class EntityActionHandler implements NodeHandler {
             throw new IllegalArgumentException("Unknown entity action operation: " + operation);
         }
         Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        if (entity instanceof Player player) {
+        boolean mutation = !operation.startsWith("entity_get_") && !"entity_is_alive".equals(operation) && !"entity_data_entry".equals(operation);
+        if (List.of("entity_state", "entity_data", "entity_typed_data").contains(operation)) {
+            mutation = !"get".equalsIgnoreCase(ctx.getInputValue(node, "action", String.class, "get"));
+        }
+        if (mutation && entity != null && (!entity.isValid() || entity instanceof Player player && !player.isOnline())) {
+            throw new IllegalStateException("Entity mutation target is unavailable");
+        }
+        if (mutation && entity instanceof Player player) {
             playerDataAdmission.mutatePlayer("flow-entity-action:" + operation, player, () -> op.accept(ctx, node));
         } else {
             op.accept(ctx, node);
@@ -789,6 +808,7 @@ public class EntityActionHandler implements NodeHandler {
     private static Location requireLocation(FlowContext context, FlowNode node, String inputName) {
         Location location = context.getInputValue(node, inputName, Location.class, null);
         if (location == null || location.getWorld() == null) throw new IllegalArgumentException("Location input is required: " + inputName);
+        location.checkFinite();
         return location;
     }
 

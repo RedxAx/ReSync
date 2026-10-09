@@ -37,7 +37,7 @@ public final class StringTemplatePins {
             if (!STRING.equals(pin.getValue())) {
                 continue;
             }
-            PinValue stored = node.values().get(pin.getKey());
+            PinValue stored = node.configuredValues().get(pin.getKey());
             if (stored == null || stored.value().state() != TypedValue.State.VALUE
                 || !(stored.value().value() instanceof String value)) {
                 continue;

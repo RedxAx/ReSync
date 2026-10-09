@@ -247,7 +247,10 @@ public final class AssetCoordinatorMigration {
                 || !evidence.equals(durable.evidence())) {
                 throw new MigrationException("Fresh Asset Adoption Authority Does Not Match Its Durable Artifact");
             }
-            FreshRootProvenance.verifyConsumed(coordination, active, proofHash, artifactHash);
+            Path genesis = FreshRootProvenance.verifyConsumedInstallation(coordination, proofHash, artifactHash);
+            if (!genesis.equals(active) || !genesis.toRealPath().equals(active.toRealPath())) {
+                return Optional.empty();
+            }
             return Optional.of(new FreshRootAuthority(active.toRealPath(), proofHash, artifactHash));
         }
 

@@ -12,6 +12,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -83,6 +84,7 @@ public final class SqliteManagedFlowFileCapability implements ManagedFlowFileCap
     private int mutationCount;
     private IOException postCommitCleanupFailure;
     private ManagedFlowFileMigrationContract.StoreMetadata storeMetadata;
+    private SchemaStamp schemaStamp;
 
     public SqliteManagedFlowFileCapability(Path dataRoot) {
         this(dataRoot, true, null, NO_FAILURES);
@@ -604,12 +606,12 @@ public final class SqliteManagedFlowFileCapability implements ManagedFlowFileCap
                 statement.setString(5, ManagedFlowFileMigrationContract.Origin.FRESH_INSTALL.wireValue());
                 statement.setInt(6, ManagedFlowFileStoreContract.CONTRACT_VERSION);
                 statement.setString(7, requestedInstallIdentity == null ? UUID.randomUUID().toString() : requestedInstallIdentity);
-                statement.setNull(8, java.sql.Types.VARCHAR);
-                statement.setNull(9, java.sql.Types.VARCHAR);
-                statement.setNull(10, java.sql.Types.VARCHAR);
-                statement.setNull(11, java.sql.Types.VARCHAR);
-                statement.setNull(12, java.sql.Types.VARCHAR);
-                statement.setNull(13, java.sql.Types.VARCHAR);
+                statement.setNull(8, Types.VARCHAR);
+                statement.setNull(9, Types.VARCHAR);
+                statement.setNull(10, Types.VARCHAR);
+                statement.setNull(11, Types.VARCHAR);
+                statement.setNull(12, Types.VARCHAR);
+                statement.setNull(13, Types.VARCHAR);
                 statement.executeUpdate();
             }
             try (PreparedStatement statement = connection.prepareStatement(
@@ -638,6 +640,7 @@ public final class SqliteManagedFlowFileCapability implements ManagedFlowFileCap
             throw new SQLException("Managed flow-file store install identity changed during admission");
         }
         this.storeMetadata = metadata;
+        this.schemaStamp = null;
     }
 
     static void validateSchemaShape(Connection connection) throws SQLException {
@@ -1156,13 +1159,32 @@ public final class SqliteManagedFlowFileCapability implements ManagedFlowFileCap
             throw new IOException("Managed flow-file database connection is unavailable");
         }
         try {
+            SchemaStamp currentStamp = readSchemaStamp(connection);
+            if (currentStamp.equals(schemaStamp)) {
+                return;
+            }
             validateSchemaShape(connection);
             ManagedFlowFileMigrationContract.StoreMetadata current = readMetadata(connection);
             if (storeMetadata == null || !storeMetadata.equals(current)) {
                 throw new IOException("Managed flow-file store metadata changed");
             }
+            if (!currentStamp.equals(readSchemaStamp(connection))) {
+                throw new IOException("Managed flow-file store changed during schema validation");
+            }
+            schemaStamp = currentStamp;
         } catch (SQLException | RuntimeException exception) {
             throw new IOException("Managed flow-file store schema validation failed", exception);
+        }
+    }
+
+    private static SchemaStamp readSchemaStamp(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT data_version, schema_version FROM pragma_data_version, pragma_schema_version");
+             ResultSet result = statement.executeQuery()) {
+            if (!result.next()) {
+                throw new SQLException("Managed flow-file schema stamp is unavailable");
+            }
+            return new SchemaStamp(result.getLong(1), result.getLong(2));
         }
     }
 
@@ -1241,5 +1263,8 @@ public final class SqliteManagedFlowFileCapability implements ManagedFlowFileCap
             name = Objects.requireNonNull(name, "name");
             type = Objects.requireNonNull(type, "type").toUpperCase(Locale.ROOT);
         }
+    }
+
+    private record SchemaStamp(long dataVersion, long schemaVersion) {
     }
 }

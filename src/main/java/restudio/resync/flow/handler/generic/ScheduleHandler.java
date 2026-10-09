@@ -28,6 +28,7 @@ import restudio.resync.flow.runtime.RuntimeExecutionContext;
 import restudio.resync.flow.runtime.RuntimePrincipal;
 import restudio.resync.flow.runtime.RuntimePrincipalAuthority;
 import restudio.resync.flow.automation.AutomationDefinitionRegistry;
+import restudio.resync.flow.automation.AutomationDefinition;
 import restudio.resync.flow.automation.AutomationInstanceKey;
 import restudio.resync.flow.automation.AutomationOwner;
 import restudio.resync.flow.automation.AutomationReferences;
@@ -407,71 +408,92 @@ public class ScheduleHandler implements NodeHandler {
                                                            ServerResourceLocator targetLocator,
                                                            FlowExecutor.FunctionInvocationContext scheduledFunctionContext,
                                                            String creatorPrincipal, String creatorSessionReference) {
-        AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), owner.id());
-        return () -> onServerThread(() -> {
-            FlowGraph currentTarget = targetGraph(targetLocator);
-            if (currentTarget == null) {
-                return CompletableFuture.failedFuture(new IllegalStateException("Schedule target not found: " + targetLocator.canonicalText()));
-            }
-            if (definition.targetType() == ScheduleDefinition.TargetType.FUNCTION && currentTarget.getFunctionVersion() != signatureVersion) {
-                return CompletableFuture.failedFuture(new IllegalStateException(
-                    "Function signature changed from version " + signatureVersion + " to " + currentTarget.getFunctionVersion()
-                        + "; open the Schedule node and reconnect its arguments"));
-            }
-            Player player = scheduledPlayerId != null ? Bukkit.getPlayer(scheduledPlayerId) : null;
-            if (definition.scope() == AutomationScope.PLAYER && scheduledPlayerId != null && player == null) {
-                if (definition.offlinePolicy() == ScheduleDefinition.OfflinePolicy.CANCEL) {
-                    automationTasks.cancel(key);
+        AutomationInstanceKey key = new AutomationInstanceKey(definition.kind(), definition.id(), definition.scope(), owner.id());
+        return (AutomationTaskService.InvocationSupplier) admitted -> {
+            AutomationTaskService.TaskSnapshot task = admitted.task();
+            return onServerThread(() -> {
+                if (!automationTasks.canInvoke(admitted)) {
+                    return CompletableFuture.failedFuture(new IllegalStateException("Schedule Task Is No Longer Active"));
                 }
-                if (definition.offlinePolicy() == ScheduleDefinition.OfflinePolicy.WAIT) {
-                    return CompletableFuture.completedFuture(AutomationTaskService.waitForOwner());
+                FlowGraph currentTarget = targetGraph(targetLocator);
+                if (currentTarget == null) {
+                    return CompletableFuture.failedFuture(new IllegalStateException("Schedule target not found: " + targetLocator.canonicalText()));
                 }
-                if (definition.offlinePolicy() != ScheduleDefinition.OfflinePolicy.RUN_WITHOUT_PLAYER) {
-                    return CompletableFuture.completedFuture(null);
-                }
-            }
-            AutomationTaskService.TaskSnapshot task = automationTasks.check(key);
-            Map<String, Object> scheduleContext = new LinkedHashMap<>();
-            scheduleContext.put("schedule.task", stableScheduleTask(task));
-            scheduleContext.put("schedule.definition", definitions.reference(definition));
-            scheduleContext.put("schedule.fired_at", task.nextRun());
-            scheduleContext.put("schedule.arguments", arguments);
-            if (definition.targetType() == ScheduleDefinition.TargetType.FUNCTION) {
-                FlowExecutor.FunctionInvocationContext invocation = functionInvocationForSchedule(executor, player,
-                    scheduleContext, scheduledFunctionContext, key, task.runCount(), definition.persistent(),
-                    creatorPrincipal, creatorSessionReference);
-                CompletableFuture<Map<String, Object>> function = invocation == null
-                    ? executor.executeFunction(currentTarget, player, null, runtimeArguments(currentTarget, arguments), scheduleContext)
-                    : executor.executeFunction(currentTarget, player, null, runtimeArguments(currentTarget, arguments), scheduleContext, invocation);
-                return function
-                    .thenApply(result -> (Object) result);
-            }
-            if (definition.targetType() == ScheduleDefinition.TargetType.COMMAND) {
-                return executor.execute(currentTarget, player, null, scheduleContext).thenApply(ignored -> (Object) Map.of());
-            }
-            String eventEntry = currentTarget.getNodes().entrySet().stream().filter(entry -> entry.getValue() != null)
-                .filter(entry -> "event.schedule".equals(entry.getValue().getType()))
-                .filter(entry -> definition.id().equals(AutomationReferences.id(
-                    entry.getValue().getInputValues() != null ? entry.getValue().getInputValues().get("schedule") : null)))
-                .map(Map.Entry::getKey).findFirst().orElse(null);
-            if (eventEntry == null) {
-                if (!definition.id().startsWith("migrated.schedule.")) {
+                if (definition.targetType() == ScheduleDefinition.TargetType.FUNCTION && currentTarget.getFunctionVersion() != signatureVersion) {
                     return CompletableFuture.failedFuture(new IllegalStateException(
-                        "Target Flow requires a Schedule Event selecting " + definition.name()));
+                        "Function signature changed from version " + signatureVersion + " to " + currentTarget.getFunctionVersion()
+                            + "; open the Schedule node and reconnect its arguments"));
                 }
-                return executor.execute(currentTarget, player, null, scheduleContext).thenApply(ignored -> (Object) Map.of());
-            }
-            Map<String, Object> taskValue = task.value();
-            ScheduleFiredEvent event = new ScheduleFiredEvent(definitions.reference(definition), taskValue, owner.value(), arguments);
-            Map<String, Object> eventContext = new LinkedHashMap<>(scheduleContext);
-            eventContext.put("event.schedule", definitions.reference(definition));
-            eventContext.put("event.task", taskValue);
-            eventContext.put("event.owner", owner.value());
-            eventContext.put("event.arguments", arguments);
-            eventContext.put("event.firedAt", task.lastRun());
-            eventContext.put("event.runCount", task.runCount());
-            return executor.execute(currentTarget, eventEntry, player, event, eventContext).thenApply(ignored -> (Object) Map.of());
-        });
+                Player player = scheduledPlayerId != null ? Bukkit.getPlayer(scheduledPlayerId) : null;
+                if (definition.scope() == AutomationScope.PLAYER && scheduledPlayerId != null && player == null) {
+                    if (definition.offlinePolicy() == ScheduleDefinition.OfflinePolicy.CANCEL) {
+                        automationTasks.cancel(task.taskId());
+                    }
+                    if (definition.offlinePolicy() == ScheduleDefinition.OfflinePolicy.WAIT) {
+                        return CompletableFuture.completedFuture(AutomationTaskService.waitForOwner());
+                    }
+                    if (definition.offlinePolicy() != ScheduleDefinition.OfflinePolicy.RUN_WITHOUT_PLAYER) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                }
+                Map<String, Object> scheduleContext = new LinkedHashMap<>();
+                scheduleContext.put("schedule.task", stableScheduleTask(task));
+                scheduleContext.put("schedule.definition", definitions.reference(definition));
+                scheduleContext.put("schedule.fired_at", task.nextRun());
+                scheduleContext.put("schedule.arguments", arguments);
+                if (definition.targetType() == ScheduleDefinition.TargetType.FUNCTION) {
+                    FlowExecutor.FunctionInvocationContext invocation = functionInvocationForSchedule(executor, player,
+                        scheduleContext, scheduledFunctionContext, key, task.runCount(), definition.persistent(),
+                        creatorPrincipal, creatorSessionReference, task.taskId());
+                    Map<String, Object> inputs = runtimeArguments(currentTarget, arguments);
+                    if (!automationTasks.canInvoke(admitted)) {
+                        return CompletableFuture.failedFuture(new IllegalStateException("Schedule Task Is No Longer Active"));
+                    }
+                    CompletableFuture<Map<String, Object>> function = invocation == null
+                        ? executor.executeFunction(currentTarget, player, null, inputs, scheduleContext)
+                        : executor.executeFunction(currentTarget, player, null, inputs, scheduleContext,
+                            invocation, admitted.cancellation());
+                    return function
+                        .thenApply(result -> (Object) result);
+                }
+                if (definition.targetType() == ScheduleDefinition.TargetType.COMMAND) {
+                    return invokeAdmitted(admitted,
+                        () -> executor.execute(currentTarget, player, null, scheduleContext).thenApply(ignored -> (Object) Map.of()));
+                }
+                String eventEntry = currentTarget.getNodes().entrySet().stream().filter(entry -> entry.getValue() != null)
+                    .filter(entry -> "event.schedule".equals(entry.getValue().getType()))
+                    .filter(entry -> definition.id().equals(AutomationReferences.id(
+                        entry.getValue().getInputValues() != null ? entry.getValue().getInputValues().get("schedule") : null)))
+                    .map(Map.Entry::getKey).findFirst().orElse(null);
+                if (eventEntry == null) {
+                    if (!definition.id().startsWith("migrated.schedule.")) {
+                        return CompletableFuture.failedFuture(new IllegalStateException(
+                            "Target Flow requires a Schedule Event selecting " + definition.name()));
+                    }
+                    return invokeAdmitted(admitted,
+                        () -> executor.execute(currentTarget, player, null, scheduleContext).thenApply(ignored -> (Object) Map.of()));
+                }
+                Map<String, Object> taskValue = task.value();
+                ScheduleFiredEvent event = new ScheduleFiredEvent(definitions.reference(definition), taskValue, owner.value(), arguments);
+                Map<String, Object> eventContext = new LinkedHashMap<>(scheduleContext);
+                eventContext.put("event.schedule", definitions.reference(definition));
+                eventContext.put("event.task", taskValue);
+                eventContext.put("event.owner", owner.value());
+                eventContext.put("event.arguments", arguments);
+                eventContext.put("event.firedAt", task.lastRun());
+                eventContext.put("event.runCount", task.runCount());
+                return invokeAdmitted(admitted,
+                    () -> executor.execute(currentTarget, eventEntry, player, event, eventContext).thenApply(ignored -> (Object) Map.of()));
+            });
+        };
+    }
+
+    private CompletableFuture<Object> invokeAdmitted(AutomationTaskService.Invocation admitted,
+                                                     Supplier<CompletableFuture<Object>> action) {
+        if (!automationTasks.canInvoke(admitted)) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Schedule Task Is No Longer Active"));
+        }
+        return invokeAction(action);
     }
 
     private ServerResourceLocator targetLocator(ScheduleDefinition definition) {
@@ -556,6 +578,7 @@ public class ScheduleHandler implements NodeHandler {
 
     Map<String, Object> stableScheduleTask(AutomationTaskService.TaskSnapshot task) {
         return Map.of(
+            "taskId", task.taskId(),
             "definitionId", task.definitionId(),
             "scope", task.scope().name().toLowerCase(Locale.ROOT),
             "ownerId", task.ownerId(),
@@ -586,6 +609,15 @@ public class ScheduleHandler implements NodeHandler {
         FlowExecutor.FunctionInvocationContext scheduledContext, AutomationInstanceKey key, long runCount,
         boolean persistent, String creatorPrincipal, String creatorSessionReference
     ) {
+        return functionInvocationForSchedule(executor, player, scheduleContext, scheduledContext, key, runCount,
+            persistent, creatorPrincipal, creatorSessionReference, null);
+    }
+
+    private FlowExecutor.FunctionInvocationContext functionInvocationForSchedule(
+        FlowExecutor executor, Player player, Map<String, Object> scheduleContext,
+        FlowExecutor.FunctionInvocationContext scheduledContext, AutomationInstanceKey key, long runCount,
+        boolean persistent, String creatorPrincipal, String creatorSessionReference, String taskId
+    ) {
         FlowExecutor.FunctionInvocationContext base = scheduledContext != null
             ? scheduledContext : executor.defaultFunctionInvocationContext(player, null, scheduleContext);
         RuntimePrincipal executionPrincipal = persistent ? persistentSchedulePrincipal() : base != null ? base.principal() : null;
@@ -604,7 +636,8 @@ public class ScheduleHandler implements NodeHandler {
             scheduleContext.put("runtime.sessionId", creatorSessionReference);
         }
         CorrelationId invocationId = CorrelationId.deterministic("schedule-function|"
-            + key.definitionId() + "|" + key.scope().name() + "|" + key.ownerId() + "|" + runCount);
+            + key.definitionId() + "|" + key.scope().name() + "|" + key.ownerId() + "|"
+            + (taskId != null ? taskId : "") + "|" + runCount);
         return executor.functionInvocationContext(player, null, scheduleContext, executionPrincipal, invocationId,
             RuntimeExecutionContext.NO_DEADLINE, creatorPrincipal, creatorSessionReference);
     }
@@ -740,7 +773,8 @@ public class ScheduleHandler implements NodeHandler {
     private void controlScheduledTask(FlowContext context, FlowNode node) {
         String action = context.getInputValue(node, "action", String.class, "check").trim().toLowerCase(Locale.ROOT);
         AutomationTaskService.TaskSnapshot selected = selectedTask(context, node);
-        AutomationInstanceKey key = new AutomationInstanceKey(selected.definitionId(), selected.scope(), selected.ownerId());
+        AutomationInstanceKey key = new AutomationInstanceKey(AutomationDefinition.Kind.valueOf(selected.kind().name()),
+            selected.definitionId(), selected.scope(), selected.ownerId());
         AutomationTaskService.TaskSnapshot result = switch (action) {
             case "check" -> automationTasks.check(key);
             case "cancel" -> automationTasks.cancel(key);
@@ -783,7 +817,7 @@ public class ScheduleHandler implements NodeHandler {
         String definitionId = AutomationReferences.id(context.getInputValue(node, "schedule", Object.class, null));
         ScheduleDefinition definition = definitions.schedule(definitionId);
         AutomationOwner owner = AutomationOwner.resolve(definition.scope(), context, automationOwnerValue(context, node, definition));
-        return automationTasks.check(new AutomationInstanceKey(definition.id(), definition.scope(), owner.id()));
+        return automationTasks.check(new AutomationInstanceKey(definition.kind(), definition.id(), definition.scope(), owner.id()));
     }
 
     private Object automationOwnerValue(FlowContext context, FlowNode node, ScheduleDefinition definition) {

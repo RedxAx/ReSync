@@ -5,12 +5,17 @@ import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import net.kyori.adventure.text.Component;
 import org.java_websocket.WebSocket;
+import org.java_websocket.WebSocketImpl;
 import org.java_websocket.framing.CloseFrame;
+import org.java_websocket.framing.Framedata;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
 import org.java_websocket.server.WebSocketServer;
 import org.slf4j.Logger;
 import restudio.resync.network.NetworkChannels;
+import restudio.resync.network.NetworkEditorChunk;
+import restudio.resync.network.NetworkAuthentication;
+import restudio.resync.network.NetworkAuthenticationCodec;
 import restudio.resync.network.NetworkCredentials;
 import restudio.resync.network.NetworkEvent;
 import restudio.resync.network.NetworkEventCodec;
@@ -69,12 +74,14 @@ import restudio.resync.network.PlayerStateSnapshot;
 import restudio.resync.network.PlayerLease;
 import restudio.resync.network.PlayerTransfer;
 import restudio.resync.network.SqliteNetworkHubStore;
+import restudio.resync.network.SqliteNetworkHubStore.ExpiredTransfer;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -92,8 +99,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public class ReSyncVelocityHub extends WebSocketServer {
@@ -106,6 +117,8 @@ public class ReSyncVelocityHub extends WebSocketServer {
     private static final long MAXIMUM_MANUAL_RESTORE_MILLIS = TimeUnit.MINUTES.toMillis(15);
     private static final int RECONCILIATION_BATCH_SIZE = 5_000;
     private final Object sessionMonitor = new Object();
+    private final AtomicBoolean stopping = new AtomicBoolean();
+    private final CompletableFuture<Void> transportStopped = new CompletableFuture<>();
     private final CompletableFuture<Void> listening = new CompletableFuture<>();
     private final VelocityNetworkConfig config;
     private final Logger logger;
@@ -114,10 +127,14 @@ public class ReSyncVelocityHub extends WebSocketServer {
     private final NetworkFrameCodec codec;
     private final VelocityRouteRegistry routes;
     private final NetworkEventDeliveryService events;
+    private final Map<WebSocket, PendingAuthentication> pendingAuthentication = new ConcurrentHashMap<>();
+    private final Map<WebSocket, SocketOutput> outputs = new ConcurrentHashMap<>();
+    private final VelocityEditorGateway editors;
     private final Map<WebSocket, Session> sessions = new ConcurrentHashMap<>();
     private final Map<String, WebSocket> connectionsByNode = new ConcurrentHashMap<>();
     private final Map<String, NetworkNodeMetrics> latestMetrics = new ConcurrentHashMap<>();
-    private final Map<String, VelocityNetworkConfig.EnrollmentNode> enrollmentNodes = new ConcurrentHashMap<>();
+    private volatile Map<String, NodeAccess> nodeAccess = Map.of();
+    private volatile Map<String, VelocityNetworkConfig.EnrollmentNode> enrollmentNodes = Map.of();
     private final Map<String, NetworkNodeStatus> nodeModes = new ConcurrentHashMap<>();
     private final SnapshotUploadRegistry snapshotUploads = new SnapshotUploadRegistry(MAXIMUM_ACTIVE_SNAPSHOT_UPLOADS, MAXIMUM_SNAPSHOT_UPLOAD_MILLIS);
     private final Map<String, CompletableFuture<PlayerTransfer>> transferReadiness = new ConcurrentHashMap<>();
@@ -133,12 +150,45 @@ public class ReSyncVelocityHub extends WebSocketServer {
     public ReSyncVelocityHub(VelocityNetworkConfig config, Logger logger, ProxyServer proxyServer) {
         super(new InetSocketAddress(config.bindHost(), config.port()));
         setReuseAddr(true);
+        setConnectionLostTimeout(0);
         this.config = config;
         this.logger = logger;
         this.proxyServer = proxyServer;
         this.store = new SqliteNetworkHubStore(config.databasePath());
         this.codec = new NetworkFrameCodec(config.maximumFrameBytes(), config.maximumPayloadBytes());
-        this.enrollmentNodes.putAll(config.enrollmentNodes());
+        this.enrollmentNodes = Map.copyOf(config.enrollmentNodes());
+        this.nodeAccess = access(config.enrollmentNodes());
+        this.editors = new VelocityEditorGateway(new VelocityEditorGateway.Transport() {
+            @Override
+            public boolean active(VelocityEditorGateway.Endpoint endpoint) {
+                return endpoint.session() instanceof Session session && isActiveSession(endpoint.connection(), session);
+            }
+
+            @Override
+            public boolean canOpen(VelocityEditorGateway.Endpoint endpoint) {
+                return endpoint.session() instanceof Session session && sessionScopes(session).contains("editors.open");
+            }
+
+            @Override
+            public VelocityEditorGateway.Endpoint backend(String nodeId) {
+                NodeAccess access = nodeAccess.get(nodeId);
+                VelocityNetworkConfig.EnrollmentNode node = access == null ? null : access.node();
+                WebSocket connection = connectionsByNode.get(nodeId);
+                Session session = connection == null ? null : sessions.get(connection);
+                return node != null && "BACKEND".equalsIgnoreCase(node.role()) && session != null && isActiveSession(connection, session)
+                    ? new VelocityEditorGateway.Endpoint(connection, session, nodeId) : null;
+            }
+
+            @Override
+            public boolean send(VelocityEditorGateway.Endpoint endpoint, NetworkFrameType type, UUID tunnelId, byte[] payload) {
+                if (!active(endpoint)) return false;
+                try {
+                    return ReSyncVelocityHub.this.send(endpoint.connection(), (Session) endpoint.session(), type, NetworkChannels.EDITOR, tunnelId.toString(), payload, Set.of());
+                } catch (RuntimeException exception) {
+                    return false;
+                }
+            }
+        });
         this.routes = new VelocityRouteRegistry(proxyServer, new VelocityRouteRegistry.NodeState() {
             @Override
             public boolean managed(String nodeId) {
@@ -168,16 +218,31 @@ public class ReSyncVelocityHub extends WebSocketServer {
             }
 
             @Override
-            public boolean available(String nodeId) {
-                WebSocket connection = connectionsByNode.get(nodeId);
-                Session session = connection == null ? null : sessions.get(connection);
-                return connection != null && session != null && sessionScopes(session).contains("events.consume");
+            public NetworkEventDeliveryService.DeliverySession capture(String nodeId) {
+                synchronized (sessionMonitor) {
+                    WebSocket connection = connectionsByNode.get(nodeId);
+                    Session session = connection == null ? null : sessions.get(connection);
+                    return session != null && isActiveSession(connection, session) && sessionScopes(session).contains("events.consume")
+                        ? session.delivery : null;
+                }
             }
 
             @Override
-            public void send(String nodeId, NetworkEvent event) {
-                WebSocket connection = connectionsByNode.get(nodeId);
-                ReSyncVelocityHub.this.send(connection, NetworkFrameType.EVENT_DELIVERY, NetworkChannels.EVENTS, "event-" + event.eventId(), NetworkEventCodec.encodeEvent(event), Set.of("events.consume"));
+            public boolean matches(NetworkEventDeliveryService.DeliverySession delivery) {
+                synchronized (sessionMonitor) {
+                    return delivery != null && delivery.equals(capture(delivery.nodeId()));
+                }
+            }
+
+            @Override
+            public boolean send(NetworkEventDeliveryService.DeliverySession delivery, NetworkEvent event, BooleanSupplier admit) {
+                synchronized (sessionMonitor) {
+                    if (!matches(delivery) || !admit.getAsBoolean()) return false;
+                    WebSocket connection = connectionsByNode.get(delivery.nodeId());
+                    Session session = sessions.get(connection);
+                    return ReSyncVelocityHub.this.send(connection, session, NetworkFrameType.EVENT_DELIVERY, NetworkChannels.EVENTS,
+                        "event-" + event.eventId(), NetworkEventCodec.encodeEvent(event), Set.of("events.consume"));
+                }
             }
 
             @Override
@@ -201,36 +266,74 @@ public class ReSyncVelocityHub extends WebSocketServer {
         }
         start();
         listening.get(15, TimeUnit.SECONDS);
+        heartbeatExecutor.scheduleWithFixedDelay(this::maintainAdmissions, 1, 1, TimeUnit.SECONDS);
         heartbeatExecutor.scheduleWithFixedDelay(this::maintainRuntime, config.heartbeatTimeoutMillis(), Math.max(1000, config.heartbeatTimeoutMillis() / 3), TimeUnit.MILLISECONDS);
     }
 
     public void stopHub() {
-        heartbeatExecutor.shutdownNow();
-        transferReadiness.values().forEach(future -> future.completeExceptionally(new IllegalStateException("Network Hub Stopping")));
-        transferReadiness.clear();
-        snapshotUploads.discardOwners("Network Hub Stopping");
-        sessions.keySet().forEach(connection -> connection.close(CloseFrame.NORMAL, "Network Hub Stopping"));
-        try {
-            stop(5000);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
+        if (!stopping.compareAndSet(false, true)) {
+            try {
+                transportStopped.get(5, TimeUnit.SECONDS);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Network Hub Stop Wait Interrupted; Retry Stop", exception);
+            } catch (ExecutionException | TimeoutException exception) {
+                throw new IllegalStateException("Network Hub Is Still Stopping; Retry Stop", exception);
+            }
+            store.close();
+            return;
         }
         try {
-            store.updateNodeStatus(config.networkId(), config.nodeId(), NetworkNodeStatus.OFFLINE, Instant.now().toEpochMilli()).join();
-        } catch (RuntimeException exception) {
-            logger.warn("Failed to record proxy shutdown", exception);
+            heartbeatExecutor.shutdownNow();
+            transferReadiness.values().forEach(future -> future.completeExceptionally(new IllegalStateException("Network Hub Stopping")));
+            transferReadiness.clear();
+            snapshotUploads.discardOwners("Network Hub Stopping");
+            List<WebSocket> closing;
+            synchronized (sessionMonitor) {
+                closing = new ArrayList<>(outputs.keySet());
+                closing.forEach(connection -> onClose(connection, CloseFrame.GOING_AWAY, "Network Hub Stopping", false));
+                pendingAuthentication.clear();
+            }
+            try {
+                closing.forEach(connection -> connection.close(CloseFrame.GOING_AWAY, "Network Hub Stopping"));
+                stop(5000);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            } catch (RuntimeException exception) {
+                logger.warn("Failed to stop network transport", exception);
+            }
+            try {
+                store.updateNodeStatus(config.networkId(), config.nodeId(), NetworkNodeStatus.OFFLINE, Instant.now().toEpochMilli()).get(5, TimeUnit.SECONDS);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                logger.warn("Proxy Shutdown Status Wait Interrupted", exception);
+            } catch (ExecutionException | TimeoutException | RuntimeException exception) {
+                logger.warn("Failed to record proxy shutdown", exception);
+            }
+        } finally {
+            transportStopped.complete(null);
+            store.close();
         }
-        store.close();
+    }
+
+    public boolean isStopping() {
+        return stopping.get();
     }
 
     public CompletableFuture<List<NetworkResource>> resources(String type) {
         String normalizedType = type == null ? "" : type.trim().toLowerCase(Locale.ROOT);
-        return resourceMetadata(NetworkResourceQuery.firstPage(), normalizedType, new ArrayList<>()).thenCompose(metadata -> {
-            List<CompletableFuture<Optional<NetworkResource>>> requests = metadata.stream()
-                .map(resource -> store.getResource(config.networkId(), resource.type(), resource.resourceId()))
-                .toList();
-            return CompletableFuture.allOf(requests.toArray(new CompletableFuture[0]))
-                .thenApply(ignored -> requests.stream().map(CompletableFuture::join).flatMap(Optional::stream).filter(resource -> !resource.deleted()).toList());
+        return resourceMetadata(NetworkResourceQuery.firstPage(), normalizedType, new ArrayList<>())
+            .thenCompose(metadata -> loadResources(metadata, 0, new ArrayList<>()));
+    }
+
+    private CompletableFuture<List<NetworkResource>> loadResources(List<NetworkResourceMetadata> metadata, int offset, List<NetworkResource> loaded) {
+        if (offset >= metadata.size()) return CompletableFuture.completedFuture(List.copyOf(loaded));
+        int end = Math.min(metadata.size(), offset + 64);
+        List<CompletableFuture<Optional<NetworkResource>>> requests = metadata.subList(offset, end).stream()
+            .map(resource -> store.getResource(config.networkId(), resource.type(), resource.resourceId())).toList();
+        return CompletableFuture.allOf(requests.toArray(new CompletableFuture[0])).thenCompose(ignored -> {
+            requests.stream().map(CompletableFuture::join).flatMap(Optional::stream).filter(resource -> !resource.deleted()).forEach(loaded::add);
+            return loadResources(metadata, end, loaded);
         });
     }
 
@@ -252,55 +355,98 @@ public class ReSyncVelocityHub extends WebSocketServer {
 
     @Override
     public void onOpen(WebSocket connection, ClientHandshake handshake) {
+        boolean rejected;
+        synchronized (sessionMonitor) {
+            rejected = pendingAuthentication.size() >= 64 || stopping.get() || heartbeatExecutor.isShutdown();
+            if (!rejected) {
+                outputs.put(connection, new SocketOutput());
+                pendingAuthentication.put(connection, new PendingAuthentication());
+            }
+        }
+        if (rejected) {
+            connection.close(1013, "Network Authentication Limit Reached");
+            return;
+        }
         String networkId = header(handshake, "X-ReSync-Network");
         String nodeId = header(handshake, "X-ReSync-Node");
-        if (!config.networkId().equals(networkId) || nodeId.isBlank()) {
-            connection.close(CloseFrame.POLICY_VALIDATION, "Unknown Network Node");
-            return;
-        }
-        try {
-            reloadManagedNodes(nodeId);
-        } catch (RuntimeException exception) {
-            connection.close(CloseFrame.UNEXPECTED_CONDITION, "Network Configuration Reload Failed");
-            return;
-        }
-        VelocityNetworkConfig.EnrollmentNode node = enrollmentNodes.get(nodeId);
-        if (node == null) {
-            connection.close(CloseFrame.POLICY_VALIDATION, "Unknown Network Node");
-            return;
-        }
         String credential = header(handshake, "X-ReSync-Credential");
         String enrollment = header(handshake, "X-ReSync-Enrollment");
         String offered = header(handshake, "X-ReSync-Enrollment-Credential");
-        if (!offered.isBlank() && !validCredential(offered)) {
-            connection.close(CloseFrame.POLICY_VALIDATION, "Invalid Enrollment Credential");
+        if (networkId.isBlank() && nodeId.isBlank() && credential.isBlank() && enrollment.isBlank() && offered.isBlank()) return;
+        try {
+            beginAuthentication(connection, new NetworkAuthentication(networkId, nodeId, credential, enrollment, offered));
+        } catch (RuntimeException exception) {
+            pendingAuthentication.remove(connection);
+            connection.close(CloseFrame.POLICY_VALIDATION, "Invalid Network Authentication");
+        }
+    }
+
+    private void beginAuthentication(WebSocket connection, NetworkAuthentication authentication) {
+        PendingAuthentication pending = pendingAuthentication.get(connection);
+        if (pending == null || !pending.attempted.compareAndSet(false, true) || pending.expired()) {
+            throw new SecurityException("Network Authentication Expired Or Already Attempted");
+        }
+        if (!config.networkId().equals(authentication.networkId())) throw new SecurityException("Unknown Network");
+        reloadManagedNodes(authentication.nodeId());
+        VelocityNetworkConfig.EnrollmentNode node = enrollmentNodes.get(authentication.nodeId());
+        if (node == null) throw new SecurityException("Unknown Network Node");
+        if (!authentication.offeredCredential().isBlank() && !validCredential(authentication.offeredCredential())) {
+            throw new SecurityException("Invalid Enrollment Credential");
+        }
+        if (!authentication.credential().isBlank()) {
+            authenticate(connection, node, authentication.credential(), authentication.enrollmentToken(), authentication.offeredCredential());
+        } else {
+            enroll(connection, node, authentication.enrollmentToken(), authentication.offeredCredential());
+        }
+    }
+
+    private void authenticateFirstFrame(WebSocket connection, ByteBuffer message) {
+        if (message.remaining() > 4096) {
+            pendingAuthentication.remove(connection);
+            connection.close(CloseFrame.TOOBIG, "Network Authentication Frame Too Large");
             return;
         }
-        if (!credential.isBlank()) {
-            authenticate(connection, node, credential, enrollment, offered);
-            return;
+        try {
+            byte[] bytes = new byte[message.remaining()];
+            message.get(bytes);
+            NetworkFrame frame = codec.decode(bytes);
+            NetworkAuthentication authentication = NetworkAuthenticationCodec.decode(frame.payload());
+            if (frame.type() != NetworkFrameType.ENROLL || !NetworkChannels.CONTROL.equals(frame.channel())
+                || frame.context().protocolVersion() != PROTOCOL_VERSION || frame.context().expired(Instant.now().toEpochMilli())
+                || !frame.context().authorizationScopes().isEmpty() || !frame.context().networkId().equals(authentication.networkId())
+                || !frame.context().nodeId().equals(authentication.nodeId())) throw new SecurityException("Invalid Authentication Frame");
+            beginAuthentication(connection, authentication);
+        } catch (RuntimeException exception) {
+            pendingAuthentication.remove(connection);
+            connection.close(CloseFrame.POLICY_VALIDATION, "Invalid Network Authentication");
         }
-        if (!enrollment.isBlank()) {
-            enroll(connection, node, enrollment, offered);
-            return;
+    }
+
+    private void maintainAdmissions() {
+        try {
+            outputs.forEach((connection, output) -> {
+                if (output.full) connection.closeConnection(1013, "Network Send Queue Full");
+            });
+            pendingAuthentication.forEach((connection, pending) -> {
+                if (pending.expired() && pendingAuthentication.remove(connection, pending)) connection.close(CloseFrame.POLICY_VALIDATION, "Network Authentication Timed Out");
+            });
+            synchronized (sessionMonitor) {
+                editors.expire();
+            }
+        } catch (RuntimeException exception) {
+            logger.warn("Failed to maintain network admissions", exception);
         }
-        connection.close(CloseFrame.POLICY_VALIDATION, "Network Credential Required");
     }
 
     @Override
     public void onClose(WebSocket connection, int code, String reason, boolean remote) {
+        outputs.remove(connection);
+        pendingAuthentication.remove(connection);
         synchronized (sessionMonitor) {
             Session session = removeSession(connection, "Network Session Closed");
             if (session == null || !connectionsByNode.remove(session.nodeId(), connection)) {
                 return;
             }
-            pendingReconciliations.entrySet().removeIf(entry -> {
-                if (!entry.getValue().nodeId().equals(session.nodeId())) {
-                    return false;
-                }
-                entry.getValue().result().completeExceptionally(new IllegalStateException("ReSync Backend Disconnected During State Reconciliation"));
-                return true;
-            });
             long now = Instant.now().toEpochMilli();
             store.updateNodeStatus(config.networkId(), session.nodeId(), NetworkNodeStatus.OFFLINE, now).thenAccept(node -> publishPresence(presence(node, NetworkNodeStatus.OFFLINE, now))).exceptionally(throwable -> {
                 logger.warn("Failed to mark network node {} offline", session.nodeId(), throwable);
@@ -311,6 +457,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
 
     @Override
     public void onMessage(WebSocket connection, String message) {
+        pendingAuthentication.remove(connection);
         connection.close(CloseFrame.REFUSE, "Binary Network Frames Required");
     }
 
@@ -321,7 +468,11 @@ public class ReSyncVelocityHub extends WebSocketServer {
             return;
         }
         Session session = sessions.get(connection);
-        if (session == null || !isActiveSession(connection, session)) {
+        if (session == null) {
+            authenticateFirstFrame(connection, message);
+            return;
+        }
+        if (!isActiveSession(connection, session)) {
             connection.close(CloseFrame.POLICY_VALIDATION, "Network Authentication Pending");
             return;
         }
@@ -331,10 +482,18 @@ public class ReSyncVelocityHub extends WebSocketServer {
         try {
             frame = codec.decode(encoded);
             validateSession(frame, session);
-            PendingReconciliation reconciliation = pendingReconciliations.remove(frame.context().requestId());
+            if (NetworkChannels.EDITOR.equals(frame.channel())) {
+                synchronized (sessionMonitor) {
+                    if (isActiveSession(connection, session)) editors.receive(new VelocityEditorGateway.Endpoint(connection, session, session.nodeId()), frame);
+                }
+                return;
+            }
+            PendingReconciliation reconciliation = pendingReconciliations.get(frame.context().requestId());
             if (reconciliation != null) {
-                if (!reconciliation.nodeId().equals(session.nodeId())) {
-                    throw new SecurityException("State Reconciliation Response Came From The Wrong Node");
+                synchronized (sessionMonitor) {
+                    requireSession(connection, session, "state.reconcile");
+                    if (reconciliation.session() != session) throw new SecurityException("State Reconciliation Response Came From The Wrong Session");
+                    if (!pendingReconciliations.remove(frame.context().requestId(), reconciliation)) return;
                 }
                 if (frame.type() == NetworkFrameType.ERROR) {
                     reconciliation.result().completeExceptionally(new IllegalStateException(new String(frame.payload(), StandardCharsets.UTF_8)));
@@ -355,14 +514,19 @@ public class ReSyncVelocityHub extends WebSocketServer {
             }
             if (frame.type() == NetworkFrameType.ROUTE_RECONCILE && frame.channel().equals(NetworkChannels.ROUTING)) {
                 requireScope(session, "routes.write");
-                reconcileRoutes(session.nodeId(), frame.payload());
-                send(connection, NetworkFrameType.RESPONSE, NetworkChannels.ROUTING, frame.context().requestId(), new byte[0], sessionScopes(session));
+                byte[] payload = frame.payload();
+                String hash = NetworkPayloads.sha256(payload);
+                submit(connection, session, "routes.write", () -> store.appendAudit(config.networkId(), session.nodeId(), "routes.reconcile.requested", "proxy", hash, Instant.now().toEpochMilli())).join();
+                reconcileRoutes(session.nodeId(), payload);
+                send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.ROUTING, frame.context().requestId(), new byte[0], Set.of("routes.write"));
                 return;
             }
             if (frame.type() == NetworkFrameType.NODE_MODE_SET && frame.channel().equals(NetworkChannels.CONTROL)) {
                 requireScope(session, "nodes.manage");
-                setNodeMode(session.nodeId(), NetworkNodeModeCodec.decode(frame.payload()));
-                send(connection, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, frame.context().requestId(), new byte[0], sessionScopes(session));
+                NetworkNodeMode mode = NetworkNodeModeCodec.decode(frame.payload());
+                submit(connection, session, "nodes.manage", () -> store.appendAudit(config.networkId(), session.nodeId(), "node.mode.requested", mode.nodeId(), mode.status().name(), Instant.now().toEpochMilli())).join();
+                setNodeMode(session.nodeId(), mode);
+                send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, frame.context().requestId(), new byte[0], Set.of("nodes.manage"));
                 return;
             }
             if (frame.type() == NetworkFrameType.PROXY_ACTION && frame.channel().equals(NetworkChannels.CONTROL)) {
@@ -445,9 +609,9 @@ public class ReSyncVelocityHub extends WebSocketServer {
                 stateReconcile(connection, session, frame);
                 return;
             }
-            sendError(connection, frame.context().requestId(), "Network Operation Is Not Available");
+            sendError(connection, session, frame.context().requestId(), "Network Operation Is Not Available");
         } catch (RuntimeException exception) {
-            sendError(connection, frame == null ? "invalid" : frame.context().requestId(), rootMessage(exception));
+            sendError(connection, session, frame == null ? "invalid" : frame.context().requestId(), rootMessage(exception));
         }
     }
 
@@ -500,72 +664,101 @@ public class ReSyncVelocityHub extends WebSocketServer {
         });
     }
 
+    private static boolean sameNode(VelocityNetworkConfig.EnrollmentNode first, VelocityNetworkConfig.EnrollmentNode second) {
+        return first.nodeId().equals(second.nodeId()) && first.displayName().equals(second.displayName())
+            && first.role().equals(second.role()) && first.expiresAt() == second.expiresAt()
+            && first.capabilities().equals(second.capabilities()) && Arrays.equals(first.tokenHash(), second.tokenHash());
+    }
+
     private void authorize(WebSocket connection, VelocityNetworkConfig.EnrollmentNode node, String credential, NetworkFrameType responseType) {
+        WebSocket previous = null;
+        Session session = null;
+        CompletableFuture<NetworkNode> registration = null;
+        String rejection = null;
         synchronized (sessionMonitor) {
-            if (!connection.isOpen()) return;
-            long now = Instant.now().toEpochMilli();
-            Set<String> scopes = scopes(node.capabilities());
-            Session session = new Session(node.nodeId(), scopes);
-            WebSocket previous = connectionsByNode.put(node.nodeId(), connection);
-            sessions.put(connection, session);
-            latestMetrics.remove(node.nodeId());
-            if (previous != null && previous != connection) {
-                removeSession(previous, "Network Session Replaced");
-                previous.close(CloseFrame.NORMAL, "Network Node Reconnected");
+            PendingAuthentication pending = pendingAuthentication.remove(connection);
+            if (!connection.isOpen() || pending == null) return;
+            VelocityNetworkConfig.EnrollmentNode currentNode = enrollmentNodes.get(node.nodeId());
+            if (pending.expired() || stopping.get()) {
+                rejection = "Network Authentication Timed Out";
+            } else if (currentNode == null || !sameNode(currentNode, node)) {
+                rejection = "Network Node Configuration Changed";
+            } else {
+                long now = Instant.now().toEpochMilli();
+                session = new Session(node.nodeId(), scopes(node.capabilities()));
+                previous = connectionsByNode.put(node.nodeId(), connection);
+                sessions.put(connection, session);
+                latestMetrics.remove(node.nodeId());
+                if (previous != null && previous != connection) removeSession(previous, "Network Session Replaced");
+                NetworkNodeStatus status = nodeModes.getOrDefault(node.nodeId(), NetworkNodeStatus.ONLINE);
+                registration = store.updateNodeStatus(config.networkId(), node.nodeId(), status, now);
             }
-            NetworkNodeStatus status = nodeModes.getOrDefault(node.nodeId(), NetworkNodeStatus.ONLINE);
-            store.updateNodeStatus(config.networkId(), node.nodeId(), status, now).whenComplete((updated, throwable) -> {
-                if (throwable != null) {
-                    removeSession(connection, "Network Session Registration Failed");
-                    connectionsByNode.remove(node.nodeId(), connection);
-                    connection.close(CloseFrame.UNEXPECTED_CONDITION, "Node Registration Failed");
-                    return;
-                }
-                if (!isActiveSession(connection, session)) {
-                    return;
-                }
-                send(connection, responseType, NetworkChannels.CONTROL, "session", credential.getBytes(StandardCharsets.UTF_8), scopes);
-                if (scopes.contains("presence.read")) {
-                    sendPresenceSnapshot(connection);
-                }
-                if (scopes.contains("events.consume")) {
-                    events.deliver(node.nodeId());
-                }
-                if (scopes.contains("state.transfer")) {
-                    recoverTransfers(node.nodeId());
-                    recoverOwnership(node.nodeId());
-                }
-            });
         }
+        if (rejection != null) {
+            connection.close(CloseFrame.POLICY_VALIDATION, rejection);
+            return;
+        }
+        if (previous != null && previous != connection) previous.close(CloseFrame.NORMAL, "Network Node Reconnected");
+        Session admitted = session;
+        registration.whenComplete((updated, throwable) -> {
+            if (throwable != null) {
+                boolean retired;
+                synchronized (sessionMonitor) {
+                    retired = sessions.get(connection) == admitted;
+                    if (retired) {
+                        removeSession(connection, "Network Session Registration Failed");
+                        connectionsByNode.remove(node.nodeId(), connection);
+                    }
+                }
+                if (retired) connection.close(CloseFrame.UNEXPECTED_CONDITION, "Node Registration Failed");
+                return;
+            }
+            if (!isActiveSession(connection, admitted)) {
+                return;
+            }
+            Set<String> scopes = sessionScopes(admitted);
+            send(connection, admitted, responseType, NetworkChannels.CONTROL, "session", credential.getBytes(StandardCharsets.UTF_8), scopes);
+            if (scopes.contains("presence.read")) {
+                sendPresenceSnapshot(connection);
+            }
+            if (scopes.contains("events.consume")) {
+                events.deliver(node.nodeId());
+            }
+            if (scopes.contains("state.transfer")) {
+                recoverTransfers(node.nodeId());
+                recoverOwnership(node.nodeId());
+            }
+        });
     }
 
     private void heartbeat(WebSocket connection, Session session, NetworkFrame request, NetworkNodeMetrics metrics) {
-        synchronized (sessionMonitor) {
-            if (!isActiveSession(connection, session)) return;
+        long now = Instant.now().toEpochMilli();
+        String scope = metrics == null ? "node.heartbeat" : "presence.write";
+        NetworkNodeStatus status = nodeModes.getOrDefault(session.nodeId(), NetworkNodeStatus.ONLINE);
+        CompletableFuture<NetworkNode> update = submit(connection, session, scope, () -> {
             session.lastHeartbeat = System.nanoTime();
-            long now = Instant.now().toEpochMilli();
-            NetworkNodeStatus status = nodeModes.getOrDefault(session.nodeId(), NetworkNodeStatus.ONLINE);
-            CompletableFuture<?> update = store.updateNodeStatus(config.networkId(), session.nodeId(), status, now);
-            if (metrics != null) {
-                update = update.thenCompose(node -> store.updateNodeMetrics(new NetworkNodeMetrics(config.networkId(), session.nodeId(), metrics.players(), metrics.capacity(), metrics.tps(), metrics.mspt(), metrics.heapUsed(), metrics.heapMaximum(), now)));
+            return store.updateNodeStatus(config.networkId(), session.nodeId(), status, now);
+        });
+        CompletableFuture<?> completed = metrics == null ? update : update.thenCompose(node -> store.updateNodeMetrics(new NetworkNodeMetrics(config.networkId(), session.nodeId(), metrics.players(), metrics.capacity(), metrics.tps(), metrics.mspt(), metrics.heapUsed(), metrics.heapMaximum(), now)));
+        completed.whenComplete((unused, throwable) -> {
+            if (throwable != null) {
+                sendError(connection, session, request.context().requestId(), rootMessage(throwable));
+                return;
             }
-            update.whenComplete((unused, throwable) -> {
-                if (!isActiveSession(connection, session)) return;
-                if (throwable != null) {
-                    sendError(connection, request.context().requestId(), rootMessage(throwable));
-                    return;
-                }
+            synchronized (sessionMonitor) {
+                if (!isActiveSession(connection, session) || !sessionScopes(session).contains(scope)) return;
                 if (metrics != null) {
                     NetworkNodeMetrics observed = new NetworkNodeMetrics(config.networkId(), session.nodeId(), metrics.players(), metrics.capacity(), metrics.tps(), metrics.mspt(), metrics.heapUsed(), metrics.heapMaximum(), now);
                     latestMetrics.put(session.nodeId(), observed);
                     publishPresence(new NetworkNodePresence(config.networkId(), session.nodeId(), status, observed.players(), observed.capacity(), observed.tps(), observed.mspt(), observed.heapUsed(), observed.heapMaximum(), observed.observedAt()));
                 }
-                send(connection, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, request.context().requestId(), new byte[0], sessionScopes(session));
-            });
-        }
+                send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, request.context().requestId(), new byte[0], Set.of(scope));
+            }
+        });
     }
 
     private void validateSession(NetworkFrame frame, Session session) {
+        if (frame.context().protocolVersion() != PROTOCOL_VERSION) throw new IllegalArgumentException("Network Protocol Version Is Invalid");
         if (!frame.context().networkId().equals(config.networkId()) || !frame.context().nodeId().equals(session.nodeId())) {
             throw new SecurityException("Network Frame Identity Does Not Match The Session");
         }
@@ -597,16 +790,18 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private void expireHeartbeats() {
+        List<WebSocket> expired = new ArrayList<>();
         synchronized (sessionMonitor) {
             long now = System.nanoTime();
             for (Map.Entry<String, WebSocket> entry : connectionsByNode.entrySet()) {
                 Session session = sessions.get(entry.getValue());
                 if (session != null && now - session.lastHeartbeat >= TimeUnit.MILLISECONDS.toNanos(config.heartbeatTimeoutMillis())) {
-                    entry.getValue().close(CloseFrame.GOING_AWAY, "Heartbeat Timeout");
                     onClose(entry.getValue(), CloseFrame.GOING_AWAY, "Heartbeat Timeout", false);
+                    expired.add(entry.getValue());
                 }
             }
         }
+        expired.forEach(connection -> connection.close(CloseFrame.GOING_AWAY, "Heartbeat Timeout"));
     }
 
     private Set<String> scopes(Set<String> capabilities) {
@@ -614,6 +809,9 @@ public class ReSyncVelocityHub extends WebSocketServer {
         scopes.add("node.heartbeat");
         if (capabilities.contains("presence")) {
             scopes.add("presence.write");
+        }
+        if (capabilities.contains("editors")) {
+            scopes.add("editors.open");
         }
         if (capabilities.contains("observe")) {
             scopes.add("presence.read");
@@ -642,6 +840,9 @@ public class ReSyncVelocityHub extends WebSocketServer {
             scopes.add("resources.read");
             scopes.add("resources.write");
         }
+        if (capabilities.contains("resources-read")) {
+            scopes.add("resources.read");
+        }
         if (capabilities.contains("transfer")) {
             scopes.add("players.route");
             scopes.add("state.reconcile");
@@ -663,7 +864,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
         if (!Set.of("inventory", "ender-chest").containsAll(families)) {
             throw new IllegalArgumentException("Only Item State Can Be Reconciled");
         }
-        store.listLeases(config.networkId()).thenCompose(leases -> {
+        submit(connection, session, "state.restore", () -> store.listLeases(config.networkId())).thenCompose(leases -> {
             if (leases.stream().anyMatch(lease -> !lease.pendingNodeId().isBlank())) {
                 return CompletableFuture.failedFuture(new IllegalStateException("A Player State Transfer Is Still Active"));
             }
@@ -671,14 +872,17 @@ public class ReSyncVelocityHub extends WebSocketServer {
             if (unavailableOwner != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Owner Backend " + unavailableOwner.ownerNodeId() + " Must Remain In The ReSync Realm"));
             }
-            List<CompletableFuture<Void>> reconciliations = request.nodeIds().stream().sorted().map(nodeId -> reconcileNode(request.transitionId(), nodeId, families, leases)).toList();
-            return CompletableFuture.allOf(reconciliations.toArray(new CompletableFuture[0]));
+            String detail = String.join(",", families);
+            return submit(connection, session, "state.restore", () -> store.appendAudit(config.networkId(), session.nodeId(), "state.reconcile.requested", request.transitionId(), detail, Instant.now().toEpochMilli())).thenCompose(unused -> {
+                List<CompletableFuture<Void>> reconciliations = request.nodeIds().stream().sorted().map(nodeId -> reconcileNode(request.transitionId(), nodeId, families, leases)).toList();
+                return CompletableFuture.allOf(reconciliations.toArray(new CompletableFuture[0]));
+            });
         }).thenCompose(unused -> store.appendAudit(config.networkId(), session.nodeId(), "state.reconciled", request.transitionId(), String.join(",", families), Instant.now().toEpochMilli())).whenComplete((unused, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.STATE, frame.context().requestId(), new byte[0], sessionScopes(session));
+            send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.STATE, frame.context().requestId(), new byte[0], Set.of("state.restore"));
         });
     }
 
@@ -697,19 +901,36 @@ public class ReSyncVelocityHub extends WebSocketServer {
         for (int start = 0; start < players.size(); start += RECONCILIATION_BATCH_SIZE) {
             int end = Math.min(players.size(), start + RECONCILIATION_BATCH_SIZE);
             Set<UUID> batch = Set.copyOf(players.subList(start, end));
-            batches = batches.thenCompose(unused -> reconcileBatch(target, nodeId, transitionId, batch, families));
+            batches = batches.thenCompose(unused -> reconcileBatch(target, targetSession, transitionId, batch, families));
         }
         return batches;
     }
 
-    private CompletableFuture<Void> reconcileBatch(WebSocket target, String nodeId, String transitionId, Set<UUID> players, Set<String> families) {
+    private CompletableFuture<Void> reconcileBatch(WebSocket target, Session session, String transitionId, Set<UUID> players, Set<String> families) {
         String requestId = "reconcile-" + lifecycleOrder.incrementAndGet();
         CompletableFuture<Void> result = new CompletableFuture<>();
-        PendingReconciliation pending = new PendingReconciliation(nodeId, result);
-        pendingReconciliations.put(requestId, pending);
+        PendingReconciliation pending = new PendingReconciliation(session, result);
+        byte[] payload = NetworkStateReconciliationCodec.encodeTask(new NetworkStateReconciliationTask(transitionId, players, families));
+        boolean sent;
+        synchronized (sessionMonitor) {
+            if (!isActiveSession(target, session) || !sessionScopes(session).contains("state.reconcile")) {
+                sent = false;
+            } else {
+                pendingReconciliations.put(requestId, pending);
+                sent = send(target, session, NetworkFrameType.STATE_RECONCILE, NetworkChannels.STATE, requestId, payload, Set.of("state.reconcile"));
+            }
+        }
         result.orTimeout(120, TimeUnit.SECONDS).whenComplete((unused, throwable) -> pendingReconciliations.remove(requestId, pending));
-        send(target, NetworkFrameType.STATE_RECONCILE, NetworkChannels.STATE, requestId, NetworkStateReconciliationCodec.encodeTask(new NetworkStateReconciliationTask(transitionId, players, families)), Set.of("state.reconcile"));
+        if (!sent) result.completeExceptionally(new IllegalStateException("ReSync Backend Is No Longer Available For State Reconciliation"));
         return result;
+    }
+
+    private void failReconciliations(Session session, String reason) {
+        pendingReconciliations.forEach((requestId, pending) -> {
+            if (pending.session() == session && pendingReconciliations.remove(requestId, pending)) {
+                pending.result().completeExceptionally(new IllegalStateException(reason));
+            }
+        });
     }
 
     private void requireScope(Session session, String scope) {
@@ -718,59 +939,86 @@ public class ReSyncVelocityHub extends WebSocketServer {
         }
     }
 
+    private void requireSession(WebSocket connection, Session session, String scope) {
+        if (!isActiveSession(connection, session)) throw new SecurityException("Network Session Is No Longer Active");
+        requireScope(session, scope);
+    }
+
+    private <T> CompletableFuture<T> submit(WebSocket connection, Session session, String scope, Supplier<CompletableFuture<T>> operation) {
+        synchronized (sessionMonitor) {
+            try {
+                requireSession(connection, session, scope);
+                return operation.get();
+            } catch (RuntimeException exception) {
+                return CompletableFuture.failedFuture(exception);
+            }
+        }
+    }
+
     private Set<String> sessionScopes(Session session) {
-        VelocityNetworkConfig.EnrollmentNode node = enrollmentNodes.get(session.nodeId());
-        return node == null ? session.scopes() : scopes(node.capabilities());
+        NodeAccess access = nodeAccess.get(session.nodeId());
+        return access == null ? Set.of() : access.scopes();
+    }
+
+    private Map<String, NodeAccess> access(Map<String, VelocityNetworkConfig.EnrollmentNode> nodes) {
+        Map<String, NodeAccess> next = new LinkedHashMap<>();
+        nodes.forEach((id, node) -> {
+            NodeAccess previous = nodeAccess.get(id);
+            Set<String> granted = previous != null && previous.node().capabilities().equals(node.capabilities())
+                ? previous.scopes() : scopes(node.capabilities());
+            next.put(id, new NodeAccess(node, granted));
+        });
+        return Map.copyOf(next);
     }
 
     private void variableGet(WebSocket connection, Session session, NetworkFrame frame) {
         requireScope(session, "variables.read");
         NetworkVariableQuery query = NetworkVariableCodec.decodeQuery(frame.payload());
-        store.getVariable(config.networkId(), query.scope(), query.scopeId(), query.key(), Instant.now().toEpochMilli()).whenComplete((variable, throwable) -> {
+        submit(connection, session, "variables.read", () -> store.getVariable(config.networkId(), query.scope(), query.scopeId(), query.key(), Instant.now().toEpochMilli())).whenComplete((variable, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
             byte[] payload = variable.map(NetworkVariableCodec::encodeVariable).orElseGet(() -> new byte[0]);
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.VARIABLES, frame.context().requestId(), payload, sessionScopes(session));
+            send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.VARIABLES, frame.context().requestId(), payload, Set.of("variables.read"));
         });
     }
 
     private void resourceGet(WebSocket connection, Session session, NetworkFrame frame) {
         requireScope(session, "resources.read");
         NetworkResourceKey key = NetworkResourceCodec.decodeKey(frame.payload());
-        store.getResource(config.networkId(), key.type(), key.resourceId()).whenComplete((resource, throwable) -> {
+        submit(connection, session, "resources.read", () -> store.getResource(config.networkId(), key.type(), key.resourceId())).whenComplete((resource, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
             byte[] payload = resource.map(NetworkResourceCodec::encodeResource).orElseGet(() -> new byte[0]);
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), payload, sessionScopes(session));
+            send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), payload, Set.of("resources.read"));
         });
     }
 
     private void resourceList(WebSocket connection, Session session, NetworkFrame frame) {
         requireScope(session, "resources.read");
         NetworkResourceQuery query = NetworkResourceCodec.decodeQuery(frame.payload());
-        store.listResources(config.networkId(), query).whenComplete((page, throwable) -> {
+        submit(connection, session, "resources.read", () -> store.listResources(config.networkId(), query)).whenComplete((page, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), NetworkResourceCodec.encodePage(page), sessionScopes(session));
+            send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), NetworkResourceCodec.encodePage(page), Set.of("resources.read"));
         });
     }
 
     private void resourceSet(WebSocket connection, Session session, NetworkFrame frame) {
         requireScope(session, "resources.write");
         NetworkResourceMutation mutation = NetworkResourceCodec.decodeMutation(frame.payload());
-        store.compareAndSetResource(config.networkId(), session.nodeId(), mutation, Instant.now().toEpochMilli()).whenComplete((resource, throwable) -> {
+        submit(connection, session, "resources.write", () -> store.compareAndSetResource(config.networkId(), session.nodeId(), mutation, Instant.now().toEpochMilli())).whenComplete((resource, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
             byte[] payload = NetworkResourceCodec.encodeResource(resource);
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), payload, sessionScopes(session));
+            send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), payload, Set.of("resources.write"));
             resourceListeners.forEach(listener -> {
                 try {
                     listener.accept(resource);
@@ -786,7 +1034,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
         byte[] payload = NetworkResourceCodec.encodeResource(resource);
         sessions.forEach((connection, session) -> {
             if (!session.nodeId().equals(sourceNodeId) && sessionScopes(session).contains("resources.read")) {
-                send(connection, NetworkFrameType.RESOURCE_CHANGED, NetworkChannels.RESOURCES, "resource-" + resource.type() + "-" + resource.revision(), payload, Set.of("resources.read"));
+                send(connection, session, NetworkFrameType.RESOURCE_CHANGED, NetworkChannels.RESOURCES, "resource-" + resource.type() + "-" + resource.revision(), payload, Set.of("resources.read"));
             }
         });
     }
@@ -799,13 +1047,13 @@ public class ReSyncVelocityHub extends WebSocketServer {
             throw new IllegalArgumentException("Network Variable Expiry Must Be In The Future");
         }
         NetworkVariable desired = new NetworkVariable(config.networkId(), mutation.scope(), mutation.scopeId(), mutation.key(), mutation.type(), mutation.value(), mutation.expectedRevision(), mutation.expiresAt(), session.nodeId(), now);
-        store.compareAndSetVariable(desired, mutation.expectedRevision()).whenComplete((stored, throwable) -> {
+        submit(connection, session, "variables.write", () -> store.compareAndSetVariable(desired, mutation.expectedRevision())).whenComplete((stored, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
             byte[] payload = NetworkVariableCodec.encodeVariable(stored);
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.VARIABLES, frame.context().requestId(), payload, sessionScopes(session));
+            send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.VARIABLES, frame.context().requestId(), payload, Set.of("variables.write"));
             publishVariable(stored);
         });
     }
@@ -814,7 +1062,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
         byte[] payload = NetworkVariableCodec.encodeVariable(variable);
         sessions.forEach((connection, session) -> {
             if (sessionScopes(session).contains("variables.read")) {
-                send(connection, NetworkFrameType.VARIABLE_CHANGED, NetworkChannels.VARIABLES, "variable-change-" + variable.revision(), payload, Set.of("variables.read"));
+                send(connection, session, NetworkFrameType.VARIABLE_CHANGED, NetworkChannels.VARIABLES, "variable-change-" + variable.revision(), payload, Set.of("variables.read"));
             }
         });
     }
@@ -827,12 +1075,12 @@ public class ReSyncVelocityHub extends WebSocketServer {
             throw new IllegalArgumentException("Network Event Expiry Must Be Within Seven Days");
         }
         NetworkEvent event = new NetworkEvent(request.eventId(), config.networkId(), request.channel(), request.subject(), request.payload(), session.nodeId(), request.createdAt(), request.expiresAt());
-        events.publish(event, now).whenComplete((stored, throwable) -> {
+        submit(connection, session, "events.publish", () -> events.publish(event, now)).whenComplete((stored, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.EVENTS, frame.context().requestId(), NetworkEventCodec.encodeEvent(stored), sessionScopes(session));
+            send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.EVENTS, frame.context().requestId(), NetworkEventCodec.encodeEvent(stored), Set.of("events.publish"));
             events.deliverAll();
         });
     }
@@ -851,16 +1099,22 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private void eventAcknowledge(WebSocket connection, Session session, NetworkFrame frame) {
-        requireScope(session, "events.consume");
-        String eventId = NetworkEventCodec.decodeAcknowledgement(frame.payload());
-        events.acknowledge(eventId, session.nodeId(), Instant.now().toEpochMilli()).whenComplete((unused, throwable) -> {
-            if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
-                return;
-            }
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.EVENTS, frame.context().requestId(), new byte[0], sessionScopes(session));
-            events.deliver(session.nodeId());
-        });
+        synchronized (sessionMonitor) {
+            if (!isActiveSession(connection, session)) return;
+            requireScope(session, "events.consume");
+            String eventId = NetworkEventCodec.decodeAcknowledgement(frame.payload());
+            events.acknowledge(eventId, session.delivery, Instant.now().toEpochMilli()).whenComplete((unused, throwable) -> {
+                synchronized (sessionMonitor) {
+                    if (!isActiveSession(connection, session)) return;
+                    if (throwable != null) {
+                        sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
+                        return;
+                    }
+                    send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.EVENTS, frame.context().requestId(), new byte[0], Set.of("events.consume"));
+                    events.deliver(session.nodeId());
+                }
+            });
+        }
     }
 
     private void ownerSnapshot(WebSocket connection, Session session, NetworkFrame frame) {
@@ -870,41 +1124,39 @@ public class ReSyncVelocityHub extends WebSocketServer {
             throw new SecurityException("Owned Snapshot Identity Does Not Match The Session");
         }
         String realm = chunk.family().contains("/") ? chunk.family().substring(0, chunk.family().indexOf('/')) : chunk.family();
-        if (!stateRealms(session.nodeId()).contains(realm)) {
-            throw new SecurityException("Owned Snapshot Realm Does Not Match The Session");
-        }
-        store.getLease(config.networkId(), chunk.playerId()).whenComplete((stored, throwable) -> {
+        submit(connection, session, "state.transfer", () -> store.getLease(config.networkId(), chunk.playerId())).whenComplete((stored, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
             PlayerLease lease = stored.orElse(null);
             if (lease == null || !lease.ownerNodeId().equals(session.nodeId()) || !lease.pendingNodeId().isBlank() || lease.fenceEpoch() != chunk.fenceEpoch()) {
-                sendError(connection, frame.context().requestId(), "Snapshot Writer Does Not Own The Current Fence");
+                sendError(connection, session, frame.context().requestId(), "Snapshot Writer Does Not Own The Current Fence");
                 return;
             }
             try {
-                if (!isActiveSession(connection, session)) {
-                    return;
+                SnapshotUploadRegistry.OwnerUpload assembly;
+                boolean complete;
+                boolean commit;
+                synchronized (sessionMonitor) {
+                    requireSession(connection, session, "state.transfer");
+                    if (!stateRealms(session.nodeId()).contains(realm)) throw new SecurityException("Owned Snapshot Realm Does Not Match The Session");
+                    assembly = snapshotUploads.ownerUpload(chunk.snapshotId(), session, chunk, Instant.now().toEpochMilli());
+                    complete = assembly.add(chunk);
+                    commit = complete && assembly.claimCommit();
                 }
-                SnapshotUploadRegistry.OwnerUpload assembly = snapshotUploads.ownerUpload(chunk.snapshotId(), session, chunk, Instant.now().toEpochMilli());
-                if (!isActiveSession(connection, session)) {
-                    snapshotUploads.discardOwner(chunk.snapshotId(), assembly, "Network Session Closed");
-                    throw new IllegalStateException("Network Session Is No Longer Active");
-                }
-                boolean complete = assembly.add(chunk);
                 if (!complete) {
-                    send(connection, NetworkFrameType.OWNER_SNAPSHOT, NetworkChannels.STATE, frame.context().requestId(), NetworkOwnershipCodec.encode(lease), sessionScopes(session));
+                    send(connection, session, NetworkFrameType.OWNER_SNAPSHOT, NetworkChannels.STATE, frame.context().requestId(), NetworkOwnershipCodec.encode(lease), Set.of("state.transfer"));
                     return;
                 }
                 assembly.result().whenComplete((savedLease, failure) -> {
                     if (failure != null) {
-                        sendError(connection, frame.context().requestId(), rootMessage(failure));
+                        sendError(connection, session, frame.context().requestId(), rootMessage(failure));
                     } else {
-                        send(connection, NetworkFrameType.OWNER_SNAPSHOT, NetworkChannels.STATE, frame.context().requestId(), NetworkOwnershipCodec.encode(savedLease), sessionScopes(session));
+                        send(connection, session, NetworkFrameType.OWNER_SNAPSHOT, NetworkChannels.STATE, frame.context().requestId(), NetworkOwnershipCodec.encode(savedLease), Set.of("state.transfer"));
                     }
                 });
-                if (assembly.claimCommit()) {
+                if (commit) {
                     PlayerStateSnapshot snapshot;
                     try {
                         snapshot = NetworkTransferCodec.assemble(assembly.chunks());
@@ -913,7 +1165,10 @@ public class ReSyncVelocityHub extends WebSocketServer {
                         snapshotUploads.removeOwner(chunk.snapshotId(), assembly);
                         return;
                     }
-                    store.saveOwnerSnapshot(snapshot).thenCompose(saved -> store.getLease(config.networkId(), saved.playerId()).thenApply(current -> current.orElseThrow(() -> new IllegalStateException("Player Ownership Is Missing After Snapshot Save")))).whenComplete((savedLease, failure) -> {
+                    submit(connection, session, "state.transfer", () -> {
+                        if (!stateRealms(session.nodeId()).contains(realm)) throw new SecurityException("Owned Snapshot Realm Does Not Match The Session");
+                        return store.saveOwnerSnapshot(snapshot);
+                    }).thenCompose(saved -> store.getLease(config.networkId(), saved.playerId()).thenApply(current -> current.orElseThrow(() -> new IllegalStateException("Player Ownership Is Missing After Snapshot Save")))).whenComplete((savedLease, failure) -> {
                         if (failure != null) {
                             assembly.fail(failure);
                         } else {
@@ -923,66 +1178,71 @@ public class ReSyncVelocityHub extends WebSocketServer {
                     });
                 }
             } catch (RuntimeException exception) {
-                sendError(connection, frame.context().requestId(), rootMessage(exception));
+                sendError(connection, session, frame.context().requestId(), rootMessage(exception));
             }
         });
     }
 
     private boolean isActiveSession(WebSocket connection, Session session) {
-        return connection.isOpen() && sessions.get(connection) == session && connectionsByNode.get(session.nodeId()) == connection;
+        SocketOutput output = outputs.get(connection);
+        return !stopping.get() && connection.isOpen() && output != null && !output.full && sessions.get(connection) == session && connectionsByNode.get(session.nodeId()) == connection;
     }
 
     private Session removeSession(WebSocket connection, String reason) {
-        Session session = sessions.remove(connection);
-        if (session != null) {
-            snapshotUploads.discardOwners(session, reason);
-            events.remove(session.nodeId());
+        synchronized (sessionMonitor) {
+            Session session = sessions.remove(connection);
+            if (session != null) {
+                editors.remove(session, reason);
+                snapshotUploads.discardOwners(session, reason);
+                events.remove(session.delivery);
+                failReconciliations(session, "ReSync Backend Disconnected During State Reconciliation");
+            }
+            return session;
         }
-        return session;
     }
 
     private void snapshotList(WebSocket connection, Session session, NetworkFrame frame) {
         requireScope(session, "state.inspect");
         NetworkSnapshotQuery query = NetworkSnapshotAdminCodec.decodeQuery(frame.payload());
-        store.listSnapshots(config.networkId(), query.playerId(), query.offset(), query.limit()).whenComplete((snapshots, throwable) -> {
+        submit(connection, session, "state.inspect", () -> store.listSnapshots(config.networkId(), query.playerId(), query.offset(), query.limit())).whenComplete((snapshots, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
             List<NetworkSnapshotMetadata> metadata = snapshots.stream().map(NetworkSnapshotMetadata::from).toList();
-            send(connection, NetworkFrameType.SNAPSHOT_LIST, NetworkChannels.STATE, frame.context().requestId(), NetworkSnapshotAdminCodec.encodeList(metadata), sessionScopes(session));
+            send(connection, session, NetworkFrameType.SNAPSHOT_LIST, NetworkChannels.STATE, frame.context().requestId(), NetworkSnapshotAdminCodec.encodeList(metadata), Set.of("state.inspect"));
         });
     }
 
     private void snapshotRead(WebSocket connection, Session session, NetworkFrame frame) {
         requireScope(session, "state.inspect");
         String snapshotId = NetworkSnapshotAdminCodec.decodeReference(frame.payload());
-        store.getSnapshot(snapshotId).whenComplete((stored, throwable) -> {
+        submit(connection, session, "state.inspect", () -> store.getSnapshot(snapshotId)).whenComplete((stored, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
             PlayerStateSnapshot snapshot = stored.filter(value -> value.networkId().equals(config.networkId())).orElse(null);
             if (snapshot == null) {
-                sendError(connection, frame.context().requestId(), "Player Snapshot Does Not Exist");
+                sendError(connection, session, frame.context().requestId(), "Player Snapshot Does Not Exist");
                 return;
             }
-            send(connection, NetworkFrameType.SNAPSHOT_READ, NetworkChannels.STATE, frame.context().requestId(), NetworkSnapshotAdminCodec.encodeMetadata(NetworkSnapshotMetadata.from(snapshot)), sessionScopes(session));
+            send(connection, session, NetworkFrameType.SNAPSHOT_READ, NetworkChannels.STATE, frame.context().requestId(), NetworkSnapshotAdminCodec.encodeMetadata(NetworkSnapshotMetadata.from(snapshot)), Set.of("state.inspect"));
         });
     }
 
     private void snapshotPin(WebSocket connection, Session session, NetworkFrame frame) {
         requireScope(session, "state.restore");
         NetworkSnapshotPin pin = NetworkSnapshotAdminCodec.decodePin(frame.payload());
-        store.getSnapshot(pin.snapshotId()).thenCompose(stored -> {
+        submit(connection, session, "state.restore", () -> store.getSnapshot(pin.snapshotId())).thenCompose(stored -> {
             PlayerStateSnapshot snapshot = stored.filter(value -> value.networkId().equals(config.networkId())).orElseThrow(() -> new IllegalStateException("Player Snapshot Does Not Exist"));
-            return store.pinSnapshot(snapshot.snapshotId(), pin.pinned()).thenCompose(unused -> store.appendAudit(config.networkId(), session.nodeId(), pin.pinned() ? "snapshot.pinned" : "snapshot.unpinned", snapshot.snapshotId(), snapshot.payloadHash(), Instant.now().toEpochMilli())).thenCompose(unused -> store.getSnapshot(snapshot.snapshotId())).thenApply(updated -> updated.orElseThrow(() -> new IllegalStateException("Player Snapshot Does Not Exist")));
+            return submit(connection, session, "state.restore", () -> store.pinSnapshot(snapshot.snapshotId(), pin.pinned())).thenCompose(unused -> store.appendAudit(config.networkId(), session.nodeId(), pin.pinned() ? "snapshot.pinned" : "snapshot.unpinned", snapshot.snapshotId(), snapshot.payloadHash(), Instant.now().toEpochMilli())).thenCompose(unused -> store.getSnapshot(snapshot.snapshotId())).thenApply(updated -> updated.orElseThrow(() -> new IllegalStateException("Player Snapshot Does Not Exist")));
         }).whenComplete((snapshot, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
-            send(connection, NetworkFrameType.SNAPSHOT_PIN, NetworkChannels.STATE, frame.context().requestId(), NetworkSnapshotAdminCodec.encodeMetadata(NetworkSnapshotMetadata.from(snapshot)), sessionScopes(session));
+            send(connection, session, NetworkFrameType.SNAPSHOT_PIN, NetworkChannels.STATE, frame.context().requestId(), NetworkSnapshotAdminCodec.encodeMetadata(NetworkSnapshotMetadata.from(snapshot)), Set.of("state.restore"));
         });
     }
 
@@ -995,7 +1255,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
         }
         requireTransferNode(request.targetNodeId(), "Restore Target");
         requireStateTransferSession(request.targetNodeId(), "Restore Target");
-        store.getSnapshot(request.snapshotId()).thenCompose(stored -> {
+        submit(connection, session, "state.restore", () -> store.getSnapshot(request.snapshotId())).thenCompose(stored -> {
             PlayerStateSnapshot source = stored.filter(value -> value.networkId().equals(config.networkId())).orElseThrow(() -> new IllegalStateException("Player Snapshot Does Not Exist"));
             if (proxyServer.getPlayer(source.playerId()).isPresent()) {
                 throw new IllegalStateException("Player Must Be Offline Before Snapshot Restore");
@@ -1005,7 +1265,12 @@ public class ReSyncVelocityHub extends WebSocketServer {
                 throw new IllegalStateException("Restore Target Does Not Share The Snapshot Realm");
             }
             String transferId = UUID.randomUUID().toString();
-            return store.beginRestore(transferId, config.networkId(), source.playerId(), request.targetNodeId(), source.snapshotId(), request.deadline(), now).thenCompose(transfer -> store.getSnapshot(transfer.snapshotId()).thenCompose(restored -> {
+            return submit(connection, session, "state.restore", () -> {
+                requireTransferNode(request.targetNodeId(), "Restore Target");
+                requireStateTransferSession(request.targetNodeId(), "Restore Target");
+                if (!stateRealms(request.targetNodeId()).contains(realm)) throw new IllegalStateException("Restore Target Does Not Share The Snapshot Realm");
+                return store.beginRestore(transferId, config.networkId(), source.playerId(), request.targetNodeId(), source.snapshotId(), request.deadline(), Instant.now().toEpochMilli());
+            }).thenCompose(transfer -> store.getSnapshot(transfer.snapshotId()).thenCompose(restored -> {
                 PlayerStateSnapshot snapshot = restored.orElseThrow(() -> new IllegalStateException("Prepared Player Restore Snapshot Is Missing"));
                 CompletableFuture<PlayerTransfer> readiness = awaitTransferReady(transfer, request.deadline());
                 deliverSnapshot(transfer, snapshot);
@@ -1013,10 +1278,10 @@ public class ReSyncVelocityHub extends WebSocketServer {
             })).thenCompose(ready -> store.appendAudit(config.networkId(), session.nodeId(), "snapshot.restore.ready", ready.transferId(), source.snapshotId(), Instant.now().toEpochMilli()).thenApply(unused -> ready));
         }).whenComplete((transfer, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
-            send(connection, NetworkFrameType.SNAPSHOT_RESTORE, NetworkChannels.STATE, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), sessionScopes(session));
+            send(connection, session, NetworkFrameType.SNAPSHOT_RESTORE, NetworkChannels.STATE, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), Set.of("state.restore"));
         });
     }
 
@@ -1040,12 +1305,19 @@ public class ReSyncVelocityHub extends WebSocketServer {
         if (current == null || !current.nodeId().equals(intent.sourceNodeId())) {
             throw new SecurityException("Transfer Source Does Not Own The Connected Player");
         }
-        store.beginTransfer(intent.transferId(), config.networkId(), intent.playerId(), intent.sourceNodeId(), intent.targetNodeId(), intent.deadline(), now).thenCompose(transfer -> store.appendAudit(config.networkId(), session.nodeId(), "transfer.intent", transfer.transferId(), NetworkPayloads.sha256(frame.payload()), now).thenApply(unused -> transfer)).whenComplete((transfer, throwable) -> {
+        String hash = NetworkPayloads.sha256(frame.payload());
+        submit(connection, session, "state.transfer", () -> {
+            requireTransferNode(intent.sourceNodeId(), "Source");
+            requireTransferNode(intent.targetNodeId(), "Target");
+            requireStateTransferSession(intent.targetNodeId(), "Target");
+            requireSharedStateRealm(intent.sourceNodeId(), intent.targetNodeId());
+            return store.beginTransfer(intent.transferId(), config.networkId(), intent.playerId(), intent.sourceNodeId(), intent.targetNodeId(), intent.deadline(), Instant.now().toEpochMilli());
+        }).thenCompose(transfer -> store.appendAudit(config.networkId(), session.nodeId(), "transfer.intent", transfer.transferId(), hash, now).thenApply(unused -> transfer)).whenComplete((transfer, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
-            send(connection, NetworkFrameType.LEASE_GRANTED, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), sessionScopes(session));
+            send(connection, session, NetworkFrameType.LEASE_GRANTED, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), Set.of("state.transfer"));
         });
     }
 
@@ -1055,40 +1327,47 @@ public class ReSyncVelocityHub extends WebSocketServer {
         if (!chunk.networkId().equals(config.networkId()) || !chunk.originNodeId().equals(session.nodeId())) {
             throw new SecurityException("Snapshot Identity Does Not Match The Session");
         }
-        store.getTransfer(chunk.transferId()).whenComplete((stored, throwable) -> {
+        submit(connection, session, "state.transfer", () -> store.getTransfer(chunk.transferId())).whenComplete((stored, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
             PlayerTransfer transfer = stored.orElse(null);
             if (transfer == null) {
-                sendError(connection, frame.context().requestId(), "Player Transfer Does Not Exist");
+                sendError(connection, session, frame.context().requestId(), "Player Transfer Does Not Exist");
                 return;
             }
             try {
-                requireTransferSource(session, transfer);
-                requireSnapshotTransfer(chunk, transfer);
-                if (transfer.status().ordinal() >= NetworkTransferStatus.SNAPSHOT_COMMITTED.ordinal()) {
-                    if (!transfer.snapshotId().equals(chunk.snapshotId())) {
-                        throw new IllegalStateException("Transfer Already Uses A Different Snapshot");
+                SnapshotUploadRegistry.TransferUpload assembly;
+                boolean complete;
+                boolean commit;
+                synchronized (sessionMonitor) {
+                    requireSession(connection, session, "state.transfer");
+                    requireTransferSource(session, transfer);
+                    requireSnapshotTransfer(chunk, transfer);
+                    if (transfer.status().ordinal() >= NetworkTransferStatus.SNAPSHOT_COMMITTED.ordinal()) {
+                        if (!transfer.snapshotId().equals(chunk.snapshotId())) throw new IllegalStateException("Transfer Already Uses A Different Snapshot");
+                        assembly = null;
+                        complete = false;
+                        commit = false;
+                    } else {
+                        assembly = snapshotUploads.transferUpload(chunk, Instant.now().toEpochMilli());
+                        complete = assembly.add(chunk);
+                        commit = complete && assembly.claimCommit();
                     }
-                    send(connection, NetworkFrameType.SNAPSHOT_COMMIT, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), sessionScopes(session));
-                    return;
                 }
-                SnapshotUploadRegistry.TransferUpload assembly = snapshotUploads.transferUpload(chunk, Instant.now().toEpochMilli());
-                boolean complete = assembly.add(chunk);
                 if (!complete) {
-                    send(connection, NetworkFrameType.SNAPSHOT_COMMIT, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), sessionScopes(session));
+                    send(connection, session, NetworkFrameType.SNAPSHOT_COMMIT, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), Set.of("state.transfer"));
                     return;
                 }
                 assembly.result().whenComplete((committed, failure) -> {
                     if (failure != null) {
-                        sendError(connection, frame.context().requestId(), rootMessage(failure));
+                        sendError(connection, session, frame.context().requestId(), rootMessage(failure));
                     } else {
-                        send(connection, NetworkFrameType.SNAPSHOT_COMMIT, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(committed), sessionScopes(session));
+                        send(connection, session, NetworkFrameType.SNAPSHOT_COMMIT, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(committed), Set.of("state.transfer"));
                     }
                 });
-                if (assembly.claimCommit()) {
+                if (commit) {
                     PlayerStateSnapshot snapshot;
                     try {
                         snapshot = NetworkTransferCodec.assemble(assembly.chunks());
@@ -1097,10 +1376,15 @@ public class ReSyncVelocityHub extends WebSocketServer {
                         snapshotUploads.removeTransfer(transfer.transferId(), assembly);
                         return;
                     }
-                    store.commitSnapshot(transfer.transferId(), snapshot).whenComplete((committedSnapshot, failure) -> {
+                    submit(connection, session, "state.transfer", () -> {
+                        requireTransferSource(session, transfer);
+                        requireSnapshotTransfer(chunk, transfer);
+                        return store.commitSnapshot(transfer.transferId(), snapshot);
+                    }).whenComplete((committedSnapshot, failure) -> {
                         if (failure != null) {
                             assembly.fail(failure);
                             snapshotUploads.removeTransfer(transfer.transferId(), assembly);
+                            settleExpiry(failure);
                             return;
                         }
                         store.getTransfer(transfer.transferId()).whenComplete((advanced, readFailure) -> {
@@ -1116,7 +1400,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
                     });
                 }
             } catch (RuntimeException exception) {
-                sendError(connection, frame.context().requestId(), rootMessage(exception));
+                sendError(connection, session, frame.context().requestId(), rootMessage(exception));
             }
         });
     }
@@ -1124,18 +1408,21 @@ public class ReSyncVelocityHub extends WebSocketServer {
     private void targetReady(WebSocket connection, Session session, NetworkFrame frame) {
         requireScope(session, "state.transfer");
         NetworkTransferCheckpoint checkpoint = NetworkTransferCodec.decodeCheckpoint(frame.payload());
-        store.getTransfer(checkpoint.transferId()).thenCompose(stored -> {
+        submit(connection, session, "state.transfer", () -> store.getTransfer(checkpoint.transferId())).thenCompose(stored -> {
             PlayerTransfer transfer = stored.orElseThrow(() -> new IllegalStateException("Player Transfer Does Not Exist"));
-            requireTransferTarget(session, transfer);
-            if (!checkpoint.snapshotId().isBlank() && !checkpoint.snapshotId().equals(transfer.snapshotId())) {
-                throw new IllegalStateException("Ready Snapshot Does Not Match The Transfer");
-            }
-            return store.markTargetReady(transfer.transferId(), Instant.now().toEpochMilli());
+            return submit(connection, session, "state.transfer", () -> {
+                requireTransferTarget(session, transfer);
+                if (!checkpoint.snapshotId().isBlank() && !checkpoint.snapshotId().equals(transfer.snapshotId())) {
+                    throw new IllegalStateException("Ready Snapshot Does Not Match The Transfer");
+                }
+                return store.markTargetReady(transfer.transferId(), Instant.now().toEpochMilli());
+            });
         }).whenComplete((transfer, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
+                settleExpiry(throwable);
             } else {
-                send(connection, NetworkFrameType.TARGET_READY, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), sessionScopes(session));
+                send(connection, session, NetworkFrameType.TARGET_READY, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), Set.of("state.transfer"));
                 notifyTransfer(transfer.sourceNodeId(), NetworkFrameType.TARGET_READY, transfer);
                 CompletableFuture<PlayerTransfer> readiness = transferReadiness.remove(transfer.transferId());
                 if (readiness != null) {
@@ -1252,7 +1539,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
         WebSocket connection = connectionsByNode.get(nodeId);
         Session session = connection == null ? null : sessions.get(connection);
         if (connection != null && session != null && sessionScopes(session).contains("state.transfer")) {
-            send(connection, NetworkFrameType.OWNER_CLAIM, NetworkChannels.STATE, "ownership-" + lease.playerId(), NetworkOwnershipCodec.encode(lease), Set.of("state.transfer"));
+            send(connection, session, NetworkFrameType.OWNER_CLAIM, NetworkChannels.STATE, "ownership-" + lease.playerId(), NetworkOwnershipCodec.encode(lease), Set.of("state.transfer"));
         }
     }
 
@@ -1320,6 +1607,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
                 return;
             }
             store.markConnected(transfer.transferId(), now).thenAccept(connected -> notifyTransfer(connected.targetNodeId(), NetworkFrameType.PLAYER_CONNECTED, connected)).exceptionally(throwable -> {
+                settleExpiry(throwable);
                 logger.warn("Failed to mark player transfer {} connected", transfer.transferId(), throwable);
                 return null;
             });
@@ -1355,17 +1643,19 @@ public class ReSyncVelocityHub extends WebSocketServer {
     private void stateApplied(WebSocket connection, Session session, NetworkFrame frame) {
         requireScope(session, "state.transfer");
         NetworkTransferCheckpoint checkpoint = NetworkTransferCodec.decodeCheckpoint(frame.payload());
-        long now = Instant.now().toEpochMilli();
-        store.getTransfer(checkpoint.transferId()).thenCompose(stored -> {
+        submit(connection, session, "state.transfer", () -> store.getTransfer(checkpoint.transferId())).thenCompose(stored -> {
             PlayerTransfer transfer = stored.orElseThrow(() -> new IllegalStateException("Player Transfer Does Not Exist"));
-            requireTransferTarget(session, transfer);
-            return store.acknowledgeApplied(transfer.transferId(), checkpoint.snapshotId(), now);
+            return submit(connection, session, "state.transfer", () -> {
+                requireTransferTarget(session, transfer);
+                return store.acknowledgeApplied(transfer.transferId(), checkpoint.snapshotId(), Instant.now().toEpochMilli());
+            });
         }).thenCompose(applied -> store.commitTransfer(applied.transferId(), Instant.now().toEpochMilli())).whenComplete((transfer, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
+                settleExpiry(throwable);
                 return;
             }
-            send(connection, NetworkFrameType.TRANSFER_COMMIT, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), sessionScopes(session));
+            send(connection, session, NetworkFrameType.TRANSFER_COMMIT, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), Set.of("state.transfer"));
             notifyTransfer(transfer.sourceNodeId(), NetworkFrameType.TRANSFER_COMMIT, transfer);
             if (!transfer.targetNodeId().equals(session.nodeId())) {
                 notifyTransfer(transfer.targetNodeId(), NetworkFrameType.TRANSFER_COMMIT, transfer);
@@ -1379,18 +1669,20 @@ public class ReSyncVelocityHub extends WebSocketServer {
         if (checkpoint.failure().isBlank()) {
             throw new IllegalArgumentException("Transfer Failure Is Required");
         }
-        store.getTransfer(checkpoint.transferId()).thenCompose(stored -> {
+        submit(connection, session, "state.transfer", () -> store.getTransfer(checkpoint.transferId())).thenCompose(stored -> {
             PlayerTransfer transfer = stored.orElseThrow(() -> new IllegalStateException("Player Transfer Does Not Exist"));
-            requireTransferMember(session, transfer);
-            return store.abortTransfer(transfer.transferId(), checkpoint.failure(), Instant.now().toEpochMilli());
+            return submit(connection, session, "state.transfer", () -> {
+                requireTransferMember(session, transfer);
+                return store.abortTransfer(transfer.transferId(), checkpoint.failure(), Instant.now().toEpochMilli());
+            });
         }).whenComplete((transfer, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
                 return;
             }
             snapshotUploads.removeTransfer(transfer.transferId());
             failReadiness(transfer);
-            send(connection, NetworkFrameType.TRANSFER_ABORT, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), sessionScopes(session));
+            send(connection, session, NetworkFrameType.TRANSFER_ABORT, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkTransferCodec.encodeTransfer(transfer), Set.of("state.transfer"));
             if (!transfer.sourceNodeId().equals(session.nodeId())) {
                 notifyTransfer(transfer.sourceNodeId(), NetworkFrameType.TRANSFER_ABORT, transfer);
             }
@@ -1401,6 +1693,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private void requireSnapshotTransfer(NetworkSnapshotChunk chunk, PlayerTransfer transfer) {
+        requireTransferDeadline(transfer);
         if (!chunk.playerId().equals(transfer.playerId()) || chunk.fenceEpoch() != transfer.fenceEpoch() || !chunk.originNodeId().equals(transfer.sourceNodeId())) {
             throw new SecurityException("Snapshot Does Not Match The Transfer Lease");
         }
@@ -1422,7 +1715,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
     private void requireStateTransferSession(String nodeId, String role) {
         WebSocket connection = connectionsByNode.get(nodeId);
         Session session = connection == null ? null : sessions.get(connection);
-        if (session == null || !sessionScopes(session).contains("state.transfer")) {
+        if (session == null || !isActiveSession(connection, session) || !sessionScopes(session).contains("state.transfer")) {
             throw new IllegalStateException("Transfer " + role + " State Agent Is Not Available");
         }
     }
@@ -1443,15 +1736,23 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private void requireTransferSource(Session session, PlayerTransfer transfer) {
+        requireTransferDeadline(transfer);
         if (!transfer.sourceNodeId().equals(session.nodeId())) {
             throw new SecurityException("Only The Transfer Source Can Commit Its Snapshot");
         }
     }
 
     private void requireTransferTarget(Session session, PlayerTransfer transfer) {
+        requireTransferDeadline(transfer);
         if (!transfer.targetNodeId().equals(session.nodeId())) {
             throw new SecurityException("Only The Transfer Target Can Advance This Checkpoint");
         }
+    }
+
+    private void requireTransferDeadline(PlayerTransfer transfer) {
+        if (transfer.status() == NetworkTransferStatus.COMMITTED) return;
+        if (transfer.status() == NetworkTransferStatus.ABORTED || transfer.status() == NetworkTransferStatus.TIMED_OUT) throw new IllegalStateException("Player Transfer Is Already Complete");
+        if (transfer.deadline() > 0 && transfer.deadline() <= Instant.now().toEpochMilli()) throw new IllegalStateException("Player Transfer Deadline Expired");
     }
 
     private void requireTransferMember(Session session, PlayerTransfer transfer) {
@@ -1461,18 +1762,24 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private void deliverSnapshot(PlayerTransfer transfer, PlayerStateSnapshot snapshot) {
+        if (transfer.status() == NetworkTransferStatus.COMMITTED) return;
+        requireTransferDeadline(transfer);
         notifyTransfer(transfer.targetNodeId(), NetworkFrameType.TRANSFER_RECOVER, transfer);
         deliverSnapshotToNode(transfer.targetNodeId(), transfer, snapshot);
     }
 
     private void deliverSnapshotToNode(String nodeId, PlayerTransfer transfer, PlayerStateSnapshot snapshot) {
+        if (transfer.status() == NetworkTransferStatus.COMMITTED) return;
+        requireTransferDeadline(transfer);
         WebSocket connection = connectionsByNode.get(nodeId);
         Session session = connection == null ? null : sessions.get(connection);
         if (connection == null || session == null || !sessionScopes(session).contains("state.transfer")) {
             return;
         }
         for (NetworkSnapshotChunk chunk : NetworkTransferCodec.split(transfer.transferId(), snapshot)) {
-            send(connection, NetworkFrameType.SNAPSHOT_COMMIT, NetworkChannels.TRANSFER, "snapshot-" + transfer.transferId() + "-" + chunk.chunkIndex(), NetworkTransferCodec.encodeChunk(chunk), Set.of("state.transfer"));
+            requireTransferDeadline(transfer);
+            if (!isActiveSession(connection, session)) return;
+            send(connection, session, NetworkFrameType.SNAPSHOT_COMMIT, NetworkChannels.TRANSFER, "snapshot-" + transfer.transferId() + "-" + chunk.chunkIndex(), NetworkTransferCodec.encodeChunk(chunk), Set.of("state.transfer"));
         }
     }
 
@@ -1480,7 +1787,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
         WebSocket connection = connectionsByNode.get(nodeId);
         Session session = connection == null ? null : sessions.get(connection);
         if (connection != null && session != null && sessionScopes(session).contains("state.transfer")) {
-            send(connection, type, NetworkChannels.TRANSFER, "transfer-" + transfer.transferId() + "-" + type.code(), NetworkTransferCodec.encodeTransfer(transfer), Set.of("state.transfer"));
+            send(connection, session, type, NetworkChannels.TRANSFER, "transfer-" + transfer.transferId() + "-" + type.code(), NetworkTransferCodec.encodeTransfer(transfer), Set.of("state.transfer"));
         }
     }
 
@@ -1491,9 +1798,22 @@ public class ReSyncVelocityHub extends WebSocketServer {
         }
     }
 
+    private void settleExpiry(Throwable failure) {
+        while ((failure instanceof CompletionException || failure instanceof ExecutionException) && failure.getCause() != null) {
+            failure = failure.getCause();
+        }
+        if (!(failure instanceof ExpiredTransfer expired)) return;
+        PlayerTransfer transfer = expired.transfer();
+        snapshotUploads.removeTransfer(transfer.transferId());
+        failReadiness(transfer);
+        notifyTransfer(transfer.sourceNodeId(), NetworkFrameType.TRANSFER_ABORT, transfer);
+        notifyTransfer(transfer.targetNodeId(), NetworkFrameType.TRANSFER_ABORT, transfer);
+    }
+
     private void recoverTransfers(String nodeId) {
         long now = Instant.now().toEpochMilli();
         store.recoverableTransfers(config.networkId(), now).thenAccept(transfers -> transfers.stream().filter(transfer -> transfer.deadline() > now && (transfer.sourceNodeId().equals(nodeId) || transfer.targetNodeId().equals(nodeId))).forEach(transfer -> reconcileTransferLocation(transfer).thenAccept(reconciled -> recoverTransfer(nodeId, reconciled)).exceptionally(throwable -> {
+            settleExpiry(throwable);
             logger.warn("Failed to reconcile player transfer {}", transfer.transferId(), throwable);
             return null;
         }))).exceptionally(throwable -> {
@@ -1533,6 +1853,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
                 notifyTransfer(committed.sourceNodeId(), NetworkFrameType.TRANSFER_COMMIT, committed);
                 notifyTransfer(committed.targetNodeId(), NetworkFrameType.TRANSFER_COMMIT, committed);
             }).exceptionally(throwable -> {
+                settleExpiry(throwable);
                 logger.warn("Failed to commit recovered player transfer {}", transfer.transferId(), throwable);
                 return null;
             });
@@ -1580,14 +1901,14 @@ public class ReSyncVelocityHub extends WebSocketServer {
         var player = proxyServer.getPlayer(request.playerId()).orElseThrow(() -> new IllegalStateException("Network Player Is Not Connected"));
         long now = Instant.now().toEpochMilli();
         NetworkRoute targetRoute = routes.route(request.routeName());
-        store.getActiveTransfer(config.networkId(), request.playerId(), now).whenComplete((active, transferFailure) -> {
+        submit(connection, session, "players.route", () -> store.getActiveTransfer(config.networkId(), request.playerId(), now)).whenComplete((active, transferFailure) -> {
             if (transferFailure != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(transferFailure));
+                sendError(connection, session, frame.context().requestId(), rootMessage(transferFailure));
                 return;
             }
             PlayerTransfer transfer = active.orElse(null);
             if (transfer != null && (!transfer.targetNodeId().equals(targetRoute.nodeId()) || transfer.status() != NetworkTransferStatus.TARGET_READY)) {
-                sendError(connection, frame.context().requestId(), "Player State Transfer Is Not Ready For This Route");
+                sendError(connection, session, frame.context().requestId(), "Player State Transfer Is Not Ready For This Route");
                 return;
             }
             connectPlayer(connection, session, frame, request, server, player, now);
@@ -1595,23 +1916,24 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private void connectPlayer(WebSocket connection, Session session, NetworkFrame frame, NetworkPlayerRoute request, RegisteredServer server, Player player, long now) {
-        store.appendAudit(config.networkId(), session.nodeId(), "player.route.requested", request.routeName(), NetworkPayloads.sha256(frame.payload()), now).whenComplete((unused, auditFailure) -> {
+        String hash = NetworkPayloads.sha256(frame.payload());
+        submit(connection, session, "players.route", () -> store.appendAudit(config.networkId(), session.nodeId(), "player.route.requested", request.routeName(), hash, now)).whenComplete((unused, auditFailure) -> {
             if (auditFailure != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(auditFailure));
+                sendError(connection, session, frame.context().requestId(), rootMessage(auditFailure));
                 return;
             }
             player.createConnectionRequest(server).connect().whenComplete((result, throwable) -> {
                 if (throwable != null) {
-                    store.appendAudit(config.networkId(), session.nodeId(), "player.route.failed", request.routeName(), throwable.getClass().getSimpleName(), Instant.now().toEpochMilli()).whenComplete((failedAudit, auditThrowable) -> sendError(connection, frame.context().requestId(), auditThrowable == null ? rootMessage(throwable) : rootMessage(auditThrowable)));
+                    store.appendAudit(config.networkId(), session.nodeId(), "player.route.failed", request.routeName(), throwable.getClass().getSimpleName(), Instant.now().toEpochMilli()).whenComplete((failedAudit, auditThrowable) -> sendError(connection, session, frame.context().requestId(), auditThrowable == null ? rootMessage(throwable) : rootMessage(auditThrowable)));
                     return;
                 }
                 NetworkPlayerRouteStatus status = NetworkPlayerRouteStatus.valueOf(result.getStatus().name());
                 NetworkPlayerRouteResult response = new NetworkPlayerRouteResult(status, request.routeName());
                 store.appendAudit(config.networkId(), session.nodeId(), "player.route.completed", request.routeName(), status.name(), Instant.now().toEpochMilli()).whenComplete((completedAudit, auditThrowable) -> {
                     if (auditThrowable != null) {
-                        sendError(connection, frame.context().requestId(), rootMessage(auditThrowable));
+                        sendError(connection, session, frame.context().requestId(), rootMessage(auditThrowable));
                     } else {
-                        send(connection, NetworkFrameType.RESPONSE, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkPlayerRouteCodec.encodeResult(response), sessionScopes(session));
+                        send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.TRANSFER, frame.context().requestId(), NetworkPlayerRouteCodec.encodeResult(response), Set.of("players.route"));
                     }
                 });
             });
@@ -1662,22 +1984,21 @@ public class ReSyncVelocityHub extends WebSocketServer {
 
     private void proxyAction(WebSocket connection, Session session, NetworkFrame frame) {
         NetworkProxyAction action = NetworkProxyActionCodec.decode(frame.payload());
+        String hash = NetworkPayloads.sha256(frame.payload());
         if (action.type() == NetworkProxyActionType.BROADCAST) {
-            requireScope(session, "proxy.broadcast");
-            store.appendAudit(config.networkId(), session.nodeId(), "proxy.broadcast.requested", "proxy", NetworkPayloads.sha256(frame.payload()), Instant.now().toEpochMilli()).join();
+            submit(connection, session, "proxy.broadcast", () -> store.appendAudit(config.networkId(), session.nodeId(), "proxy.broadcast.requested", "proxy", hash, Instant.now().toEpochMilli())).join();
             proxyServer.sendMessage(Component.text(action.value()));
-            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, frame.context().requestId(), new byte[0], sessionScopes(session));
+            send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, frame.context().requestId(), new byte[0], Set.of("proxy.broadcast"));
             return;
         }
-        requireScope(session, "proxy.command");
-        store.appendAudit(config.networkId(), session.nodeId(), "proxy.command.requested", "proxy", NetworkPayloads.sha256(frame.payload()), Instant.now().toEpochMilli()).join();
+        submit(connection, session, "proxy.command", () -> store.appendAudit(config.networkId(), session.nodeId(), "proxy.command.requested", "proxy", hash, Instant.now().toEpochMilli())).join();
         proxyServer.getCommandManager().executeAsync(proxyServer.getConsoleCommandSource(), action.value()).whenComplete((executed, throwable) -> {
             if (throwable != null) {
-                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                sendError(connection, session, frame.context().requestId(), rootMessage(throwable));
             } else if (!executed) {
-                sendError(connection, frame.context().requestId(), "Proxy Command Was Not Accepted");
+                sendError(connection, session, frame.context().requestId(), "Proxy Command Was Not Accepted");
             } else {
-                send(connection, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, frame.context().requestId(), new byte[0], sessionScopes(session));
+                send(connection, session, NetworkFrameType.RESPONSE, NetworkChannels.CONTROL, frame.context().requestId(), new byte[0], Set.of("proxy.command"));
             }
         });
     }
@@ -1714,32 +2035,39 @@ public class ReSyncVelocityHub extends WebSocketServer {
         }
         Set<String> removed = new LinkedHashSet<>(previous.keySet());
         removed.removeAll(refreshed.enrollmentNodes().keySet());
-        for (String nodeId : removed) {
-            WebSocket connection = connectionsByNode.remove(nodeId);
-            if (connection != null) {
-                removeSession(connection, "Network Node Removed");
-                connection.close(CloseFrame.POLICY_VALIDATION, "Network Node Removed");
+        Map<String, NodeAccess> nextAccess = access(refreshed.enrollmentNodes());
+        List<WebSocket> removedConnections = new ArrayList<>();
+        synchronized (sessionMonitor) {
+            enrollmentNodes = Map.copyOf(refreshed.enrollmentNodes());
+            nodeAccess = nextAccess;
+            for (String nodeId : removed) {
+                WebSocket connection = connectionsByNode.remove(nodeId);
+                if (connection != null) {
+                    removeSession(connection, "Network Node Removed");
+                    removedConnections.add(connection);
+                }
+                events.remove(nodeId);
             }
-            events.remove(nodeId);
+            connectionsByNode.forEach((nodeId, connection) -> {
+                Session session = sessions.get(connection);
+                if (session == null || !sessionScopes(session).contains("events.consume")) events.remove(nodeId);
+                if (session != null && !sessionScopes(session).contains("state.reconcile")) failReconciliations(session, "ReSync Backend State Reconciliation Grant Was Revoked");
+                if (session != null && !sessionScopes(session).contains("state.transfer")) snapshotUploads.discardOwners(session, "Network State Transfer Grant Was Revoked");
+            });
+            editors.expire();
+        }
+        removedConnections.forEach(connection -> connection.close(CloseFrame.POLICY_VALIDATION, "Network Node Removed"));
+        for (String nodeId : removed) {
             store.revokeNode(config.networkId(), nodeId, now).join();
             nodeModes.remove(nodeId);
             NetworkNodeMetrics metrics = latestMetrics.get(nodeId);
             publishPresence(new NetworkNodePresence(config.networkId(), nodeId, NetworkNodeStatus.REVOKED, metrics == null ? 0 : metrics.players(), metrics == null ? 0 : metrics.capacity(), metrics == null ? -1 : metrics.tps(), metrics == null ? -1 : metrics.mspt(), metrics == null ? 0 : metrics.heapUsed(), metrics == null ? 0 : metrics.heapMaximum(), now));
         }
-        enrollmentNodes.clear();
-        enrollmentNodes.putAll(refreshed.enrollmentNodes());
-        connectionsByNode.keySet().forEach(nodeId -> {
-            WebSocket connection = connectionsByNode.get(nodeId);
-            Session session = connection == null ? null : sessions.get(connection);
-            if (session != null && sessionScopes(session).contains("events.consume")) {
-                events.deliver(nodeId);
-            } else {
-                events.remove(nodeId);
-            }
+        connectionsByNode.forEach((nodeId, connection) -> {
+            Session session = sessions.get(connection);
+            if (session != null && sessionScopes(session).contains("events.consume")) events.deliver(nodeId);
             VelocityNetworkConfig.EnrollmentNode previousNode = previous.get(nodeId);
-            if (session != null && sessionScopes(session).contains("presence.read") && (previousNode == null || !previousNode.capabilities().contains("observe"))) {
-                sendPresenceSnapshot(connection);
-            }
+            if (session != null && sessionScopes(session).contains("presence.read") && (previousNode == null || !previousNode.capabilities().contains("observe"))) sendPresenceSnapshot(connection);
         });
     }
 
@@ -1751,7 +2079,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
         Session session = sessions.get(connection);
         store.listNodes(config.networkId()).thenAccept(nodes -> {
             if (session == null || !isActiveSession(connection, session)) return;
-            nodes.forEach(node -> send(connection, NetworkFrameType.PRESENCE_SNAPSHOT, NetworkChannels.PRESENCE, "presence-snapshot", NetworkNodePresenceCodec.encode(presence(node, node.status(), node.heartbeatAt())), Set.of("presence.read")));
+            nodes.forEach(node -> send(connection, session, NetworkFrameType.PRESENCE_SNAPSHOT, NetworkChannels.PRESENCE, "presence-snapshot", NetworkNodePresenceCodec.encode(presence(node, node.status(), node.heartbeatAt())), Set.of("presence.read")));
         }).exceptionally(throwable -> {
             logger.warn("Failed to send network presence snapshot", throwable);
             return null;
@@ -1762,7 +2090,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
         byte[] payload = NetworkNodePresenceCodec.encode(presence);
         sessions.forEach((connection, session) -> {
             if (sessionScopes(session).contains("presence.read")) {
-                send(connection, NetworkFrameType.PRESENCE_DELTA, NetworkChannels.PRESENCE, "presence-delta", payload, Set.of("presence.read"));
+                send(connection, session, NetworkFrameType.PRESENCE_DELTA, NetworkChannels.PRESENCE, "presence-delta", payload, Set.of("presence.read"));
             }
         });
     }
@@ -1776,16 +2104,51 @@ public class ReSyncVelocityHub extends WebSocketServer {
         return new NetworkNodePresence(config.networkId(), node.nodeId(), status, metrics.players(), metrics.capacity(), metrics.tps(), metrics.mspt(), metrics.heapUsed(), metrics.heapMaximum(), Math.max(observedAt, metrics.observedAt()));
     }
 
-    private void sendError(WebSocket connection, String requestId, String message) {
-        send(connection, NetworkFrameType.ERROR, NetworkChannels.CONTROL, requestId, message.getBytes(StandardCharsets.UTF_8), Set.of());
+    private void sendError(WebSocket connection, Session session, String requestId, String message) {
+        send(connection, session, NetworkFrameType.ERROR, NetworkChannels.CONTROL, requestId, message.getBytes(StandardCharsets.UTF_8), Set.of());
     }
 
-    private void send(WebSocket connection, NetworkFrameType type, String channel, String requestId, byte[] payload, Set<String> scopes) {
-        if (connection == null || !connection.isOpen()) {
-            return;
+    private boolean send(WebSocket connection, Session session, NetworkFrameType type, String channel, String requestId, byte[] payload, Set<String> scopes) {
+        synchronized (sessionMonitor) {
+            if (connection == null || session == null || !isActiveSession(connection, session) || !sessionScopes(session).containsAll(scopes)) return false;
+            NetworkRequestContext context = new NetworkRequestContext(PROTOCOL_VERSION, config.networkId(), config.nodeId(), requestId, Instant.now().plusSeconds(10).toEpochMilli(), scopes);
+            byte[] encoded = codec.encode(new NetworkFrame(context, channel, type, payload));
+            SocketOutput output = outputs.get(connection);
+            if (output == null) return false;
+            synchronized (output) {
+                if (output.full) return false;
+                if (!socketRoom(connection, encoded.length + 10L)) {
+                    output.full = true;
+                    return false;
+                }
+                connection.send(encoded);
+                return true;
+            }
         }
-        NetworkRequestContext context = new NetworkRequestContext(PROTOCOL_VERSION, config.networkId(), config.nodeId(), requestId, Instant.now().plusSeconds(10).toEpochMilli(), scopes);
-        connection.send(codec.encode(new NetworkFrame(context, channel, type, payload)));
+    }
+
+    private boolean socketRoom(WebSocket connection, long bytes) {
+        if (!(connection instanceof WebSocketImpl socket)) return false;
+        int frames = 0;
+        for (ByteBuffer queued : socket.outQueue) {
+            bytes += queued.capacity();
+            if (++frames >= 1024 || bytes > NetworkEditorChunk.MAXIMUM_FRAME_BYTES) return false;
+        }
+        return bytes <= NetworkEditorChunk.MAXIMUM_FRAME_BYTES;
+    }
+
+    @Override
+    public void onWebsocketPing(WebSocket connection, Framedata frame) {
+        SocketOutput output = outputs.get(connection);
+        if (output == null) return;
+        synchronized (output) {
+            if (output.full) return;
+            if (!socketRoom(connection, frame.getPayloadData().remaining() + 10L)) {
+                output.full = true;
+                return;
+            }
+            super.onWebsocketPing(connection, frame);
+        }
     }
 
     private String header(ClientHandshake handshake, String name) {
@@ -1801,13 +2164,31 @@ public class ReSyncVelocityHub extends WebSocketServer {
         return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
     }
 
+    private record NodeAccess(VelocityNetworkConfig.EnrollmentNode node, Set<String> scopes) {
+    }
+
+    private static final class SocketOutput {
+        private volatile boolean full;
+    }
+
+    private static final class PendingAuthentication {
+        private final long startedAt = System.nanoTime();
+        private final AtomicBoolean attempted = new AtomicBoolean();
+
+        private boolean expired() {
+            return System.nanoTime() - startedAt >= TimeUnit.SECONDS.toNanos(10);
+        }
+    }
+
     private static final class Session {
+        private final NetworkEventDeliveryService.DeliverySession delivery;
         private final String nodeId;
         private final Set<String> scopes;
         private volatile long lastHeartbeat = System.nanoTime();
 
         private Session(String nodeId, Set<String> scopes) {
             this.nodeId = nodeId;
+            this.delivery = new NetworkEventDeliveryService.DeliverySession(nodeId, UUID.randomUUID());
             this.scopes = Set.copyOf(scopes);
         }
 
@@ -1815,6 +2196,6 @@ public class ReSyncVelocityHub extends WebSocketServer {
         private Set<String> scopes() { return scopes; }
     }
 
-    private record PendingReconciliation(String nodeId, CompletableFuture<Void> result) {
+    private record PendingReconciliation(Session session, CompletableFuture<Void> result) {
     }
 }

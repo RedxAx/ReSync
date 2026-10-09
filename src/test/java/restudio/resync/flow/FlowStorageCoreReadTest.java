@@ -23,6 +23,7 @@ import restudio.resync.storage.StorageSafety;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,13 +44,31 @@ class FlowStorageCoreReadTest {
     @Test
     void readsAnExactIndexedCoreEnvelope() throws Exception {
         writeCore(SERVER, "main");
-        try (AssetTransactionCoordinator coordinator = transactions()) {
+        Path file = tempDir.resolve("assets/Blueprints/Flows/main.json");
+        byte[] historical = Files.readAllBytes(file);
+        Path archive = tempDir.resolve("assets/Archive/main.json");
+        Files.createDirectories(archive.getParent());
+        Files.write(archive, historical);
+        var shadow = new AssetTransactionCoordinator.AdoptedAsset(
+            new AssetTransactionCoordinator.AssetKey("legacy-duplicate:flow", "historical-main"),
+            Path.of("Archive/main.json"), new AssetTransactionCoordinator.Live(3L, StorageSafety.sha256(historical)),
+            new AssetTransactionCoordinator.AssetMutationId("33333333-3333-4333-8333-333333333333"), historical, null);
+        try (AssetTransactionCoordinator coordinator = transactions(shadow)) {
             FlowStorage storage = new FlowStorage(tempDir.toFile(), LegacyRuntimeActivationGate.runtime(tempDir),
                 new AssetPersistenceGate(tempDir), SERVER, coordinator);
+            Path legacyNamed = file.resolveSibling("flow__main.json");
+            Files.writeString(legacyNamed, "{broken historical payload");
+            Files.createSymbolicLink(tempDir.resolve("flows"), archive.getParent());
             var decoded = storage.getCoreGraph("flow", "main").orElseThrow();
             assertEquals(4, decoded.envelope().assetFormatVersion());
             assertEquals(3, decoded.envelope().assetRevision());
             assertEquals("keep", decoded.graphDocument().unknown().get("future"));
+            storage.clearCache();
+            assertEquals(decoded.graphDocument().checksum(), storage.getCoreGraph("flow", "main")
+                .orElseThrow().graphDocument().checksum());
+            assertEquals(StorageSafety.sha256(historical), StorageSafety.sha256(Files.readAllBytes(archive)));
+            assertEquals("{broken historical payload", Files.readString(legacyNamed));
+            assertTrue(Files.isSymbolicLink(tempDir.resolve("flows")));
         }
     }
 
@@ -130,20 +149,22 @@ class FlowStorageCoreReadTest {
         }
     }
 
-    private AssetTransactionCoordinator transactions() {
+    private AssetTransactionCoordinator transactions(AssetTransactionCoordinator.AdoptedAsset... historical) {
         try {
             Path assets = tempDir.resolve("assets");
             Path file = assets.resolve("Blueprints/Flows/main.json");
             byte[] content = Files.readAllBytes(file);
+            List<AssetTransactionCoordinator.AdoptedAsset> inventory = new ArrayList<>();
+            inventory.add(new AssetTransactionCoordinator.AdoptedAsset(
+                new AssetTransactionCoordinator.AssetKey("flow", "main"),
+                Path.of("Blueprints/Flows/main.json"),
+                new AssetTransactionCoordinator.Live(3L, StorageSafety.sha256(content)),
+                new AssetTransactionCoordinator.AssetMutationId(
+                    "33333333-3333-4333-8333-333333333333"), content, null));
+            inventory.addAll(List.of(historical));
             return AssetTransactionCoordinator.adoptExisting(assets, new Gson(),
                 new AssetTransactionCoordinator.AdoptionInventory("flow-storage-core-read-test",
-                    Files.readString(assets.resolve("project.json")),
-                    List.of(new AssetTransactionCoordinator.AdoptedAsset(
-                        new AssetTransactionCoordinator.AssetKey("flow", "main"),
-                        Path.of("Blueprints/Flows/main.json"),
-                        new AssetTransactionCoordinator.Live(3L, StorageSafety.sha256(content)),
-                        new AssetTransactionCoordinator.AssetMutationId(
-                            "33333333-3333-4333-8333-333333333333"), content, null))));
+                    Files.readString(assets.resolve("project.json")), inventory));
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to open asset transaction coordinator", exception);
         }

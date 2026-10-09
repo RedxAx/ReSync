@@ -330,7 +330,7 @@ public final class FlowJobRegistry {
         CompletableFuture<Void> drain;
         synchronized (lifecycleMonitor) {
             if (state == State.CLOSED) {
-                return CompletableFuture.completedFuture(null);
+                return lifecycleDrain;
             }
             if (state == State.FAILED) {
                 return failedDrain();
@@ -493,8 +493,12 @@ public final class FlowJobRegistry {
         List<PhysicalTask> physical;
         CompletableFuture<Void> drain;
         synchronized (lifecycleMonitor) {
-            if (state == State.CLOSED) {
+            if (state == State.CLOSED && !lifecycleDrain.isCompletedExceptionally()) {
                 return lifecycleDrain;
+            }
+            if (state == State.CLOSED) {
+                lifecycleFailures.computeIfPresent("lifecycle", (id, diagnostic) ->
+                    diagnostic.startsWith("shutdown timed out") ? null : diagnostic);
             }
             if (state == State.QUIESCING) {
                 state = State.CLOSED;
@@ -519,7 +523,11 @@ public final class FlowJobRegistry {
         }
         scheduleDrainTimeout(drain, drainTimeout, "shutdown");
         completeLifecycleIfIdle();
-        drain.whenComplete((unused, failure) -> listeners.clear());
+        drain.whenComplete((unused, failure) -> {
+            if (failure == null) {
+                listeners.clear();
+            }
+        });
         return drain;
     }
 
@@ -622,8 +630,12 @@ public final class FlowJobRegistry {
                 lifecycleFuture = lifecycleDrain;
             } else if (state == State.CLOSED) {
                 lifecycleFuture = lifecycleDrain;
-                jobs.clear();
-                terminalTimes.clear();
+                if (lifecycleFailures.isEmpty()) {
+                    jobs.clear();
+                    terminalTimes.clear();
+                } else {
+                    lifecycleFailure = new IllegalStateException("Flow Job Shutdown Failed: " + lifecycleFailures);
+                }
                 closeExecutor = true;
             }
         }
@@ -772,6 +784,9 @@ public final class FlowJobRegistry {
             }
             IllegalStateException failure;
             synchronized (lifecycleMonitor) {
+                if (drain != lifecycleDrain || drain.isDone()) {
+                    return;
+                }
                 String reason = phase + " timed out with " + physicalTaskCountLocked() + " physical tasks, "
                     + pendingCancellations.size() + " cancellation callbacks, " + pendingCancellationActions
                     + " cancellation actions, and " + activeJobCountLocked() + " logical jobs";

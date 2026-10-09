@@ -14,6 +14,9 @@ import restudio.flow.data.FlowResourceReference;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.modules.flow.FlowResourceMutationContext;
 import restudio.resync.runtime.LootTableService;
@@ -37,20 +40,26 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         "trade_open_trades", "trade_open_virtual_trades", "npc_spawn", "npc_despawn", "npc_open", "npc_set_profile", "npc_teleport");
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
     private final FlowResourceRegistry resourceRegistry;
+    private final ServerId serverId;
 
     public ReSyncRuntimeResourceHandler() {
         this(null);
     }
 
     public ReSyncRuntimeResourceHandler(FlowResourceRegistry resourceRegistry) {
+        this(resourceRegistry, null);
+    }
+
+    public ReSyncRuntimeResourceHandler(FlowResourceRegistry resourceRegistry, ServerId serverId) {
         this.resourceRegistry = resourceRegistry;
+        this.serverId = serverId;
         operations.put("loot_generate", (ctx, node) -> {
             LootTableService service = ReSyncRuntimeContentAccess.lootTables();
-            String id = ctx.getInputValue(node, "loot_table", String.class, "");
+            String id = resourceId(ctx, node, "loot_table", ReSyncResourceCatalog.LOOT_TABLE);
             Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             Location location = ctx.getInputValue(node, "location", Location.class, null);
-            FlowOperationResult<List<ItemStack>> result = lootResult(service, id, true,
+            FlowOperationResult<List<ItemStack>> result = lootResult(service, id, true, service != null ? service.context(player, entity, location) : Map.of(),
                 () -> service.generate(id, service.context(player, entity, location)));
             List<ItemStack> items = result.value() != null ? result.value() : List.of();
             ctx.setOutput(node, "items", items);
@@ -59,8 +68,9 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         operations.put("loot_give", (ctx, node) -> {
             LootTableService service = ReSyncRuntimeContentAccess.lootTables();
             Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
-            String id = ctx.getInputValue(node, "loot_table", String.class, "");
-            FlowOperationResult<List<ItemStack>> result = lootResult(service, id, player != null, () -> service.give(player, id));
+            String id = resourceId(ctx, node, "loot_table", ReSyncResourceCatalog.LOOT_TABLE);
+            FlowOperationResult<List<ItemStack>> result = lootResult(service, id, player != null,
+                service != null ? service.context(player, null, player != null ? player.getLocation() : null) : Map.of(), () -> service.give(player, id));
             List<ItemStack> items = result.value() != null ? result.value() : List.of();
             ctx.setOutput(node, "items", items);
             setResult(ctx, node, result);
@@ -70,9 +80,10 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
             Location location = ctx.getInputValue(node, "location", Location.class, null);
             Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            String id = ctx.getInputValue(node, "loot_table", String.class, "");
+            String id = resourceId(ctx, node, "loot_table", ReSyncResourceCatalog.LOOT_TABLE);
             Container container = location != null && location.getBlock().getState() instanceof Container found ? found : null;
-            FlowOperationResult<List<ItemStack>> result = lootResult(service, id, container != null, () -> service != null && container != null
+            FlowOperationResult<List<ItemStack>> result = lootResult(service, id, container != null,
+                service != null ? service.context(player, entity, location) : Map.of(), () -> service != null && container != null
                 ? service.fillContainer(container.getInventory(), id, service.context(player, entity, location))
                 : List.of());
             List<ItemStack> items = result.value() != null ? result.value() : List.of();
@@ -82,7 +93,7 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         operations.put("trade_apply_trade_profile", (ctx, node) -> {
             TradeProfileService service = ReSyncRuntimeContentAccess.tradeProfiles();
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            String id = ctx.getInputValue(node, "profile_id", String.class, "");
+            String id = resourceId(ctx, node, "profile_id", ReSyncResourceCatalog.TRADE_PROFILE);
             FlowOperationResult<Boolean> result = tradeResult(service, id, entity instanceof Villager,
                 () -> service != null && entity instanceof Villager villager && service.apply(villager, id));
             setResult(ctx, node, result);
@@ -91,7 +102,7 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
             TradeProfileService service = ReSyncRuntimeContentAccess.tradeProfiles();
             Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            String id = ctx.getInputValue(node, "profile_id", String.class, "");
+            String id = resourceId(ctx, node, "profile_id", ReSyncResourceCatalog.TRADE_PROFILE);
             FlowOperationResult<Boolean> result = tradeResult(service, id, player != null && entity instanceof Villager,
                 () -> service != null && entity instanceof Villager villager && service.openTrades(player, villager, id));
             setResult(ctx, node, result);
@@ -100,14 +111,14 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
             TradeProfileService service = ReSyncRuntimeContentAccess.tradeProfiles();
             Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            String id = ctx.getInputValue(node, "profile_id", String.class, "");
+            String id = resourceId(ctx, node, "profile_id", ReSyncResourceCatalog.TRADE_PROFILE);
             FlowOperationResult<Boolean> result = tradeResult(service, id, player != null,
                 () -> service != null && service.openVirtualTrades(player, entity, id));
             setResult(ctx, node, result);
         });
         operations.put("npc_spawn", (ctx, node) -> {
             NpcService service = ReSyncRuntimeContentAccess.npcs();
-            String id = ctx.getInputValue(node, "npc_id", String.class, "");
+            String id = resourceId(ctx, node, "npc_id", ReSyncResourceCatalog.NPC_DEFINITION);
             Location location = ctx.getInputValue(node, "location", Location.class, null);
             FlowOperationResult<FlowNpcHandle> result = npcSpawnResult(service, id, location);
             ctx.setOutput(node, "handle", result.value());
@@ -116,7 +127,7 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         });
         operations.put("npc_despawn", (ctx, node) -> {
             NpcService service = ReSyncRuntimeContentAccess.npcs();
-            String id = ctx.getInputValue(node, "npc_id", String.class, "");
+            String id = resourceId(ctx, node, "npc_id", ReSyncResourceCatalog.NPC_DEFINITION);
             boolean active = service != null ? service.isActive(id) : false;
             FlowOperationResult<Boolean> result = npcResult(service, id, active,
                 "NPC_NOT_ACTIVE", "NPC is not active", () -> service != null && service.despawn(id));
@@ -125,22 +136,22 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         operations.put("npc_open", (ctx, node) -> {
             NpcService service = ReSyncRuntimeContentAccess.npcs();
             Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
-            String id = ctx.getInputValue(node, "npc_id", String.class, "");
+            String id = resourceId(ctx, node, "npc_id", ReSyncResourceCatalog.NPC_DEFINITION);
             FlowOperationResult<Boolean> result = npcResult(service, id, player != null, "INVALID_NPC_CONTEXT", "NPC player context is invalid",
                 () -> service.open(player, id));
             setResult(ctx, node, result);
         });
         operations.put("npc_set_profile", (ctx, node) -> {
             NpcService service = ReSyncRuntimeContentAccess.npcs();
-            String id = ctx.getInputValue(node, "npc_id", String.class, "");
-            String profileId = ctx.getInputValue(node, "profile_id", String.class, "");
+            String id = resourceId(ctx, node, "npc_id", ReSyncResourceCatalog.NPC_DEFINITION);
+            String profileId = resourceId(ctx, node, "profile_id", ReSyncResourceCatalog.TRADE_PROFILE);
             FlowOperationResult<Boolean> result = npcResult(service, id, profileId != null && !profileId.isBlank(), "RESOURCE_ID_REQUIRED",
                 "Trade profile ID is required", () -> service.setProfile(id, profileId));
             setResult(ctx, node, result);
         });
         operations.put("npc_lookup", (ctx, node) -> {
             NpcService service = ReSyncRuntimeContentAccess.npcs();
-            String id = ctx.getInputValue(node, "npc_id", String.class, "");
+            String id = resourceId(ctx, node, "npc_id", ReSyncResourceCatalog.NPC_DEFINITION);
             FlowOperationResult<Boolean> readiness = npcReadiness(service, id, service != null && service.isActive(id), "NPC_NOT_ACTIVE", "NPC is not active");
             FlowNpcHandle handle = readiness.success() && service != null ? service.handle(id) : null;
             FlowOperationResult<FlowNpcHandle> result = handle != null ? FlowOperationResult.success(handle)
@@ -160,7 +171,7 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         });
         operations.put("npc_is_active", (ctx, node) -> {
             NpcService service = ReSyncRuntimeContentAccess.npcs();
-            String id = ctx.getInputValue(node, "npc_id", String.class, "");
+            String id = resourceId(ctx, node, "npc_id", ReSyncResourceCatalog.NPC_DEFINITION);
             FlowOperationResult<Boolean> readiness = npcReadiness(service, id, true, "", "");
             boolean active = readiness.success() && service.isActive(id);
             FlowOperationResult<Boolean> result = readiness.success() ? FlowOperationResult.success(active) : readiness;
@@ -233,7 +244,14 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
         if (op != null) {
-            op.accept(ctx, node);
+            try {
+                op.accept(ctx, node);
+            } catch (ResourceFailure failure) {
+                if (operation.startsWith("loot_")) {
+                    ctx.setOutput(node, "items", List.of());
+                }
+                setResult(ctx, node, FlowOperationResult.failure(failure.code, failure.getMessage(), Map.of()));
+            }
         } else {
             throw new IllegalArgumentException("Unknown runtime resource operation: " + operation);
         }
@@ -416,13 +434,16 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         if (!validContext) {
             return FlowOperationResult.failure("INVALID_TRADE_CONTEXT", "Trade operation context is invalid", Map.of("profileId", id));
         }
-        boolean success = operation.getAsBoolean();
-        return success ? FlowOperationResult.success(true)
-            : FlowOperationResult.failure("TRADE_OPERATION_FAILED", "Trade operation failed", Map.of("profileId", id));
+        try {
+            return operation.getAsBoolean() ? FlowOperationResult.success(true)
+                : FlowOperationResult.failure("TRADE_OPERATION_FAILED", "Trade operation failed", Map.of("profileId", id));
+        } catch (RuntimeException exception) {
+            return FlowOperationResult.failure("TRADE_OPERATION_FAILED", failureMessage(exception, "Trade operation failed"), Map.of("profileId", id));
+        }
     }
 
     private FlowOperationResult<List<ItemStack>> lootResult(LootTableService service, String id, boolean validContext,
-                                                             Supplier<List<ItemStack>> operation) {
+                                                             Map<String, Object> context, Supplier<List<ItemStack>> operation) {
         if (service == null) {
             return FlowOperationResult.failure("LOOT_SERVICE_UNAVAILABLE", "Loot service is unavailable", Map.of("lootTableId", safe(id)));
         }
@@ -434,6 +455,11 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
             return FlowOperationResult.failure("RESOURCE_NOT_FOUND", "Loot table not found: " + id, Map.of("lootTableId", id));
         }
         if (!enabled(definition)) {
+            try {
+                service.generate(id, context);
+            } catch (RuntimeException exception) {
+                return FlowOperationResult.failure("LOOT_OPERATION_FAILED", failureMessage(exception, "Loot hook failed"), Map.of("lootTableId", id));
+            }
             return FlowOperationResult.failure("RESOURCE_DISABLED", "Loot table is disabled: " + id, Map.of("lootTableId", id));
         }
         if (!validContext) {
@@ -504,8 +530,13 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         if (handle == null || handle.definitionId().isBlank()) {
             return FlowOperationResult.failure("NPC_HANDLE_REQUIRED", "NPC handle is required", Map.of());
         }
-        if (!service.isActive(handle.definitionId())) {
+        FlowNpcHandle current = service.handle(handle.definitionId());
+        if (current == null || !current.active()) {
             return FlowOperationResult.failure("NPC_NOT_ACTIVE", "NPC is not active", Map.of("npcId", handle.definitionId()));
+        }
+        if (!handle.active() || handle.instanceUuid().isBlank() || !handle.instanceUuid().equals(current.instanceUuid())
+            || handle.packetBacked() != current.packetBacked() || !handle.entityUuid().equals(current.entityUuid())) {
+            return FlowOperationResult.failure("NPC_HANDLE_STALE", "NPC handle no longer identifies the active instance", Map.of("npcId", handle.definitionId()));
         }
         return FlowOperationResult.success(true);
     }
@@ -528,20 +559,77 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
     }
 
     private ResourceIdentity resourceIdentity(FlowContext ctx, FlowNode node) {
-        Object rawReference = ctx.getInputValue(node, "reference");
-        if (rawReference instanceof FlowResourceReference reference) {
-            return new ResourceIdentity(reference.kind(), reference.id());
-        }
-        if (rawReference instanceof Map<?, ?> map) {
-            Object kind = map.get("kind");
-            Object id = map.get("id");
-            return new ResourceIdentity(kind != null ? kind.toString() : "", id != null ? id.toString() : "");
-        }
         String configuredType = node.getHandlerConfig().getString("resource_type");
         String type = configuredType != null && !configuredType.isBlank() ? configuredType : ctx.getInputValue(node, "resource_type", String.class, "");
+        Object rawReference = ctx.getInputValue(node, "reference", Object.class, null);
         String resourcePin = node.getHandlerConfig().getString("resource_pin");
-        String id = ctx.getInputValue(node, resourcePin != null && !resourcePin.isBlank() ? resourcePin : "resource_id", String.class, rawReference != null ? rawReference.toString() : "");
-        return new ResourceIdentity(type, id);
+        Object value = rawReference != null ? rawReference
+            : ctx.getInputValue(node, resourcePin != null && !resourcePin.isBlank() ? resourcePin : "resource_id", Object.class, null);
+        return resourceIdentity(value, type);
+    }
+
+    private String resourceId(FlowContext ctx, FlowNode node, String pin, String type) {
+        Object value = ctx.getInputValue(node, pin, Object.class, null);
+        if (value instanceof ServerResourceLocator locator && !"restudio.resync".equals(locator.owner().value())) {
+            throw new ResourceFailure("RESOURCE_OWNER_MISMATCH", "Resource reference owner does not match the runtime service");
+        }
+        return resourceIdentity(value, type).id();
+    }
+
+    private ResourceIdentity resourceIdentity(Object value, String expectedType) {
+        if (value instanceof ServerResourceLocator locator) {
+            if (serverId == null || !serverId.equals(locator.serverId())) {
+                throw new ResourceFailure("RESOURCE_SERVER_MISMATCH", "Resource reference server does not match this server");
+            }
+            String type = locator.resourceType().value();
+            requireType(type, expectedType);
+            requireOwner(type, locator.owner().value(), true);
+            return new ResourceIdentity(type, locator.id());
+        }
+        if (value instanceof FlowResourceReference reference) {
+            requireType(reference.kind(), expectedType);
+            requireOwner(reference.kind(), reference.owner(), false);
+            return new ResourceIdentity(reference.kind(), reference.id());
+        }
+        if (value instanceof Map<?, ?> map) {
+            if (!(map.get("kind") instanceof String type) || !(map.get("id") instanceof String id)
+                || !(map.get("owner") instanceof String owner)) {
+                throw new ResourceFailure("RESOURCE_REFERENCE_INVALID", "Resource reference requires type, owner, and ID");
+            }
+            requireType(type, expectedType);
+            requireOwner(type, owner, false);
+            return new ResourceIdentity(type, id);
+        }
+        if (value == null || value instanceof String) {
+            return new ResourceIdentity(expectedType != null ? expectedType : "", value instanceof String id ? id : "");
+        }
+        throw new ResourceFailure("RESOURCE_REFERENCE_INVALID", "Resource reference requires a typed resource identity");
+    }
+
+    private void requireType(String type, String expectedType) {
+        if (type == null || type.isBlank() || expectedType != null && !expectedType.isBlank() && !expectedType.equals(type)) {
+            throw new ResourceFailure("RESOURCE_TYPE_MISMATCH", "Resource reference type does not match the requested type");
+        }
+    }
+
+    private void requireOwner(String type, String owner, boolean canonical) {
+        String registeredOwner = resourceRegistry != null ? resourceRegistry.protocolOwner(type) : "";
+        boolean builtin = ReSyncResourceCatalog.byType(type) != null;
+        String expectedOwner = builtin && ("builtin".equals(registeredOwner) || registeredOwner.isBlank())
+            ? "restudio.resync" : registeredOwner;
+        boolean localOwner = !canonical && !registeredOwner.isBlank() && registeredOwner.equals(owner);
+        if (expectedOwner.isBlank() || !expectedOwner.equals(owner) && !localOwner) {
+            throw new ResourceFailure("RESOURCE_OWNER_MISMATCH", "Resource reference owner does not match the registered authority");
+        }
+    }
+
+    private static final class ResourceFailure extends RuntimeException {
+        private final String code;
+
+        private ResourceFailure(String code, String message) {
+            super(message);
+            this.code = code;
+        }
     }
 
     private FlowResourceReference reference(ResourceIdentity identity, boolean available) {

@@ -21,6 +21,11 @@ public record VariableDefinition(String id, String name, String description, Flo
         scope = scope != null ? scope : AutomationScope.FLOW;
     }
 
+    @Override
+    public Kind kind() {
+        return Kind.VARIABLE;
+    }
+
     public static VariableDefinition from(JsonObject json, String fallbackId) {
         JsonObject value = json != null ? json : new JsonObject();
         String id = string(value, "id", fallbackId);

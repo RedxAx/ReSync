@@ -30,10 +30,6 @@ dependencies {
     compileOnly("com.nexomc:nexo:1.23")
     compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
 
-    implementation("org.apache.logging.log4j:log4j-core:2.25.4")
-    implementation("io.javalin:javalin:6.7.0") {
-        exclude(group = "org.slf4j")
-    }
     compileOnly("com.google.code.gson:gson:2.10.1")
     implementation("org.java-websocket:Java-WebSocket:1.5.7") {
         exclude(group = "org.slf4j")
@@ -255,9 +251,6 @@ tasks {
         exclude("restudio/resync/upgrade/command/**")
         exclude("restudio/resync/upgrade/flow/**")
         exclude("restudio/resync/upgrade/sqlite/**")
-        relocate("io.javalin", "restudio.resync.libs.javalin")
-        relocate("org.eclipse.jetty", "restudio.resync.libs.jetty")
-        relocate("kotlin", "restudio.resync.libs.kotlin")
         relocate("org.java_websocket", "restudio.resync.libs.websocket")
         relocate("org.bouncycastle", "restudio.resync.libs.bouncycastle")
         relocate("com.github.retrooper.packetevents", "restudio.resync.libs.packetevents.api")

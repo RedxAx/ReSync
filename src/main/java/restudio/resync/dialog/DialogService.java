@@ -12,6 +12,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.resync.Log;
 import restudio.resync.core.Session;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.CustomEventManager;
@@ -22,6 +23,7 @@ import restudio.resync.flow.FunctionCallSupport;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.resources.JsonAssetStore;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -34,7 +36,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 public class DialogService {
@@ -45,9 +49,9 @@ public class DialogService {
     private final EditTargetStateSender editTargetStateSender;
     private final PlayerSessionLinkService sessionLinkService;
     private final LegacyRuntimeActivationGate legacyRuntimeGate;
-    private final Map<UUID, String> activeDialogs = new ConcurrentHashMap<>();
+    private final Map<UUID, ActiveDialog> activeDialogs = new ConcurrentHashMap<>();
     private final DialogApi api;
-    private String lastError = "";
+    private volatile String lastError = "";
 
     public DialogService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, FlowStorage flowStorage, FlowExecutor flowExecutor) {
         this(plugin, storage, flowStorage, flowExecutor, null, null);
@@ -85,26 +89,51 @@ public class DialogService {
             lastError = !supported() ? "Paper Dialog API Unavailable" : "Dialog Context Missing";
             return false;
         }
-        JsonObject dialog = storage.get(ReSyncResourceCatalog.DIALOG, dialogId);
-        if (dialog == null || !bool(dialog, "enabled", true)) {
-            lastError = dialog == null ? "Dialog Not Found" : "Dialog Disabled";
-            return false;
-        }
+        ActiveDialog admitted = null;
+        ActiveDialog previous = null;
+        boolean shown = false;
         try {
-            Object paperDialog = buildDialog(player, dialogId, dialog);
+            long generation = storage.snapshotGeneration();
+            JsonAssetStore.AssetStamp stamp = storage.readAssetStamp(ReSyncResourceCatalog.DIALOG, dialogId);
+            JsonObject dialog = storage.get(ReSyncResourceCatalog.DIALOG, dialogId);
+            if (dialog == null || stamp == null || stamp.deleted() || !bool(dialog, "enabled", true)) {
+                lastError = dialog == null || stamp == null || stamp.deleted() ? "Dialog Not Found" : "Dialog Disabled";
+                return false;
+            }
+            if (generation != storage.snapshotGeneration() || !stamp.equals(storage.readAssetStamp(ReSyncResourceCatalog.DIALOG, dialogId))) {
+                lastError = "Dialog Changed";
+                return false;
+            }
+            FlowStorage.RuntimeObservation runtime = flowStorage == null ? null : flowStorage.observeRuntime().orElse(null);
+            admitted = new ActiveDialog(dialogId, generation, stamp, runtime);
+            previous = activeDialogs.put(player.getUniqueId(), admitted);
+            Object paperDialog = buildDialog(player, dialogId, dialog.deepCopy());
             Method show = showDialogMethod(player, paperDialog);
             if (show == null) {
                 lastError = "Player Show Method Missing";
                 return false;
             }
+            if (!current(player, admitted)) {
+                lastError = "Dialog Changed";
+                return false;
+            }
             show.setAccessible(true);
             show.invoke(player, paperDialog);
+            shown = true;
             publishEditState(player, dialogId);
             return true;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             Throwable cause = unwrap(exception);
             lastError = cause.getClass().getSimpleName() + ": " + (cause.getMessage() == null ? "Dialog Build Failed" : cause.getMessage());
             return false;
+        } finally {
+            if (!shown && admitted != null) {
+                if (previous == null) {
+                    activeDialogs.remove(player.getUniqueId(), admitted);
+                } else {
+                    activeDialogs.replace(player.getUniqueId(), admitted, previous);
+                }
+            }
         }
     }
 
@@ -135,7 +164,6 @@ public class DialogService {
         if (editTargetStateSender == null || sessionLinkService == null || player == null || dialogId == null || dialogId.isBlank()) {
             return;
         }
-        activeDialogs.put(player.getUniqueId(), dialogId);
         Session session = sessionLinkService.getLinkedSession(player.getUniqueId());
         sendActiveState(player, session);
     }
@@ -144,9 +172,9 @@ public class DialogService {
         if (editTargetStateSender == null || player == null || session == null) {
             return;
         }
-        String dialogId = activeDialogs.get(player.getUniqueId());
-        if (dialogId != null && !dialogId.isBlank()) {
-            editTargetStateSender.send(session, true, ReSyncResourceCatalog.DIALOG, dialogId, null);
+        ActiveDialog active = activeDialogs.get(player.getUniqueId());
+        if (active != null && current(player, active)) {
+            editTargetStateSender.send(session, true, ReSyncResourceCatalog.DIALOG, active.id(), null);
         }
     }
 
@@ -322,14 +350,108 @@ public class DialogService {
     }
 
     private Object callback(Player player, String dialogId, JsonObject dialog, JsonObject action, int index) {
+        ActiveDialog admitted = activeDialogs.get(player.getUniqueId());
+        JsonObject dialogSnapshot = dialog.deepCopy();
+        JsonObject actionSnapshot = action.deepCopy();
         InvocationHandler handler = (proxy, method, args) -> {
             if ("accept".equals(method.getName())) {
-                Map<String, Object> vars = responseVars(dialogId, dialog, action, index, args != null && args.length > 0 ? args[0] : null);
-                Bukkit.getScheduler().runTask(plugin, () -> handleAction(player, dialogId, action, vars));
+                Map<String, Object> vars = responseVars(dialogId, dialogSnapshot, actionSnapshot, index, args != null && args.length > 0 ? args[0] : null);
+                Map<String, Object> snapshot = new HashMap<>(vars);
+                Object inputs = snapshot.get("dialog.inputs");
+                if (inputs instanceof Map<?, ?> values) {
+                    snapshot.put("dialog.inputs", Map.copyOf(values));
+                }
+                boolean close = !Set.of("none", "wait", "wait_for_response").contains(text(dialogSnapshot, "after_action", "close").toLowerCase(Locale.ROOT));
+                onMain(() -> admitAction(player, admitted, actionSnapshot, Map.copyOf(snapshot), close));
             }
             return null;
         };
         return Proxy.newProxyInstance(api.callbackClass.getClassLoader(), new Class<?>[]{api.callbackClass}, handler);
+    }
+
+    private void admitAction(Player player, ActiveDialog admitted, JsonObject action, Map<String, Object> vars, boolean close) {
+        if (!current(player, admitted)) {
+            return;
+        }
+        CompletableFuture<Boolean> predicate;
+        try {
+            predicate = predicatePass(player, object(action, "resync"), vars);
+        } catch (RuntimeException failure) {
+            reportActionFailure(admitted.id(), failure);
+            if (close) {
+                activeDialogs.remove(player.getUniqueId(), admitted);
+            }
+            return;
+        }
+        predicate.whenComplete((allowed, failure) -> onMain(() -> {
+            try {
+                if (failure != null) {
+                    reportActionFailure(admitted.id(), failure);
+                } else if (Boolean.TRUE.equals(allowed) && current(player, admitted)) {
+                    handleAction(player, admitted.id(), action, vars);
+                }
+            } catch (RuntimeException actionFailure) {
+                reportActionFailure(admitted.id(), actionFailure);
+            } finally {
+                if (close) {
+                    activeDialogs.remove(player.getUniqueId(), admitted);
+                }
+            }
+        }));
+    }
+
+    private boolean current(Player player, ActiveDialog admitted) {
+        if (admitted == null || player == null || !player.isOnline() || Bukkit.getPlayer(player.getUniqueId()) != player
+            || !plugin.isEnabled() || activeDialogs.get(player.getUniqueId()) != admitted) {
+            return false;
+        }
+        try {
+            if (storage.snapshotGeneration() != admitted.generation()
+                || !admitted.stamp().equals(storage.readAssetStamp(ReSyncResourceCatalog.DIALOG, admitted.id()))) {
+                return false;
+            }
+            if (flowStorage != null) {
+                FlowStorage.RuntimeObservation runtime = flowStorage.observeRuntime().orElse(null);
+                if (runtime == null || admitted.runtime() == null || runtime.generation() != admitted.runtime().generation()
+                    || runtime.coordinator() != admitted.runtime().coordinator()) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (RuntimeException unavailable) {
+            return false;
+        }
+    }
+
+    private void onMain(Runnable action) {
+        if (!plugin.isEnabled()) {
+            return;
+        }
+        if (Bukkit.isPrimaryThread()) {
+            action.run();
+        } else {
+            Bukkit.getScheduler().runTask(plugin, action);
+        }
+    }
+
+    private void reportActionFailure(String dialogId, Throwable failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        lastError = cause.getMessage() == null ? "Dialog Action Failed" : cause.getMessage();
+        Log.warn("Dialog action failed for " + dialogId + ": " + lastError, cause);
+    }
+
+    private void runFunction(Player player, String dialogId, JsonObject call, Map<String, Object> vars) {
+        FunctionCallSupport.execute(flowStorage, flowExecutor, call, player, null, vars).whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                onMain(() -> reportActionFailure(dialogId, failure));
+            }
+        });
+    }
+
+    private record ActiveDialog(String id, long generation, JsonAssetStore.AssetStamp stamp, FlowStorage.RuntimeObservation runtime) {
     }
 
     private Map<String, Object> responseVars(String dialogId, JsonObject dialog, JsonObject action, int index, Object response) {
@@ -374,9 +496,6 @@ public class DialogService {
 
     private void handleAction(Player player, String dialogId, JsonObject action, Map<String, Object> vars) {
         JsonObject resync = object(action, "resync");
-        if (!predicatePass(player, resync, vars)) {
-            return;
-        }
         String mode = text(resync, "actionMode", text(action, "actionMode", ""));
         switch (mode) {
             case "Run Flow" -> {
@@ -386,7 +505,7 @@ public class DialogService {
                     recordBlockedLegacyAction(dialogId, "Run Flow");
                 }
             }
-            case "Run Function" -> FunctionCallSupport.execute(flowStorage, flowExecutor, object(resync, "action"), player, null, vars);
+            case "Run Function" -> runFunction(player, dialogId, object(resync, "action"), vars);
             case "Run Command" -> runCommands(player, resync, vars);
             case "Open Dialog" -> show(player, text(resync, "dialogId", ""));
             case "Custom Event" -> emitEvent(text(resync, "customEventId", ""), vars);
@@ -394,7 +513,7 @@ public class DialogService {
                 JsonObject legacyAction = object(action, "action");
                 if (legacyAction != null) {
                     if (legacyAllowed()) {
-                        FunctionCallSupport.execute(flowStorage, flowExecutor, legacyAction, player, null, vars);
+                        runFunction(player, dialogId, legacyAction, vars);
                     } else {
                         recordBlockedLegacyAction(dialogId, "legacy action");
                     }
@@ -403,19 +522,18 @@ public class DialogService {
         }
     }
 
-    private boolean predicatePass(Player player, JsonObject resync, Map<String, Object> vars) {
+    private CompletableFuture<Boolean> predicatePass(Player player, JsonObject resync, Map<String, Object> vars) {
         String mode = text(resync, "predicateMode", "None");
         if ("Flow".equals(mode)) {
             if (!legacyAllowed()) {
                 recordBlockedLegacyAction("predicate", "Flow predicate");
-                return false;
+                return CompletableFuture.completedFuture(false);
             }
-            return FlowPredicateSupport.evaluate(flowStorage, flowExecutor, text(resync, "predicateFlowId", ""), player, null, vars);
+            return FlowPredicateSupport.evaluateAsync(flowStorage, flowExecutor, text(resync, "predicateFlowId", ""), player, null, vars);
         }
-        if ("Function".equals(mode)) {
-            return FunctionCallSupport.evaluate(flowStorage, flowExecutor, object(resync, "predicate"), player, null, vars);
-        }
-        return true;
+        return "Function".equals(mode)
+            ? FunctionCallSupport.evaluateAsync(flowStorage, flowExecutor, object(resync, "predicate"), player, null, vars)
+            : CompletableFuture.completedFuture(true);
     }
 
     private void runFlow(String flowId, Player player, Map<String, Object> vars) {

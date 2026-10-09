@@ -8,6 +8,7 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.TypeAdapterRegistry;
 import restudio.resync.flow.handler.HandlerRegistry;
+import restudio.resync.flow.automation.AutomationDefinition;
 import restudio.resync.flow.automation.AutomationInstanceKey;
 import restudio.resync.flow.automation.AutomationScope;
 import restudio.resync.flow.automation.AutomationTaskService;
@@ -157,7 +158,7 @@ class ScheduleHandlerTest {
             true, AutomationTaskService.State.FAILED, 4L, 1_000L, 2_000L, 9_999L, 4L, 0L, 0L, 0L, 0D, "new", "failure");
 
         assertEquals(handler.stableScheduleTask(first), handler.stableScheduleTask(retry));
-        assertEquals(Map.of("definitionId", "schedule-test", "scope", "server", "ownerId", "server",
+        assertEquals(Map.of("taskId", "task", "definitionId", "schedule-test", "scope", "server", "ownerId", "server",
             "runCount", 4L, "scheduledAt", 2_000L), handler.stableScheduleTask(first));
     }
 
@@ -202,7 +203,7 @@ class ScheduleHandlerTest {
     }
 
     private AutomationInstanceKey scheduleKey() {
-        return new AutomationInstanceKey("schedule-test", AutomationScope.SERVER, "server");
+        return new AutomationInstanceKey(AutomationDefinition.Kind.SCHEDULE, "schedule-test", AutomationScope.SERVER, "server");
     }
 
     private CapturingExecutor executor(RuntimeAuthority authority, RuntimePrincipalAuthority principals,

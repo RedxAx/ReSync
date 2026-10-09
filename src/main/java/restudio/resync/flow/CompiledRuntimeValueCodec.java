@@ -305,7 +305,7 @@ public final class CompiledRuntimeValueCodec {
                 case "vector" -> Set.of("x", "y", "z");
                 case "item", "itemstack" -> Set.of("format", "data", "material", "amount");
                 case "inventory" -> Set.of("kind", "serverId", "worldId", "world", "holderKind", "holderId", "inventoryType");
-                case "npc_handle" -> Set.of("kind", "serverId", "worldId", "world", "definitionId", "entityUuid", "packetBacked", "active", "x", "y", "z", "yaw", "pitch");
+                case "npc_handle" -> Set.of("kind", "serverId", "worldId", "world", "definitionId", "entityUuid", "instanceUuid", "packetBacked", "active", "x", "y", "z", "yaw", "pitch");
                 default -> throw invalid("Unsupported Host Type");
             };
             if (!value.keySet().equals(fields)) throw invalid("Reference Fields Do Not Match The Declared Type");
@@ -469,6 +469,7 @@ public final class CompiledRuntimeValueCodec {
             value.put("kind", "npc_handle");
             value.put("definitionId", handle.definitionId());
             value.put("entityUuid", handle.entityUuid());
+            value.put("instanceUuid", handle.instanceUuid());
             value.put("packetBacked", handle.packetBacked());
             value.put("active", handle.active());
             value.put("x", decimal(handle.x()));
@@ -482,10 +483,12 @@ public final class CompiledRuntimeValueCodec {
 
         private FlowNpcHandle resolveNpc(Map<?, ?> value, World world) {
             if (!(value.get("packetBacked") instanceof Boolean packetBacked)
-                || !(value.get("active") instanceof Boolean active) || !(value.get("entityUuid") instanceof String entityUuid)) {
+                || !(value.get("active") instanceof Boolean active) || !(value.get("entityUuid") instanceof String entityUuid)
+                || !(value.get("instanceUuid") instanceof String instanceUuid)) {
                 throw invalid("NPC Handle Fields Have Invalid Types");
             }
             String definitionId = text(value.get("definitionId"));
+            uuid(instanceUuid);
             if (packetBacked) {
                 if (!entityUuid.isEmpty()) throw invalid("Packet NPC Handle Cannot Have An Entity UUID");
             } else {
@@ -497,7 +500,7 @@ public final class CompiledRuntimeValueCodec {
                     }
                 }
             }
-            return new FlowNpcHandle(definitionId, entityUuid, packetBacked, active, world.getName(),
+            return new FlowNpcHandle(definitionId, entityUuid, instanceUuid, packetBacked, active, world.getName(),
                 number(value, "x"), number(value, "y"), number(value, "z"), angle(value, "yaw"), angle(value, "pitch"));
         }
 

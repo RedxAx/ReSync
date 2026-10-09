@@ -2,6 +2,7 @@ package restudio.resync.flow.catalog;
 
 import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.canonical.CanonicalLimits;
+import restudio.resync.flow.identity.CatalogBinding;
 import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.migration.AtomicFiles;
 import restudio.resync.migration.MigrationPaths;
@@ -35,6 +36,78 @@ public final class CatalogStartupIndex {
     private static long epoch;
 
     private CatalogStartupIndex() {
+    }
+
+    public static CommittedSnapshot readCommitted(Path directory, CatalogBinding committedBinding) throws IOException {
+        CatalogBinding binding = Objects.requireNonNull(committedBinding, "Committed catalog binding is required");
+        Path root = MigrationPaths.requireDirectory(directory, "Committed catalog directory");
+        Path file = root.resolve(FILE_NAME);
+        MigrationPaths.requireNoSymlinkTraversal(root, file);
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.size(file) > MAX_RECORD_BYTES) {
+            throw new IOException("Committed catalog snapshot is missing or exceeds its recovery bound");
+        }
+        byte[] bytes;
+        try (var input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
+            bytes = input.readNBytes(MAX_RECORD_BYTES + 1);
+        }
+        int first = -1;
+        int second = -1;
+        for (int index = 0; index < Math.min(bytes.length, 1_024); index++) {
+            if (bytes[index] == '\n') {
+                if (first < 0) {
+                    first = index;
+                } else {
+                    second = index;
+                    break;
+                }
+            }
+        }
+        if (first < 0 || second < 0 || bytes.length > MAX_RECORD_BYTES) {
+            throw new IOException("Committed catalog snapshot header is invalid");
+        }
+        String fingerprint = new String(bytes, first + 1, second - first - 1, StandardCharsets.UTF_8);
+        try {
+            ContentHash.parseCanonicalText(fingerprint);
+        } catch (RuntimeException exception) {
+            throw new IOException("Committed catalog snapshot fingerprint is invalid", exception);
+        }
+        Record record = read(new Key(root, fingerprint), null, bytes);
+        if (record == null || !binding.catalogChecksum().equals(record.contentChecksum())
+            || !binding.bindingManifestHash().equals(record.bindingManifestHash())) {
+            throw new IOException("Committed catalog snapshot differs from its activation record");
+        }
+        String canonical = CatalogCanonicalizer.rebaseSnapshotGeneration(record.canonicalContent(), binding.generation());
+        return new CommittedSnapshot(binding, canonical);
+    }
+
+    public static final class CommittedSnapshot {
+        private final CatalogBinding binding;
+        private final String canonicalContent;
+        private final Map<String, Object> content;
+
+        private CommittedSnapshot(CatalogBinding binding, String canonicalContent) {
+            this.binding = binding;
+            this.canonicalContent = canonicalContent;
+            Object decoded = CanonicalJson.parseTree(canonicalContent, CanonicalLimits.catalog()).toJava();
+            if (!(decoded instanceof Map<?, ?> fields)) {
+                throw new IllegalArgumentException("Committed catalog content is not an object");
+            }
+            Map<String, Object> values = new LinkedHashMap<>();
+            fields.forEach((key, value) -> values.put((String) key, value));
+            this.content = Map.copyOf(values);
+        }
+
+        public CatalogBinding binding() {
+            return binding;
+        }
+
+        public String canonicalContent() {
+            return canonicalContent;
+        }
+
+        public Map<String, Object> content() {
+            return content;
+        }
     }
 
     public static String fingerprint(List<String> sourceIdentities, String bindingManifestHash, String contractVersion,
@@ -178,6 +251,14 @@ public final class CatalogStartupIndex {
             if (bytes.length > MAX_RECORD_BYTES) {
                 return null;
             }
+            return read(key, expected, bytes);
+        } catch (IOException | RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private static Record read(Key key, Supplier<CatalogCanonicalizer.DerivedSnapshot> expected, byte[] bytes) {
+        try {
             int bodyStart = 0;
             int lines = 0;
             while (bodyStart < bytes.length && bodyStart < 1_024 && lines < 6) {
@@ -229,7 +310,7 @@ public final class CatalogStartupIndex {
                 return null;
             }
             return new Record(key.fingerprint(), generation, contentChecksum, bindingManifestHash, canonical);
-        } catch (IOException | RuntimeException exception) {
+        } catch (RuntimeException exception) {
             return null;
         }
     }

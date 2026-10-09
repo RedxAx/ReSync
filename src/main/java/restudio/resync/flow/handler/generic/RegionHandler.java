@@ -732,8 +732,8 @@ public class RegionHandler implements NodeHandler {
                 for (int y = 0; y < data.sizeY; y++) {
                     for (int x = 0; x < newSizeX; x++) {
                         for (int z = 0; z < newSizeZ; z++) {
-                            newBlockTypes[y][x][z] = data.blockTypes[y][data.sizeZ - 1 - z][x];
-                            newBlockDataStrings[y][x][z] = data.blockDataStrings[y][data.sizeZ - 1 - z][x];
+                            newBlockTypes[y][x][z] = data.blockTypes[y][data.sizeX - 1 - z][x];
+                            newBlockDataStrings[y][x][z] = data.blockDataStrings[y][data.sizeX - 1 - z][x];
                         }
                     }
                 }
@@ -966,6 +966,9 @@ public class RegionHandler implements NodeHandler {
             ClipboardData data = clipboards.get(clipboardId);
             if (data == null) throw new IllegalArgumentException("Region clipboard was not found");
             int deg = degrees != null ? degrees : 90;
+            if (deg != 90 && deg != 180 && deg != 270) {
+                throw new IllegalArgumentException("Region rotation must be 90, 180, or 270 degrees");
+            }
 
             Runnable task = () -> {
                 if (deg == 90) {
@@ -976,8 +979,8 @@ public class RegionHandler implements NodeHandler {
                     for (int y = 0; y < data.sizeY; y++) {
                         for (int x = 0; x < newSizeX; x++) {
                             for (int z = 0; z < newSizeZ; z++) {
-                                newBlockTypes[y][x][z] = data.blockTypes[y][data.sizeZ - 1 - z][x];
-                                newBlockDataStrings[y][x][z] = data.blockDataStrings[y][data.sizeZ - 1 - z][x];
+                                newBlockTypes[y][x][z] = data.blockTypes[y][data.sizeX - 1 - z][x];
+                                newBlockDataStrings[y][x][z] = data.blockDataStrings[y][data.sizeX - 1 - z][x];
                             }
                         }
                     }
@@ -1002,8 +1005,8 @@ public class RegionHandler implements NodeHandler {
                     for (int y = 0; y < data.sizeY; y++) {
                         for (int x = 0; x < newSizeX; x++) {
                             for (int z = 0; z < newSizeZ; z++) {
-                                newBlockTypes[y][x][z] = data.blockTypes[y][z][data.sizeX - 1 - x];
-                                newBlockDataStrings[y][x][z] = data.blockDataStrings[y][z][data.sizeX - 1 - x];
+                                newBlockTypes[y][x][z] = data.blockTypes[y][z][data.sizeZ - 1 - x];
+                                newBlockDataStrings[y][x][z] = data.blockDataStrings[y][z][data.sizeZ - 1 - x];
                             }
                         }
                     }

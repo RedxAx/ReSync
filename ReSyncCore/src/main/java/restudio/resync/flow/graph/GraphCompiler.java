@@ -172,7 +172,7 @@ public final class GraphCompiler {
         pins.values().stream()
             .filter(pin -> pin.direction() == CatalogNodeDescriptor.Direction.INPUT)
             .forEach(pin -> {
-                PinValue configured = node.values().get(pin.id());
+                PinValue configured = node.configuredValues().get(pin.id());
                 if (configured != null) {
                     values.put(pin.id(), configured.value());
                 } else if (pin.defaultValue() != null) {

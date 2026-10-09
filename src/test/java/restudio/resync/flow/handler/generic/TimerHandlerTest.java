@@ -13,6 +13,7 @@ import restudio.flow.data.FlowResourceReference;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.automation.AutomationDefinitionRegistry;
+import restudio.resync.flow.automation.AutomationDefinition;
 import restudio.resync.flow.automation.AutomationInstanceKey;
 import restudio.resync.flow.automation.AutomationScope;
 import restudio.resync.flow.automation.AutomationTaskService;
@@ -169,7 +170,7 @@ class TimerHandlerTest {
         handler.execute(context, node);
 
         AutomationTaskService.TaskSnapshot snapshot = tasks.check(
-            new AutomationInstanceKey("owned_timer", AutomationScope.SERVER, "server"));
+            new AutomationInstanceKey(AutomationDefinition.Kind.TIMER, "owned_timer", AutomationScope.SERVER, "server"));
         assertEquals(player, snapshot.owner());
         assertEquals("server", snapshot.ownerId());
         assertEquals("active", context.outputs.get("state"));

@@ -70,7 +70,7 @@
     "inputs": [
       {"id": "content_id", "displayName": "Content ID", "name": "content_id", "dataType": "string", "defaultValue": "new_item", "description": "Sets the stable ID for this custom item."},
       {"id": "name", "displayName": "Name", "name": "name", "dataType": "string", "defaultValue": "New Item", "description": "Sets the display name stored with the item."},
-      {"id": "material", "displayName": "Material", "name": "material", "dataType": "material", "optionsSource": "server:minecraft:material", "defaultValue": "STICK", "visibleWhen": {"provider": "vanilla"}, "description": "Selects the vanilla material used by the item."},
+      {"id": "material", "displayName": "Material", "name": "material", "dataType": "material", "optionsSource": "server:minecraft:material", "defaultValue": "stick", "visibleWhen": {"provider": "vanilla"}, "description": "Selects the vanilla material used by the item."},
       {"id": "provider", "displayName": "Provider", "name": "provider", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:custom_content:provider", "defaultValue": "vanilla", "description": "Chooses the content provider."},
       {"id": "external_id", "displayName": "External ID", "name": "external_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:custom_content:asset", "visibleWhen": {"provider": "nexo"}, "description": "Selects the provider asset when the provider supplies one."},
       {"id": "custom_model_data", "displayName": "Custom Model Data", "name": "custom_model_data", "dataType": "any", "description": "Sets the custom model data value."},
@@ -181,7 +181,7 @@
     "inputs": [
       {"id": "content_id", "displayName": "Content ID", "name": "content_id", "dataType": "string", "defaultValue": "new_armor", "description": "Sets the stable ID for this custom armor."},
       {"id": "name", "displayName": "Name", "name": "name", "dataType": "string", "defaultValue": "New Armor", "description": "Sets the display name stored with the armor."},
-      {"id": "material", "displayName": "Material", "name": "material", "dataType": "material", "optionsSource": "server:minecraft:material", "defaultValue": "IRON_CHESTPLATE", "visibleWhen": {"provider": "vanilla"}, "description": "Selects the vanilla material used by the armor."},
+      {"id": "material", "displayName": "Material", "name": "material", "dataType": "material", "optionsSource": "server:minecraft:material", "defaultValue": "iron_chestplate", "visibleWhen": {"provider": "vanilla"}, "description": "Selects the vanilla material used by the armor."},
       {"id": "provider", "displayName": "Provider", "name": "provider", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:custom_content:provider", "defaultValue": "vanilla", "description": "Chooses the content provider."},
       {"id": "external_id", "displayName": "External ID", "name": "external_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:custom_content:asset", "visibleWhen": {"provider": "nexo"}, "description": "Selects the provider asset when the provider supplies one."},
       {"id": "custom_model_data", "displayName": "Custom Model Data", "name": "custom_model_data", "dataType": "any", "description": "Sets the custom model data value."},
@@ -288,7 +288,7 @@
     "inputs": [
       {"id": "content_id", "displayName": "Content ID", "name": "content_id", "dataType": "string", "defaultValue": "new_block", "description": "Sets the stable ID for this custom block."},
       {"id": "name", "displayName": "Name", "name": "name", "dataType": "string", "defaultValue": "New Block", "description": "Sets the display name stored with the block."},
-      {"id": "material", "displayName": "Material", "name": "material", "dataType": "material", "optionsSource": "server:minecraft:material", "defaultValue": "STONE", "visibleWhen": {"provider": "vanilla"}, "description": "Selects the vanilla material used by the block."},
+      {"id": "material", "displayName": "Material", "name": "material", "dataType": "material", "optionsSource": "server:minecraft:material", "defaultValue": "stone", "visibleWhen": {"provider": "vanilla"}, "description": "Selects the vanilla material used by the block."},
       {"id": "provider", "displayName": "Provider", "name": "provider", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:custom_content:provider", "defaultValue": "vanilla", "description": "Chooses the content provider."},
       {"id": "external_id", "displayName": "External ID", "name": "external_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:custom_content:asset", "visibleWhen": {"provider": "nexo"}, "description": "Selects the provider asset when the provider supplies one."},
       {"id": "custom_model_data", "displayName": "Custom Model Data", "name": "custom_model_data", "dataType": "any", "description": "Sets the custom model data value."},
@@ -394,7 +394,7 @@
     "inputs": [
       {"id": "content_id", "displayName": "Content ID", "name": "content_id", "dataType": "string", "defaultValue": "new_projectile", "description": "Sets the stable ID for this custom projectile."},
       {"id": "name", "displayName": "Name", "name": "name", "dataType": "string", "defaultValue": "New Projectile", "description": "Sets the display name stored with the projectile."},
-      {"id": "material", "displayName": "Material", "name": "material", "dataType": "material", "optionsSource": "server:minecraft:material", "defaultValue": "ARROW", "visibleWhen": {"provider": "vanilla"}, "description": "Selects the vanilla material used by the projectile."},
+      {"id": "material", "displayName": "Material", "name": "material", "dataType": "material", "optionsSource": "server:minecraft:material", "defaultValue": "arrow", "visibleWhen": {"provider": "vanilla"}, "description": "Selects the vanilla material used by the projectile."},
       {"id": "provider", "displayName": "Provider", "name": "provider", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:custom_content:provider", "defaultValue": "vanilla", "description": "Chooses the content provider."},
       {"id": "external_id", "displayName": "External ID", "name": "external_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:custom_content:asset", "visibleWhen": {"provider": "nexo"}, "description": "Selects the provider asset when the provider supplies one."},
       {"id": "custom_model_data", "displayName": "Custom Model Data", "name": "custom_model_data", "dataType": "any", "description": "Sets the custom model data value."},

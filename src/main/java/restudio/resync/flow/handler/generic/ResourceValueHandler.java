@@ -8,12 +8,14 @@ import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowOperationResult;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowExecutor;
-import restudio.resync.flow.FlowRuntimeAccess;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FunctionCallSupport;
 import restudio.resync.flow.handler.FlowHandlerException;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,9 +26,17 @@ import java.util.function.BiConsumer;
 
 public final class ResourceValueHandler implements NodeHandler {
     private static final Gson GSON = new Gson();
+    private final FlowStorage storage;
+    private final ServerId serverId;
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new LinkedHashMap<>();
 
     public ResourceValueHandler() {
+        this(null, null);
+    }
+
+    public ResourceValueHandler(FlowStorage storage, ServerId serverId) {
+        this.storage = storage;
+        this.serverId = serverId;
         operations.put("run_graph", this::runGraph);
         operations.put("run_graph_id", this::runGraphId);
         operations.put("call_function", this::callFunction);
@@ -65,19 +75,34 @@ public final class ResourceValueHandler implements NodeHandler {
 
     private void runGraphId(FlowContext ctx, FlowNode node) {
         String inputPin = node.getHandlerConfig().getString("resource_pin", "resource");
-        String resourceId = ctx.getInputValue(node, inputPin, String.class, "");
-        if (resourceId == null || resourceId.isBlank()) {
-            throw new FlowHandlerException("GRAPH_ID_REQUIRED", "Flow or command is required",
-                "Select the Flow or command to run");
-        }
-        FlowStorage storage = FlowRuntimeAccess.getStorage();
-        FlowGraph graph = storage != null ? storage.getGraph(resourceId) : null;
         String expectedType = node.getHandlerConfig().getString("resource_type", "");
-        if (graph == null || !expectedType.equals(storage.getGraphResourceType(resourceId))) {
+        ServerResourceLocator locator = requireGraphLocator(ctx.getInputValue(node, inputPin), serverId, expectedType);
+        String resourceId = locator.id();
+        FlowGraph graph = storage != null ? storage.getGraph(expectedType, resourceId) : null;
+        if (graph == null) {
             throw new FlowHandlerException("GRAPH_NOT_FOUND", "Flow or command not found: " + resourceId,
                 "Select an existing " + ("command".equals(expectedType) ? "command" : "Flow"));
         }
         executeGraph(ctx, node, graph);
+    }
+
+    static ServerResourceLocator requireGraphLocator(Object value, ServerId serverId, String expectedType) {
+        if (!(value instanceof ServerResourceLocator locator)) {
+            throw new IllegalArgumentException("Flow or command reference must contain server, type, and ID");
+        }
+        if (serverId == null || !serverId.equals(locator.serverId())) {
+            throw new IllegalArgumentException("Flow or command reference server does not match this server");
+        }
+        if (!OwnerId.of("restudio.resync").equals(locator.owner())) {
+            throw new IllegalArgumentException("Flow or command reference owner must be restudio.resync");
+        }
+        if (!Set.of("flow", "command").contains(expectedType) || !expectedType.equals(locator.resourceType().value())) {
+            throw new IllegalArgumentException("Flow or command reference type does not match " + expectedType);
+        }
+        if (locator.id().isBlank()) {
+            throw new IllegalArgumentException("Flow or command reference ID is required");
+        }
+        return locator;
     }
 
     private void executeGraph(FlowContext ctx, FlowNode node, FlowGraph graph) {

@@ -102,6 +102,10 @@ public final class GraphValidator {
                 continue;
             }
             CatalogNodeDescriptor definition = owned.descriptor();
+            if (!node.branchConflicts().isEmpty()) {
+                node.branchConflicts().forEach(pin -> diagnostics.add(error("GRAPH.BRANCH_INPUT_AMBIGUOUS", node.instanceId(), pin)));
+                continue;
+            }
             Map<PinId, FunctionBoundaryPins.EffectivePin> endpointPins;
             try {
                 endpointPins = FunctionBoundaryPins.resolve(owned, functionSignature, node);
@@ -128,7 +132,6 @@ public final class GraphValidator {
         }
         validateVariables(graph.variables(), diagnostics);
         validateFunctions(graph, catalog, diagnostics);
-        validateFunctionIds(graph.functions(), diagnostics);
         return ValidationResult.of(diagnostics);
     }
 
@@ -202,6 +205,9 @@ public final class GraphValidator {
         validateMode(node, definition, diagnostics);
         validateBranches(node, definition, pins, diagnostics);
         validateRepeatables(node, definition, pins, diagnostics);
+        if (runtimeManifest != null && node.repeatables().stream().anyMatch(group -> !group.elements().isEmpty())) {
+            diagnostics.add(error("GRAPH.REPEATABLE_RUNTIME_UNAVAILABLE", node.instanceId(), null));
+        }
         validateNodeCapabilities(node, definition, catalog, runtimeManifest, diagnostics);
         validateRuntimeBinding(node, definition, catalog, runtimeManifest, diagnostics);
     }
@@ -366,7 +372,7 @@ public final class GraphValidator {
         Set<InspectorFieldId> knownFields = inspectorFieldMap(definition, owned, catalog).keySet();
         for (CatalogNodeDescriptor.Pin pin : pins.values()) {
             validateConditionReferences(pin.visibility(), knownFields, node.instanceId(), pin.id(), diagnostics);
-            if (node.values().containsKey(pin.id())) {
+            if (node.configuredValues().containsKey(pin.id())) {
                 validateConditionValue(pin.visibility(), values, node.instanceId(), pin.id(), diagnostics);
             }
         }
@@ -733,7 +739,8 @@ public final class GraphValidator {
             if (!functions.add(function.function().canonicalText())) {
                 diagnostics.add(error("IDENTITY.COLLISION", null, null));
             }
-            if (!function.function().serverId().equals(graph.resource().serverId())) {
+            if (!function.function().serverId().equals(graph.resource().serverId())
+                || !"function".equals(function.function().resourceType().value())) {
                 diagnostics.add(error("GRAPH.DEFINITION_MISSING", null, null));
                 continue;
             }
@@ -828,21 +835,9 @@ public final class GraphValidator {
     private static SignatureRef findSignature(FunctionBinding function, List<SignatureRef> signatures) {
         Object rawSignature = function.unknown().get("signatureId");
         String signatureId = rawSignature == null ? function.function().id() : String.valueOf(rawSignature);
-        return signatures.stream().filter(value -> value.signature().id().value().equals(signatureId)).findFirst().orElse(null);
-    }
-
-    private static void validateFunctionIds(List<FunctionBinding> functions, List<Diagnostic> diagnostics) {
-        Set<FunctionParameterId> ids = new HashSet<>();
-        functions.forEach(function -> {
-            function.inputs().forEach(parameter -> addParameterId(parameter, ids, diagnostics));
-            function.outputs().forEach(parameter -> addParameterId(parameter, ids, diagnostics));
-        });
-    }
-
-    private static void addParameterId(FunctionParameter parameter, Set<FunctionParameterId> ids, List<Diagnostic> diagnostics) {
-        if (!ids.add(parameter.parameterId())) {
-            diagnostics.add(error("GRAPH.DUPLICATE_FUNCTION_PARAMETER", null, null));
-        }
+        List<SignatureRef> matches = signatures.stream().filter(value -> value.owned().key().owner().equals(function.function().owner())
+            && value.signature().id().value().equals(signatureId)).toList();
+        return matches.size() == 1 ? matches.getFirst() : null;
     }
 
     private static boolean runtimeCapabilityAvailable(ContractRef<?> capability, RuntimeBindingManifest manifest) {
@@ -876,6 +871,14 @@ public final class GraphValidator {
         Diagnostic.Builder builder = Diagnostic.builder(code, DiagnosticSeverity.ERROR, DiagnosticPhase.SEMANTIC, "graph")
             .messageKey(new ContractRef<>(new OwnerId("resync"), new OperationId("graph-validation")))
             .correlationId(UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8)));
+        if ("GRAPH.BRANCH_INPUT_AMBIGUOUS".equals(code)) {
+            builder.message("Selected branch cases provide conflicting values for the same runtime input pin")
+                .remediation("Use distinct pins or configure the selected cases with the same input value.");
+        }
+        if ("GRAPH.REPEATABLE_RUNTIME_UNAVAILABLE".equals(code)) {
+            builder.message("The active runtime operation does not declare input or output capabilities for repeatable elements")
+                .remediation("Connect ordinary pins; the current runtime contract cannot execute repeatable elements.");
+        }
         Map<String, Object> evidence = new LinkedHashMap<>();
         if (nodeId != null) {
             evidence.put("nodeInstanceId", nodeId.canonicalText());

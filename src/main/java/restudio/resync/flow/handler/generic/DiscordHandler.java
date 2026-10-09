@@ -10,11 +10,8 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +25,7 @@ public class DiscordHandler implements NodeHandler {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
+    private final HttpHandler http = new HttpHandler();
 
     public DiscordHandler() {
         operations.put("discord_webhook_send", (ctx, node) -> {
@@ -276,14 +274,6 @@ public class DiscordHandler implements NodeHandler {
     private boolean sendWebhook(String webhookUrl, String content, Object embedOrEmbeds, String username, String avatarUrl, boolean tts, String messageId) {
         try {
             URL url = validateWebhookUrl(webhookUrl, null);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setInstanceFollowRedirects(false);
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
-            connection.setDoOutput(true);
-
             JsonObject payload = new JsonObject();
             if (content != null && !content.isEmpty()) {
                 payload.addProperty("content", content);
@@ -300,14 +290,11 @@ public class DiscordHandler implements NodeHandler {
             }
             payload.addProperty("tts", tts);
 
-            try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
-            }
-
-            int responseCode = connection.getResponseCode();
-            return responseCode >= 200 && responseCode < 300;
+            return request("POST", url, payload);
         } catch (Exception exception) {
+            if (exception instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             throw new IllegalStateException("Discord webhook send failed", exception);
         }
     }
@@ -315,30 +302,19 @@ public class DiscordHandler implements NodeHandler {
     private boolean editWebhookMessage(String webhookUrl, String messageId, String content, List<Map<String, Object>> embeds) {
         try {
             URL url = validateWebhookUrl(webhookUrl, messageId);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setInstanceFollowRedirects(false);
-            connection.setRequestMethod("PATCH");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
-            connection.setDoOutput(true);
-
             JsonObject payload = new JsonObject();
-            if (content != null && !content.isEmpty()) {
+            if (content != null) {
                 payload.addProperty("content", content);
             }
-            if (embeds != null && !embeds.isEmpty()) {
+            if (embeds != null) {
                 payload.add("embeds", GSON.toJsonTree(embeds));
             }
 
-            try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
-            }
-
-            int responseCode = connection.getResponseCode();
-            return responseCode >= 200 && responseCode < 300;
+            return request("PATCH", url, payload);
         } catch (Exception exception) {
+            if (exception instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             throw new IllegalStateException("Discord webhook edit failed", exception);
         }
     }
@@ -346,16 +322,24 @@ public class DiscordHandler implements NodeHandler {
     private boolean deleteWebhookMessage(String webhookUrl, String messageId) {
         try {
             URL url = validateWebhookUrl(webhookUrl, messageId);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setInstanceFollowRedirects(false);
-            connection.setRequestMethod("DELETE");
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
-            int responseCode = connection.getResponseCode();
-            return responseCode >= 200 && responseCode < 300;
+            return request("DELETE", url, null);
         } catch (Exception exception) {
+            if (exception instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             throw new IllegalStateException("Discord webhook delete failed", exception);
         }
+    }
+
+    private boolean request(String method, URL url, JsonObject payload) throws Exception {
+        Map<String, Object> response = http.makeHttpRequest(method, url.toExternalForm(), payload, Map.of(), 10_000);
+        int status = ((Number) response.get("status_code")).intValue();
+        return status >= 200 && status < 300;
+    }
+
+    @Override
+    public void shutdown() {
+        http.shutdown();
     }
 
     private URL validateWebhookUrl(String value, String messageId) throws Exception {

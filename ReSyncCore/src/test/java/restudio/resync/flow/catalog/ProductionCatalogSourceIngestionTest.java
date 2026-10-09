@@ -91,6 +91,7 @@ class ProductionCatalogSourceIngestionTest {
         Map.entry("server-minecraft-material", "material"),
         Map.entry("server-minecraft-particle", "string"),
         Map.entry("server-minecraft-potion-effect", "potion_effect"),
+        Map.entry("server-minecraft-scoreboard-objective", "string"),
         Map.entry("server-minecraft-sound", "sound"),
         Map.entry("server-resync-advancement-tree", "advancement_tree_id"),
         Map.entry("server-resync-chat", "chat_id"),

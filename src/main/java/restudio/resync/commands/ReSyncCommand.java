@@ -176,6 +176,16 @@ public class ReSyncCommand implements TabExecutor {
             if (status.enabled()) {
                 sender.sendMessage("Node: " + status.nodeId() + " | Hub: " + status.hubUrl());
                 sender.sendMessage("Retries: " + status.retries() + (status.failure().isBlank() ? "" : " | Last Failure: " + status.failure()));
+                var server = plugin.getReSyncServer();
+                var resources = server == null ? null : server.getNetworkResourceSynchronizer();
+                if (resources != null) {
+                    Map<String, String> blocked = resources.blockedResources();
+                    if (!blocked.isEmpty()) {
+                        sender.sendMessage("Preserved Resources Awaiting Recovery: " + blocked.size());
+                        blocked.entrySet().stream().sorted(Map.Entry.comparingByKey())
+                            .forEach(entry -> sender.sendMessage(entry.getKey() + " | " + entry.getValue()));
+                    }
+                }
             }
             return true;
         }
@@ -247,6 +257,8 @@ public class ReSyncCommand implements TabExecutor {
         sendInfo(sender, "Open Connections", String.valueOf(status.get("openConnections")));
         sendInfo(sender, "Queue", status.get("queueMaxGlobalRequests") + " global / " + status.get("queueMaxRequestsPerClient") + " per client");
         sendInfo(sender, "Memory", status.get("sessionMemoryBytes") + "/" + status.get("sessionMemoryLimitBytes"));
+        sendInfo(sender, "Active Data Folder", String.valueOf(status.get("activeDataFolder")));
+        sendInfo(sender, "Recovery Folder", String.valueOf(status.get("recoveryFolder")));
         TemporaryLifecycleDiagnostics.HotPathSnapshot hotPath = TemporaryLifecycleDiagnostics.hotPathSnapshot();
         sendInfo(sender, "Resident Plans", hotPath.residentPlanHits() + " hits · " + hotPath.residentPlanMisses()
             + " misses · " + hotPath.residentPlanReplacements() + " replacements · "
@@ -1113,7 +1125,7 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.DIALOG -> List.of("displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape", "after_action", "columns", "body", "inputs", "actions");
             case ReSyncResourceCatalog.TRADE_PROFILE -> List.of("displayName", "enabled", "profession", "villagerType", "level", "maxUses", "restockTicks", "lootTable", "offers", "hooks.openAction", "hooks.completeAction", "hooks.deniedAction");
             case ReSyncResourceCatalog.NPC_DEFINITION -> List.of("displayName", "enabled", "entityType", "skin.username", "ai", "gravity", "invulnerable", "followPlayer", "followRange", "dialog", "tradeProfile", "lootTable", "equipment.mainHand", "equipment.offHand", "equipment.helmet", "equipment.chestplate", "equipment.leggings", "equipment.boots", "hooks.spawnAction", "hooks.interactAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.damageAction", "hooks.deathAction", "hooks.despawnAction");
-            case ReSyncResourceCatalog.LOOT_TABLE -> List.of("displayName", "enabled", "trigger", "trigger.event", "trigger.target", "trigger.entity", "trigger.tool", "trigger.overrideDrops", "pools", "pools.0.rolls", "pools.0.entries.0.item", "pools.0.entries.0.minAmount", "pools.0.entries.0.maxAmount", "pools.0.entries.0.weight", "pools.0.entries.0.chance", "hooks.beforeRollFlow", "hooks.afterRollFlow", "hooks.deniedRollFlow");
+            case ReSyncResourceCatalog.LOOT_TABLE -> List.of("displayName", "enabled", "trigger", "trigger.event", "trigger.target", "trigger.entity", "trigger.tool", "trigger.overrideDrops", "pools", "pools.0.rolls", "pools.0.entries.0.item", "pools.0.entries.0.minAmount", "pools.0.entries.0.maxAmount", "pools.0.entries.0.weight", "pools.0.entries.0.chance", "hooks.beforeRollAction", "hooks.afterRollAction", "hooks.deniedRollAction");
             default -> List.of("enabled", "priority", "displayName", "template", "prefix", "format");
         };
     }
@@ -1319,9 +1331,6 @@ public class ReSyncCommand implements TabExecutor {
                 pools.add(pool);
                 resource.add("pools", pools);
                 JsonObject hooks = new JsonObject();
-                hooks.addProperty("beforeRollFlow", "");
-                hooks.addProperty("afterRollFlow", "");
-                hooks.addProperty("deniedRollFlow", "");
                 resource.add("hooks", hooks);
             }
             default -> resource.addProperty("displayName", id);

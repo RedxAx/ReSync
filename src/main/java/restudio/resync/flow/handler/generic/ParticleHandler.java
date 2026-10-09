@@ -2,8 +2,10 @@ package restudio.resync.flow.handler.generic;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Registry;
+import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -18,7 +20,9 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +34,8 @@ public class ParticleHandler implements NodeHandler {
     private static final int MAX_TEXT_IMAGE_HEIGHT = 160;
     private static final int MAX_TEXT_PARTICLES = 500;
     private static final int MAX_PARTICLES_PER_ACTION = 10_000;
+    private final Font textFont = new Font("Arial", Font.BOLD, 100);
+    private final Map<String, List<TextPoint>> textPoints = new LinkedHashMap<>(16, 0.75f, true);
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public ParticleHandler() {
@@ -53,25 +59,15 @@ public class ParticleHandler implements NodeHandler {
     }
 
     private void applyLegacyParticle(FlowContext ctx, FlowNode node, String mode) {
-        Map<String, Object> inputs = new HashMap<>(node.getInputValues() != null ? node.getInputValues() : Map.of());
-        inputs.put("mode", mode);
-        copyIfMissing(inputs, "particle", "particle_type");
-        copyIfMissing(inputs, "location", "center_location");
-        copyIfMissing(inputs, "filled", "is_filled");
-        copyIfMissing(inputs, "count", "points");
-        FlowNode particleNode = new FlowNode("particle.apply", node.getX(), node.getY(), inputs);
-        particleNode.setHandlerConfig(Map.of("operation", "particle_apply"));
-        applyParticle(ctx, particleNode);
-    }
-
-    private void copyIfMissing(Map<String, Object> inputs, String target, String source) {
-        if (!inputs.containsKey(target) && inputs.containsKey(source)) {
-            inputs.put(target, inputs.get(source));
-        }
+        applyParticle(ctx, node, mode);
     }
 
     private void applyParticle(FlowContext ctx, FlowNode node) {
-        String spawnType = text(ctx, node, "mode", text(ctx, node, "spawn_type", "point")).toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+        applyParticle(ctx, node, text(ctx, node, "mode", text(ctx, node, "spawn_type", "point")));
+    }
+
+    private void applyParticle(FlowContext ctx, FlowNode node, String mode) {
+        String spawnType = mode.toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
         String particleName = text(ctx, node, "particle", text(ctx, node, "particle_type", "FLAME"));
         Particle particle = parseParticle(particleName);
 
@@ -115,9 +111,46 @@ public class ParticleHandler implements NodeHandler {
         int count = boundedCount(integer(ctx, node, "count", 24), 0, "count");
         double spread = decimal(ctx, node, "spread", 0.6);
         double speed = decimal(ctx, node, "speed", 0.02);
-        if (spread < 0.0 || spread > 1024.0) throw new IllegalArgumentException("Particle burst spread must be between 0 and 1024");
+        spawnBurst(location, particle, count, spread, speed);
+    }
+
+    void spawnBurst(Location location, Particle particle, int count, double spread, double speed) {
+        requireLocation(location);
+        boundedCount(count, 0, "count");
+        if (!Double.isFinite(spread) || spread < 0.0 || spread > 1024.0) throw new IllegalArgumentException("Particle burst spread must be between 0 and 1024");
         requireParticleMotion(spread, spread, spread, speed);
+        if (count == 0) return;
         run(location, () -> location.getWorld().spawnParticle(particle, location, count, spread, spread, spread, speed, null));
+    }
+
+    void spawnShape(Location center, Particle particle, String mode, int count, double radius, double speed) {
+        requireLocation(center);
+        World world = center.getWorld();
+        boundedCount(count, 0, "count");
+        if (!Double.isFinite(radius) || radius < 0 || radius > 128) throw new IllegalArgumentException("Particle shape radius must be between 0 and 128");
+        requireParticleMotion(0, 0, 0, speed);
+        String normalized = mode == null ? "ring" : mode.toLowerCase(Locale.ROOT);
+        if (!List.of("burst", "line", "ring", "orbit").contains(normalized)) throw new IllegalArgumentException("Unknown particle shape mode: " + mode);
+        if (count == 0) return;
+        if ("burst".equals(normalized)) {
+            spawnBurst(center, particle, count, radius, speed);
+            return;
+        }
+        if ("line".equals(normalized)) {
+            Vector direction = center.getDirection();
+            for (int i = 0; i < count; i++) {
+                double distance = count == 1 ? 0 : -radius + radius * 2.0 * i / (count - 1);
+                Location point = center.clone().add(direction.clone().multiply(distance));
+                world.spawnParticle(particle, point, 1, 0, 0, 0, speed);
+            }
+            return;
+        }
+        for (int i = 0; i < count; i++) {
+            double angle = Math.PI * 2.0 * i / count;
+            double y = "orbit".equals(normalized) ? Math.sin(angle * 2.0) * radius * 0.5 : 0.0;
+            Location point = center.clone().add(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+            world.spawnParticle(particle, point, 1, 0, 0, 0, speed);
+        }
     }
 
     private void spawnForPlayer(FlowContext ctx, FlowNode node, Particle particle) {
@@ -305,7 +338,7 @@ public class ParticleHandler implements NodeHandler {
         run(center, () -> {
             for (int i = 0; i < count; i++) {
                 double progress = i / (double) count;
-                double angle = (2 * Math.PI * i) % (2 * Math.PI);
+                double angle = Math.PI * (3.0 - Math.sqrt(5.0)) * i;
                 Location loc = new Location(center.getWorld(),
                     center.getX() + radius * progress * Math.cos(angle),
                     center.getY() + height * progress,
@@ -357,14 +390,14 @@ public class ParticleHandler implements NodeHandler {
         int steps = boundedCount((int) Math.ceil(length * 10.0), 1, "steps");
         requireParticleBudget(steps + 1L);
         Vector dir = direction.clone().normalize();
+        Vector cross = dir.clone().getCrossProduct(new Vector(0, 1, 0));
+        Vector waveDir = cross.lengthSquared() < 0.0001 ? new Vector(0, 0, 1) : cross.normalize();
         run(start, () -> {
             for (int i = 0; i <= steps; i++) {
                 double distance = (length * i) / steps;
                 double waveOffset = Math.sin(distance * frequency) * amplitude;
                 Vector forward = dir.clone().multiply(distance);
-                Vector waveDir = dir.clone().getCrossProduct(new Vector(0, 1, 0)).normalize();
-                if (waveDir.length() < 0.1) waveDir = new Vector(0, 0, 1);
-                Location loc = start.clone().add(forward).add(waveDir.multiply(waveOffset));
+                Location loc = start.clone().add(forward).add(waveDir.clone().multiply(waveOffset));
                 start.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
             }
         });
@@ -379,49 +412,13 @@ public class ParticleHandler implements NodeHandler {
             throw new IllegalArgumentException("Particle text is required");
         }
         if (size <= 0.0 || size > 10.0) throw new IllegalArgumentException("Particle text size must be between 0 and 10");
+        List<TextPoint> points = textPoints(text);
+        double scale = size / 10.0;
         run(location, () -> {
-            Font font = new Font("Arial", Font.BOLD, 100);
-            BufferedImage measure = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D measureGraphics = measure.createGraphics();
-            measureGraphics.setFont(font);
-            FontMetrics fm = measureGraphics.getFontMetrics();
-            int textWidth = fm.stringWidth(text);
-            int textHeight = fm.getHeight();
-            if (textWidth + 24 > MAX_TEXT_IMAGE_WIDTH || textHeight + 24 > MAX_TEXT_IMAGE_HEIGHT) {
-                measureGraphics.dispose();
-                throw new IllegalArgumentException("Particle text exceeds the render bounds");
+            for (TextPoint point : points) {
+                Location position = location.clone().add(point.x() * scale, point.y() * scale, 0);
+                location.getWorld().spawnParticle(particle, position, 1, 0, 0, 0, 0);
             }
-            int imageWidth = Math.min(MAX_TEXT_IMAGE_WIDTH, Math.max(64, textWidth + 24));
-            int imageHeight = Math.min(MAX_TEXT_IMAGE_HEIGHT, Math.max(64, textHeight + 24));
-            measureGraphics.dispose();
-            BufferedImage image = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2d = image.createGraphics();
-            g2d.setFont(font);
-            g2d.setColor(Color.WHITE);
-            g2d.drawString(text, 12, 12 + fm.getAscent());
-            g2d.dispose();
-            int minPixelX = imageWidth;
-            int maxPixelX = 0;
-            int minPixelY = imageHeight;
-            int maxPixelY = 0;
-            for (int y = 0; y < imageHeight; y += 2) {
-                for (int x = 0; x < imageWidth; x += 2) {
-                    int rgb = image.getRGB(x, y);
-                    if ((rgb & 0xFF000000) != 0) {
-                        minPixelX = Math.min(minPixelX, x);
-                        maxPixelX = Math.max(maxPixelX, x);
-                        minPixelY = Math.min(minPixelY, y);
-                        maxPixelY = Math.max(maxPixelY, y);
-                    }
-                }
-            }
-            if (minPixelX > maxPixelX || minPixelY > maxPixelY) {
-                throw new IllegalArgumentException("Particle text did not produce renderable pixels");
-            }
-            double centerPixelX = (minPixelX + maxPixelX) / 2.0;
-            double centerPixelY = (minPixelY + maxPixelY) / 2.0;
-            double particleScale = size / 10.0;
-            emitTextParticles(location, particle, image, imageWidth, imageHeight, centerPixelX, centerPixelY, particleScale);
         });
     }
 
@@ -431,31 +428,75 @@ public class ParticleHandler implements NodeHandler {
         return value;
     }
 
-    private void emitTextParticles(Location location, Particle particle, BufferedImage image, int imageWidth, int imageHeight, double centerPixelX, double centerPixelY, double particleScale) {
-        int opaquePixels = 0;
-        for (int y = 0; y < imageHeight; y += 2) {
-            for (int x = 0; x < imageWidth; x += 2) {
-                if ((image.getRGB(x, y) & 0xFF000000) != 0) opaquePixels++;
-            }
+    private synchronized List<TextPoint> textPoints(String text) {
+        List<TextPoint> resident = textPoints.get(text);
+        if (resident != null) return resident;
+        BufferedImage measure = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = measure.createGraphics();
+        FontMetrics metrics;
+        int width;
+        int height;
+        try {
+            graphics.setFont(textFont);
+            metrics = graphics.getFontMetrics();
+            width = metrics.stringWidth(text) + 24;
+            height = metrics.getHeight() + 24;
+        } finally {
+            graphics.dispose();
         }
-        double interval = opaquePixels > MAX_TEXT_PARTICLES ? opaquePixels / (double) MAX_TEXT_PARTICLES : 1.0;
-        double nextEmission = 0.0;
-        int visited = 0;
-        int emitted = 0;
-        for (int y = 0; y < imageHeight; y += 2) {
-            for (int x = 0; x < imageWidth; x += 2) {
-                int rgb = image.getRGB(x, y);
-                if ((rgb & 0xFF000000) != 0) {
-                    if (emitted < MAX_TEXT_PARTICLES && visited >= Math.floor(nextEmission)) {
-                        Location loc = location.clone().add((x - centerPixelX) * particleScale, (centerPixelY - y) * particleScale, 0);
-                        location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        emitted++;
-                        nextEmission += interval;
-                    }
-                    visited++;
+        if (width > MAX_TEXT_IMAGE_WIDTH || height > MAX_TEXT_IMAGE_HEIGHT) {
+            throw new IllegalArgumentException("Particle text exceeds the render bounds");
+        }
+        BufferedImage image = new BufferedImage(Math.max(64, width), Math.max(64, height), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D raster = image.createGraphics();
+        try {
+            raster.setFont(textFont);
+            raster.setColor(Color.WHITE);
+            raster.drawString(text, 12, 12 + metrics.getAscent());
+        } finally {
+            raster.dispose();
+        }
+        List<TextPoint> pixels = new ArrayList<>();
+        int minX = image.getWidth();
+        int maxX = 0;
+        int minY = image.getHeight();
+        int maxY = 0;
+        for (int y = 0; y < image.getHeight(); y += 2) {
+            for (int x = 0; x < image.getWidth(); x += 2) {
+                if ((image.getRGB(x, y) & 0xFF000000) != 0) {
+                    pixels.add(new TextPoint(x, y));
+                    minX = Math.min(minX, x);
+                    maxX = Math.max(maxX, x);
+                    minY = Math.min(minY, y);
+                    maxY = Math.max(maxY, y);
                 }
             }
         }
+        if (pixels.isEmpty()) throw new IllegalArgumentException("Particle text did not produce renderable pixels");
+        double centerX = (minX + maxX) / 2.0;
+        double centerY = (minY + maxY) / 2.0;
+        double interval = pixels.size() > MAX_TEXT_PARTICLES ? pixels.size() / (double) MAX_TEXT_PARTICLES : 1.0;
+        List<TextPoint> selected = new ArrayList<>();
+        double next = 0.0;
+        for (int visited = 0; visited < pixels.size() && selected.size() < MAX_TEXT_PARTICLES; visited++) {
+            if (visited >= Math.floor(next)) {
+                TextPoint pixel = pixels.get(visited);
+                selected.add(new TextPoint(pixel.x() - centerX, centerY - pixel.y()));
+                next += interval;
+            }
+        }
+        List<TextPoint> admitted = List.copyOf(selected);
+        if (textPoints.size() >= 128) textPoints.remove(textPoints.keySet().iterator().next());
+        textPoints.put(text, admitted);
+        return admitted;
+    }
+
+    private record TextPoint(double x, double y) {
+    }
+
+    @Override
+    public synchronized void shutdown() {
+        textPoints.clear();
     }
 
     private void spawnBlockDust(FlowContext ctx, FlowNode node) {
@@ -493,19 +534,16 @@ public class ParticleHandler implements NodeHandler {
         });
     }
 
-    private Particle parseParticle(String name) {
+    Particle parseParticle(String name) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Particle is required");
         }
         String value = name.trim();
         if (value.contains(":")) {
-            String key = value.toLowerCase(Locale.ROOT);
-            for (Particle particle : Registry.PARTICLE_TYPE) {
-                if (particle.getKey().toString().equalsIgnoreCase(key)) {
-                    return particle;
-                }
-            }
-            value = value.substring(value.indexOf(':') + 1);
+            NamespacedKey key = NamespacedKey.fromString(value.toLowerCase(Locale.ROOT));
+            Particle particle = key != null ? Registry.PARTICLE_TYPE.get(key) : null;
+            if (particle == null) throw new IllegalArgumentException("Unknown particle: " + name);
+            return particle;
         }
         value = value.replace('.', '_').replace('-', '_');
         try {
@@ -543,12 +581,12 @@ public class ParticleHandler implements NodeHandler {
         if (Math.abs(offsetX) > 1024.0 || Math.abs(offsetY) > 1024.0 || Math.abs(offsetZ) > 1024.0) {
             throw new IllegalArgumentException("Particle offsets cannot exceed 1024");
         }
-        if (speed < 0.0 || speed > 100.0) throw new IllegalArgumentException("Particle speed must be between 0 and 100");
+        if (!Double.isFinite(speed) || speed < 0.0 || speed > 100.0) throw new IllegalArgumentException("Particle speed must be between 0 and 100");
     }
 
     private void requireDirection(Vector direction, String name) {
         if (direction == null || !Double.isFinite(direction.getX()) || !Double.isFinite(direction.getY()) || !Double.isFinite(direction.getZ())
-            || direction.lengthSquared() == 0.0) {
+            || !Double.isFinite(direction.lengthSquared()) || direction.lengthSquared() == 0.0) {
             throw new IllegalArgumentException(name + " must be finite and non-zero");
         }
     }
@@ -582,6 +620,7 @@ public class ParticleHandler implements NodeHandler {
         if (!valid(location)) {
             throw new IllegalArgumentException("World location is required");
         }
+        location.checkFinite();
     }
 
     private void requireSameWorld(Location first, Location second) {
@@ -593,7 +632,9 @@ public class ParticleHandler implements NodeHandler {
     }
 
     private Location location(FlowContext ctx, FlowNode node, String pin) {
-        return ctx.getInputValue(node, pin, Location.class, null);
+        Location value = ctx.getInputValue(node, pin, Location.class, null);
+        if (value == null && "location".equals(pin)) value = ctx.getInputValue(node, "center_location", Location.class, null);
+        return value;
     }
 
     private String text(FlowContext ctx, FlowNode node, String pin, String fallback) {

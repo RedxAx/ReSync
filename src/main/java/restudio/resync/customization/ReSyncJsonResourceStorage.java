@@ -39,6 +39,8 @@ import restudio.resync.storage.ProjectMetadataLineage;
 import restudio.resync.storage.StorageSafety;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.MemoryCacheImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -62,6 +64,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ReSyncJsonResourceStorage {
+    private static final int MAX_ICON_BYTES = 1024 * 1024;
+    private static final int MAX_ICON_TEXT = 4 * ((MAX_ICON_BYTES + 2) / 3);
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final Map<String, JsonAssetStore<JsonObject>> stores = new LinkedHashMap<>();
     private final Map<String, CachedIconData> iconDataCache = new ConcurrentHashMap<>();
@@ -91,7 +95,7 @@ public class ReSyncJsonResourceStorage {
         JsonAssetInventory scan(Path root) throws IOException;
     }
 
-    private record CachedIconData(long modified, long size, String data, String hash) {
+    private record CachedIconData(long revision, String mutation, String data, String hash) {
     }
 
     public record ResourceSnapshotValue(String id, JsonObject value, JsonAssetStore.AssetStamp stamp) {
@@ -191,7 +195,8 @@ public class ReSyncJsonResourceStorage {
                     this::persistenceMutationOpen,
                     this::acquireStoreMutation,
                     payloadMerger(type),
-                    ProjectMetadataLineage.writer(candidateAssetsRoot, gson)
+                    ProjectMetadataLineage.writer(candidateAssetsRoot, gson),
+                    JsonObject::deepCopy
                 ));
             }
             return candidateStores;
@@ -443,7 +448,7 @@ public class ReSyncJsonResourceStorage {
                 "hooks.deathAction", "hooks.despawnAction");
             case ReSyncResourceCatalog.LOOT_TABLE -> Set.of(
                 "id", "folder", "displayName", "enabled", "trigger", "trigger.event", "trigger.target", "trigger.entity", "trigger.tool",
-                "trigger.overrideDrops", "pools", "hooks", "hooks.beforeRollFlow", "hooks.afterRollFlow", "hooks.deniedRollFlow");
+                "trigger.overrideDrops", "pools", "hooks", "hooks.beforeRollAction", "hooks.afterRollAction", "hooks.deniedRollAction");
             case ReSyncResourceCatalog.VARIABLE_DEFINITION -> Set.of(
                 "id", "folder", "name", "displayName", "description", "valueType", "type", "scope", "persistent", "defaultValue");
             case ReSyncResourceCatalog.TIMER_DEFINITION -> Set.of(
@@ -691,6 +696,12 @@ public class ReSyncJsonResourceStorage {
 
     public boolean supportsAuthoritativeMutationIdentity() {
         return true;
+    }
+
+    public JsonAssetStore.AssetStamp readAssetStamp(String type, String id) {
+        try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+            return requireStore(type).readStamp(id);
+        }
     }
 
     public FlowResourceMutationStamp readMutationStamp(String type, String id) {
@@ -1116,7 +1127,7 @@ public class ReSyncJsonResourceStorage {
             return copy;
         }
         Path icon = resolveIconPath(text(copy, "icon"));
-        if (icon == null || !Files.isRegularFile(icon)) {
+        if (icon == null) {
             return copy;
         }
         try {
@@ -1134,26 +1145,53 @@ public class ReSyncJsonResourceStorage {
     }
 
     private CachedIconData cachedIconData(Path icon) throws IOException {
-        Path canonicalRoot = assetsRoot.toRealPath();
-        Path canonicalIcon = icon.toRealPath();
-        if (canonicalIcon.equals(canonicalRoot) || !canonicalIcon.startsWith(canonicalRoot)) {
+        Path root = assetsRoot.toAbsolutePath().normalize();
+        Path path = icon.toAbsolutePath().normalize();
+        if (path.equals(root) || !path.startsWith(root)) {
             throw new IOException("MOTD icon is outside coordinated asset storage");
         }
-        String key = canonicalIcon.toString();
-        long modified = Files.getLastModifiedTime(canonicalIcon).toMillis();
-        long size = Files.size(canonicalIcon);
-        CachedIconData cached = iconDataCache.get(key);
-        if (cached != null && cached.modified() == modified && cached.size() == size) {
+        String relative = root.relativize(path).toString().replace('\\', '/');
+        AssetKey key = new AssetKey("blob", StorageSafety.sha256(relative.getBytes(StandardCharsets.UTF_8)));
+        Snapshot snapshot = requireCoordinator().read(current -> current);
+        ExpectedState state = snapshot.state(key).orElse(null);
+        String mutation = snapshot.mutationValue(key).orElse(null);
+        if (!(state instanceof Live live) || mutation == null
+            || !snapshot.path(key).filter(path::equals).isPresent()) {
+            iconDataCache.remove(relative);
+            throw new IOException("MOTD icon has no committed asset state");
+        }
+        CachedIconData cached = iconDataCache.get(relative);
+        if (cached != null && cached.revision() == live.revision()
+            && cached.mutation().equals(mutation) && cached.hash().equals(live.hash())) {
             return cached;
         }
-        byte[] bytes = Files.readAllBytes(canonicalIcon);
+        MigrationPaths.requireNoSymlinkTraversal(root, path);
+        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("MOTD icon is not a regular asset file");
+        }
+        byte[] bytes = readIconBytes(path);
+        if (!live.hash().equals(StorageSafety.sha256(bytes))) {
+            iconDataCache.remove(relative);
+            throw new IOException("MOTD icon does not match its committed asset state");
+        }
         BufferedImage image = validPngIcon(bytes);
         if (image == null) {
-            iconDataCache.remove(key);
+            iconDataCache.remove(relative);
             return null;
         }
-        CachedIconData fresh = new CachedIconData(modified, size, Base64.getEncoder().encodeToString(bytes), sha256(bytes));
-        iconDataCache.put(key, fresh);
+        CachedIconData fresh = new CachedIconData(live.revision(), mutation, Base64.getEncoder().encodeToString(bytes), live.hash());
+        boolean published = requireCoordinator().read(current -> {
+            if (current.state(key).filter(live::equals).isPresent()
+                && current.mutationValue(key).filter(mutation::equals).isPresent()
+                && current.path(key).filter(path::equals).isPresent()) {
+                iconDataCache.put(relative, fresh);
+                return true;
+            }
+            return false;
+        });
+        if (!published) {
+            throw new IOException("MOTD icon changed during asset admission");
+        }
         return fresh;
     }
 
@@ -1162,9 +1200,16 @@ public class ReSyncJsonResourceStorage {
         if (iconData.isBlank()) {
             return null;
         }
+        if (iconData.length() > MAX_ICON_TEXT + 128) {
+            throw new IllegalArgumentException("MOTD icon exceeds its byte limit");
+        }
+        String encoded = stripImageDataPrefix(iconData);
+        if (encoded.length() > MAX_ICON_TEXT) {
+            throw new IllegalArgumentException("MOTD icon exceeds its byte limit");
+        }
         byte[] bytes;
         try {
-            bytes = Base64.getDecoder().decode(stripImageDataPrefix(iconData));
+            bytes = Base64.getDecoder().decode(encoded);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("MOTD icon must be valid PNG data");
         }
@@ -1184,17 +1229,43 @@ public class ReSyncJsonResourceStorage {
         return bytes;
     }
 
+    private byte[] readIconBytes(Path path) throws IOException {
+        if (Files.size(path) > MAX_ICON_BYTES) {
+            throw new IOException("MOTD icon exceeds its byte limit");
+        }
+        try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
+            byte[] bytes = input.readNBytes(MAX_ICON_BYTES + 1);
+            if (bytes.length > MAX_ICON_BYTES) {
+                throw new IOException("MOTD icon exceeds its byte limit");
+            }
+            return bytes;
+        }
+    }
+
     private BufferedImage validPngIcon(byte[] bytes) {
-        if (!hasPngSignature(bytes)) {
+        if (!hasPngSignature(bytes) || bytes.length > MAX_ICON_BYTES) {
             return null;
         }
-        try {
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-            if (image == null || image.getWidth() != 64 || image.getHeight() != 64) {
+        try (var input = new MemoryCacheImageInputStream(new ByteArrayInputStream(bytes))) {
+            var readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
                 return null;
             }
-            return image;
-        } catch (IOException e) {
+            ImageReader reader = readers.next();
+            try {
+                if (!"png".equalsIgnoreCase(reader.getFormatName())) {
+                    return null;
+                }
+                reader.setInput(input, true, true);
+                if (reader.getWidth(0) != 64 || reader.getHeight(0) != 64) {
+                    return null;
+                }
+                BufferedImage image = reader.read(0);
+                return image != null && image.getWidth() == 64 && image.getHeight() == 64 ? image : null;
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException | RuntimeException failure) {
             return null;
         }
     }

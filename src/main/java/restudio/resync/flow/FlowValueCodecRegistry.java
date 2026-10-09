@@ -472,6 +472,7 @@ public final class FlowValueCodecRegistry {
         Map<String, Object> encoded = new LinkedHashMap<>();
         encoded.put("definitionId", handle.definitionId());
         encoded.put("entityUuid", handle.entityUuid());
+        encoded.put("instanceUuid", handle.instanceUuid());
         encoded.put("packetBacked", handle.packetBacked());
         encoded.put("active", handle.active());
         encoded.put("world", handle.world());
@@ -485,7 +486,7 @@ public final class FlowValueCodecRegistry {
 
     private FlowNpcHandle decodeNpcHandle(Object value) {
         Map<?, ?> encoded = map(value);
-        return new FlowNpcHandle(string(encoded.get("definitionId")), string(encoded.get("entityUuid")), bool(encoded.get("packetBacked")),
+        return new FlowNpcHandle(string(encoded.get("definitionId")), string(encoded.get("entityUuid")), string(encoded.get("instanceUuid")), bool(encoded.get("packetBacked")),
             bool(encoded.get("active")), string(encoded.get("world")), number(encoded.get("x")).doubleValue(), number(encoded.get("y")).doubleValue(),
             number(encoded.get("z")).doubleValue(), number(encoded.get("yaw")).floatValue(), number(encoded.get("pitch")).floatValue());
     }

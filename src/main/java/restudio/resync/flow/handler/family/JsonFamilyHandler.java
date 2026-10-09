@@ -1,6 +1,7 @@
 package restudio.resync.flow.handler.family;
 
 import org.bukkit.World;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
@@ -10,7 +11,9 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.Container;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Ageable;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemFlag;
@@ -28,6 +31,7 @@ import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.ItemStackPropertySelector;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.handler.property.PropertyHandler;
 import restudio.resync.flow.handler.property.PropertyRegistry;
 import restudio.resync.flow.registry.NodeDefinition;
 
@@ -63,6 +67,78 @@ public class JsonFamilyHandler implements NodeHandler {
         registry.register("itemstack", new JsonFamilyHandler("itemstack", propertyRegistry));
     }
 
+    public static List<String> nativeActions(String family, String property) {
+        List<Class<?>> types = switch (family) {
+            case "player" -> List.of(Player.class);
+            case "entity" -> List.of(Entity.class, LivingEntity.class, Ageable.class, Mob.class);
+            case "world" -> List.of(World.class);
+            case "block" -> List.of(Block.class);
+            case "inventory" -> List.of(Inventory.class, PlayerInventory.class);
+            case "itemstack" -> List.of(ItemStack.class);
+            default -> List.of();
+        };
+        if (types.isEmpty()) {
+            return List.of();
+        }
+        String suffix = toMethodSuffix(property);
+        boolean readable = explicitReader(family, property) || types.stream().flatMap(type -> Arrays.stream(type.getMethods()))
+            .anyMatch(method -> (method.getName().equals("get" + suffix) || method.getName().equals("is" + suffix))
+                && method.getParameterCount() == 0 && method.getReturnType() != Void.TYPE);
+        boolean writable = switch (family) {
+            case "itemstack" -> Set.of("type", "amount", "display_name", "lore", "durability", "max_durability", "enchantments",
+                "custom_model_data", "unbreakable", "repair_cost", "item_flags", "localized_name").contains(property);
+            case "player", "entity" -> "location".equals(property) || "entity".equals(family) && "baby".equals(property)
+                || hasWriter(types, suffix);
+            default -> hasWriter(types, suffix);
+        };
+        String methodName = toMethodName(property);
+        boolean invokable = Set.of("player", "entity").contains(family) && "kill".equals(property)
+            || types.stream().flatMap(type -> Arrays.stream(type.getMethods()))
+                .anyMatch(method -> (method.getName().equals(methodName) || method.getName().equals("set" + suffix))
+                    && method.getParameterCount() == 0
+                    && (method.getReturnType() == void.class || !readable && method.getReturnType() == boolean.class));
+        List<String> actions = new ArrayList<>();
+        if (readable) {
+            actions.add("get");
+            actions.add("has");
+        }
+        if (writable) {
+            actions.add("set");
+        }
+        if (invokable) {
+            actions.add("do");
+            actions.add("execute");
+        }
+        return List.copyOf(actions);
+    }
+
+    private static boolean hasWriter(List<Class<?>> types, String suffix) {
+        return types.stream().flatMap(type -> Arrays.stream(type.getMethods()))
+            .anyMatch(method -> method.getName().equals("set" + suffix) && method.getParameterCount() == 1);
+    }
+
+    private static boolean explicitReader(String family, String property) {
+        return switch (family) {
+            case "player" -> Set.of("uuid", "gamemode", "world", "inventory", "item_in_hand", "item_in_mainhand", "offhand_item",
+                "item_in_offhand", "xp_level", "exp", "total_exp", "exp_to_level", "allow_flight", "on_ground", "sleeping",
+                "bed_spawn_location", "last_damage", "killer", "ping", "player_list_name", "op", "is_op", "sneak", "fly",
+                "is_flying", "sprint", "vanish", "ip", "online", "whitelisted", "banned", "locale", "armor").contains(property);
+            case "entity" -> Set.of("type", "uuid", "world", "exists", "is_alive", "is_valid", "is_dead", "health", "max_health",
+                "absorption", "type_info").contains(property);
+            case "world" -> Set.of("weather", "weather_type", "has_storm", "difficulty", "environment", "players", "entities",
+                "loaded_chunks", "time_relative", "pvp", "keep_spawn", "thundering", "is_thundering").contains(property);
+            case "block" -> Set.of("type", "display_name", "translation_key", "key", "data", "state", "location", "world", "x", "y",
+                "z", "is_solid", "is_liquid", "is_air", "is_occluding", "is_flammable", "is_burnable", "has_gravity", "hardness",
+                "blast_resistance", "slipperiness", "light_level", "light_from_sky", "light_from_blocks", "biome", "temperature",
+                "humidity", "power", "is_powered", "is_indirectly_powered", "is_passable", "container_items").contains(property);
+            case "inventory" -> Set.of("type", "items", "contents", "storage_contents", "first_empty", "max_stack_size", "holder", "armor")
+                .contains(property);
+            case "itemstack" -> Set.of("type", "display_name", "lore", "durability", "max_durability", "enchantments", "custom_model_data",
+                "unbreakable", "item_flags", "repair_cost", "localized_name").contains(property);
+            default -> false;
+        };
+    }
+
     @Override
     public void execute(FlowContext ctx, FlowNode node) {
         String property = null;
@@ -81,11 +157,12 @@ public class JsonFamilyHandler implements NodeHandler {
         if (property == null || property.isBlank()) {
             throw new IllegalArgumentException("Property is required for " + familyId + " operations");
         }
-        if (!isSupportedProperty(property)) {
+        PropertyRegistry properties = propertyRegistry != null ? propertyRegistry.copy() : null;
+        if (properties == null || !properties.hasProperty(familyId, property)) {
             throw new IllegalArgumentException("Unknown " + familyId + " property: " + property);
         }
         String normalizedAction = action != null ? action.toLowerCase(Locale.ROOT) : "get";
-        if (!propertyRegistry.getActions(familyId, property).contains(normalizedAction)) {
+        if (!properties.getActions(familyId, property).contains(normalizedAction)) {
             throw new IllegalArgumentException("Property " + familyId + "." + property + " does not support action " + normalizedAction);
         }
         Object target = resolveTarget(ctx, node);
@@ -95,7 +172,10 @@ public class JsonFamilyHandler implements NodeHandler {
         if (target == null) {
             throw new IllegalArgumentException("Target is required for " + familyId + "." + property);
         }
-        switch (normalizedAction) {
+        PropertyHandler<Object, Object> handler = properties.get(familyId, property);
+        if (handler != null) {
+            executeRegistered(ctx, node, target, property, normalizedAction, handler);
+        } else switch (normalizedAction) {
             case "set" -> setValue(ctx, node, target, property);
             case "has" -> ctx.setOutput(node, "has", readValue(target, property) != null);
             case "do", "execute" -> ctx.setOutput(node, "success", executeAction(ctx, target, property));
@@ -118,8 +198,33 @@ public class JsonFamilyHandler implements NodeHandler {
         return OPERATIONS;
     }
 
-    private boolean isSupportedProperty(String property) {
-        return propertyRegistry != null && propertyRegistry.hasProperty(familyId, property);
+    private void executeRegistered(FlowContext ctx, FlowNode node, Object target, String property, String action,
+                                   PropertyHandler<Object, Object> handler) {
+        switch (action) {
+            case "get" -> {
+                Object value = handler.get(target);
+                Object genericValue = outputValue(ctx, node, "value", value);
+                Object propertyValue = outputValue(ctx, node, property, value);
+                ctx.setOutput(node, "value", genericValue);
+                ctx.setOutput(node, property, propertyValue);
+            }
+            case "has" -> ctx.setOutput(node, "has", handler.get(target) != null);
+            case "set" -> {
+                String valuePin = "itemstack".equals(familyId)
+                    && (ctx.getRuntime().resolveInputPin(node, "set_" + property) != null || ctx.getRuntime().hasExplicitInput(node, "set_" + property))
+                    ? "set_" + property : "value";
+                Object value = ctx.getInputValue(node, valuePin, Object.class, null);
+                Consumer<ItemStack> writeback = target instanceof ItemStack item ? ItemWriteback.resolve(ctx, node, item) : null;
+                boolean success = handler.set(target, coerceValue(value, handler.getValueType()));
+                if (success && target instanceof ItemStack item) {
+                    writeback.accept(item);
+                    ctx.setOutput(node, "item", item);
+                }
+                ctx.setOutput(node, "success", success);
+            }
+            case "do", "execute" -> ctx.setOutput(node, "success", handler.execute(target));
+            default -> throw new IllegalArgumentException("Unknown property action: " + action);
+        }
     }
 
     private Object outputValue(FlowContext ctx, FlowNode node, String output, Object value) {
@@ -402,6 +507,28 @@ public class JsonFamilyHandler implements NodeHandler {
             ctx.setOutput(node, "success", true);
             return;
         }
+        if (target instanceof Entity entity && "location".equals(property)) {
+            Location location = ctx.getTypeAdapter().adapt(value, Location.class);
+            if (location == null || location.getWorld() == null || !Double.isFinite(location.getX())
+                || !Double.isFinite(location.getY()) || !Double.isFinite(location.getZ())
+                || !Float.isFinite(location.getYaw()) || !Float.isFinite(location.getPitch())) {
+                throw new IllegalArgumentException("Property " + familyId + ".location requires a finite world location");
+            }
+            ctx.setOutput(node, "success", entity.teleport(location));
+            return;
+        }
+        if (target instanceof Ageable ageable && "baby".equals(property)) {
+            if (!(value instanceof Boolean baby)) {
+                throw new IllegalArgumentException("Property entity.baby requires true or false");
+            }
+            if (baby) {
+                ageable.setBaby();
+            } else {
+                ageable.setAdult();
+            }
+            ctx.setOutput(node, "success", true);
+            return;
+        }
         if (target instanceof LivingEntity living && setLivingAfterDamage(ctx, living, property, value)) {
             ctx.setOutput(node, "success", true);
             return;
@@ -556,8 +683,8 @@ public class JsonFamilyHandler implements NodeHandler {
         for (String candidate : new String[] {methodName, "set" + toMethodSuffix(property)}) {
             try {
                 Method method = target.getClass().getMethod(candidate);
-                method.invoke(target);
-                return true;
+                Object result = method.invoke(target);
+                return !(result instanceof Boolean success) || success;
             } catch (NoSuchMethodException exception) {
                 continue;
             } catch (ReflectiveOperationException exception) {
@@ -628,9 +755,29 @@ public class JsonFamilyHandler implements NodeHandler {
         return Enum.valueOf((Class<? extends Enum>) targetType.asSubclass(Enum.class), value.toUpperCase(Locale.ROOT));
     }
 
-    private String toMethodSuffix(String property) {
-        if ("max_air".equals(property)) {
-            return "MaximumAir";
+    private static String toMethodSuffix(String property) {
+        String alias = switch (property) {
+            case "max_air" -> "MaximumAir";
+            case "items" -> "Contents";
+            case "armor" -> "ArmorContents";
+            case "keep_spawn" -> "KeepSpawnInMemory";
+            case "gamemode" -> "GameMode";
+            case "sneak" -> "Sneaking";
+            case "sprint" -> "Sprinting";
+            case "fly", "is_flying" -> "Flying";
+            case "vanish" -> "Invisible";
+            case "xp_level" -> "Level";
+            case "xp_progress" -> "Exp";
+            case "total_exp" -> "TotalExperience";
+            case "ai" -> "AI";
+            case "pickup_items" -> "CanPickupItems";
+            case "absorption" -> "AbsorptionAmount";
+            case "pvp" -> "PVP";
+            case "is_op" -> "Op";
+            default -> null;
+        };
+        if (alias != null) {
+            return alias;
         }
         StringBuilder builder = new StringBuilder();
         for (String part : property.split("_")) {
@@ -644,7 +791,7 @@ public class JsonFamilyHandler implements NodeHandler {
         return builder.toString();
     }
 
-    private String toMethodName(String property) {
+    private static String toMethodName(String property) {
         String suffix = toMethodSuffix(property);
         if (suffix.isEmpty()) {
             return property;

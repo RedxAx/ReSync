@@ -1,6 +1,7 @@
 package restudio.resync.flow;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -24,6 +25,8 @@ import restudio.resync.storage.AssetIntegrityService;
 import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.AssetProjectMetadata;
 import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.storage.AssetTransactionManager;
+import restudio.resync.storage.ProjectMetadataRecovery;
 import restudio.resync.storage.StorageSafety;
 import restudio.resync.flow.validation.FlowGraphValidationException;
 import restudio.resync.flow.validation.FlowGraphValidationResult;
@@ -38,6 +41,8 @@ import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.graph.GraphDocument;
 import restudio.resync.flow.function.FunctionSourceDocument;
 import restudio.resync.migration.MigrationPaths;
+import restudio.resync.migration.ReSyncDataFix;
+import restudio.resync.migration.ReSyncDataFixer;
 import restudio.resync.flow.protocol.ResourceActivationState;
 import restudio.resync.flow.protocol.ResourcePresentationIntent;
 import restudio.resync.flow.resource.ResourcePayloadCodecs;
@@ -104,6 +109,7 @@ public class FlowStorage {
     private static final String PROJECT_METADATA_LINEAGE_ID = "project";
     private static final String PROJECT_METADATA_LINEAGE_FORMAT = "project-metadata-lineage-v1";
     private static final int MAX_TYPED_COMMAND_REFRESH_PROOFS = 256;
+    private static final int MAX_PROJECT_METADATA_HISTORY = 4096;
     private final Map<String, CachedGraph> graphCache = new ConcurrentHashMap<>();
     private final CoreGraphStorageBoundary coreGraphStorage = new CoreGraphStorageBoundary();
     private final Map<AssetTransactionCoordinator.AssetKey, ResidentCoreGraph> coreGraphs = new LinkedHashMap<>(16, 0.75f, true);
@@ -115,7 +121,14 @@ public class FlowStorage {
             CoreProjectMetadata metadata) {}
 
     private record ResidentCoreGraph(AssetTransactionCoordinator coordinator, long generation,
-            AssetTransactionCoordinator.CommittedAsset stamp, CoreGraphStorageBoundary.Decoded source, long bytes) {}
+            AssetTransactionCoordinator.CommittedAsset stamp, CoreGraphStorageBoundary.Decoded source,
+            LegacyCoreRecoverySource rawSource, long bytes) {
+        private ResidentCoreGraph {
+            if ((source == null) == (rawSource == null)) {
+                throw new IllegalArgumentException("A resident graph requires exactly one proved payload kind");
+            }
+        }
+    }
     private final Map<String, GuiDefinition> guiCache = new ConcurrentHashMap<>();
     private final Map<String, ScoreboardDefinition> scoreboardCache = new ConcurrentHashMap<>();
     private final Map<String, TabDefinition> tabCache = new ConcurrentHashMap<>();
@@ -130,6 +143,7 @@ public class FlowStorage {
     private volatile int tabRefreshIntervalTicks = 20;
     private volatile PersistenceState persistenceState = PersistenceState.OPEN;
     private volatile long persistenceGeneration;
+    private volatile int dataVersion;
     private volatile boolean persistenceTransition;
     private FlowGraphValidator graphValidator;
     private Function<FlowGraph, FlowGraphValidationResult> graphValidationFunction;
@@ -444,6 +458,7 @@ public class FlowStorage {
                 Files.createDirectories(assetsRoot);
             }
             MigrationPaths.requireDirectory(assetsRoot, "Flow asset root");
+            this.dataVersion = ReSyncDataFixer.installedVersion(assetsRoot.getParent()).orElse(1);
         } catch (IOException | RuntimeException exception) {
             throw new IllegalStateException("Failed to initialize the Flow asset root safely", exception);
         }
@@ -484,41 +499,330 @@ public class FlowStorage {
             }
             try {
                 AssetTransactionCoordinator coordinator = requireAssetTransactions();
-                AssetTransactionCoordinator.AssetKey key = assetKey(type, safeId);
-                AssetTransactionCoordinator.CommittedAsset stamp = coordinator.committedAsset(key).orElse(null);
-                synchronized (coreGraphs) {
-                    ResidentCoreGraph resident = coreGraphs.get(key);
-                    if (resident != null && resident.coordinator() == coordinator && resident.generation() == persistenceGeneration
-                        && resident.stamp().equals(stamp) && stamp.state() instanceof AssetTransactionCoordinator.Live) {
-                        return Optional.of(resident.source());
+                return coordinator.read(snapshot -> {
+                    try {
+                        return readCommittedCoreGraph(coordinator, snapshot, type, safeId);
+                    } catch (IOException exception) {
+                        throw new UncheckedIOException(exception);
                     }
-                    removeResidentCoreGraph(key);
-                }
-                CoreProjectMetadata metadata = readCoreProjectMetadata();
-                CoreStoredState state = readCoreStoredState(type, safeId, coreResource(type, safeId), metadata.snapshot());
-                requireCoordinatedCoreState(coordinator, type, safeId, state);
-                if (state.kind() != CoreStateKind.LIVE) {
-                    return Optional.empty();
-                }
-                AssetTransactionCoordinator.CommittedAsset verified = coordinator.committedAsset(key).orElseThrow();
-                if (!verified.equals(stamp) || !(verified.state() instanceof AssetTransactionCoordinator.Live)) {
-                    throw new IllegalStateException("Core Graph Authority Changed During Source Admission");
-                }
-                long bytes = Math.multiplyExact(Files.size(state.liveFiles().getFirst()), 4L);
-                synchronized (coreGraphs) {
-                    if (bytes <= 32L * 1024 * 1024) {
-                        coreGraphs.put(key, new ResidentCoreGraph(coordinator, persistenceGeneration, verified, state.decoded(), bytes));
-                        coreGraphBytes += bytes;
-                        while (coreGraphs.size() > 128 || coreGraphBytes > 32L * 1024 * 1024) {
-                            removeResidentCoreGraph(coreGraphs.keySet().iterator().next());
-                        }
-                    }
-                }
-                return Optional.of(state.decoded());
-            } catch (IOException | RuntimeException exception) {
+                });
+            } catch (UncheckedIOException exception) {
+                throw new IllegalStateException("Failed to load Core graph " + type + ':' + safeId, exception.getCause());
+            } catch (RuntimeException exception) {
                 throw new IllegalStateException("Failed to load Core graph " + type + ':' + safeId, exception);
             }
         }
+    }
+
+    private Optional<CoreGraphStorageBoundary.Decoded> readCommittedCoreGraph(AssetTransactionCoordinator coordinator,
+            AssetTransactionCoordinator.Snapshot snapshot, String type, String id) throws IOException {
+        AssetTransactionCoordinator.AssetKey key = assetKey(type, id);
+        AssetTransactionCoordinator.CommittedAsset stamp = coordinator.committedAsset(key).orElse(null);
+        synchronized (coreGraphs) {
+            ResidentCoreGraph resident = coreGraphs.get(key);
+            if (resident != null && resident.coordinator() == coordinator && resident.generation() == persistenceGeneration
+                && resident.stamp().equals(stamp) && stamp.state() instanceof AssetTransactionCoordinator.Live) {
+                if (resident.rawSource() != null) {
+                    throw new IOException("Coordinated graph has a historical payload and cannot be read as Core: " + type + ':' + id);
+                }
+                return Optional.of(resident.source());
+            }
+            removeResidentCoreGraph(key);
+        }
+        if (stamp == null || stamp.state() instanceof AssetTransactionCoordinator.Missing) {
+            return Optional.empty();
+        }
+        Path root = assetsDir.toPath().toAbsolutePath().normalize();
+        ServerResourceLocator resource = coreResource(type, id);
+        if (stamp.state() instanceof AssetTransactionCoordinator.Deleted deleted) {
+            Path tombstoneFile = snapshot.path(tombstoneKey(type, id))
+                .orElseThrow(() -> new IOException("Core graph tombstone is not coordinated: " + type + ':' + id));
+            requireCoreStoragePath(root, tombstoneFile);
+            requireCoreStoragePath(root, stamp.path());
+            AssetTransactionCoordinator.AssetKey tombstoneKey = tombstoneKey(type, id);
+            if (!(snapshot.state(tombstoneKey).orElse(AssetTransactionCoordinator.Missing.INSTANCE)
+                instanceof AssetTransactionCoordinator.Live tombstoneState)
+                || !Files.isRegularFile(tombstoneFile, LinkOption.NOFOLLOW_LINKS)
+                || !coordinatedMutationMatches(snapshot, tombstoneKey, stamp.mutationId().value())
+                || Files.exists(stamp.path(), LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Physical graph tombstone diverged from the shared asset coordinator: " + type + ':' + id);
+            }
+            byte[] source = readCoreAssetBytes(tombstoneFile);
+            if (!tombstoneState.hash().equals(StorageSafety.sha256(source))) {
+                throw new IOException("Core graph tombstone bytes diverged from the shared asset coordinator: " + type + ':' + id);
+            }
+            CoreGraphStorageBoundary.CoreGraphTombstone tombstone = coreGraphStorage.decodeTombstone(
+                source, resource);
+            if (tombstone.revision() != deleted.revision()
+                || !tombstone.mutationId().toString().equals(stamp.mutationId().value())) {
+                throw new IOException("Core graph tombstone state diverged from the shared asset coordinator: " + type + ':' + id);
+            }
+            return Optional.empty();
+        }
+        if (!(stamp.state() instanceof AssetTransactionCoordinator.Live live)) {
+            throw new IOException("Unsupported Core graph coordinator state: " + type + ':' + id);
+        }
+        Path file = stamp.path();
+        requireCoreStoragePath(root, file);
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("Core graph asset is not a regular file: " + type + ':' + id);
+        }
+        byte[] source = readCoreAssetBytes(file);
+        if (!live.hash().equals(StorageSafety.sha256(source))) {
+            throw new IOException("Core graph live bytes diverged from the shared asset coordinator: " + type + ':' + id);
+        }
+        CoreGraphStorageBoundary.Decoded decoded = coreGraphStorage.decode(source, resource);
+        if (decoded.envelope().assetRevision() != live.revision()
+            || !decoded.envelope().assetMutationId().equals(stamp.mutationId().value())) {
+            throw new IOException("Core graph live state diverged from the shared asset coordinator: " + type + ':' + id);
+        }
+        long bytes = Math.multiplyExact((long) source.length, 4L);
+        synchronized (coreGraphs) {
+            if (bytes <= 32L * 1024 * 1024) {
+                coreGraphs.put(key, new ResidentCoreGraph(coordinator, persistenceGeneration, stamp, decoded, null, bytes));
+                coreGraphBytes += bytes;
+                while (coreGraphs.size() > 128 || coreGraphBytes > 32L * 1024 * 1024) {
+                    removeResidentCoreGraph(coreGraphs.keySet().iterator().next());
+                }
+            }
+        }
+        return Optional.of(decoded);
+    }
+
+    public synchronized Optional<LegacyCoreRecoverySource> coordinatedRawGraphSource(ServerResourceLocator resource) {
+        Objects.requireNonNull(resource, "Coordinated graph resource is required");
+        if (serverId == null || !serverId.equals(resource.serverId())
+            || !OwnerId.of("restudio.resync").equals(resource.owner())
+            || !GRAPH_TYPES.contains(resource.resourceType().value())) {
+            throw new IllegalArgumentException("Coordinated graph resource is outside this storage authority");
+        }
+        String id = safeId(resource.id(), "inspect coordinated graph");
+        if (id == null || !id.equals(resource.id())) {
+            throw new IllegalArgumentException("Coordinated graph resource ID is invalid");
+        }
+        try (AssetPersistenceGate.MutationLease ignored = requirePersistenceReadOpen()) {
+            AssetTransactionCoordinator coordinator = requireAssetTransactions();
+            return coordinator.read(snapshot -> {
+                try {
+                    return readCoordinatedRawGraph(coordinator, snapshot, resource);
+                } catch (IOException exception) {
+                    throw new UncheckedIOException(exception);
+                }
+            });
+        } catch (UncheckedIOException exception) {
+            throw new IllegalStateException("Failed to inspect coordinated historical graph "
+                + resource.canonicalText(), exception.getCause());
+        }
+    }
+
+    private Optional<LegacyCoreRecoverySource> readCoordinatedRawGraph(AssetTransactionCoordinator coordinator,
+            AssetTransactionCoordinator.Snapshot snapshot, ServerResourceLocator resource) throws IOException {
+        AssetTransactionCoordinator.AssetKey key = assetKey(resource.resourceType().value(), resource.id());
+        AssetTransactionCoordinator.CommittedAsset stamp = coordinator.committedAsset(key).orElse(null);
+        synchronized (coreGraphs) {
+            ResidentCoreGraph resident = coreGraphs.get(key);
+            if (resident != null && resident.coordinator() == coordinator && resident.generation() == persistenceGeneration
+                && resident.stamp().equals(stamp) && stamp.state() instanceof AssetTransactionCoordinator.Live) {
+                return Optional.ofNullable(resident.rawSource());
+            }
+            removeResidentCoreGraph(key);
+        }
+        if (stamp == null || !(stamp.state() instanceof AssetTransactionCoordinator.Live live)) {
+            return Optional.empty();
+        }
+        if (!live.equals(snapshot.state(key).orElse(null))
+            || !stamp.mutationId().value().equals(snapshot.mutationValue(key).orElse(""))
+            || !stamp.path().equals(snapshot.path(key).orElse(null))) {
+            throw new IOException("Coordinated graph stamp differs from its snapshot: " + resource.canonicalText());
+        }
+        requireCoreStoragePath(assetsDir.toPath(), stamp.path());
+        if (!Files.isRegularFile(stamp.path(), LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("Coordinated graph asset is not a regular file: " + resource.canonicalText());
+        }
+        byte[] bytes = readCoreAssetBytes(stamp.path());
+        if (!live.hash().equals(StorageSafety.sha256(bytes))) {
+            throw new IOException("Coordinated graph bytes differ from committed state: " + resource.canonicalText());
+        }
+        JsonElement parsed = JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8));
+        if (!parsed.isJsonObject()) {
+            throw new IOException("Coordinated graph payload is not an object: " + resource.canonicalText());
+        }
+        JsonObject value = parsed.getAsJsonObject();
+        if (value.has(CoreGraphStorageBoundary.CORE_PAYLOAD_KIND)
+            || value.has(CoreGraphStorageBoundary.CORE_PAYLOAD_VERSION)) {
+            return Optional.empty();
+        }
+        String type = resource.resourceType().value();
+        UUID mutationId = UUID.fromString(stamp.mutationId().value());
+        String payloadHash = jsonText(value, AssetFileFormat.CONTENT_HASH);
+        if (!resource.id().equals(jsonText(value, "id")) || !type.equals(jsonText(value, AssetFileFormat.RESOURCE_TYPE))
+            || exactGraphNumber(value, AssetFileFormat.FORMAT_VERSION) != AssetFileFormat.CURRENT_FORMAT_VERSION
+            || exactGraphNumber(value, AssetFileFormat.REVISION) != live.revision()
+            || exactGraphNumber(value, "resourceRevision") != live.revision()
+            || !mutationId.toString().equals(jsonText(value, AssetFileFormat.MUTATION_ID))
+            || !mutationId.toString().equals(jsonText(value, "resourceMutationId"))
+            || payloadHash == null || !payloadHash.matches("[0-9a-f]{64}") || !AssetFileFormat.verify(value)
+            || !value.has("function") || !value.get("function").isJsonPrimitive()
+            || !value.get("function").getAsJsonPrimitive().isBoolean()
+            || value.get("function").getAsBoolean() != "function".equals(type)
+            || !value.has("enabled") || !value.get("enabled").isJsonPrimitive()
+            || !value.get("enabled").getAsJsonPrimitive().isBoolean()
+            || !value.has("nodes") || !value.get("nodes").isJsonObject()
+            || !value.has("connections") || !value.get("connections").isJsonArray()
+            || !value.has("localVariables") || !value.get("localVariables").isJsonArray()) {
+            throw new IOException("Coordinated historical graph identity is invalid: " + resource.canonicalText());
+        }
+        CoreStoredState stored = readCoreStoredState(type, resource.id(), resource, readCoreProjectMetadata().snapshot());
+        if (stored.kind() != CoreStateKind.LEGACY || stored.liveFiles().size() != 1
+            || !stamp.path().toAbsolutePath().normalize().equals(stored.liveFile())) {
+            throw new IOException("Coordinated historical graph has ambiguous payload ownership: " + resource.canonicalText());
+        }
+        LegacyCoreRecoverySource source = new LegacyCoreRecoverySource(live.revision(), mutationId,
+            new ContentHash(live.hash()), new ContentHash(payloadHash), "legacy-flow-graph-v3");
+        long residentBytes = Math.multiplyExact((long) bytes.length, 4L);
+        synchronized (coreGraphs) {
+            if (residentBytes <= 32L * 1024 * 1024) {
+                coreGraphs.put(key, new ResidentCoreGraph(coordinator, persistenceGeneration, stamp, null, source, residentBytes));
+                coreGraphBytes += residentBytes;
+                while (coreGraphs.size() > 128 || coreGraphBytes > 32L * 1024 * 1024) {
+                    removeResidentCoreGraph(coreGraphs.keySet().iterator().next());
+                }
+            }
+        }
+        return Optional.of(source);
+    }
+
+    private long exactGraphNumber(JsonObject value, String name) throws IOException {
+        if (!value.has(name) || !value.get(name).isJsonPrimitive()
+            || !value.get(name).getAsJsonPrimitive().isNumber()) {
+            throw new IOException("Coordinated historical graph number is invalid: " + name);
+        }
+        try {
+            return value.get(name).getAsBigDecimal().longValueExact();
+        } catch (ArithmeticException exception) {
+            throw new IOException("Coordinated historical graph number is inexact: " + name, exception);
+        }
+    }
+
+    public synchronized CoreGraphStorageBoundary.Decoded convertCoordinatedRawGraph(ReSyncDataFix.Context context,
+            ServerResourceLocator resource, LegacyCoreRecoverySource sourceProof,
+            CoreGraphStorageBoundary.Decoded candidate, UUID migrationId) {
+        Objects.requireNonNull(context, "Graph data fix context is required");
+        Objects.requireNonNull(resource, "Graph data fix resource is required");
+        if (serverId == null || !serverId.equals(resource.serverId())
+            || !OwnerId.of("restudio.resync").equals(resource.owner())
+            || !GRAPH_TYPES.contains(resource.resourceType().value())) {
+            throw new IllegalArgumentException("Graph data fix resource is outside this storage authority");
+        }
+        Objects.requireNonNull(sourceProof, "Graph data fix source proof is required");
+        Objects.requireNonNull(candidate, "Graph data fix candidate is required");
+        Objects.requireNonNull(migrationId, "Graph data fix mutation ID is required");
+        Path root = assetsDir.toPath().toAbsolutePath().normalize().getParent();
+        if (!context.root().equals(root) || context.sourceVersion() != 1 || context.targetVersion() != 2) {
+            throw new IllegalArgumentException("Graph conversion requires its staged version 1 to 2 data fix context");
+        }
+        try (AssetPersistenceGate.MutationLease ignored = requirePersistenceMutationOpen()) {
+            if (dataVersion != context.sourceVersion()) {
+                throw new IOException("Graph conversion source data version does not match its data fix context");
+            }
+            CoreGraphStorageBoundary.Decoded checked = coreGraphStorage.decode(coreGraphStorage.encode(candidate), resource);
+            long targetRevision = Math.addExact(sourceProof.revision(), 1L);
+            if (checked.envelope().assetRevision() != targetRevision
+                || !migrationId.toString().equals(checked.envelope().assetMutationId())) {
+                throw new IOException("Graph conversion candidate differs from its intended revision and mutation");
+            }
+            Path retained = root.resolve(".migrations/rewrite-graphs-v2").resolve(migrationId + ".source.json");
+            MigrationPaths.requireNoSymlinkTraversal(root, retained);
+            if (!Files.isRegularFile(retained, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Graph conversion has no retained original source");
+            }
+            byte[] sourceBytes = readCoreAssetBytes(retained);
+            if (!sourceProof.assetHash().canonicalText().equals(StorageSafety.sha256(sourceBytes))) {
+                throw new IOException("Graph conversion retained source differs from its proof");
+            }
+            JsonObject sourceJson = JsonParser.parseString(new String(sourceBytes, StandardCharsets.UTF_8)).getAsJsonObject();
+            boolean enabled = sourceJson.has("enabled") && sourceJson.get("enabled").isJsonPrimitive()
+                && sourceJson.get("enabled").getAsJsonPrimitive().isBoolean() && sourceJson.get("enabled").getAsBoolean();
+            ResourceActivationState activation = enabled ? ResourceActivationState.ACTIVE : ResourceActivationState.INACTIVE;
+            if (checked.envelope().assetActivationState() != activation) {
+                throw new IOException("Graph conversion changes the original activation state");
+            }
+            AssetTransactionCoordinator coordinator = requireAssetTransactions();
+            AssetTransactionCoordinator.MutationView replay = coordinator.mutation(migrationId).orElse(null);
+            if (replay != null) {
+                CoreGraphStorageBoundary.Decoded current = getCoreGraph(resource.resourceType().value(), resource.id())
+                    .orElseThrow(() -> new IOException("Graph conversion replay has no live Core graph"));
+                if (!sameCoreReplayState(current, checked)
+                    || !conversionScope(context, resource, sourceProof, migrationId).equals(replay.intent().getAsJsonObject("scope"))) {
+                    throw new IOException("Graph conversion replay differs from its original transaction");
+                }
+                return current;
+            }
+            LegacyCoreRecoverySource current = coordinatedRawGraphSource(resource)
+                .orElseThrow(() -> new IOException("Graph conversion source is no longer a coordinated historical graph"));
+            if (!sourceProof.equals(current)) {
+                throw new IOException("Graph conversion source proof changed before publication");
+            }
+            AssetTransactionCoordinator.Snapshot snapshot = coordinator.read(Function.identity());
+            AssetTransactionCoordinator.AssetKey key = assetKey(resource.resourceType().value(), resource.id());
+            Path file = snapshot.path(key).orElseThrow(() -> new IOException("Graph conversion source path is unavailable"));
+            requireCoreStoragePath(assetsDir.toPath(), file);
+            if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Graph conversion source is not a regular file");
+            }
+            byte[] liveBytes = readCoreAssetBytes(file);
+            if (!Arrays.equals(sourceBytes, liveBytes) || !sourceProof.assetHash().canonicalText().equals(StorageSafety.sha256(liveBytes))
+                || !(snapshot.state(key).orElse(null) instanceof AssetTransactionCoordinator.Live sourceLive)
+                || sourceLive.revision() != sourceProof.revision() || !sourceLive.hash().equals(sourceProof.assetHash().canonicalText())
+                || !sourceProof.mutationId().toString().equals(snapshot.mutationValue(key).orElse(""))) {
+                throw new IOException("Graph conversion source no longer matches its retained original");
+            }
+            byte[] encoded = coreGraphStorage.encode(checked);
+            AssetTransactionCoordinator.TransactionResult result;
+            try {
+                result = coordinator.withTransactionIntentScope(conversionScope(context, resource, sourceProof, migrationId), () -> {
+                    try {
+                        return transactAssets(coordinator, snapshot, migrationId,
+                            List.of(AssetMutation.write(key, file, encoded)), null, snapshot.rootSequence());
+                    } catch (IOException exception) {
+                        throw new UncheckedIOException(exception);
+                    }
+                });
+            } catch (UncheckedIOException exception) {
+                throw exception.getCause();
+            }
+            if (result == null || !result.project().equals(snapshot.project())
+                || !(result.states().get(key) instanceof AssetTransactionCoordinator.Live savedLive)
+                || savedLive.revision() != targetRevision || !savedLive.hash().equals(StorageSafety.sha256(encoded))) {
+                throw new IOException("Graph conversion transaction did not publish its exact metadata-neutral result");
+            }
+            evictGraphCache(resource.id());
+            CoreGraphStorageBoundary.Decoded committed = getCoreGraph(resource.resourceType().value(), resource.id())
+                .orElseThrow(() -> new IOException("Graph conversion has no committed Core graph"));
+            if (!sameCoreReplayState(committed, checked)) {
+                throw new IOException("Graph conversion committed payload differs from its candidate");
+            }
+            return committed;
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to convert coordinated historical graph " + resource.canonicalText(), exception);
+        }
+    }
+
+    private JsonObject conversionScope(ReSyncDataFix.Context context, ServerResourceLocator resource,
+            LegacyCoreRecoverySource sourceProof, UUID migrationId) {
+        JsonObject scope = new JsonObject();
+        scope.addProperty("format", "rewrite-graphs-v2");
+        scope.addProperty("sourceVersion", context.sourceVersion());
+        scope.addProperty("targetVersion", context.targetVersion());
+        scope.addProperty("resource", resource.canonicalText());
+        scope.addProperty("sourceRevision", sourceProof.revision());
+        scope.addProperty("sourceMutationId", sourceProof.mutationId().toString());
+        scope.addProperty("sourceAssetHash", sourceProof.assetHash().canonicalText());
+        scope.addProperty("sourcePayloadHash", sourceProof.payloadHash().canonicalText());
+        scope.addProperty("sourcePayloadKind", sourceProof.payloadKind());
+        scope.addProperty("targetRevision", Math.addExact(sourceProof.revision(), 1L));
+        scope.addProperty("targetMutationId", migrationId.toString());
+        return scope;
     }
 
     public synchronized Optional<LegacyCoreRecoverySource> legacyCoreRecoverySource(ServerResourceLocator resource,
@@ -1417,11 +1721,13 @@ public class FlowStorage {
         if (size > 33_554_432L) {
             throw new IOException("Core graph asset exceeds the maximum supported size: " + file);
         }
-        byte[] bytes = Files.readAllBytes(file);
-        if (bytes.length > 33_554_432) {
-            throw new IOException("Core graph asset exceeds the maximum supported size: " + file);
+        try (var input = Files.newInputStream(file)) {
+            byte[] bytes = input.readNBytes(33_554_433);
+            if (bytes.length > 33_554_432) {
+                throw new IOException("Core graph asset exceeds the maximum supported size: " + file);
+            }
+            return bytes;
         }
-        return bytes;
     }
 
     private LegacyCoreRecoverySource requireLegacyCoreRecoverySource(ServerResourceLocator resource,
@@ -2027,7 +2333,9 @@ public class FlowStorage {
                     .sorted()
                     .toList());
             }
+            int candidateVersion = ReSyncDataFixer.installedVersion(candidate.getParent()).orElse(1);
             assetsGate.rebind(candidate.getParent());
+            dataVersion = candidateVersion;
             assetsDir = candidate.toFile();
             assetTransactions = candidateTransactions;
             assetIntegrity = candidateIntegrity;
@@ -2188,6 +2496,7 @@ public class FlowStorage {
     public void saveGraph(FlowGraph graph) {
         GraphChange change;
         synchronized (this) {
+            requireRawGraphWrites();
             if (graph == null) {
                 throw new IllegalArgumentException("Flow is required");
             }
@@ -2201,6 +2510,7 @@ public class FlowStorage {
     public void saveGraph(FlowGraph graph, UUID mutationId, long expectedRevision) {
         GraphChange change;
         synchronized (this) {
+            requireRawGraphWrites();
             if (graph == null) {
                 throw new IllegalArgumentException("Flow is required");
             }
@@ -2253,6 +2563,7 @@ public class FlowStorage {
     public void reclassifyGraph(FlowGraph graph, String targetType) {
         List<GraphChange> changes;
         synchronized (this) {
+            requireRawGraphWrites();
             if (!Set.of("flow", "function", "command").contains(targetType)) {
                 throw new IllegalArgumentException("Unsupported graph type: " + targetType);
             }
@@ -2267,6 +2578,7 @@ public class FlowStorage {
 
     private synchronized List<GraphChange> reclassifyGraphAsset(FlowGraph graph, String targetType, UUID mutationId,
                                                    RuntimeObservation validation) {
+        requireRawGraphWrites();
         String safeId = safeId(graph.getId(), "reclassify flow");
         if (safeId == null) {
             throw new IllegalArgumentException("Invalid flow id");
@@ -2290,6 +2602,7 @@ public class FlowStorage {
                 }
                 StoredGraphState stored = readStoredGraphState(sourceType, safeId)
                     .orElseThrow(() -> new IOException("Graph reclassification source does not exist: " + sourceType + ':' + safeId));
+                requireRawGraphOwner(stored);
                 if (stored.identity().deleted() || stored.assetFile() == null) {
                     throw new IOException("Graph reclassification source is not live: " + sourceType + ':' + safeId);
                 }
@@ -2381,6 +2694,7 @@ public class FlowStorage {
     public void restoreGraph(FlowGraph graph) {
         GraphChange change;
         synchronized (this) {
+            requireRawGraphWrites();
             if (graph == null || graph.getId() == null) {
                 return;
             }
@@ -2396,6 +2710,7 @@ public class FlowStorage {
 
     private synchronized GraphChange saveGraph(FlowGraph graph, UUID mutationId, Long expectedRevision,
                                         boolean enforceExpectedRevision, RuntimeObservation validation) {
+        requireRawGraphWrites();
         if (graph == null) {
             throw new IllegalArgumentException("Flow is required");
         }
@@ -2436,6 +2751,7 @@ public class FlowStorage {
             ensureValidGraphTombstone(identityType, safeId);
             StoredGraphState stored = readStoredGraphState(identityType, safeId)
                 .orElseGet(() -> readStoredGraphState(type, safeId).orElse(null));
+            requireRawGraphOwner(stored);
             AssetTransactionCoordinator.Snapshot coordinatorSnapshot = requireCoordinatedGraphState(
                 coordinator, type, safeId, stored);
             if (stored != null && stored.identity().deleted()) {
@@ -2518,6 +2834,31 @@ public class FlowStorage {
         }
         cacheGraphIfCurrent(generation, committedType, safeId, committedRevision, committedMutation, graph);
         return new GraphChange(committedType, safeId);
+    }
+
+    private void requireRawGraphWrites() {
+        if (dataVersion >= 2) {
+            throw new IllegalStateException("Graph Persistence Requires Core Resource Authority. Use The Core Graph Save Or Delete Operation.");
+        }
+    }
+
+    private void requireRawGraphOwner(StoredGraphState stored) throws IOException {
+        if (stored == null) {
+            return;
+        }
+        Path file = stored.identity().deleted() ? stored.tombstoneFile() : stored.assetFile();
+        if (file == null) {
+            return;
+        }
+        JsonElement parsed = JsonParser.parseString(new String(readCoreAssetBytes(file), StandardCharsets.UTF_8));
+        if (parsed.isJsonObject()) {
+            JsonObject value = parsed.getAsJsonObject();
+            if (value.has(CoreGraphStorageBoundary.CORE_PAYLOAD_KIND)
+                || value.has(CoreGraphStorageBoundary.CORE_PAYLOAD_VERSION)
+                || hasTombstoneString(value, "kind", CoreGraphStorageBoundary.TOMBSTONE_KIND)) {
+                throw new IllegalStateException("Graph Is Owned By Core Resource Authority. Use The Core Graph Save Or Delete Operation.");
+            }
+        }
     }
 
     private void requireGraphSaveLineageType(FlowGraph graph, String requestedType, String id,
@@ -2783,6 +3124,7 @@ public class FlowStorage {
 
     private synchronized GraphChange deleteGraphFiles(String type, String safeId, UUID mutationId, Long expectedRevision,
                                                 boolean enforceExpectedRevision) {
+        requireRawGraphWrites();
         PersistenceGeneration generation = capturePersistenceGeneration();
         try (AssetPersistenceGate.MutationLease ignored = requirePersistenceMutationOpen()) {
             Objects.requireNonNull(mutationId, "mutationId");
@@ -2791,6 +3133,7 @@ public class FlowStorage {
             }
             ensureValidGraphTombstone(type, safeId);
             StoredGraphState stored = readStoredGraphState(type, safeId).orElse(null);
+            requireRawGraphOwner(stored);
             AssetTransactionCoordinator coordinator = requireAssetTransactions();
             AssetTransactionCoordinator.Snapshot coordinatorSnapshot = requireCoordinatedGraphState(
                 coordinator, type, safeId, stored);
@@ -3713,6 +4056,13 @@ public class FlowStorage {
                 AssetTransactionCoordinator.MutationView source = coordinator.mutation(sourceMutationId)
                     .orElseThrow(() -> new IOException("Current project metadata transition is absent from coordinator history"));
                 JsonObject intent = source.intent();
+                ResourceIdentity observed = projectMetadataIdentity(snapshot, projectMetadataResourceId());
+                if (observed != null && !observed.deleted() && observed.revision() > previousMetadataRevision
+                    && (observed.revision() != Math.addExact(previousMetadataRevision, 1L)
+                    || observed.payloadHash().equals(previousMetadataHash))) {
+                    return recoverWorldGenProjectMetadataChain(coordinator, snapshot, previousMetadataRevision,
+                        previousMetadataMutationId, previousMetadataHash);
+                }
                 ResourceIdentity normalization = recoverProjectMetadataNormalization(snapshot, source, intent,
                     previousMetadataRevision, previousMetadataMutationId, previousMetadataHash);
                 if (normalization != null) {
@@ -3782,6 +4132,323 @@ public class FlowStorage {
                 throw new IllegalStateException("Failed to recover unreceipted project metadata lineage", exception);
             }
         }
+    }
+
+    private ResourceIdentity recoverWorldGenProjectMetadataChain(AssetTransactionCoordinator coordinator,
+                                                                  AssetTransactionCoordinator.Snapshot snapshot,
+                                                                  long previousRevision, UUID previousMutationId,
+                                                                  String previousHash) throws IOException {
+        AssetTransactionCoordinator.AssetKey lineageKey = projectMetadataLineageKey();
+        AssetTransactionCoordinator.MutationView baseline = coordinator.mutation(previousMutationId).orElse(null);
+        if (baseline == null || !(baseline.result().states().get(lineageKey) instanceof AssetTransactionCoordinator.Live lineage)
+            || !lineage.hash().equals(StorageSafety.sha256(projectMetadataLineage(projectMetadataResourceId(),
+            previousRevision, previousMutationId, previousHash, false)))
+            || !canonicalProjectMetadataPayloadHash(canonicalProjectMetadataJson(baseline.projectAfter().serializedJson()))
+            .equals(previousHash)) {
+            return null;
+        }
+        Path bindings = coordinator.canonicalRoot().resolve(".asset-coordinator/bindings");
+        List<Path> files;
+        try (Stream<Path> paths = Files.list(bindings)) {
+            files = paths.limit(MAX_PROJECT_METADATA_HISTORY + 1L).toList();
+        }
+        if (files.size() > MAX_PROJECT_METADATA_HISTORY) throw new IOException("WorldGen metadata recovery history exceeds its bound");
+        List<AssetTransactionCoordinator.MutationView> history = new ArrayList<>();
+        for (Path file : files) {
+            String name = file.getFileName().toString();
+            if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || !name.endsWith(".json")) {
+                throw new IOException("WorldGen metadata recovery binding is invalid");
+            }
+            UUID mutationId;
+            try {
+                mutationId = UUID.fromString(name.substring(0, name.length() - 5));
+                if (!name.equals(mutationId + ".json")) throw new IllegalArgumentException();
+            } catch (IllegalArgumentException exception) {
+                throw new IOException("WorldGen metadata recovery binding identity is invalid", exception);
+            }
+            AssetTransactionCoordinator.MutationView mutation = coordinator.mutation(mutationId)
+                .orElseThrow(() -> new IOException("WorldGen metadata recovery binding has no durable mutation"));
+            if (mutation.result().rootSequence() > baseline.result().rootSequence()
+                && mutation.result().rootSequence() <= snapshot.rootSequence()) history.add(mutation);
+        }
+        history.sort(Comparator.comparingLong(mutation -> mutation.result().rootSequence()));
+        long sequence = baseline.result().rootSequence();
+        long revision = previousRevision;
+        UUID mutationId = previousMutationId;
+        AssetProjectMetadata metadata = baseline.projectAfter();
+        AssetTransactionCoordinator.ExpectedProject project = baseline.result().project();
+        AssetTransactionCoordinator.ExpectedState previousLineage = lineage;
+        Map<AssetTransactionCoordinator.AssetKey, AssetTransactionCoordinator.ExpectedState> states = new LinkedHashMap<>();
+        Map<AssetTransactionCoordinator.AssetKey, String> mutations = new LinkedHashMap<>();
+        Map<AssetTransactionCoordinator.AssetKey, Path> paths = new LinkedHashMap<>();
+        for (AssetTransactionCoordinator.MutationView source : history) {
+            if (source.result().rootSequence() != Math.addExact(sequence, 1L)) {
+                throw new IOException("WorldGen metadata recovery history is not contiguous");
+            }
+            JsonObject intent = source.intent();
+            JsonObject scope = intent.has("scope") && intent.get("scope").isJsonObject()
+                ? intent.getAsJsonObject("scope") : null;
+            boolean worldGen = scope != null && scope.has("action")
+                && Set.of("worldGenProjectSave", "worldGenProjectDelete").contains(scope.get("action").getAsString());
+            JsonObject expectedProject = object(intent, "expectedProject", "WorldGen metadata recovery project baseline is invalid");
+            if (longValue(expectedProject, "revision", "WorldGen metadata recovery project revision is invalid") != project.revision()
+                || !project.hash().equals(stringValue(expectedProject, "hash", "WorldGen metadata recovery project hash is invalid"))) {
+                throw new IOException("WorldGen metadata recovery project history has a different baseline");
+            }
+            Map<AssetTransactionCoordinator.AssetKey, JsonObject> assets = projectMetadataRecoveryAssets(source);
+            if (!worldGen) {
+                if (!source.result().project().equals(project) || !source.projectAfter().document().equals(metadata.document())
+                    || !array(intent, "projectDeltas", "WorldGen metadata recovery neutral deltas are invalid").isEmpty()
+                    || assets.containsKey(lineageKey)) return null;
+                sequence = source.result().rootSequence();
+                continue;
+            }
+            AssetTransactionManager.TransactionInspection inspection = coordinator.inspectMutation(source.mutationId())
+                .orElseThrow(() -> new IOException("WorldGen metadata recovery has no committed transaction evidence"));
+            Map<String, byte[]> writes = inspection.stagedWrites();
+            for (Map.Entry<AssetTransactionCoordinator.AssetKey, JsonObject> entry : assets.entrySet()) {
+                AssetTransactionCoordinator.ExpectedState expected = worldGenRecoveryExpectedState(entry.getValue());
+                AssetTransactionCoordinator.ExpectedState known = states.get(entry.getKey());
+                if (known != null && !known.equals(expected)) {
+                    throw new IOException("WorldGen metadata recovery asset history has a different baseline");
+                }
+                Path path = coordinator.canonicalRoot().resolve(stringValue(entry.getValue(), "path",
+                    "WorldGen metadata recovery asset path is invalid")).normalize();
+                MigrationPaths.requireNoSymlinkTraversal(coordinator.canonicalRoot(), path);
+                if (!path.startsWith(coordinator.canonicalRoot()) || path.equals(coordinator.canonicalRoot())
+                    || !coordinator.canonicalRoot().relativize(path).toString().replace('\\', '/').equals(
+                    stringValue(entry.getValue(), "path", "WorldGen metadata recovery asset path is invalid"))) {
+                    throw new IOException("WorldGen metadata recovery asset path is not canonical within the root");
+                }
+                AssetTransactionCoordinator.ExpectedState result = source.result().states().get(entry.getKey());
+                String operation = stringValue(entry.getValue(), "operation", "WorldGen metadata recovery asset operation is invalid");
+                if (result.revision() != Math.addExact(expected.revision(), 1L)
+                    || !("WRITE".equals(operation) && result instanceof AssetTransactionCoordinator.Live live
+                    && live.hash().equals(stringValue(entry.getValue(), "payloadHash", "WorldGen metadata recovery asset hash is invalid")))
+                    && !("DELETE".equals(operation) && result instanceof AssetTransactionCoordinator.Deleted deleted
+                    && deleted.hash().equals(StorageSafety.sha256("deleted\n" + entry.getKey().canonical() + "\n"
+                    + deleted.revision() + "\n" + source.mutationId())))) {
+                    throw new IOException("WorldGen metadata recovery asset result differs from its exact operation");
+                }
+                byte[] bytes = writes.get(stringValue(entry.getValue(), "path", "WorldGen metadata recovery asset path is invalid"));
+                if (result instanceof AssetTransactionCoordinator.Live live
+                    && (bytes == null || !live.hash().equals(StorageSafety.sha256(bytes))
+                    || bytes.length != longValue(entry.getValue(), "payloadSize", "WorldGen metadata recovery asset size is invalid"))) {
+                    throw new IOException("WorldGen metadata recovery staged bytes differ from their durable result");
+                }
+                states.put(entry.getKey(), result);
+                mutations.put(entry.getKey(), source.mutationId().toString());
+                paths.put(entry.getKey(), path);
+            }
+            Set<String> deltaPaths = new LinkedHashSet<>();
+            List<AssetProjectMetadata.Delta> deltas = new ArrayList<>();
+            for (JsonElement element : array(intent, "projectDeltas", "WorldGen metadata recovery project deltas are invalid")) {
+                if (!element.isJsonObject()) throw new IOException("WorldGen metadata recovery project delta is invalid");
+                JsonObject delta = element.getAsJsonObject();
+                JsonArray path = array(delta, "path", "WorldGen metadata recovery project path is invalid");
+                if (!delta.keySet().equals(Set.of("operation", "path", "value")) || path.size() != 1
+                    || !"SET".equals(stringValue(delta, "operation", "WorldGen metadata recovery operation is invalid"))) {
+                    throw new IOException("WorldGen metadata recovery project delta is not an exact field set");
+                }
+                String field = path.get(0).getAsString();
+                if (!Set.of("resources", "folders").contains(field) || !deltaPaths.add(field)) {
+                    throw new IOException("WorldGen metadata recovery changes an unrelated project field");
+                }
+                deltas.add(new AssetProjectMetadata.Delta(List.of(field), delta.get("value"), false));
+            }
+            AssetProjectMetadata after = metadata.apply(deltas);
+            if (!after.document().equals(source.projectAfter().document()) || !after.hash().equals(source.result().project().hash())
+                || source.result().project().revision() != project.revision() + (deltas.isEmpty() ? 0L : 1L)) {
+                throw new IOException("WorldGen metadata recovery project result differs from its exact effect");
+            }
+            requireWorldGenRecoveryTransition(source, scope, assets, metadata.document(), after.document(), deltaPaths,
+                inspection, writes);
+            if (!deltas.isEmpty()) {
+                JsonObject lineageAsset = assets.get(lineageKey);
+                if (lineageAsset == null || !previousLineage.equals(worldGenRecoveryExpectedState(lineageAsset))
+                    || !paths.get(lineageKey).equals(projectMetadataLineageFile().toAbsolutePath().normalize())) {
+                    throw new IOException("WorldGen metadata recovery does not extend the durable lineage baseline");
+                }
+                revision = Math.addExact(revision, 1L);
+                mutationId = source.mutationId();
+                String hash = canonicalProjectMetadataPayloadHash(canonicalProjectMetadataJson(after.serializedJson()));
+                AssetTransactionCoordinator.ExpectedState result = source.result().states().get(lineageKey);
+                if (!(result instanceof AssetTransactionCoordinator.Live live) || live.revision() != previousLineage.revision() + 1L
+                    || !live.hash().equals(StorageSafety.sha256(projectMetadataLineage(projectMetadataResourceId(),
+                    revision, mutationId, hash, false))) || !live.hash().equals(stringValue(lineageAsset, "payloadHash",
+                    "WorldGen metadata recovery lineage payload hash is invalid"))) {
+                    throw new IOException("WorldGen metadata recovery lineage result is invalid");
+                }
+                previousLineage = result;
+            }
+            metadata = after;
+            project = source.result().project();
+            sequence = source.result().rootSequence();
+        }
+        if (sequence != snapshot.rootSequence() || revision <= previousRevision || !project.equals(snapshot.project())
+            || !metadata.document().equals(snapshot.metadata().document())) return null;
+        for (AssetTransactionCoordinator.AssetKey key : states.keySet()) {
+            if (!states.get(key).equals(snapshot.state(key).orElse(null))
+                || !mutations.get(key).equals(snapshot.mutationValue(key).orElse(""))
+                || !paths.get(key).equals(snapshot.path(key).orElse(null))) {
+                throw new IOException("WorldGen metadata recovery final asset state is not authoritative");
+            }
+        }
+        coordinator.healthCheck();
+        if (coordinator.read(AssetTransactionCoordinator.Snapshot::rootSequence) != snapshot.rootSequence()) {
+            throw new IOException("WorldGen metadata recovery coordinator changed during validation");
+        }
+        ResourceIdentity current = projectMetadataIdentity(snapshot, projectMetadataResourceId());
+        String hash = canonicalProjectMetadataPayloadHash(canonicalProjectMetadataJson(metadata.serializedJson()));
+        if (current == null || current.deleted() || current.revision() != revision
+            || !current.mutationId().equals(mutationId.toString()) || !current.payloadHash().equals(hash)) {
+            throw new IOException("WorldGen metadata recovery final lineage is not authoritative");
+        }
+        return current;
+    }
+
+    private AssetTransactionCoordinator.ExpectedState worldGenRecoveryExpectedState(JsonObject asset) throws IOException {
+        JsonObject expected = object(asset, "expected", "WorldGen metadata recovery asset baseline is invalid");
+        long revision = longValue(expected, "revision", "WorldGen metadata recovery asset revision is invalid");
+        String hash = exactStringValue(expected, "hash", "WorldGen metadata recovery asset hash is invalid");
+        return switch (stringValue(expected, "kind", "WorldGen metadata recovery asset kind is invalid")) {
+            case "MISSING" -> {
+                if (revision != 0L || !hash.isEmpty()) throw new IOException("WorldGen metadata recovery missing baseline is invalid");
+                yield AssetTransactionCoordinator.Missing.INSTANCE;
+            }
+            case "LIVE" -> new AssetTransactionCoordinator.Live(revision, hash);
+            case "DELETED" -> new AssetTransactionCoordinator.Deleted(revision, hash);
+            default -> throw new IOException("WorldGen metadata recovery asset baseline kind is invalid");
+        };
+    }
+
+    private void requireWorldGenRecoveryTransition(AssetTransactionCoordinator.MutationView source, JsonObject scope,
+                                                     Map<AssetTransactionCoordinator.AssetKey, JsonObject> assets,
+                                                     JsonObject before, JsonObject after, Set<String> deltaPaths,
+                                                     AssetTransactionManager.TransactionInspection inspection,
+                                                     Map<String, byte[]> writes) throws IOException {
+        if (!scope.keySet().equals(Set.of("actorClientId", "requestId", "mutationId", "operationId", "action",
+            "resourceId", "expectedRevision", "payload", "worldGenIntentHash"))) {
+            throw new IOException("WorldGen metadata recovery scope is incomplete");
+        }
+        String action = stringValue(scope, "action", "WorldGen metadata recovery action is invalid");
+        String id = stringValue(scope, "resourceId", "WorldGen metadata recovery resource is invalid");
+        String actor = stringValue(scope, "actorClientId", "WorldGen metadata recovery actor is invalid");
+        String request = stringValue(scope, "requestId", "WorldGen metadata recovery request is invalid");
+        long expectedRevision = longValue(scope, "expectedRevision", "WorldGen metadata recovery expected revision is invalid");
+        JsonObject payload = object(scope, "payload", "WorldGen metadata recovery payload is invalid");
+        if (actor.isBlank() || !source.mutationId().toString().equals(stringValue(scope, "mutationId",
+            "WorldGen metadata recovery mutation is invalid")) || !isCanonicalWorldGenOperationId(request, action, id)
+            || !request.equals(stringValue(scope, "operationId", "WorldGen metadata recovery operation is invalid"))
+            || ("worldGenProjectSave".equals(action) && !request.equals(action + ':' + id + ':' + source.mutationId()))) {
+            throw new IOException("WorldGen metadata recovery scope identity is invalid");
+        }
+        Map<String, Object> hashInput = new LinkedHashMap<>();
+        hashInput.put("actorClientId", actor);
+        hashInput.put("requestId", request);
+        hashInput.put("mutationId", source.mutationId().toString());
+        hashInput.put("operationId", request);
+        hashInput.put("action", action);
+        hashInput.put("resourceId", id);
+        hashInput.put("expectedRevision", expectedRevision);
+        hashInput.put("data", CanonicalJson.parseOpaque(payload.toString()));
+        if (!CanonicalJson.sha256("worldgen-mutation", hashInput).equals(stringValue(scope, "worldGenIntentHash",
+            "WorldGen metadata recovery scope hash is invalid"))) throw new IOException("WorldGen metadata recovery scope hash differs");
+        AssetTransactionCoordinator.AssetKey key = assetKey(ReSyncResourceCatalog.WORLDGEN, id);
+        AssetTransactionCoordinator.AssetKey intentKey = assetKey(ReSyncResourceCatalog.WORLDGEN + ".intent", id);
+        AssetTransactionCoordinator.AssetKey tombstoneKey = assetKey(ReSyncResourceCatalog.WORLDGEN + ".tombstone", id);
+        Set<AssetTransactionCoordinator.AssetKey> expectedKeys = new LinkedHashSet<>(Set.of(key, intentKey));
+        boolean delete = "worldGenProjectDelete".equals(action);
+        if (delete) expectedKeys.add(tombstoneKey);
+        if (!deltaPaths.isEmpty()) expectedKeys.add(projectMetadataLineageKey());
+        JsonObject primary = assets.get(key);
+        AssetTransactionCoordinator.ExpectedState result = source.result().states().get(key);
+        if (!assets.keySet().equals(expectedKeys) || primary == null || result == null
+            || worldGenRecoveryExpectedState(primary).revision() != expectedRevision || expectedRevision < 0L
+            || result.revision() != Math.addExact(expectedRevision, 1L)) {
+            throw new IOException("WorldGen metadata recovery resource result is not exact");
+        }
+        JsonObject semantic = new JsonObject();
+        semantic.addProperty("operation", delete ? "delete" : "save");
+        semantic.addProperty("type", ReSyncResourceCatalog.WORLDGEN);
+        String operation;
+        if (delete) {
+            if (!(result instanceof AssetTransactionCoordinator.Deleted deleted)
+                || !(worldGenRecoveryExpectedState(primary) instanceof AssetTransactionCoordinator.Live)
+                || !"DELETE".equals(stringValue(primary, "operation", "WorldGen metadata recovery primary operation is invalid"))
+                || !payload.keySet().equals(Set.of("projectId")) || !id.equals(payload.get("projectId").getAsString())
+                || !deleted.hash().equals(StorageSafety.sha256("deleted\n" + key.canonical() + "\n"
+                + deleted.revision() + "\n" + source.mutationId()))) {
+                throw new IOException("WorldGen metadata recovery delete result is invalid");
+            }
+            String relativePath = stringValue(primary, "path", "WorldGen metadata recovery deleted path is invalid");
+            Path priorPath = assetsDir.toPath().toAbsolutePath().normalize().resolve(".snapshots")
+                .resolve(inspection.visibility().transactionId()).resolve(relativePath).normalize();
+            MigrationPaths.requireNoSymlinkTraversal(assetsDir.toPath(), priorPath);
+            byte[] priorBytes = Files.readAllBytes(priorPath);
+            if (!worldGenRecoveryExpectedState(primary).hash().equals(StorageSafety.sha256(priorBytes))) {
+                throw new IOException("WorldGen metadata recovery deleted payload backup differs from its baseline");
+            }
+            JsonObject priorPayload = worldGenRecoveryPayload(priorBytes, id, expectedRevision, null);
+            JsonObject tombstone = JsonParser.parseString(new String(writes.get(stringValue(assets.get(tombstoneKey), "path",
+                "WorldGen metadata recovery tombstone path is invalid")), StandardCharsets.UTF_8)).getAsJsonObject();
+            String priorHash = ResourcePayloadCodecs.json().hashPayload(gson.fromJson(priorPayload, Map.class)).canonicalText();
+            if (!ReSyncResourceCatalog.WORLDGEN.equals(stringValue(tombstone, "type", "WorldGen metadata recovery tombstone type is invalid"))
+                || !id.equals(stringValue(tombstone, "id", "WorldGen metadata recovery tombstone resource is invalid"))
+                || longValue(tombstone, AssetFileFormat.REVISION, "WorldGen metadata recovery tombstone revision is invalid") != result.revision()
+                || !source.mutationId().toString().equals(stringValue(tombstone, AssetFileFormat.MUTATION_ID,
+                "WorldGen metadata recovery tombstone mutation is invalid")) || !tombstone.get("deleted").getAsBoolean()
+                || !priorHash.equals(stringValue(tombstone, "payloadHash", "WorldGen metadata recovery tombstone payload hash is invalid"))) {
+                throw new IOException("WorldGen metadata recovery tombstone does not prove its exact deleted payload");
+            }
+            operation = "DELETE";
+        } else {
+            if (!(result instanceof AssetTransactionCoordinator.Live live)
+                || !"WRITE".equals(stringValue(primary, "operation", "WorldGen metadata recovery primary operation is invalid"))
+                || !live.hash().equals(stringValue(primary, "payloadHash", "WorldGen metadata recovery payload hash is invalid"))
+                || !id.equals(stringValue(payload, "id", "WorldGen metadata recovery payload identity is invalid"))) {
+                throw new IOException("WorldGen metadata recovery save result is invalid");
+            }
+            AssetTransactionCoordinator.ExpectedState expected = worldGenRecoveryExpectedState(primary);
+            operation = expected instanceof AssetTransactionCoordinator.Missing ? "CREATE" : "SAVE";
+            if (!(expected instanceof AssetTransactionCoordinator.Missing) && !(expected instanceof AssetTransactionCoordinator.Live)) {
+                throw new IOException("WorldGen metadata recovery save baseline is unsupported");
+            }
+            JsonObject durablePayload = worldGenRecoveryPayload(writes.get(stringValue(primary, "path",
+                "WorldGen metadata recovery saved path is invalid")), id, result.revision(), source.mutationId());
+            if (!durablePayload.equals(payload)) {
+                throw new IOException("WorldGen metadata recovery scope differs from its exact committed payload");
+            }
+            WorldGenProject value = WorldGenSerializer.deserializeProject(payload.toString());
+            value.rebuildIndices();
+            semantic.addProperty("id", id);
+            semantic.addProperty("payloadHash", StorageSafety.sha256(
+                JsonParser.parseString(WorldGenSerializer.serializeProjectOwned(value)).toString().getBytes(StandardCharsets.UTF_8)));
+            semantic.addProperty("auxiliaryHash", "");
+        }
+        AssetTransactionCoordinator.ExpectedState intentState = source.result().states().get(intentKey);
+        Gson serializer = new GsonBuilder().setPrettyPrinting().create();
+        if (!(intentState instanceof AssetTransactionCoordinator.Live live)
+            || !live.hash().equals(StorageSafety.sha256(serializer.toJson(semantic)))
+            || !live.hash().equals(stringValue(assets.get(intentKey), "payloadHash",
+            "WorldGen metadata recovery semantic hash is invalid"))) {
+            throw new IOException("WorldGen metadata recovery semantic intent is invalid");
+        }
+        requireProjectMetadataRecoveryEffect(before, after, ReSyncResourceCatalog.WORLDGEN, id,
+            stringValue(primary, "path", "WorldGen metadata recovery resource path is invalid"), operation, semantic, deltaPaths);
+    }
+
+    private JsonObject worldGenRecoveryPayload(byte[] bytes, String id, long revision, UUID mutationId) throws IOException {
+        JsonObject asset = JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8)).getAsJsonObject();
+        if (!AssetFileFormat.verify(asset) || !ReSyncResourceCatalog.WORLDGEN.equals(stringValue(asset, "resourceType",
+            "WorldGen metadata recovery payload type is invalid"))
+            || !id.equals(stringValue(asset, "id", "WorldGen metadata recovery payload resource is invalid"))
+            || longValue(asset, AssetFileFormat.REVISION, "WorldGen metadata recovery payload revision is invalid") != revision
+            || mutationId != null && !mutationId.toString().equals(stringValue(asset, AssetFileFormat.MUTATION_ID,
+            "WorldGen metadata recovery payload mutation is invalid"))) {
+            throw new IOException("WorldGen metadata recovery payload identity is invalid");
+        }
+        return JsonAssetStore.logicalPayload(asset);
     }
 
     private ResourceIdentity recoverProjectMetadataNormalization(AssetTransactionCoordinator.Snapshot snapshot,
@@ -4741,6 +5408,7 @@ public class FlowStorage {
     }
 
     public synchronized void clearCache() {
+        persistenceGeneration++;
         coreMetadata = null;
         synchronized (coreGraphs) {
             coreGraphs.clear();
@@ -6257,119 +6925,8 @@ public class FlowStorage {
                                                       String sourceType, String sourceId, String sourcePath,
                                                       String operation, JsonObject semanticIntent,
                                                       Set<String> deltaPaths) throws IOException {
-        JsonArray beforeResources = projectMetadataArray(projectBefore, "resources");
-        JsonArray beforeFolders = projectMetadataArray(projectBefore, "folders");
-        JsonArray resources = beforeResources.deepCopy();
-        JsonArray folders = beforeFolders.deepCopy();
-        List<JsonObject> matches = projectMetadataResourceMatches(resources, sourceType, sourceId);
-        if (("CREATE".equals(operation) && !matches.isEmpty())
-            || ("SAVE".equals(operation) && matches.size() != 1)
-            || ("DELETE".equals(operation) && matches.size() != 1)) {
-            throw new IOException("Source resource mutation presentation precondition is invalid for " + operation);
-        }
-        resources.asList().removeIf(element -> element.isJsonObject()
-            && sourceType.equals(projectMetadataText(element.getAsJsonObject(), "type"))
-            && sourceId.equals(projectMetadataText(element.getAsJsonObject(), "id")));
-        if (!"DELETE".equals(operation)) {
-            JsonObject resource = matches.isEmpty() ? new JsonObject() : matches.getFirst().deepCopy();
-            resource.addProperty("type", sourceType);
-            resource.addProperty("id", sourceId);
-            resource.addProperty("path", sourcePath);
-            if (semanticIntent.has("presentation")) {
-                JsonObject presentation = object(semanticIntent, "presentation",
-                    "Source resource mutation presentation intent is invalid");
-                if (!presentation.keySet().equals(Set.of("displayName", "path", "sortOrder"))
-                    || !sourcePath.equals(stringValue(presentation, "path",
-                    "Source resource mutation presentation path is invalid"))) {
-                    throw new IOException("Source resource mutation presentation intent does not match its asset path");
-                }
-                applyProjectMetadataPresentation(resource, presentation, "displayName");
-                applyProjectMetadataPresentation(resource, presentation, "sortOrder");
-            }
-            ensureProjectMetadataRecoveryFolders(folders, sourcePath);
-            resources.add(resource);
-        }
-        JsonObject expected = projectBefore.deepCopy();
-        expected.add("resources", resources);
-        if (!beforeFolders.equals(folders)) {
-            expected.add("folders", folders);
-        }
-        if (!expected.equals(projectAfter)) {
-            throw new IOException("Source resource mutation project metadata transition includes unrelated presentation changes");
-        }
-        Set<String> expectedDeltas = new LinkedHashSet<>();
-        if (!beforeResources.equals(resources)) {
-            expectedDeltas.add("resources");
-        }
-        if (!beforeFolders.equals(folders)) {
-            expectedDeltas.add("folders");
-        }
-        if (!expectedDeltas.equals(deltaPaths)) {
-            throw new IOException("Source resource mutation project deltas do not match its presentation effect");
-        }
-    }
-
-    private JsonArray projectMetadataArray(JsonObject metadata, String field) throws IOException {
-        JsonElement value = metadata.get(field);
-        if (value == null || value.isJsonNull()) {
-            return new JsonArray();
-        }
-        if (!value.isJsonArray()) {
-            throw new IOException("Source resource mutation project metadata " + field + " is invalid");
-        }
-        return value.getAsJsonArray().deepCopy();
-    }
-
-    private List<JsonObject> projectMetadataResourceMatches(JsonArray resources, String sourceType,
-                                                            String sourceId) throws IOException {
-        List<JsonObject> matches = resources.asList().stream().filter(JsonElement::isJsonObject)
-            .map(JsonElement::getAsJsonObject)
-            .filter(resource -> sourceType.equals(projectMetadataText(resource, "type"))
-                && sourceId.equals(projectMetadataText(resource, "id")))
-            .toList();
-        if (matches.size() > 1) {
-            throw new IOException("Source resource mutation project metadata repeats its typed identity");
-        }
-        return matches;
-    }
-
-    private String projectMetadataText(JsonObject object, String field) {
-        JsonElement value = object.get(field);
-        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
-            ? value.getAsString() : "";
-    }
-
-    private void applyProjectMetadataPresentation(JsonObject resource, JsonObject presentation, String field) {
-        JsonElement value = presentation.get(field);
-        if (value != null && !value.isJsonNull()) {
-            resource.add(field, value.deepCopy());
-        }
-    }
-
-    private void ensureProjectMetadataRecoveryFolders(JsonArray folders, String resourcePath) throws IOException {
-        int separator = resourcePath.lastIndexOf('/');
-        if (separator < 1) {
-            return;
-        }
-        String parent = "";
-        for (String part : resourcePath.substring(0, separator).split("/")) {
-            String path = parent.isBlank() ? part : parent + '/' + part;
-            List<JsonObject> matches = folders.asList().stream().filter(JsonElement::isJsonObject)
-                .map(JsonElement::getAsJsonObject).filter(folder -> path.equals(projectMetadataText(folder, "path"))).toList();
-            if (matches.size() > 1) {
-                throw new IOException("Source resource mutation project metadata repeats a folder path");
-            }
-            if (matches.isEmpty()) {
-                JsonObject folder = new JsonObject();
-                folder.addProperty("path", path);
-                folder.addProperty("parentPath", parent);
-                folder.addProperty("name", part);
-                folder.addProperty("sortOrder", 0);
-                folder.addProperty("collapsed", false);
-                folders.add(folder);
-            }
-            parent = path;
-        }
+        ProjectMetadataRecovery.requireEffect(projectBefore, projectAfter, sourceType, sourceId, sourcePath,
+            operation, semanticIntent, deltaPaths);
     }
 
     private UUID sourceMutationId(AssetTransactionCoordinator.MutationView source,

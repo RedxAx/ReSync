@@ -206,7 +206,7 @@ public final class VariableService {
     }
 
     private AutomationInstanceKey key(VariableDefinition definition, AutomationOwner owner) {
-        return new AutomationInstanceKey(definition.id(), definition.scope(), owner.id());
+        return new AutomationInstanceKey(definition.kind(), definition.id(), definition.scope(), owner.id());
     }
 
     private Object lock(VariableDefinition definition, AutomationOwner owner) {

@@ -154,7 +154,7 @@ class FlowValueCodecRegistryTest {
     @Test
     void npcHandlesPreserveRuntimeIdentityWithoutPretendingToBeEntities() {
         FlowValueCodecRegistry codecs = new FlowValueCodecRegistry();
-        FlowNpcHandle handle = new FlowNpcHandle("guide", "", true, true, "world", 12.5, 64, -8.25, 90, 15);
+        FlowNpcHandle handle = new FlowNpcHandle("guide", "", "11111111-1111-5111-8111-111111111111", true, true, "world", 12.5, 64, -8.25, 90, 15);
 
         FlowNpcHandle decoded = assertInstanceOf(FlowNpcHandle.class,
             codecs.decode(FlowTypeRef.simple("npc_handle"), codecs.encode(FlowTypeRef.simple("npc_handle"), handle)));

@@ -5,6 +5,8 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.block.Action;
@@ -94,6 +96,17 @@ class FlowEventRegistryOutputAdaptationTest {
             .output(output)
             .outputMappings(List.of(new NodeDefinition.PinMapping(source, target)))
             .build();
+    }
+
+    @Test
+    void projectileEventsResolveTheirPlayerShooter() {
+        Player shooter = player();
+        Projectile projectile = (Projectile) Proxy.newProxyInstance(Projectile.class.getClassLoader(), new Class<?>[]{Projectile.class},
+            (proxy, method, args) -> "getShooter".equals(method.getName()) ? shooter : null);
+        Function<Event, Player> extractor = new FlowEventRegistry(null).buildPlayerExtractor(ProjectileLaunchEvent.class);
+
+        assertSame(shooter, extractor.apply(new ProjectileLaunchEvent(projectile)));
+        assertNull(extractor.apply(new ProjectileLaunchEvent(proxy(Projectile.class))));
     }
 
     private Block block() {

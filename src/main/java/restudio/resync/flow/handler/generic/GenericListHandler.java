@@ -357,7 +357,13 @@ public class GenericListHandler implements NodeHandler {
             String property = ctx.getInputValue(node, "property_name", String.class, "");
             String operator = ctx.getInputValue(node, "operator", String.class, "equals");
             Object compareValue = ctx.getInputValue(node, "compare_value", null);
-            Object found = list.stream().filter(item -> matchesPredicate(item, property, operator, compareValue)).findFirst().orElse(null);
+            Object found = null;
+            for (Object item : list) {
+                if (matchesPredicate(item, property, operator, compareValue)) {
+                    found = item;
+                    break;
+                }
+            }
             ctx.setOutput(node, "found_element", found);
         });
         operations.put("count", (ctx, node) -> {
@@ -458,7 +464,7 @@ public class GenericListHandler implements NodeHandler {
             ctx.setOutput(node, "list", items);
         });
         operations.put("insert", (ctx, node) -> {
-            List<Object> list = ctx.getInputValue(node, "list", List.class, new ArrayList<>());
+            List<Object> list = mutableList(ctx, node);
             Integer index = ctx.getInputValue(node, "index", Integer.class, 0);
             Object item = ctx.getInputValue(node, "item", null);
             if (index >= 0 && index <= list.size()) {
@@ -511,10 +517,7 @@ public class GenericListHandler implements NodeHandler {
                 if (valA == null && valB == null) return 0;
                 if (valA == null) return 1;
                 if (valB == null) return -1;
-                if (valA instanceof Comparable && valB instanceof Comparable) {
-                    return ((Comparable<Object>) valA).compareTo(valB);
-                }
-                return String.valueOf(valA).compareTo(String.valueOf(valB));
+                return compareOrderedValues(valA, valB);
             });
             ctx.setOutput(node, "list", result);
         });

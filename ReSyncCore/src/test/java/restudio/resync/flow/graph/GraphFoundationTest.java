@@ -29,6 +29,8 @@ import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.inspector.InspectorFallback;
 import restudio.resync.flow.runtime.RuntimeFailureContract;
 import restudio.resync.flow.runtime.RuntimeBindingDescriptor;
+import restudio.resync.flow.runtime.RuntimeAuthority;
+import restudio.resync.flow.runtime.RuntimeBindingRegistry;
 import restudio.resync.flow.runtime.RuntimeBindingKey;
 import restudio.resync.flow.runtime.RuntimeBindingManifest;
 import restudio.resync.flow.runtime.RuntimeOperationDescriptor;
@@ -224,6 +226,14 @@ class GraphFoundationTest {
             repeatableGraph(catalog, PinId.of("first-value"), SECOND_ELEMENT), catalog);
 
         assertTrue(valid.valid(), valid.diagnostics()::toString);
+        GraphDocument executable = repeatableGraph(catalog, PinId.of("first-value"), FIRST_ELEMENT);
+        ValidationResult runtime = new GraphValidator().validate(executable, catalog,
+            RuntimeBindingManifest.create(List.of(), List.of(), Map.of(), List.of()));
+        assertTrue(runtime.diagnostics().stream().anyMatch(value -> value.code().equals("GRAPH.REPEATABLE_RUNTIME_UNAVAILABLE")));
+        CompiledExecutionPlan plan = new GraphCompiler().compile(executable, catalog);
+        CompiledExecutionRunner runner = new CompiledExecutionRunner(new RuntimeBindingRegistry(), new RuntimeAuthority("repeatable-test"));
+        IllegalStateException rejected = assertThrows(IllegalStateException.class, () -> runner.prepare(plan, null));
+        assertTrue(rejected.getMessage().startsWith("GRAPH.REPEATABLE_RUNTIME_UNAVAILABLE"));
         assertFalse(crossGroupValue.valid());
         assertTrue(crossGroupValue.diagnostics().stream()
             .anyMatch(value -> value.code().equals("GRAPH.PIN_UNDECLARED")));

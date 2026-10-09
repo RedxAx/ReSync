@@ -12,6 +12,7 @@ import restudio.resync.flow.identity.ContentHash;
 import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.FunctionParameterId;
 import restudio.resync.flow.identity.InspectorFieldId;
+import restudio.resync.flow.identity.NodeId;
 import restudio.resync.flow.identity.NodeInstanceId;
 import restudio.resync.flow.identity.OwnerId;
 import restudio.resync.flow.identity.ResourceTypeId;
@@ -29,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,7 +51,7 @@ class GraphValidatorContractTest {
         RuntimeBindingManifest manifest = RuntimeBindingManifest.create(List.of(), List.of(), Map.of(), List.of());
         GraphDocument graph = new GraphDocument(catalog.contractVersion(), resource(), 0,
             CatalogBinding.of(catalog.generation(), catalog.contentChecksum(), ContentHash.of("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")),
-            java.util.Set.of(), List.of(), List.of(), List.of(), OpaqueData.empty());
+            Set.of(), List.of(), List.of(), List.of(), OpaqueData.empty());
 
         ContentHash before = graph.checksum();
         ValidationResult result = new GraphValidator().validate(graph, catalog, manifest);
@@ -67,13 +69,13 @@ class GraphValidatorContractTest {
             TypedValue.value(TEXT, "hello"));
         GraphNode node = new GraphNode(
             NodeInstanceId.of(UUID.fromString("33333333-3333-4333-8333-333333333333")),
-            ContractRef.of(new OwnerId("builtin"), restudio.resync.flow.identity.NodeId.of("text")), 1, null, Map.of(),
+            ContractRef.of(new OwnerId("builtin"), NodeId.of("text")), 1, null, Map.of(),
             Map.of(InspectorFieldId.of("message"), TypedValue.value(TEXT, "hello")), List.of(), List.of(),
             InspectorState.empty(), 0, 0, OpaqueData.of(unknown));
         CatalogSnapshot catalog = CatalogSnapshot.empty(new CatalogVersion(1, 0));
         GraphDocument graph = new GraphDocument(new CatalogVersion(1, 0), resource(), 0,
             CatalogBinding.of(catalog.generation(), catalog.contentChecksum(), catalog.bindingManifestHash()),
-            java.util.Set.of(), List.of(node), List.of(), List.of(variable), List.of(), OpaqueData.empty());
+            Set.of(), List.of(node), List.of(), List.of(variable), List.of(), OpaqueData.empty());
 
         assertEquals(1, graph.variables().size());
         assertEquals(TypedValue.value(TEXT, "hello"), graph.variables().getFirst().value());
@@ -113,6 +115,22 @@ class GraphValidatorContractTest {
         assertTrue(result.diagnostics().stream().anyMatch(value -> value.code().equals("GRAPH.PIN_TYPE_MISMATCH")));
     }
 
+    @Test
+    void inspectorFunctionSignaturesCannotAliasAnotherOwnerOrResourceKind() {
+        CatalogSnapshot catalog = functionCatalog();
+        List<FunctionParameter> inputs = List.of(new FunctionParameter(FIRST_PARAMETER, "first", TEXT),
+            new FunctionParameter(SECOND_PARAMETER, "second", NUMBER));
+        List<FunctionParameter> outputs = List.of(new FunctionParameter(OUTPUT_PARAMETER, "result", TEXT));
+        for (ServerResourceLocator alias : List.of(
+            new ServerResourceLocator(SERVER, ContractRef.of(new OwnerId("other"), new ResourceTypeId("function")), "compute"),
+            new ServerResourceLocator(SERVER, ContractRef.of(new OwnerId("example"), new ResourceTypeId("flow")), "compute"))) {
+            ValidationResult result = new GraphValidator().validate(functionGraph(catalog,
+                new FunctionBinding(alias, 0, inputs, outputs)), catalog);
+            assertFalse(result.valid());
+            assertTrue(result.diagnostics().stream().anyMatch(value -> value.code().equals("GRAPH.DEFINITION_MISSING")));
+        }
+    }
+
     private static ServerResourceLocator resource() {
         return new ServerResourceLocator(SERVER, ContractRef.of(new OwnerId("resync"), new ResourceTypeId("flow")), "example");
     }
@@ -124,7 +142,7 @@ class GraphValidatorContractTest {
     private static GraphDocument functionGraph(CatalogSnapshot catalog, FunctionBinding function) {
         return new GraphDocument(new CatalogVersion(1, 0), resource(), 0,
             CatalogBinding.of(catalog.generation(), catalog.contentChecksum(), catalog.bindingManifestHash()),
-            java.util.Set.of(), List.of(), List.of(), List.of(function), OpaqueData.empty());
+            Set.of(), List.of(), List.of(), List.of(function), OpaqueData.empty());
     }
 
     private static CatalogSnapshot functionCatalog() {
@@ -140,10 +158,10 @@ class GraphValidatorContractTest {
                 CatalogProvenance.fromText(CatalogProvenance.SourceKind.BUNDLED, "classpath:/functions", "1.0.0", "test", "functions"))
             .inspectors(List.of(inspector)).build();
         List<CatalogContribution> contributions = List.of(contribution);
-        String canonical = CatalogCanonicalizer.canonicalSnapshotContent(1, version, contributions, java.util.Set.of(), List.of());
+        String canonical = CatalogCanonicalizer.canonicalSnapshotContent(1, version, contributions, Set.of(), List.of());
         return new CatalogSnapshot(1, version,
-            CatalogCanonicalizer.contentChecksum(1, version, contributions, java.util.Set.of(), List.of()),
-            CatalogCanonicalizer.bindingManifestHash(contributions), java.util.Set.of(), contributions,
+            CatalogCanonicalizer.contentChecksum(1, version, contributions, Set.of(), List.of()),
+            CatalogCanonicalizer.bindingManifestHash(contributions), Set.of(), contributions,
             List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), canonical);
     }
 }

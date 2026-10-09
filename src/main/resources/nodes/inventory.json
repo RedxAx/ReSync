@@ -500,7 +500,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "description": "Material to remove.",
         "direction": "input"
       },
@@ -2121,7 +2121,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "description": "Material to remove.",
         "direction": "input"
       },
@@ -2434,7 +2434,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "description": "Material used for the item.",
         "direction": "input"
       },
@@ -2557,7 +2557,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "description": "Material to assign to the item stack.",
         "direction": "input"
       }

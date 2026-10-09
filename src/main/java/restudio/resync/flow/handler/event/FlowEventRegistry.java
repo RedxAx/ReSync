@@ -1,6 +1,7 @@
 package restudio.resync.flow.handler.event;
 
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
@@ -485,7 +486,10 @@ public class FlowEventRegistry {
         }
         try {
             Object result = method.invoke(event);
-            return result instanceof Player player ? player : null;
+            if (result instanceof Player player) {
+                return player;
+            }
+            return result instanceof Projectile projectile && projectile.getShooter() instanceof Player shooter ? shooter : null;
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("Failed to resolve player from event " + event.getEventName() + " using " + method.getName(), exception);
         }

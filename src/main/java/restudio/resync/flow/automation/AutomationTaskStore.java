@@ -6,7 +6,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
-import restudio.resync.Log;
 import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.OwnerId;
 import restudio.resync.flow.identity.ResourceTypeId;
@@ -40,8 +39,7 @@ final class AutomationTaskStore {
         try {
             return loadStrict();
         } catch (IOException | RuntimeException failure) {
-            Log.warn("Failed to load persistent automation tasks: " + failure.getMessage());
-            return List.of();
+            throw new IllegalStateException("Failed to load persistent automation tasks: " + file, failure);
         }
     }
 

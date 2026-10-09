@@ -385,7 +385,7 @@ public class SystemEventListener implements Listener {
                 + " resourceType=flow resourceId=" + resourceId + " eventType=" + triggerType);
     }
     
-    private boolean isSystemEvent(String eventType) {
+    boolean isSystemEvent(String eventType) {
         String key = normalizeEventKey(eventType);
         return key.equals("server_start") || key.equals("server_stop") ||
                key.equals("plugin_enable") || key.equals("plugin_disable") ||

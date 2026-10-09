@@ -10,6 +10,7 @@ import restudio.resync.flow.identity.RepeatableGroupId;
 import restudio.resync.flow.identity.InspectorFieldId;
 import restudio.resync.flow.type.TypedValue;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,6 +27,8 @@ public final class GraphNode {
     private final Map<PinId, PinValue> inspector;
     private final Map<InspectorFieldId, TypedValue> inspectorFields;
     private final List<BranchBinding> branches;
+    private final Map<PinId, PinValue> configuredValues;
+    private final Set<PinId> branchConflicts;
     private final List<RepeatableBinding> repeatables;
     private final InspectorState inspectorState;
     private final double x;
@@ -50,6 +53,21 @@ public final class GraphNode {
         this.branches = List.copyOf(branches != null ? branches : List.of());
         this.repeatables = List.copyOf(repeatables != null ? repeatables : List.of());
         validateStructuralIds(this.branches, this.repeatables);
+        Map<PinId, PinValue> selectedValues = new LinkedHashMap<>();
+        Set<PinId> conflicts = new HashSet<>();
+        for (BranchBinding branch : this.branches) {
+            BranchCase selected = branch.cases().stream().filter(value -> value.caseId().equals(branch.selectedCaseId())).findFirst().orElseThrow();
+            selected.values().forEach((pin, value) -> {
+                PinValue previous = selectedValues.putIfAbsent(pin, value);
+                if (previous != null && !previous.value().equals(value.value())) {
+                    conflicts.add(pin);
+                }
+            });
+        }
+        Map<PinId, PinValue> configured = new LinkedHashMap<>(this.values);
+        configured.putAll(selectedValues);
+        this.configuredValues = Collections.unmodifiableMap(configured);
+        this.branchConflicts = Set.copyOf(conflicts);
         this.inspectorState = inspectorState != null ? inspectorState : InspectorState.empty();
         if (!Double.isFinite(x) || !Double.isFinite(y)) {
             throw new IllegalArgumentException("Node position must be finite");
@@ -94,6 +112,17 @@ public final class GraphNode {
 
     public Map<InspectorFieldId, TypedValue> inspectorValues() {
         return inspectorFields;
+    }
+
+    public Map<PinId, PinValue> configuredValues() {
+        if (!branchConflicts.isEmpty()) {
+            throw new IllegalStateException("Selected branch cases provide conflicting values for the same runtime input pin");
+        }
+        return configuredValues;
+    }
+
+    public Set<PinId> branchConflicts() {
+        return branchConflicts;
     }
 
     public List<BranchBinding> branches() {

@@ -208,7 +208,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "description": "Provides the new material used by Replace Region.",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material"
       }
@@ -325,7 +325,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "description": "Provides the material used by Count Blocks.",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material"
       }
@@ -445,7 +445,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "description": "Provides the material used by Create Outline.",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material"
       }
@@ -2150,7 +2150,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "description": "Provides the material used by Region Set Blocks.",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material"
       }
@@ -3703,7 +3703,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "description": "Provides the material used by Region Walls.",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material"
       }
@@ -3815,7 +3815,7 @@
         "pinType": "DATA",
         "dataType": "material",
         "description": "Provides the material used by Region Hollow.",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material"
       }

@@ -4,10 +4,15 @@ import org.bukkit.entity.Player;
 import restudio.flow.data.FlowJobReference;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowOperationResult;
-import restudio.flow.data.FlowResourceReference;
+import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.worldgen.WorldGenOperationService;
 
 import java.util.Map;
@@ -85,14 +90,33 @@ public final class WorldGenFlowHandler implements NodeHandler {
     }
 
     private String projectId(FlowContext ctx, FlowNode node) {
-        Object value = ctx.getInputValue(node, "project");
-        if (value instanceof FlowResourceReference reference) {
-            return reference.id();
+        return requireProject(ctx.getInputValue(node, "project"), currentServerId()).id();
+    }
+
+    static ServerResourceLocator requireProject(Object value, ServerId serverId) {
+        if (!(value instanceof ServerResourceLocator locator)) {
+            throw new IllegalArgumentException("WorldGen project reference must contain server, type, and ID");
         }
-        if (value != null) {
-            return String.valueOf(value);
+        if (serverId == null || !serverId.equals(locator.serverId())) {
+            throw new IllegalArgumentException("WorldGen project reference server does not match this server");
         }
-        return ctx.getInputValue(node, "project_id", String.class, "");
+        if (!OwnerId.of("restudio.resync").equals(locator.owner())
+            || !ResourceTypeId.of(ReSyncResourceCatalog.WORLDGEN).equals(locator.resourceType())) {
+            throw new IllegalArgumentException("WorldGen project reference must identify a ReSync WorldGen project");
+        }
+        return locator;
+    }
+
+    private static ServerId currentServerId() {
+        ReSync plugin = ReSync.getInstance();
+        if (plugin == null || plugin.getReSyncServer() == null) {
+            throw new IllegalStateException("ReSync server identity is unavailable");
+        }
+        String serverId = plugin.getReSyncServer().getCanonicalServerId();
+        if (serverId == null || serverId.isBlank()) {
+            throw new IllegalStateException("ReSync server identity is unavailable");
+        }
+        return ServerId.parseCanonicalText(serverId);
     }
 
     private String owner(FlowContext ctx, FlowNode node) {

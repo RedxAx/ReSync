@@ -100,7 +100,11 @@ class PropertyRegistryAuthorityTest {
         assertFalse(forward.hasProperty("inventory", ""));
         for (String property : List.of("size", "items", "missing")) {
             assertEquals(forward.getType("inventory", property).toString(), reverse.getType("inventory", property).toString());
-            assertEquals(List.of("get", "has", "set", "do"), forward.getActions("inventory", property));
+            assertEquals(switch (property) {
+                case "size" -> List.of("get", "has");
+                case "items" -> List.of("get", "has", "set");
+                default -> List.of();
+            }, forward.getActions("inventory", property));
             assertEquals(forward.getActions("inventory", property), reverse.getActions("inventory", property));
         }
         assertEquals("number", forward.getType("inventory", "size").getTypeId());
@@ -118,7 +122,54 @@ class PropertyRegistryAuthorityTest {
         assertEquals("list<itemstack>", registry.getType("block", "container_items").toString());
         assertEquals("boolean", registry.getType("entity", "is_dead").getTypeId());
         assertEquals("list<item>", registry.getType("player", "armor").toString());
-        assertTrue(registry.getActions("inventory", "type").containsAll(List.of("get", "has", "set", "do", "execute")));
+        assertEquals(List.of("get", "has"), registry.getActions("inventory", "type"));
+        assertEquals(List.of("get", "has"), registry.getActions("player", "uuid"));
+        assertEquals(List.of("get", "has"), registry.getActions("player", "name"));
+        assertEquals(List.of("get", "has", "set"), registry.getActions("player", "gamemode"));
+        assertEquals(List.of("get", "has", "set"), registry.getActions("inventory", "items"));
+        assertEquals(List.of("do", "execute"), registry.getActions("block", "break_naturally"));
+
+        registry.register("player", "uuid", new PropertyHandler<Object, String>() {
+            @Override
+            public String getPropertyName() {
+                return "uuid";
+            }
+
+            @Override
+            public FlowDataType getDataType() {
+                return FlowDataType.STRING;
+            }
+
+            @Override
+            public List<String> getSupportedActions() {
+                return List.of("set");
+            }
+
+            @Override
+            public String get(Object target) {
+                return "custom";
+            }
+
+            @Override
+            public boolean set(Object target, String value) {
+                return true;
+            }
+
+            @Override
+            public boolean execute(Object target) {
+                return false;
+            }
+        });
+        registry.registerDescriptor(new PropertyRegistry.PropertyDescriptor("player", "uuid", FlowTypeRef.simple("uuid"),
+            List.of("get", "set"), true, true, true, false, "extension"));
+        registry.registerDescriptor(new PropertyRegistry.PropertyDescriptor("inventory", "custom", FlowTypeRef.simple("string"),
+            List.of("get", "execute"), true, false, false, true, "extension"));
+        registry.replaceNodeDefinitions(new NodeDefinitionLoader().loadFromClasspath("nodes"));
+        assertEquals(List.of("set"), registry.getActions("player", "uuid"));
+        assertEquals("uuid", registry.getType("player", "uuid").getTypeId());
+        assertTrue(registry.getDescriptor("player", "uuid").observable());
+        assertEquals("extension", registry.getDescriptor("player", "uuid").owner());
+        assertEquals(List.of("get", "execute"), registry.getActions("inventory", "custom"));
         assertTrue(registry.getActions("itemstack", "amount").containsAll(List.of("get", "has")));
     }
 }

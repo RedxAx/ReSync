@@ -100,16 +100,18 @@ final class EntityDataAccess {
             case "fire_ticks", "burning" -> entity.setFireTicks(integer(value, property, 0, Integer.MAX_VALUE));
             case "freeze_ticks", "frozen" -> entity.setFreezeTicks(integer(value, property, 0, entity.getMaxFreezeTicks()));
             case "ticks_lived" -> entity.setTicksLived(integer(value, property, 1, Integer.MAX_VALUE));
-            case "fall_distance" -> entity.setFallDistance((float) nonNegative(value, property));
+            case "fall_distance" -> entity.setFallDistance(nonNegativeFloat(value, property));
             case "portal_cooldown" -> entity.setPortalCooldown(integer(value, property, 0, Integer.MAX_VALUE));
-            case "velocity" -> entity.setVelocity(vector(value, property));
+            case "velocity" -> FlowMutations.applyVelocity(context, entity, vector(value, property));
             case "location" -> {
-                if (!(value instanceof Location location) || location.getWorld() == null || !entity.teleport(location)) {
+                if (!(value instanceof Location location) || location.getWorld() == null) {
                     throw new IllegalArgumentException("Entity data location must be a valid world location");
                 }
+                location.checkFinite();
+                if (!entity.teleport(location.clone())) throw new IllegalStateException("Entity data location could not be applied");
             }
             case "health" -> FlowMutations.setHealth(context, living(entity, property), nonNegative(value, property));
-            case "absorption" -> living(entity, property).setAbsorptionAmount(nonNegative(value, property));
+            case "absorption" -> FlowMutations.setAbsorption(context, living(entity, property), nonNegative(value, property));
             case "ai" -> living(entity, property).setAI(bool(value, property));
             case "collidable" -> living(entity, property).setCollidable(bool(value, property));
             case "can_pickup_items", "pickup_items" -> living(entity, property).setCanPickupItems(bool(value, property));
@@ -131,7 +133,7 @@ final class EntityDataAccess {
                 }
             }
             case "fuse_ticks" -> setFuseTicks(entity, property, integer(value, property, 0, Integer.MAX_VALUE));
-            case "yield" -> explosive(entity, property).setYield((float) nonNegative(value, property));
+            case "yield" -> explosive(entity, property).setYield(nonNegativeFloat(value, property));
             case "incendiary" -> explosive(entity, property).setIsIncendiary(bool(value, property));
             case "explosion_radius" -> creeper(entity, property).setExplosionRadius(integer(value, property, 0, 127));
             case "max_fuse_ticks" -> creeper(entity, property).setMaxFuseTicks(integer(value, property, 0, Integer.MAX_VALUE));
@@ -211,6 +213,7 @@ final class EntityDataAccess {
 
     private static Vector vector(Object value, String property) {
         if (value instanceof Vector vector) {
+            vector.checkFinite();
             return vector.clone();
         }
         if (value instanceof Map<?, ?> map) {
@@ -223,8 +226,8 @@ final class EntityDataAccess {
         if (value instanceof Boolean bool) {
             return bool;
         }
-        if (value instanceof Number number) {
-            return number.doubleValue() != 0;
+        if (value instanceof Number) {
+            return decimal(value, property) != 0;
         }
         if (value != null && ("true".equalsIgnoreCase(value.toString()) || "false".equalsIgnoreCase(value.toString()))) {
             return Boolean.parseBoolean(value.toString());
@@ -246,6 +249,12 @@ final class EntityDataAccess {
             throw new IllegalArgumentException("Entity data property requires a non-negative number: " + property);
         }
         return number;
+    }
+
+    private static float nonNegativeFloat(Object value, String property) {
+        double number = nonNegative(value, property);
+        if (number > Float.MAX_VALUE) throw new IllegalArgumentException("Entity data property exceeds the float range: " + property);
+        return (float) number;
     }
 
     private static double decimal(Object value, String property) {

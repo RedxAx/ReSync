@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GraphFunctionBindingValidationTest {
@@ -67,7 +68,8 @@ class GraphFunctionBindingValidationTest {
     @Test
     void effectOnlyAndMultipleOutputFunctionsUseTheirExactAdvertisedShape() {
         CatalogSnapshot catalog = catalog(definition("effect", "effect", Map.of(), Map.of()),
-            definition("many", "many", Map.of(FIRST, STRING), Map.of(SECOND, STRING, RESULT, NUMBER)));
+            definition("many", "many", Map.of(FIRST, STRING), Map.of(SECOND, STRING, RESULT, NUMBER)),
+            definition("copy", "copy", Map.of(FIRST, STRING), Map.of(SECOND, STRING, RESULT, NUMBER)));
         FunctionBinding effect = new FunctionBinding(resource("function", "effect"), 3, List.of(), List.of());
         FunctionBinding many = new FunctionBinding(resource("function", "many"), 7,
             List.of(parameter(FIRST, "input", STRING)),
@@ -75,6 +77,13 @@ class GraphFunctionBindingValidationTest {
 
         assertTrue(validate(catalog, effect).valid());
         assertTrue(validate(catalog, many).valid());
+        FunctionBinding copy = new FunctionBinding(resource("function", "copy"), 7, many.inputs(), many.outputs());
+        GraphDocument caller = new GraphDocument(VERSION, resource("flow", "caller"), 1,
+            CatalogBinding.of(catalog.generation(), catalog.contentChecksum(), catalog.bindingManifestHash()),
+            Set.of(), List.of(), List.of(), List.of(), List.of(many, copy), OpaqueData.empty());
+        var compiled = new GraphCompiler().compileResult(caller, catalog);
+        assertTrue(compiled.compiled(), compiled.validation().diagnostics()::toString);
+        assertEquals(caller.canonicalJson(), GraphDocumentCodec.INSTANCE.decode(GraphDocumentCodec.INSTANCE.encode(caller)).canonicalJson());
         rejects(catalog, new FunctionBinding(effect.function(), 3, List.of(), List.of(parameter(RESULT, "extra", NUMBER))),
             "GRAPH.PIN_TYPE_MISMATCH");
     }

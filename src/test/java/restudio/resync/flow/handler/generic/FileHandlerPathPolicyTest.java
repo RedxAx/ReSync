@@ -12,6 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.sql.SQLException;
+import java.sql.DriverManager;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -159,6 +160,23 @@ class FileHandlerPathPolicyTest {
         try (ManagedFlowFileCapability reopened = capability()) {
             assertEquals("persisted", reopened.read("durable/value.txt"));
             assertEquals(List.of("value.txt"), reopened.list("durable"));
+        }
+    }
+
+    @Test
+    void warmReadsObserveExternalContentAndRejectChangedStoreMetadata() throws Exception {
+        try (ManagedFlowFileCapability capability = capability()) {
+            capability.write("value.txt", "original");
+            assertEquals("original", capability.read("value.txt"));
+            try (var external = DriverManager.getConnection("jdbc:sqlite:" + capability.databaseFile());
+                 var statement = external.createStatement()) {
+                statement.executeUpdate("UPDATE managed_files SET content = CAST('external' AS BLOB) WHERE path = 'value.txt'");
+                assertEquals("external", capability.read("value.txt"));
+                statement.executeUpdate("UPDATE managed_flow_file_store_metadata SET install_identity = 'changed' WHERE id = 1");
+                assertEquals("FILE_ROOT_CHANGED", assertThrows(ManagedFlowFileCapability.AccessException.class,
+                    () -> capability.read("value.txt")).code());
+                assertFalse(capability.available());
+            }
         }
     }
 

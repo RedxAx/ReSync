@@ -72,6 +72,19 @@ class ScheduleDefinitionTest {
         assertEquals("heartbeat", definition.targetId());
     }
 
+    @Test
+    void conflictingTypedTargetsCannotSelectAnotherGraphWithTheSameId() {
+        JsonObject value = schedule("schedule");
+        value.addProperty("targetType", "function");
+        value.addProperty("targetId", "shared");
+        JsonObject target = new JsonObject();
+        target.addProperty("type", "flow");
+        target.addProperty("id", "shared");
+        value.add("target", target);
+
+        assertThrows(IllegalArgumentException.class, () -> ScheduleDefinition.from(value, "schedule"));
+    }
+
     private JsonObject schedule(String id) {
         JsonObject value = new JsonObject();
         value.addProperty("id", id);

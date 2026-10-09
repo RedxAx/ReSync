@@ -702,7 +702,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STICK",
+        "defaultValue": "stick",
         "id": "material",
         "displayName": "Material",
         "description": "Provides the material used by build custom content definition."
@@ -927,7 +927,7 @@
        "dataType": "material",
        "widget": "SEARCHABLE_LIST",
        "optionsSource": "server:minecraft:material",
-       "defaultValue": "EMERALD",
+       "defaultValue": "emerald",
        "id": "cost",
        "displayName": "Cost",
        "description": "Provides the cost used by build trade."
@@ -964,7 +964,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "id": "result",
         "displayName": "Result",
         "description": "Provides the result used by build trade."
@@ -1401,7 +1401,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "id": "item",
         "displayName": "Item",
         "description": "Provides the item used by build loot entry."
@@ -2716,7 +2716,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "id": "icon",
         "displayName": "Icon",
         "description": "Provides the icon used by build advancement tree."
@@ -2947,7 +2947,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "id": "material",
         "displayName": "Material",
         "description": "Provides the material used by build recipe ingredient."
@@ -3142,7 +3142,7 @@
         "dataType": "material",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:material",
-        "defaultValue": "STONE",
+        "defaultValue": "stone",
         "id": "result",
         "displayName": "Result",
         "description": "Provides the result used by build recipe definition."

@@ -490,14 +490,14 @@ class JsonFamilyHandlerTest {
         }
 
         @Test
-        void velocityDoesNotFabricateALocationForTheCurrentDescriptor() {
-            player.setVelocity(new Vector(1.0, 0.5, -2.0));
+        void velocityRoundTripsAsAVectorFromSelectorAndDedicatedPropertyNode() {
+            Vector velocity = new Vector(1.0, 0.5, -2.0);
+            player.setVelocity(velocity);
             for (String id : List.of("entity.properties", "entity.velocity")) {
                 Query query = prepare(id, "velocity", player, "get");
-                IllegalStateException failure = assertThrows(IllegalStateException.class, query::execute);
-                assertTrue(failure.getMessage().contains("produces a vector, not a location"));
-                assertFalse(query.context().getRuntime().hasNodeOutput("node", "value"));
-                assertFalse(query.context().getRuntime().hasNodeOutput("node", "velocity"));
+                query.execute();
+                String output = "entity.properties".equals(id) ? "velocity" : "value";
+                assertEquals(velocity, query.roundTrip(output, "vector"));
             }
         }
 

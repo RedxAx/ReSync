@@ -1138,6 +1138,16 @@
       "argumentTypes": {"detail":"text"}
     },
     {
+      "code": "GRAPH.BRANCH_INPUT_AMBIGUOUS",
+      "severity": "error",
+      "phase": "semantic",
+      "stage": "branch-input-ambiguous",
+      "messageKey": "diagnostic.graph-branch-input-ambiguous",
+      "message": "Selected branches configure different values for the same scalar input.",
+      "durable": false,
+      "remediation": "Choose matching values or separate the input routes."
+    },
+    {
       "code": "GRAPH.BRANCH_MISSING",
       "severity": "error",
       "phase": "semantic",
@@ -1498,6 +1508,16 @@
       "message": "The graph reported repeatable ordering.",
       "durable": false,
       "remediation": "Correct the reported graph configuration and validate it again."
+    },
+    {
+      "code": "GRAPH.REPEATABLE_RUNTIME_UNAVAILABLE",
+      "severity": "error",
+      "phase": "semantic",
+      "stage": "repeatable-runtime-unavailable",
+      "messageKey": "diagnostic.graph-repeatable-runtime-unavailable",
+      "message": "This runtime does not provide independently addressed element inputs and outputs.",
+      "durable": false,
+      "remediation": "Use an operation with element capabilities before executing this graph."
     },
     {
       "code": "GRAPH.RUNTIME_BINDING_MISSING",

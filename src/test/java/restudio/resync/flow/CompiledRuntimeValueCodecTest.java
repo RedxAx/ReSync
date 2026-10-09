@@ -310,7 +310,7 @@ class CompiledRuntimeValueCodecTest {
         assertThrows(IllegalArgumentException.class, () -> CompiledRuntimeValueCodec.decode(FOREIGN, handle));
         assertThrows(IllegalArgumentException.class, () -> CompiledRuntimeValueCodec.encode(null, type("npc_handle"), npcHandle("", true, true)));
         for (Map.Entry<String, Object> invalid : Map.<String, Object>of("packetBacked", "false", "active", 1,
-                "entityUuid", "1-1-1-1-1", "definitionId", "", "kind", "entity", "x", Double.NaN,
+                "entityUuid", "1-1-1-1-1", "instanceUuid", "bad-instance", "definitionId", "", "kind", "entity", "x", Double.NaN,
                 "yaw", new BigDecimal("1E100"), "worldId", UUID.randomUUID().toString(), "extra", true).entrySet()) {
             assertThrows(IllegalArgumentException.class, () -> decode(changed(handle, invalid.getKey(), invalid.getValue())), invalid.getKey());
         }
@@ -318,7 +318,7 @@ class CompiledRuntimeValueCodecTest {
         TypedValue packet = encode("npc_handle", npcHandle("", true, true));
         assertThrows(IllegalArgumentException.class, () -> decode(changed(packet, "entityUuid", entity.getUniqueId().toString())));
         assertThrows(IllegalArgumentException.class, () -> encode("npc_handle",
-            new FlowNpcHandle("qa_npc", "", true, true, world.getName(), Double.POSITIVE_INFINITY, 65, 0, 0, 0)));
+            new FlowNpcHandle("qa_npc", "", UUID.randomUUID().toString(), true, true, world.getName(), Double.POSITIVE_INFINITY, 65, 0, 0, 0)));
         World other = MockBukkit.getMock().addSimpleWorld("npc-other");
         entity.teleport(new Location(other, 5, 65, -3));
         assertThrows(IllegalArgumentException.class, () -> decode(handle));
@@ -328,7 +328,7 @@ class CompiledRuntimeValueCodecTest {
     }
 
     private FlowNpcHandle npcHandle(String entityId, boolean packet, boolean active) {
-        return new FlowNpcHandle("qa_npc", entityId, packet, active, world.getName(), 5.5, 65, -3.25, 90, -15);
+        return new FlowNpcHandle("qa_npc", entityId, UUID.randomUUID().toString(), packet, active, world.getName(), 5.5, 65, -3.25, 90, -15);
     }
 
     @Test

@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -129,6 +130,18 @@ class ManagedFlowFileUnavailableCatalogTest {
 
         @Override
         public void triggerOutput(String pinName) {
+        }
+
+        @Override
+        public CompletableFuture<Void> runAsync(Runnable action) {
+            action.run();
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override
+        public CompletableFuture<Void> runSync(Runnable action) {
+            action.run();
+            return CompletableFuture.completedFuture(null);
         }
     }
 }

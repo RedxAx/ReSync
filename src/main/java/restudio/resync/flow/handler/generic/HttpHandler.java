@@ -218,7 +218,7 @@ public class HttpHandler implements NodeHandler {
         });
     }
 
-    private Map<String, Object> makeHttpRequest(String method, String url, Map<String, Object> body, Map<String, Object> headers, int timeoutMs) throws Exception {
+    Map<String, Object> makeHttpRequest(String method, String url, Object body, Map<String, Object> headers, int timeoutMs) throws Exception {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("HTTP URL is required");
         }
@@ -341,7 +341,7 @@ public class HttpHandler implements NodeHandler {
         return base + path + suffix;
     }
 
-    private byte[] boundedBody(Map<String, Object> body) throws IOException {
+    private byte[] boundedBody(Object body) throws IOException {
         LimitedOutput output = new LimitedOutput();
         try (Writer writer = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
             GSON.toJson(body, writer);

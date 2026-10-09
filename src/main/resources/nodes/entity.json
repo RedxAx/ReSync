@@ -11,7 +11,7 @@
     "inspectorIntent": "entity-property",
     "owner": "restudio.resync",
     "category": "ENTITY",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "QUERY",
     "tags": [
       "entity",
@@ -410,7 +410,7 @@
         "displayName": "Velocity",
         "name": "velocity",
         "pinType": "DATA",
-        "dataType": "location",
+        "dataType": "vector",
         "description": "Motion vector of the entity in blocks per server tick.",
         "visibleWhen": {
           "input_action": "get",
@@ -636,7 +636,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {
@@ -4583,7 +4583,7 @@
     "inspectorIntent": "entity-property",
     "owner": "restudio.resync",
     "category": "ENTITY",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "QUERY",
     "tags": [
       "entity",
@@ -4628,7 +4628,7 @@
         "displayName": "Value",
         "name": "value",
         "pinType": "DATA",
-        "dataType": "location",
+        "dataType": "vector",
         "description": "New value used by Set. Motion vector of the entity in blocks per server tick.",
         "visibleWhen": {
           "input_action": "set"
@@ -4641,7 +4641,7 @@
         "displayName": "Value",
         "name": "value",
         "pinType": "DATA",
-        "dataType": "location",
+        "dataType": "vector",
         "description": "Motion vector of the entity in blocks per server tick."
       },
       {
@@ -4671,7 +4671,7 @@
     ],
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {

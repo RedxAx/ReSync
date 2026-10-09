@@ -40,7 +40,7 @@ public final class TimerHandler implements NodeHandler {
         }
         Object ownerValue = ownerValue(context, node, definition);
         AutomationOwner owner = AutomationOwner.resolve(definition.scope(), context, ownerValue);
-        AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), owner.id());
+        AutomationInstanceKey key = new AutomationInstanceKey(definition.kind(), definition.id(), definition.scope(), owner.id());
         AutomationTaskService.TaskSnapshot snapshot = switch (action) {
             case "start" -> start(context, node, definition, owner);
             case "stop" -> tasks.cancel(key);

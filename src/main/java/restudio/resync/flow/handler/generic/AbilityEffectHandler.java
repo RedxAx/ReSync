@@ -16,7 +16,6 @@ import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Egg;
-import org.bukkit.entity.Fireball;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
@@ -212,7 +211,9 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             ctx.triggerOutput("flow");
         });
         operations.put("particle_burst", (ctx, node) -> {
-            executeParticle(ctx, node, "burst", Map.of());
+            particleHandler.spawnBurst(requireLocation(ctx, node), parseParticle(string(ctx, node, "particle", "FLAME")),
+                integer(ctx, node, "count", 24), number(ctx, node, "spread", 0.6), number(ctx, node, "speed", 0.02));
+            ctx.triggerOutput("flow");
         });
         operations.put("play_sound", (ctx, node) -> {
             Location location = requireLocation(ctx, node);
@@ -242,33 +243,35 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             int fireTicks = integer(ctx, node, "fire_ticks", 0);
             double damage = number(ctx, node, "damage", 0.0);
             int pierce = integer(ctx, node, "pierce", 0);
-            String pickupMode = string(ctx, node, "pickup_mode", "allowed");
+            AbstractArrow.PickupStatus pickup = pickupStatus(string(ctx, node, "pickup_mode", "allowed"));
             String markKey = string(ctx, node, "mark_key", "");
             if (!Double.isFinite(speed) || speed < 0 || speed > 10) throw new IllegalArgumentException("Projectile speed must be between 0 and 10");
             if (fireTicks < 0 || fireTicks > 72_000) throw new IllegalArgumentException("Projectile fire ticks must be between 0 and 72000");
             if (!Double.isFinite(damage) || damage < 0) throw new IllegalArgumentException("Projectile damage must be a finite non-negative number");
             if (pierce < 0 || pierce > 127) throw new IllegalArgumentException("Projectile pierce level must be between 0 and 127");
-            Projectile projectile = launchProjectile(player, projectileType);
-            try {
-                projectile.setVelocity(player.getEyeLocation().getDirection().multiply(speed));
-                projectile.setGravity(gravity);
-                projectile.setFireTicks(fireTicks);
-                if (projectile instanceof AbstractArrow arrow) {
-                    if (damage > 0.0) {
-                        arrow.setDamage(damage);
+            if (!player.isOnline() || !player.isValid() || player.isDead()) throw new IllegalStateException("Projectile player is unavailable");
+            if (!markKey.isBlank() && markKey.length() > 1017) throw new IllegalArgumentException("Projectile mark cannot exceed 1017 characters");
+            Vector velocity = player.getEyeLocation().getDirection().multiply(speed);
+            Projectile projectile = launchProjectile(player, projectileType, velocity, launched -> {
+                try {
+                    launched.setGravity(gravity);
+                    launched.setFireTicks(fireTicks);
+                    if (launched instanceof AbstractArrow arrow) {
+                        if (damage > 0.0) arrow.setDamage(damage);
+                        arrow.setPierceLevel(pierce);
+                        arrow.setPickupStatus(pickup);
                     }
-                    arrow.setPierceLevel(pierce);
-                    arrow.setPickupStatus(pickupStatus(pickupMode));
+                    if (!markKey.isBlank() && !launched.addScoreboardTag("resync:" + markKey)) {
+                        throw new IllegalStateException("Projectile mark could not be applied");
+                    }
+                } catch (RuntimeException exception) {
+                    launched.remove();
+                    throw exception;
                 }
-                if (!markKey.isBlank()) {
-                    projectile.addScoreboardTag("resync:" + markKey);
-                }
-                if (projectile instanceof Fireball fireball) {
-                    fireball.setDirection(player.getEyeLocation().getDirection().multiply(speed));
-                }
-            } catch (RuntimeException exception) {
+            });
+            if (!projectile.isValid() || projectile.isDead()) {
                 projectile.remove();
-                throw exception;
+                throw new IllegalStateException("Projectile launch was rejected");
             }
             ctx.setOutput(node, "projectile", projectile);
             ctx.triggerOutput("flow");
@@ -331,6 +334,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             Location location = requireLocation(ctx, node);
             double strength = number(ctx, node, "strength", 1.0);
             Vector vector = location.toVector().subtract(target.getLocation().toVector());
+            if (!target.getWorld().equals(location.getWorld())) throw new IllegalArgumentException("Pull locations must be in the same world");
             if (vector.lengthSquared() <= 0.0001) throw new IllegalArgumentException("Pull target is already at the destination");
             FlowMutations.applyVelocity(ctx, target, vector.normalize().multiply(strength));
             ctx.triggerOutput("flow");
@@ -482,13 +486,17 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
                 target.setYaw(player.getLocation().getYaw());
                 target.setPitch(player.getLocation().getPitch());
             }
-            mutateEntity(player, "flow-ability-teleport-caster", () -> player.teleport(target));
+            mutateEntity(player, "flow-ability-teleport-caster", () -> {
+                if (!player.teleport(target)) throw new IllegalStateException("Caster could not be teleported");
+            });
             ctx.triggerOutput("flow");
         });
         operations.put("teleport_target", (ctx, node) -> {
             Entity target = requireTarget(ctx, node);
             Location location = requireLocation(ctx, node);
-            mutateEntity(target, "flow-ability-teleport-target", () -> target.teleport(location));
+            mutateEntity(target, "flow-ability-teleport-target", () -> {
+                if (!target.teleport(location)) throw new IllegalStateException("Target could not be teleported");
+            });
             ctx.triggerOutput("flow");
         });
         operations.put("beam", (ctx, node) -> {
@@ -605,7 +613,9 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         });
         operations.put("particle_shape", (ctx, node) -> {
             String mode = string(ctx, node, "mode", "ring");
-            executeParticle(ctx, node, "orbit".equalsIgnoreCase(mode) ? "circle" : mode, Map.of());
+            particleHandler.spawnShape(requireLocation(ctx, node), parseParticle(string(ctx, node, "particle", "FLAME")), mode,
+                integer(ctx, node, "count", 32), number(ctx, node, "radius", 2.0), number(ctx, node, "speed", 0.0));
+            ctx.triggerOutput("flow");
         });
         operations.put("filter_entities", (ctx, node) -> {
             List<Entity> entities = entityList(ctx, node);
@@ -776,6 +786,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             ItemStack item = requireItem(ctx, node);
             String key = string(ctx, node, "key", "charge");
             double amount = number(ctx, node, "amount", 1.0);
+            if (amount < 0) throw new IllegalArgumentException("Consumed charge cannot be negative");
             double value = getCharge(item, key);
             boolean success = value >= amount;
             if (success) {
@@ -832,7 +843,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             String mode = string(ctx, node, "mode", "damage");
             boolean worldEffect = isAreaWorldEffect(mode);
             if (!worldEffect) requireEntityEffectMode(mode);
-            List<Entity> entities = worldEffect ? List.of() : areaEntities(ctx, node, center);
+            List<Entity> entities = worldEffect ? List.of() : areaEntities(ctx, node);
             int affected = 0;
             for (Entity entity : entities) {
                 if (applyEntityEffect(ctx, node, entity, mode)) {
@@ -912,6 +923,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         }
         marks.clear();
         cooldowns.clear();
+        particleHandler.shutdown();
         if (!disarmedItems.isEmpty()) throw new IllegalStateException("Disarmed items could not be restored for players: " + disarmedItems.keySet());
     }
 
@@ -1205,7 +1217,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         };
         String id = "legacy.cooldown." + name.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.-]+", "_");
         TimerDefinition definition = new TimerDefinition(id, name, "", scope, false, 0D, TimerDefinition.TimeUnit.TICKS, 0D);
-        return new LegacyCooldown(definition, owner, new AutomationInstanceKey(id, scope, owner.id()));
+        return new LegacyCooldown(definition, owner, new AutomationInstanceKey(definition.kind(), id, scope, owner.id()));
     }
 
     private AutomationOwner textCooldownOwner(Object value, String label) {
@@ -1336,22 +1348,15 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         return result != null && result.getHitEntity() != null ? List.of(result.getHitEntity()) : List.of();
     }
 
-    private List<Entity> areaEntities(FlowContext ctx, FlowNode node, Location center) {
+    private List<Entity> areaEntities(FlowContext ctx, FlowNode node) {
         String shape = string(ctx, node, "shape", "sphere").toLowerCase(Locale.ROOT);
-        Map<String, Object> inputs = new HashMap<>(node.getInputValues() != null ? node.getInputValues() : Map.of());
-        inputs.put("mode", switch (shape) {
-            case "sphere" -> "radius";
-            case "cone" -> "cone";
-            case "line" -> "line";
-            case "box" -> "box";
+        return switch (shape) {
+            case "sphere" -> limitEntities(ctx, node, sortEntities(ctx, node, entitiesAround(ctx, node, true)));
+            case "cone" -> coneEntities(ctx, node);
+            case "line" -> lineEntities(ctx, node);
+            case "box" -> boxEntities(ctx, node);
             default -> throw new IllegalArgumentException("Unknown area shape: " + shape);
-        });
-        inputs.put("location", center);
-        FlowNode queryNode = new FlowNode("ability.entity_query", node.getX(), node.getY(), inputs);
-        if ("sphere".equals(shape)) {
-            return limitEntities(ctx, queryNode, sortEntities(ctx, queryNode, entitiesAround(ctx, queryNode, true)));
-        }
-        return queryEntities(ctx, queryNode);
+        };
     }
 
     private List<Entity> sortEntities(FlowContext ctx, FlowNode node, List<Entity> entities) {
@@ -1381,7 +1386,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     }
 
     private boolean applyEntityEffect(FlowContext ctx, FlowNode node, Entity entity, String mode) {
-        if (entity == null) {
+        if (entity == null || !entity.isValid() || entity instanceof Player player && !player.isOnline()) {
             return false;
         }
         String normalized = mode == null ? "damage" : mode.toLowerCase(Locale.ROOT);
@@ -1406,11 +1411,11 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
                 }
             }
             case "ignite" -> {
-                mutateEntity(entity, "flow-ability-ignite", () -> entity.setFireTicks(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100))));
+                mutateEntity(entity, "flow-ability-ignite", () -> entity.setFireTicks(requireDuration(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100)))));
                 return true;
             }
             case "freeze" -> {
-                mutateEntity(entity, "flow-ability-freeze", () -> entity.setFreezeTicks(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100))));
+                mutateEntity(entity, "flow-ability-freeze", () -> entity.setFreezeTicks(requireDuration(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100)))));
                 return true;
             }
             case "stun" -> {
@@ -1427,7 +1432,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
                 }
             }
             case "silence" -> {
-                marks.put(markKey(entity.getUniqueId(), "silenced"), System.currentTimeMillis() + integer(ctx, node, "duration_ticks", 100) * 50L);
+                marks.put(markKey(entity.getUniqueId(), "silenced"), System.currentTimeMillis() + requireDuration(integer(ctx, node, "duration_ticks", 100)) * 50L);
                 return true;
             }
             case "disarm" -> {
@@ -1444,6 +1449,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             }
             case "pull" -> {
                 Location center = requireAreaCenter(ctx, node);
+                if (!entity.getWorld().equals(center.getWorld())) throw new IllegalArgumentException("Pull locations must be in the same world");
                 Vector vector = center.toVector().subtract(entity.getLocation().toVector());
                 if (vector.lengthSquared() <= 0.0001) return false;
                 FlowMutations.applyVelocity(ctx, entity, vector.normalize().multiply(number(ctx, node, "strength", 1.0)));
@@ -1473,7 +1479,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
                 }
             }
             case "mark" -> {
-                marks.put(markKey(entity.getUniqueId(), string(ctx, node, "key", "mark")), System.currentTimeMillis() + integer(ctx, node, "duration_ticks", 100) * 50L);
+                marks.put(markKey(entity.getUniqueId(), string(ctx, node, "key", "mark")), System.currentTimeMillis() + requireDuration(integer(ctx, node, "duration_ticks", 100)) * 50L);
                 return true;
             }
             case "remove_mark" -> {
@@ -1817,6 +1823,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     private Location requireAreaCenter(FlowContext context, FlowNode node) {
         Location center = areaCenter(context, node);
         if (center == null || center.getWorld() == null) throw new IllegalArgumentException("Ability area center is required");
+        center.checkFinite();
         return center;
     }
 
@@ -1835,6 +1842,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     private Location requireLocation(FlowContext context, FlowNode node) {
         Location value = location(context, node);
         if (value == null || value.getWorld() == null) throw new IllegalArgumentException("Ability location is required");
+        value.checkFinite();
         return value;
     }
 
@@ -1858,6 +1866,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     private Entity requireTarget(FlowContext context, FlowNode node) {
         Entity value = target(context, node);
         if (value == null) throw new IllegalArgumentException("Ability target is required");
+        if (!value.isValid() || value instanceof Player player && !player.isOnline()) throw new IllegalStateException("Ability target is unavailable");
         return value;
     }
 
@@ -1922,8 +1931,10 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
 
     private Vector direction(FlowContext ctx, FlowNode node) {
         Vector direction = ctx.getInputValue(node, "direction", Vector.class, null);
-        if (direction != null && direction.lengthSquared() > 0.0) {
-            return direction;
+        if (direction != null) {
+            direction.checkFinite();
+            if (!Double.isFinite(direction.lengthSquared())) throw new IllegalArgumentException("Ability direction is too large");
+            if (direction.lengthSquared() > 0.0) return direction.clone();
         }
         Entity target = target(ctx, node);
         if (target != null) {
@@ -1988,6 +1999,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     }
 
     private void damage(LivingEntity target, double amount, Entity source) {
+        if (!Double.isFinite(amount) || amount < 0) throw new IllegalArgumentException("Damage amount must be a finite non-negative number");
         mutateEntity(target, "flow-ability-damage", () -> CustomContentListener.runSuppressingDamageAbilities(() -> {
             if (source != null) {
                 target.damage(amount, source);
@@ -2009,33 +2021,34 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
 
     private double number(FlowContext ctx, FlowNode node, String pin, double fallback) {
         Double value = ctx.getInputValue(node, pin, Double.class, fallback);
-        return value != null ? value : fallback;
+        double number = value != null ? value : fallback;
+        if (!Double.isFinite(number)) throw new IllegalArgumentException("Ability input " + pin + " must be finite");
+        return number;
     }
 
     private int integer(FlowContext ctx, FlowNode node, String pin, int fallback) {
-        Integer value = ctx.getInputValue(node, pin, Integer.class, fallback);
-        return value != null ? value : fallback;
-    }
-
-    private void executeParticle(FlowContext ctx, FlowNode source, String mode, Map<String, Object> overrides) {
-        Map<String, Object> inputs = new HashMap<>(source.getInputValues() != null ? source.getInputValues() : Map.of());
-        inputs.put("mode", mode);
-        inputs.putAll(overrides);
-        FlowNode particleNode = new FlowNode("particle.apply", source.getX(), source.getY(), inputs);
-        particleNode.setHandlerConfig(Map.of("operation", "particle_apply"));
-        particleHandler.executeInline(ctx, particleNode);
-        ctx.triggerOutput("flow");
+        Object raw = ctx.getInputValue(node, pin, Object.class, null);
+        if (raw == null) return fallback;
+        double value;
+        if (raw instanceof Number number) {
+            value = number.doubleValue();
+        } else if (raw instanceof String text) {
+            try {
+                value = Double.parseDouble(text);
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Ability input " + pin + " must be a whole number", exception);
+            }
+        } else {
+            throw new IllegalArgumentException("Ability input " + pin + " must be a whole number");
+        }
+        if (!Double.isFinite(value) || value != Math.rint(value) || value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Ability input " + pin + " must be a whole number");
+        }
+        return (int) value;
     }
 
     private Particle parseParticle(String name) {
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Particle is required");
-        }
-        try {
-            return Particle.valueOf(name.toUpperCase(Locale.ROOT).replace('.', '_'));
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Unknown particle: " + name, exception);
-        }
+        return particleHandler.parseParticle(name);
     }
 
     private Sound parseSound(String name) {
@@ -2080,16 +2093,16 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         return type;
     }
 
-    private Projectile launchProjectile(Player player, String projectileType) {
-        String normalized = projectileType == null ? "ARROW" : projectileType.toUpperCase(Locale.ROOT);
-        return switch (normalized) {
-            case "SNOWBALL" -> player.launchProjectile(Snowball.class);
-            case "EGG" -> player.launchProjectile(Egg.class);
-            case "TRIDENT" -> player.launchProjectile(Trident.class);
-            case "FIREBALL", "SMALL_FIREBALL" -> player.launchProjectile(SmallFireball.class);
-            case "ARROW" -> player.launchProjectile(Arrow.class);
+    private Projectile launchProjectile(Player player, String projectileType, Vector velocity, Consumer<Projectile> configure) {
+        String normalized = projectileType == null ? "ARROW" : projectileType.trim().toUpperCase(Locale.ROOT);
+        return CustomContentListener.runSuppressingProjectileAbilities(() -> switch (normalized) {
+            case "SNOWBALL" -> player.launchProjectile(Snowball.class, velocity, configure);
+            case "EGG" -> player.launchProjectile(Egg.class, velocity, configure);
+            case "TRIDENT" -> player.launchProjectile(Trident.class, velocity, configure);
+            case "FIREBALL", "SMALL_FIREBALL" -> player.launchProjectile(SmallFireball.class, velocity, configure);
+            case "ARROW" -> player.launchProjectile(Arrow.class, velocity, configure);
             default -> throw new IllegalArgumentException("Unknown projectile type: " + projectileType);
-        };
+        });
     }
 
     private AbstractArrow.PickupStatus pickupStatus(String pickupMode) {
@@ -2125,34 +2138,6 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
                     consumer.accept(world.getBlockAt(center.getBlockX() + x, center.getBlockY() + y, center.getBlockZ() + z));
                 }
             }
-        }
-    }
-
-    private void spawnParticleShape(Location center, Particle particle, String mode, int count, double radius, double speed) {
-        World world = center.getWorld();
-        if (world == null) throw new IllegalArgumentException("Particle shape center must have a world");
-        if (count < 1 || count > 10_000) throw new IllegalArgumentException("Particle shape count must be between 1 and 10000");
-        requireRadius(radius);
-        String normalized = mode == null ? "ring" : mode.toLowerCase(Locale.ROOT);
-        if ("burst".equals(normalized)) {
-            world.spawnParticle(particle, center, count, radius, radius, radius, speed);
-            return;
-        }
-        if ("line".equals(normalized)) {
-            Vector direction = center.getDirection().normalize().multiply(radius * 2.0 / count);
-            Location point = center.clone().subtract(direction.clone().multiply(count / 2.0));
-            for (int i = 0; i < count; i++) {
-                world.spawnParticle(particle, point, 1, 0, 0, 0, speed);
-                point.add(direction);
-            }
-            return;
-        }
-        if (!"ring".equals(normalized) && !"orbit".equals(normalized)) throw new IllegalArgumentException("Unknown particle shape mode: " + mode);
-        for (int i = 0; i < count; i++) {
-            double angle = Math.PI * 2.0 * i / count;
-            double y = "orbit".equals(normalized) ? Math.sin(angle * 2.0) * radius * 0.5 : 0.0;
-            Location point = center.clone().add(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
-            world.spawnParticle(particle, point, 1, 0, 0, 0, speed);
         }
     }
 
@@ -2312,10 +2297,11 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         };
         String id = "legacy.cooldown." + name.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.-]+", "_");
         TimerDefinition definition = new TimerDefinition(id, name, "", scope, false, 0D, TimerDefinition.TimeUnit.TICKS, 0D);
-        return new LegacyCooldown(definition, owner, new AutomationInstanceKey(id, scope, owner.id()));
+        return new LegacyCooldown(definition, owner, new AutomationInstanceKey(definition.kind(), id, scope, owner.id()));
     }
 
     private void mutateEntity(Entity entity, String operation, Runnable mutation) {
+        if (!entity.isValid() || entity instanceof Player player && !player.isOnline()) throw new IllegalStateException("Ability mutation target is unavailable");
         if (entity instanceof Player player) {
             playerDataAdmission.mutatePlayer(operation + ":" + player.getUniqueId(), player, mutation);
             return;

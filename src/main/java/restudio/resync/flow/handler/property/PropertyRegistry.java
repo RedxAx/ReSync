@@ -3,6 +3,7 @@ package restudio.resync.flow.handler.property;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowTypeRef;
 import restudio.resync.api.ExtensionRegistryActivation;
+import restudio.resync.flow.handler.family.JsonFamilyHandler;
 import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.Collection;
@@ -50,7 +51,10 @@ public class PropertyRegistry {
     private synchronized <T, V> void registerLocal(String family, String property, PropertyHandler<T, V> handler) {
         MutableState next = new MutableState(state);
         next.families.computeIfAbsent(family, ignored -> new LinkedHashMap<>()).put(property, handler);
-        next.mergeDescriptor(descriptor(family, property, FlowTypeRef.simple(handler.getDataType().getId()), handler.getSupportedActions(), "runtime"));
+        PropertyDescriptor previous = getDescriptor(state, family, property);
+        PropertyDescriptor metadata = previous != null && !"builtin".equals(previous.owner()) ? previous
+            : descriptor(family, property, FlowTypeRef.simple(handler.getDataType().getId()), handler.getSupportedActions(), "runtime");
+        next.descriptors.computeIfAbsent(family, ignored -> new LinkedHashMap<>()).put(property, handlerDescriptor(metadata, handler));
         state = next.freeze();
     }
 
@@ -69,7 +73,13 @@ public class PropertyRegistry {
 
     private synchronized void registerDescriptorLocal(PropertyDescriptor descriptor) {
         MutableState next = new MutableState(state);
-        next.mergeDescriptor(descriptor);
+        PropertyHandler<?, ?> handler = getHandler(state, descriptor.family(), descriptor.property());
+        if (handler != null) {
+            next.descriptors.computeIfAbsent(descriptor.family(), ignored -> new LinkedHashMap<>())
+                .put(descriptor.property(), handlerDescriptor(descriptor, handler));
+        } else {
+            next.mergeDescriptor(descriptor);
+        }
         state = next.freeze();
     }
 
@@ -317,7 +327,9 @@ public class PropertyRegistry {
     private void registerNodeDescriptor(Map<String, Map<String, PropertyDescriptor>> target, NodeDefinition definition,
                                         String family, String property, List<String> actions, boolean selector) {
         FlowTypeRef type = selector ? selectorType(definition, property) : configuredType(definition, property);
-        PropertyDescriptor next = descriptor(family, property, type, actions, "builtin");
+        List<String> supported = JsonFamilyHandler.nativeActions(family, property);
+        List<String> nativeActions = actions.stream().filter(action -> action != null && supported.contains(action.toLowerCase(Locale.ROOT))).toList();
+        PropertyDescriptor next = descriptor(family, property, type, nativeActions, "builtin");
         target.computeIfAbsent(family, ignored -> new LinkedHashMap<>())
             .merge(property, next, this::mergeDescriptors);
     }
@@ -351,7 +363,17 @@ public class PropertyRegistry {
             normalizedActions.contains("do") || normalizedActions.contains("execute"), owner);
     }
 
+    private PropertyDescriptor handlerDescriptor(PropertyDescriptor metadata, PropertyHandler<?, ?> handler) {
+        PropertyDescriptor contract = descriptor(metadata.family(), metadata.property(), metadata.type(), handler.getSupportedActions(),
+            "builtin".equals(metadata.owner()) ? "runtime" : metadata.owner());
+        return new PropertyDescriptor(contract.family(), contract.property(), contract.type(), contract.actions(), contract.readable(),
+            contract.writable(), metadata.observable(), contract.invokable(), contract.owner());
+    }
+
     private PropertyDescriptor mergeDescriptors(PropertyDescriptor first, PropertyDescriptor second) {
+        if ("builtin".equals(first.owner()) != "builtin".equals(second.owner())) {
+            return "builtin".equals(first.owner()) ? second : first;
+        }
         Set<String> actions = new LinkedHashSet<>(first.actions());
         actions.addAll(second.actions());
         FlowTypeRef type = first.type().getTypeId().equals("any") ? second.type() : first.type();

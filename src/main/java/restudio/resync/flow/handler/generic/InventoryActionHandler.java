@@ -353,7 +353,7 @@ public class InventoryActionHandler implements NodeHandler {
                 throw new IllegalArgumentException("Item amount must be between 1 and " + item.getMaxStackSize());
             }
             item.setAmount(amount);
-            ctx.setOutput(node, "item", item);
+            ctx.setOutput(node, "target", item);
         });
 
         operations.put("item_set_material", (ctx, node) -> {
@@ -645,7 +645,14 @@ public class InventoryActionHandler implements NodeHandler {
                 ctx.setOutput(node, "item", requireItem(ctx, node, "item"));
             } else if ("set".equalsIgnoreCase(action)) {
                 operations.get("item_set_typed_component").accept(ctx, node);
-                ctx.setOutput(node, "exists", true);
+                ItemStack item = (ItemStack) ctx.getOutput(node, "item");
+                String component = componentId(ctx.getInputValue(node, "component", String.class, ""));
+                String valuePin = node.getHandlerConfig().getString("valuePin", "value");
+                String expectedKind = node.getHandlerConfig().getString("valueKind", "object");
+                Map<String, Object> components = itemComponents.componentsFromStack(item);
+                boolean exists = components.containsKey(component);
+                ctx.setOutput(node, valuePin, "presence".equals(expectedKind) ? exists : components.get(component));
+                ctx.setOutput(node, "exists", exists);
             } else {
                 throw new IllegalArgumentException("Unknown item component action: " + action);
             }

@@ -809,6 +809,11 @@ public class TriggerDispatcher implements Listener {
     }
 
     private static Player playerFromEventVariables(Map<String, Object> variables) {
+        Object associated = variables.get("event.player");
+        if (associated instanceof Player player) {
+            return player;
+        }
+
         Object owner = variables.get("owner");
         if (owner instanceof Player player) {
             return player;

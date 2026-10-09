@@ -11,6 +11,7 @@ import restudio.resync.flow.identity.ConnectionId;
 import restudio.resync.flow.identity.NodeInstanceId;
 import restudio.resync.flow.identity.OwnerId;
 import restudio.resync.flow.identity.PinId;
+import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.identity.FunctionParameterId;
 import restudio.resync.flow.function.FunctionDiagnostic;
 import restudio.resync.flow.function.FunctionInputMap;
@@ -163,6 +164,10 @@ public final class CompiledExecutionRunner {
         RuntimeRegistrySnapshot runtimeSnapshot = activation == null ? null : activation.runtime();
         RuntimeRegistrySnapshot preparationRuntime = runtimeSnapshot == null ? registry.snapshot() : runtimeSnapshot;
         validateActivationPlan(plan, activation);
+        if (plan.connections().stream().anyMatch(connection -> connection.source().elementId() != null || connection.target().elementId() != null)
+            || plan.structuralRoutes().stream().anyMatch(route -> route.kind() == StructuralRoute.Kind.REPEATABLE_ELEMENT)) {
+            throw new IllegalStateException("GRAPH.REPEATABLE_RUNTIME_UNAVAILABLE: Runtime operations do not declare element input or output capabilities");
+        }
         List<CompiledExecutionStep> ordered = topologicalOrder(plan);
         List<CompiledExecutionStep> scoped = executionScope(plan, ordered, startNodeId);
         Map<GraphEndpoint, List<RoutedConnection>> routes = conversionBindings(plan, scoped, activation, preparationRuntime);
@@ -213,6 +218,9 @@ public final class CompiledExecutionRunner {
         Objects.requireNonNull(injectedInputs, "Injected Inputs Are Required");
         Objects.requireNonNull(cancellationToken, "Cancellation Token Is Required");
         Objects.requireNonNull(invocationId, "Invocation ID Is Required");
+        if (injectedInputs.keySet().stream().anyMatch(endpoint -> endpoint.elementId() != null)) {
+            throw new IllegalArgumentException("GRAPH.REPEATABLE_RUNTIME_UNAVAILABLE: Injected elements require a runtime element capability");
+        }
         if (requestedDeadlineMillis < 0) {
             throw new IllegalArgumentException("Requested Deadline Cannot Be Negative");
         }
@@ -235,10 +243,10 @@ public final class CompiledExecutionRunner {
                 : registry.acquire(leaseInput, runtimeSnapshot);
             activeInvocations.incrementAndGet();
             Map<NodeInstanceId, RuntimeResult> results = new LinkedHashMap<>();
-            Map<NodeInstanceId, Map<PinId, TypedValue>> routedInputs = new HashMap<>();
+            Map<NodeInstanceId, Map<GraphEndpoint, TypedValue>> routedInputs = new HashMap<>();
             Map<NodeInstanceId, Set<PinId>> activatedExecutionInputs = new HashMap<>();
             injectedInputs.forEach((endpoint, value) -> routedInputs.computeIfAbsent(endpoint.nodeId(), ignored -> new LinkedHashMap<>())
-                .put(endpoint.pinId(), Objects.requireNonNull(value, "Injected Input Value Is Required")));
+                .put(endpoint, Objects.requireNonNull(value, "Injected Input Value Is Required")));
             Map<GraphEndpoint, TypedValue> outputs = new LinkedHashMap<>();
             RuntimePlanLease executionLease = lease;
             ExecutionFrame rootFrame = new ExecutionFrame(results, routedInputs, activatedExecutionInputs, outputs);
@@ -574,7 +582,9 @@ public final class CompiledExecutionRunner {
 
         private void invoke(CompiledExecutionStep step, ExecutionFrame frame, FramePath path, Consumer<FlowOutcome> finished) {
             Map<PinId, TypedValue> inputs = new LinkedHashMap<>(step.inputBindings());
-            Map<PinId, TypedValue> routed = frame.routedInputs.getOrDefault(step.nodeId(), Map.of());
+            Map<GraphEndpoint, TypedValue> endpoints = frame.routedInputs.getOrDefault(step.nodeId(), Map.of());
+            Map<PinId, TypedValue> routed = new LinkedHashMap<>();
+            endpoints.forEach((endpoint, value) -> routed.put(endpoint.pinId(), value));
             inputs.putAll(routed);
             TemplateBinding binding = templateBindings.get(step.nodeId());
             if (binding != null) {
@@ -587,7 +597,9 @@ public final class CompiledExecutionRunner {
             RuntimeBindingKey key = new RuntimeBindingKey(step.handler().capability(), step.handler().operation());
             RuntimeInvocation invocation = new RuntimeInvocation(key, inputs, childId(invocationId, step, path), cancellationToken)
                 .withRuntimeContext(runtimeContext)
-                .withInvocationId(invocationId);
+                .withInvocationId(invocationId)
+                .withRoutedInputs(endpoints.entrySet().stream().filter(entry -> inputs.containsKey(entry.getKey().pinId()))
+                    .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue)));
             CompletionStage<RuntimeResult> resultStage = lease.execute(invocation);
             resultStage.whenComplete((result, failure) -> schedule(() -> {
                 if (failure != null) {
@@ -767,6 +779,8 @@ public final class CompiledExecutionRunner {
                 return;
             }
             RoutedConnection route = outgoing.get(routeIndex);
+            GraphEndpoint source = route.connection().source();
+            frame.outputs.put(new GraphEndpoint(source.nodeId(), source.pinId(), source.elementId(), source.branchId()), value);
             int nextIndex = routeIndex + 1;
             convert(step, route, 0, value, path, converted -> {
                 if (!converted.successful()) {
@@ -775,7 +789,8 @@ public final class CompiledExecutionRunner {
                 }
                 GraphEndpoint target = route.connection().target();
                 frame.routedInputs.computeIfAbsent(target.nodeId(), ignored -> new LinkedHashMap<>())
-                    .put(target.pinId(), assignDirectly(converted.value(), route.targetType()));
+                    .put(new GraphEndpoint(target.nodeId(), target.pinId(), target.elementId(), target.branchId()),
+                        assignDirectly(converted.value(), route.targetType()));
                 if (executionInputs.getOrDefault(target.nodeId(), Set.of()).contains(target.pinId())
                     && converted.value().hasValue()) {
                     frame.activatedExecutionInputs.computeIfAbsent(target.nodeId(), ignored -> new LinkedHashSet<>())
@@ -928,12 +943,12 @@ public final class CompiledExecutionRunner {
 
     private static final class ExecutionFrame {
         private final Map<NodeInstanceId, RuntimeResult> results;
-        private final Map<NodeInstanceId, Map<PinId, TypedValue>> routedInputs;
+        private final Map<NodeInstanceId, Map<GraphEndpoint, TypedValue>> routedInputs;
         private final Map<NodeInstanceId, Set<PinId>> activatedExecutionInputs;
         private final Map<GraphEndpoint, TypedValue> outputs;
 
         private ExecutionFrame(Map<NodeInstanceId, RuntimeResult> results,
-                               Map<NodeInstanceId, Map<PinId, TypedValue>> routedInputs,
+                               Map<NodeInstanceId, Map<GraphEndpoint, TypedValue>> routedInputs,
                                Map<NodeInstanceId, Set<PinId>> activatedExecutionInputs,
                                Map<GraphEndpoint, TypedValue> outputs) {
             this.results = results;
@@ -943,7 +958,7 @@ public final class CompiledExecutionRunner {
         }
 
         private static ExecutionFrame iteration(ExecutionFrame parent) {
-            LinkedHashMap<NodeInstanceId, Map<PinId, TypedValue>> inherited = new LinkedHashMap<>();
+            LinkedHashMap<NodeInstanceId, Map<GraphEndpoint, TypedValue>> inherited = new LinkedHashMap<>();
             parent.routedInputs.forEach((nodeId, inputs) -> inherited.put(nodeId, new LinkedHashMap<>(inputs)));
             return new ExecutionFrame(new LinkedHashMap<>(), inherited, new LinkedHashMap<>(), new LinkedHashMap<>());
         }
@@ -1036,13 +1051,10 @@ public final class CompiledExecutionRunner {
         }
 
         private static TypedValue returnedValue(TypeExpr type, TypedValue value) {
-            if (value == null || value.state() == TypedValue.State.ABSENT) {
+            if (value == null) {
                 return TypedValue.absent(type);
             }
-            if (value.state() == TypedValue.State.NULL) {
-                return TypedValue.nullValue(type);
-            }
-            return type.equals(value.type()) ? value : TypedValue.value(type, value.value());
+            return assignDirectly(value, type);
         }
 
         private void accept(FunctionOutputMap output) {
@@ -1473,18 +1485,72 @@ public final class CompiledExecutionRunner {
             return value;
         }
         if (value.state() == TypedValue.State.ABSENT) {
-            return TypedValue.absent(target);
+            return TypedValue.absent(target, value.unknown());
         }
         if (value.state() == TypedValue.State.NULL) {
-            return TypedValue.nullValue(target);
+            return TypedValue.nullValue(target, value.unknown());
+        }
+        Object material = value.state() == TypedValue.State.LOCATOR ? value.locator() : value.value();
+        if (value.state() == TypedValue.State.LOCATOR && resourceType(target)) {
+            return TypedValue.locator(target, value.locator(), value.unknown());
+        }
+        if (material == null) {
+            return TypedValue.nullValue(target, value.unknown());
+        }
+        return TypedValue.value(target, assignMaterial(material, value.type(), target), value.unknown());
+    }
+
+    private static boolean resourceType(TypeExpr type) {
+        return type instanceof TypeExpr.ResourceType || type instanceof TypeExpr.OptionalType optional && resourceType(optional.element());
+    }
+
+    private static Object assignMaterial(Object value, TypeExpr source, TypeExpr target) {
+        if (value == null || source.equals(target)) {
+            return value;
+        }
+        if (target instanceof TypeExpr.OptionalType optional) {
+            return assignMaterial(value, source instanceof TypeExpr.OptionalType from ? from.element() : source, optional.element());
         }
         if (target instanceof TypeExpr.Named named && "builtin".equals(named.reference().ownerId())
             && "string".equals(named.reference().localId()) && named.arguments().isEmpty()) {
-            Object material = value.state() == TypedValue.State.LOCATOR ? value.locator().canonicalText() : value.value();
-            return TypedValue.value(target, String.valueOf(material));
+            return value instanceof ServerResourceLocator locator ? locator.canonicalText() : String.valueOf(value);
         }
-        if (value.state() == TypedValue.State.VALUE) {
-            return TypedValue.value(target, value.value());
+        if (target instanceof TypeExpr.ListType list && value instanceof List<?> values) {
+            TypeExpr element = source instanceof TypeExpr.ListType from ? from.element() : source;
+            List<Object> result = new ArrayList<>(values.size());
+            values.forEach(item -> result.add(assignMaterial(item, element, list.element())));
+            return result;
+        }
+        if (target instanceof TypeExpr.MapType map && value instanceof Map<?, ?> values) {
+            TypeExpr key = source instanceof TypeExpr.MapType from ? from.key() : source;
+            TypeExpr item = source instanceof TypeExpr.MapType from ? from.value() : source;
+            Map<Object, Object> result = new LinkedHashMap<>();
+            values.forEach((name, material) -> {
+                Object assigned = assignMaterial(name, key, map.key());
+                if (result.containsKey(assigned)) {
+                    throw new IllegalArgumentException("Assigned Map Keys Collide");
+                }
+                result.put(assigned, assignMaterial(material, item, map.value()));
+            });
+            return result;
+        }
+        if (target instanceof TypeExpr.TupleType tuple && value instanceof List<?> values) {
+            if (values.size() != tuple.elements().size()) {
+                throw new IllegalArgumentException("Assigned Tuple Shape Is Invalid");
+            }
+            List<Object> result = new ArrayList<>(values.size());
+            for (int index = 0; index < values.size(); index++) {
+                TypeExpr element = source instanceof TypeExpr.TupleType from ? from.elements().get(index) : source;
+                result.add(assignMaterial(values.get(index), element, tuple.elements().get(index)));
+            }
+            return result;
+        }
+        if (target instanceof TypeExpr.ResultType result && value instanceof Map<?, ?> values
+            && values.get("success") instanceof Boolean success && values.containsKey("value")) {
+            TypeExpr branch = source instanceof TypeExpr.ResultType from ? success ? from.success() : from.failure() : source;
+            Map<Object, Object> assigned = new LinkedHashMap<>(values);
+            assigned.put("value", assignMaterial(values.get("value"), branch, success ? result.success() : result.failure()));
+            return assigned;
         }
         return value;
     }

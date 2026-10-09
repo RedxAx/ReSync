@@ -1,9 +1,9 @@
 package restudio.resync.flow.automation;
 
-public record AutomationInstanceKey(String definitionId, AutomationScope scope, String ownerId) {
+public record AutomationInstanceKey(AutomationDefinition.Kind kind, String definitionId, AutomationScope scope, String ownerId) {
     public AutomationInstanceKey {
-        if (definitionId == null || definitionId.isBlank() || scope == null || ownerId == null || ownerId.isBlank()) {
-            throw new IllegalArgumentException("Automation definition, scope, and owner are required");
+        if (kind == null || definitionId == null || definitionId.isBlank() || scope == null || ownerId == null || ownerId.isBlank()) {
+            throw new IllegalArgumentException("Automation kind, definition, scope, and owner are required");
         }
     }
 

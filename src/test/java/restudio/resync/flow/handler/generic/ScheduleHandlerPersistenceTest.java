@@ -2,6 +2,8 @@ package restudio.resync.flow.handler.generic;
 
 import com.google.gson.Gson;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -48,6 +50,7 @@ import restudio.resync.flow.identity.NodeInstanceId;
 import restudio.resync.flow.identity.OperationId;
 import restudio.resync.flow.identity.OwnerId;
 import restudio.resync.flow.identity.PinId;
+import restudio.resync.flow.identity.ProviderId;
 import restudio.resync.flow.identity.ResourceTypeId;
 import restudio.resync.flow.identity.ServerId;
 import restudio.resync.flow.identity.ServerResourceLocator;
@@ -56,6 +59,7 @@ import restudio.resync.flow.runtime.CompiledRuntimeContext;
 import restudio.resync.flow.runtime.DurableRuntimeReceiptStore;
 import restudio.resync.flow.runtime.RuntimeAuditBoundary;
 import restudio.resync.flow.runtime.RuntimeAuthority;
+import restudio.resync.flow.runtime.RuntimeCancellationToken;
 import restudio.resync.flow.runtime.RuntimeExecutionContext;
 import restudio.resync.flow.runtime.RuntimeExecutionProvenance;
 import restudio.resync.flow.runtime.RuntimeLeaseInput;
@@ -75,6 +79,7 @@ import com.google.gson.JsonParser;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -171,7 +176,7 @@ class ScheduleHandlerPersistenceTest {
         AutomationTaskService firstTasks = new AutomationTaskService(null, null, firstClock, firstScheduler, taskFile);
         ScheduleDefinition definition = definition();
         AutomationOwner owner = new AutomationOwner("server", null);
-        AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), owner.id());
+        AutomationInstanceKey key = new AutomationInstanceKey(definition.kind(), definition.id(), definition.scope(), owner.id());
         FlowExecutor.FunctionInvocationContext creatorContext = firstExecutor.functionInvocationContext(null, null,
             Map.of("runtime.sessionId", "client-session"), creator, CorrelationId.deterministic("schedule-create"),
             RuntimeExecutionContext.NO_DEADLINE);
@@ -305,14 +310,15 @@ class ScheduleHandlerPersistenceTest {
 
         @Override
         public CompletableFuture<Map<String, Object>> executeFunction(FlowGraph functionGraph,
-                                                                        org.bukkit.entity.Player player,
-                                                                        org.bukkit.event.Event event,
+                                                                        Player player,
+                                                                        Event event,
                                                                         Map<String, Object> inputs,
                                                                         Map<String, Object> eventVars,
-                                                                        FunctionInvocationContext invocationContext) {
+                                                                        FunctionInvocationContext invocationContext,
+                                                                        RuntimeCancellationToken cancellation) {
             invocation.set(invocationContext);
             invocationInputs.set(Map.copyOf(inputs));
-            return super.executeFunction(functionGraph, player, event, inputs, eventVars, invocationContext);
+            return super.executeFunction(functionGraph, player, event, inputs, eventVars, invocationContext, cancellation);
         }
 
         private FunctionInvocationContext invocation() {
@@ -427,12 +433,12 @@ class ScheduleHandlerPersistenceTest {
         }
 
         @Override
-        public void releaseProvider(ContractRef<restudio.resync.flow.identity.ProviderId> provider) {
+        public void releaseProvider(ContractRef<ProviderId> provider) {
             delegate.releaseProvider(provider);
         }
 
         @Override
-        public void quiesce() throws java.io.IOException {
+        public void quiesce() throws IOException {
             delegate.quiesce();
         }
     }

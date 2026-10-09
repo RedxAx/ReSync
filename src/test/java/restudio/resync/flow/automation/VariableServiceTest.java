@@ -27,6 +27,7 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class VariableServiceTest {
     private ReSyncJsonResourceStorage storage;
@@ -90,6 +91,23 @@ class VariableServiceTest {
 
         assertEquals(200D, variables.get(context, definition, null));
         assertEquals("round", variables.list(context, AutomationScope.SERVER, null).getFirst().id());
+    }
+
+    @Test
+    void admittedTimerDefinitionsFollowCommittedUpdatesAndDeletion() {
+        AutomationDefinitionRegistry definitions = new AutomationDefinitionRegistry(storage);
+        JsonObject timer = new JsonObject();
+        timer.addProperty("id", "resident_timer");
+        timer.addProperty("defaultDuration", 10D);
+        storage.save(ReSyncResourceCatalog.TIMER_DEFINITION, timer);
+        assertEquals(10D, definitions.timer("resident_timer").defaultDuration());
+        assertEquals(10D, definitions.timer("resident_timer").defaultDuration());
+
+        timer.addProperty("defaultDuration", 20D);
+        storage.save(ReSyncResourceCatalog.TIMER_DEFINITION, timer);
+        assertEquals(20D, definitions.timer("resident_timer").defaultDuration());
+        storage.delete(ReSyncResourceCatalog.TIMER_DEFINITION, "resident_timer");
+        assertThrows(IllegalArgumentException.class, () -> definitions.timer("resident_timer"));
     }
 
     private VariableDefinition definition(String id, String type, String scope, boolean persistent, Object defaultValue) {

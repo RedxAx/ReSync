@@ -6,6 +6,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 import restudio.resync.network.NetworkCredentials;
+import restudio.resync.network.NetworkAuthentication;
+import restudio.resync.network.NetworkAuthenticationCodec;
+import restudio.resync.network.NetworkChannels;
+import restudio.resync.network.NetworkRequestContext;
 import restudio.resync.network.NetworkFrame;
 import restudio.resync.network.NetworkFrameCodec;
 import restudio.resync.network.NetworkFrameType;
@@ -27,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class NetworkEnrollmentRecoveryTest {
     @TempDir
@@ -47,7 +52,7 @@ class NetworkEnrollmentRecoveryTest {
         ReSyncVelocityHub hub = new ReSyncVelocityHub(config, LoggerFactory.getLogger(getClass()), null);
         try {
             hub.startHub();
-            try (Client enrollment = new Client(port, Map.of("X-ReSync-Enrollment", "token", "X-ReSync-Enrollment-Credential", durable))) {
+            try (Client enrollment = new Client(port, Map.of("X-ReSync-Enrollment", "token", "X-ReSync-Enrollment-Credential", durable), true)) {
                 assertTrue(enrollment.connectBlocking(5, TimeUnit.SECONDS));
                 NetworkFrame accepted = enrollment.frames.poll(5, TimeUnit.SECONDS);
                 assertNotNull(accepted, () -> "Enrollment Closed: " + enrollment.closed.peek());
@@ -61,14 +66,18 @@ class NetworkEnrollmentRecoveryTest {
                 NetworkFrame accepted = recovered.frames.poll(5, TimeUnit.SECONDS);
                 assertNotNull(accepted);
                 assertEquals(NetworkFrameType.RESPONSE, accepted.type());
+                assertFalse(accepted.context().authorizationScopes().contains("editors.open"));
             }
             try (Client replay = new Client(port, Map.of("X-ReSync-Enrollment", "token", "X-ReSync-Enrollment-Credential", NetworkCredentials.generate()))) {
                 replay.connectBlocking(5, TimeUnit.SECONDS);
                 assertEquals("Enrollment Token Rejected", replay.closed.poll(5, TimeUnit.SECONDS));
             }
+            Files.writeString(directory.resolve("network.properties"), Files.readString(directory.resolve("network.properties")) + "node.backend.capabilities=presence,editors\n");
             try (Client recovered = new Client(port, Map.of("X-ReSync-Credential", durable))) {
                 recovered.connectBlocking(5, TimeUnit.SECONDS);
-                assertNotNull(recovered.frames.poll(5, TimeUnit.SECONDS));
+                NetworkFrame accepted = recovered.frames.poll(5, TimeUnit.SECONDS);
+                assertNotNull(accepted);
+                assertTrue(accepted.context().authorizationScopes().contains("editors.open"));
             }
         } finally {
             hub.stopHub();
@@ -92,15 +101,29 @@ class NetworkEnrollmentRecoveryTest {
         private final CountDownLatch stopped = new CountDownLatch(1);
         private final ArrayBlockingQueue<String> closed = new ArrayBlockingQueue<>(1);
         private final NetworkFrameCodec codec = new NetworkFrameCodec(1_048_576, 500_000);
+        private final NetworkAuthentication authentication;
 
         private Client(int port, Map<String, String> auth) {
-            super(URI.create("ws://127.0.0.1:" + port), auth);
-            addHeader("X-ReSync-Network", "network");
-            addHeader("X-ReSync-Node", "backend");
+            this(port, auth, false);
+        }
+
+        private Client(int port, Map<String, String> auth, boolean binary) {
+            super(URI.create("ws://127.0.0.1:" + port), binary ? Map.of() : auth);
+            authentication = binary ? new NetworkAuthentication("network", "backend", auth.getOrDefault("X-ReSync-Credential", ""),
+                auth.getOrDefault("X-ReSync-Enrollment", ""), auth.getOrDefault("X-ReSync-Enrollment-Credential", "")) : null;
+            if (!binary) {
+                addHeader("X-ReSync-Network", "network");
+                addHeader("X-ReSync-Node", "backend");
+            }
         }
 
         @Override
-        public void onOpen(ServerHandshake handshake) {}
+        public void onOpen(ServerHandshake handshake) {
+            if (authentication != null) {
+                NetworkRequestContext context = new NetworkRequestContext(1, "network", "backend", "authentication", System.currentTimeMillis() + 10_000, Set.of());
+                send(codec.encode(new NetworkFrame(context, NetworkChannels.CONTROL, NetworkFrameType.ENROLL, NetworkAuthenticationCodec.encode(authentication))));
+            }
+        }
         @Override
         public void onMessage(String message) {}
         @Override

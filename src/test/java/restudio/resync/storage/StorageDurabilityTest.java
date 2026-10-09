@@ -20,14 +20,22 @@ import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.resources.AssetFileFormat;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -37,6 +45,97 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class StorageDurabilityTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void asyncAdmissionIsBoundedAndWholeSnapshotsKeepTheLatestWrite() throws Exception {
+        AsyncStorageExecutor writer = new AsyncStorageExecutor();
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicBoolean runningReleased = new AtomicBoolean();
+        AtomicBoolean oldReleased = new AtomicBoolean();
+        Path snapshot = tempDir.resolve("players.json");
+        writer.submitTracked(() -> {
+            started.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(failure);
+            }
+        }, () -> runningReleased.set(true));
+        try {
+            assertTrue(started.await(1, TimeUnit.SECONDS));
+            writer.submitLatest("players", () -> { throw new AssertionError("old snapshot ran"); },
+                () -> oldReleased.set(true));
+            for (int revision = 1; revision <= 100; revision++) {
+                String latest = Integer.toString(revision);
+                writer.submitLatest("players", () -> {
+                    try {
+                        Files.writeString(snapshot, latest);
+                    } catch (IOException failure) {
+                        throw new UncheckedIOException(failure);
+                    }
+                }, () -> {});
+            }
+            assertTrue(oldReleased.get());
+            assertFalse(runningReleased.get());
+            for (int queued = 1; queued < 64; queued++) {
+                writer.submit(() -> {});
+            }
+            assertThrows(RejectedExecutionException.class, () -> writer.submit(() -> {}));
+            assertFalse(Files.exists(snapshot));
+            release.countDown();
+            writer.flush();
+            assertEquals("100", Files.readString(snapshot));
+            assertTrue(runningReleased.get());
+        } finally {
+            release.countDown();
+            writer.shutdown();
+        }
+        assertThrows(RejectedExecutionException.class, () -> writer.submitLatest("players", () -> {}, () -> {}));
+    }
+
+    @Test
+    void asyncFailuresRemainObservableAndShutdownSettlesDiscardedWrites() throws Exception {
+        AsyncStorageExecutor failed = new AsyncStorageExecutor();
+        IllegalStateException cause = new IllegalStateException("write failed");
+        CompletableFuture<Void> write = failed.submitTracked(() -> { throw cause; });
+        assertThrows(CompletionException.class, write::join);
+        assertEquals(cause, assertThrows(IOException.class, failed::flush).getCause());
+        assertEquals(cause, assertThrows(IOException.class, failed::shutdown).getCause());
+        assertThrows(RejectedExecutionException.class, () -> failed.submit(() -> {}));
+
+        AsyncStorageExecutor blocked = new AsyncStorageExecutor(Duration.ofMillis(100));
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch cleaned = new CountDownLatch(1);
+        CompletableFuture<Void> running = blocked.submitTracked(() -> {
+            started.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("write interrupted", exception);
+            }
+        });
+        try {
+            assertTrue(started.await(1, TimeUnit.SECONDS));
+            CompletableFuture<Void> queued = blocked.submitTracked(() -> {
+                throw new AssertionError("discarded write ran");
+            }, cleaned::countDown);
+            assertThrows(IOException.class, blocked::shutdown);
+            assertTrue(cleaned.await(1, TimeUnit.SECONDS));
+            assertThrows(CompletionException.class, queued::join);
+            assertThrows(RejectedExecutionException.class, () -> blocked.submit(() -> {}));
+        } finally {
+            release.countDown();
+            try {
+                blocked.shutdown();
+            } catch (IOException ignored) {
+            }
+            running.handle((ignored, failure) -> null).get(1, TimeUnit.SECONDS);
+        }
+    }
 
     @Test
     void transactionSnapshotsCanBePreviewedAndExplicitlyRestored() throws Exception {

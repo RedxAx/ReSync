@@ -92,6 +92,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
     private static final Map<Path, RootContext> ROOTS = new LinkedHashMap<>();
     private final RootContext context;
     private final AtomicBoolean closed = new AtomicBoolean();
+    private IOException closeFailure;
     private final ReentrantReadWriteLock lifecycle = new ReentrantReadWriteLock();
     private final List<ListenerRegistration> registrations = new CopyOnWriteArrayList<>();
     private final ThreadLocal<JsonObject> transactionIntentScope = new ThreadLocal<>();
@@ -322,6 +323,26 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         }
     }
 
+    public Optional<AssetTransactionManager.TransactionInspection> inspectMutation(UUID mutationId) throws IOException {
+        Objects.requireNonNull(mutationId, "mutationId");
+        lifecycle.readLock().lock();
+        try {
+            requireOpen();
+            context.lock.readLock().lock();
+            try {
+                if (context.mutation(mutationId).isEmpty()) return Optional.empty();
+                AssetTransactionManager.TransactionVisibility committed = context.manager
+                    .findCommittedTransaction(mutationId.toString())
+                    .orElseThrow(() -> new IOException("Coordinator mutation has no committed asset transaction"));
+                return Optional.of(context.manager.inspectTransaction(committed.transactionId()));
+            } finally {
+                context.lock.readLock().unlock();
+            }
+        } finally {
+            lifecycle.readLock().unlock();
+        }
+    }
+
     public ListenerRegistration addListener(PostCommitListener listener) {
         Objects.requireNonNull(listener, "listener");
         lifecycle.readLock().lock();
@@ -365,13 +386,24 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             lifecycle.writeLock().lock();
             try {
                 if (!closed.compareAndSet(false, true)) {
+                    if (closeFailure != null) {
+                        throw closeFailure;
+                    }
+                    if (context.closeFailure != null) {
+                        throw context.closeFailure;
+                    }
                     return;
                 }
                 for (ListenerRegistration registration : registrations) {
                     registration.close();
                 }
                 registrations.clear();
-                releaseRoot(context);
+                try {
+                    releaseRoot(context);
+                } catch (IOException exception) {
+                    closeFailure = exception;
+                    throw exception;
+                }
             } finally {
                 lifecycle.writeLock().unlock();
             }
@@ -402,6 +434,9 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
             RootContext existing = ROOTS.get(root);
             if (existing != null) {
                 if (existing.references == 0) {
+                    if (existing.closeFailure != null) {
+                        throw new RootBusyException("Asset transaction root has a failed physical close: " + root, existing.closeFailure);
+                    }
                     throw new RootBusyException("Asset transaction root is completing listener delivery: " + root);
                 }
                 if (adoption != null) {
@@ -440,8 +475,8 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                 if (context.activeDeliveries > 0) {
                     context.releasePending = true;
                 } else {
-                    ROOTS.remove(context.root);
                     context.close();
+                    ROOTS.remove(context.root);
                 }
             }
         }
@@ -453,9 +488,9 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                 || ROOTS.get(context.root) != context) {
                 return;
             }
+            context.close();
             context.releasePending = false;
             ROOTS.remove(context.root);
-            context.close();
         }
     }
 
@@ -502,6 +537,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
         private int references;
         private volatile int activeDeliveries;
         private volatile boolean releasePending;
+        private volatile IOException closeFailure;
 
         private RootContext(Path root, Path coordinatorRoot, Gson gson, Clock clock, FileChannel lockChannel,
                             FileLock processLock, AssetTransactionManager manager, CoordinatorState state,
@@ -1535,6 +1571,9 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
 
         @Override
         public void close() throws IOException {
+            if (closeFailure != null) {
+                throw closeFailure;
+            }
             IOException failure = null;
             try {
                 processLock.release();
@@ -1560,6 +1599,7 @@ public final class AssetTransactionCoordinator implements AutoCloseable {
                 }
             }
             if (failure != null) {
+                closeFailure = failure;
                 throw failure;
             }
         }

@@ -12,9 +12,11 @@ import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.storage.AssetTransactionCoordinator.ProjectDelta;
 import restudio.resync.storage.AssetTransactionCoordinator.TransactionRequest;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -167,9 +169,18 @@ class JsonAssetStoreTest {
     @Test
     void closeUnregistersStoreWithoutClosingBorrowedCoordinator() throws Exception {
         Path assets = tempDir.resolve("assets");
+        AtomicReference<JsonAssetStore<TestResource>> owner = new AtomicReference<>();
         try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON)) {
-            JsonAssetStore<TestResource> store = store(assets, coordinator);
+            JsonAssetStore<TestResource> store = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
+                json -> {
+                    owner.get().close();
+                    return TestResource.fromJson(json);
+                }, TestResource::toJson, TestResource::id, null,
+                LegacyRuntimeActivationGate.runtime(tempDir), coordinator, () -> true);
+            owner.set(store);
+            store.save(new TestResource("main", "Live"), UUID.randomUUID(), 0L);
 
+            assertThrows(IllegalStateException.class, () -> store.get("main"));
             store.close();
             store.close();
 
@@ -347,17 +358,20 @@ class JsonAssetStoreTest {
     void cachedJsonValuesAreDetachedFromCallersAndReloadValidatorsRunOutsideLeases() throws Exception {
         Path assets = tempDir.resolve("assets");
         AtomicBoolean leaseHeld = new AtomicBoolean();
+        AtomicInteger reads = new AtomicInteger();
         try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
              JsonAssetStore<JsonObject> store = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
                  json -> {
                      assertFalse(leaseHeld.get());
+                     reads.incrementAndGet();
                      return JsonParser.parseString(json).getAsJsonObject();
                  }, GSON::toJson, value -> value.get("id").getAsString(), null,
                  LegacyRuntimeActivationGate.runtime(tempDir), coordinator, () -> true,
                  () -> {
                      leaseHeld.set(true);
                      return () -> leaseHeld.set(false);
-                 })) {
+                 }, (value, existing, serialized) -> JsonAssetStore.mergePayload(existing, serialized, serialized.keySet()),
+                 null, JsonObject::deepCopy)) {
             JsonObject initial = new JsonObject();
             initial.addProperty("id", "main");
             initial.addProperty("name", "Stable");
@@ -367,7 +381,39 @@ class JsonAssetStoreTest {
             first.addProperty("name", "Mutated By Caller");
             assertEquals("Stable", store.get("main").get("name").getAsString());
 
+            assertEquals(1, reads.get());
+            JsonObject unrelated = new JsonObject();
+            unrelated.addProperty("id", "other");
+            unrelated.addProperty("name", "Unrelated");
+            store.save(unrelated, UUID.randomUUID(), 0L);
+            assertEquals("Stable", store.get("main").get("name").getAsString());
+            assertEquals(1, reads.get());
+            store.delete("other", UUID.randomUUID(), 1L);
+            assertEquals("Stable", store.readSnapshot().values().getFirst().value().get("name").getAsString());
+            assertEquals(1, reads.get());
             store.reload("main", value -> assertFalse(leaseHeld.get()));
+            store.get("main");
+            assertEquals(3, reads.get());
+            JsonObject updated = initial.deepCopy();
+            updated.addProperty("name", "Updated");
+            store.save(updated, UUID.randomUUID(), 1L);
+            assertEquals("Updated", store.get("main").get("name").getAsString());
+            Path file = store.findAssetFile("main");
+            String original = Files.readString(file);
+            try {
+                Files.writeString(file, "corrupt");
+                assertEquals("Updated", store.get("main").get("name").getAsString());
+                store.clearCache();
+                assertNull(store.get("main"));
+                try (var channel = Files.newByteChannel(file, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                    channel.position(32L * 1024 * 1024);
+                    channel.write(ByteBuffer.wrap(new byte[]{0}));
+                }
+                assertNull(store.get("main"));
+                assertThrows(IllegalStateException.class, () -> store.readStamp("main"));
+            } finally {
+                Files.writeString(file, original);
+            }
         }
     }
 

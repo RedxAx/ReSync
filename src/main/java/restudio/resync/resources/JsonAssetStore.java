@@ -12,6 +12,7 @@ import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.flow.protocol.ResourcePresentationIntent;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.flow.resource.ResourcePayloadCodecs;
+import restudio.resync.migration.MigrationPaths;
 import restudio.resync.storage.AssetProjectMetadata;
 import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.storage.AssetTransactionCoordinator.AssetDelta;
@@ -31,6 +32,7 @@ import restudio.resync.storage.StorageSafety;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -50,12 +52,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 public class JsonAssetStore<T> implements AutoCloseable {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final long NO_EXPECTED_REVISION = -1L;
     private static final int MAX_READ_RETRIES = 3;
+    private static final int MAX_ASSET_BYTES = 32 * 1024 * 1024;
     private static final String AUXILIARY_HASH = "assetAuxiliaryHash";
     private static final String EMPTY_PAYLOAD_HASH = ResourcePayloadCodecs.json().hashPayload(Map.of()).canonicalText();
 
@@ -164,11 +168,14 @@ public class JsonAssetStore<T> implements AutoCloseable {
     private record AggregatePrimary(JsonObject payload, Live state) {
     }
 
-    private record CachedValue(String json, AssetStamp stamp) {
+    private record CachedValue<T>(String json, AssetStamp stamp, T value) {
         private CachedValue {
             Objects.requireNonNull(json, "json");
             Objects.requireNonNull(stamp, "stamp");
         }
+    }
+
+    private record CommittedRead(String json, AssetStamp stamp) {
     }
 
     private record CoordinatorLineage(long revision, String mutationValue, boolean deleted) {
@@ -427,6 +434,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
     private final String defaultFolder;
     private final JsonReader<T> reader;
     private final JsonWriter<T> writer;
+    private final UnaryOperator<T> valueCopy;
     private final IdExtractor<T> idExtractor;
     private final FolderResolver<T> folderResolver;
     private final PayloadMerger<T> payloadMerger;
@@ -435,7 +443,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
     private final BooleanSupplier mutationAdmission;
     private final MutationLeaseProvider mutationLeaseProvider;
     private final ProjectMetadataLineageWriter projectMetadataLineageWriter;
-    private final ConcurrentHashMap<String, CachedValue> cache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CachedValue<T>> cache = new ConcurrentHashMap<>();
     private final Object cacheLock = new Object();
     private final AtomicLong cacheGeneration = new AtomicLong();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -475,11 +483,22 @@ public class JsonAssetStore<T> implements AutoCloseable {
                           AssetTransactionCoordinator coordinator, BooleanSupplier mutationAdmission,
                           MutationLeaseProvider mutationLeaseProvider, PayloadMerger<T> payloadMerger,
                           ProjectMetadataLineageWriter projectMetadataLineageWriter) {
+        this(assetsRoot, legacyDirectory, typeId, defaultFolder, reader, writer, idExtractor, folderResolver,
+            legacyRuntimeGate, coordinator, mutationAdmission, mutationLeaseProvider, payloadMerger,
+            projectMetadataLineageWriter, null);
+    }
+
+    public JsonAssetStore(Path assetsRoot, Path legacyDirectory, String typeId, String defaultFolder, JsonReader<T> reader, JsonWriter<T> writer,
+                          IdExtractor<T> idExtractor, FolderResolver<T> folderResolver, LegacyRuntimeActivationGate legacyRuntimeGate,
+                          AssetTransactionCoordinator coordinator, BooleanSupplier mutationAdmission,
+                          MutationLeaseProvider mutationLeaseProvider, PayloadMerger<T> payloadMerger,
+                          ProjectMetadataLineageWriter projectMetadataLineageWriter, UnaryOperator<T> valueCopy) {
         this.assetsRoot = Objects.requireNonNull(assetsRoot, "assetsRoot").toAbsolutePath().normalize();
         this.typeId = Objects.requireNonNull(typeId, "typeId");
         this.defaultFolder = defaultFolder == null ? "" : defaultFolder;
         this.reader = Objects.requireNonNull(reader, "reader");
         this.writer = Objects.requireNonNull(writer, "writer");
+        this.valueCopy = valueCopy;
         this.idExtractor = Objects.requireNonNull(idExtractor, "idExtractor");
         this.folderResolver = folderResolver;
         this.payloadMerger = Objects.requireNonNull(payloadMerger, "payloadMerger");
@@ -492,9 +511,8 @@ public class JsonAssetStore<T> implements AutoCloseable {
             throw new IllegalArgumentException("JSON Asset Coordinator Root Does Not Match Asset Store Root");
         }
         this.coordinatorListener = this.coordinator.addListener(result -> {
-            if (result.states().keySet().stream().anyMatch(this::ownsCoordinatorKey)) {
-                clearCache();
-            }
+            result.states().keySet().stream().filter(this::ownsCoordinatorKey)
+                .map(AssetKey::id).distinct().forEach(this::invalidate);
         });
     }
 
@@ -509,28 +527,31 @@ public class JsonAssetStore<T> implements AutoCloseable {
             long generation;
             AssetStamp before;
             String json;
-            boolean lineageHit = false;
+            T resident = null;
             try (MutationLease ignored = acquireMutationLease()) {
                 generation = cacheGeneration.get();
                 Snapshot snapshot = coordinator.read(current -> current);
                 CoordinatorLineage lineage = coordinatorLineage(safeId, snapshot);
-                CachedValue cached = cacheGet(safeId);
+                CachedValue<T> cached = cacheGet(safeId);
                 if (cached != null && matches(cached.stamp(), lineage)) {
                     before = cached.stamp();
                     json = cached.json();
-                    lineageHit = true;
+                    resident = cached.value();
                 } else {
                     if (cached != null) {
                         synchronized (cacheLock) {
+                            requireOpen();
                             if (generation != cacheGeneration.get()) {
                                 continue;
                             }
                             cache.remove(safeId, cached);
                         }
                     }
-                    before = currentStamp(safeId, snapshot);
+                    CommittedRead read = readCommitted(safeId, snapshot);
+                    before = read.stamp();
                     if (before == null) {
                         synchronized (cacheLock) {
+                            requireOpen();
                             if (generation != cacheGeneration.get()) {
                                 continue;
                             }
@@ -538,26 +559,35 @@ public class JsonAssetStore<T> implements AutoCloseable {
                             return null;
                         }
                     }
-                    json = before.deleted() ? null : readCurrentJson(safeId, snapshot);
+                    json = read.json();
                 }
             } catch (IOException exception) {
                 lastFailure = exception;
                 continue;
             }
-            T value = readValue(json);
+            if (resident == null) {
+                resident = readValue(json);
+            }
+            T value = resident == null || valueCopy == null ? resident : valueCopy.apply(resident);
             String valueId = value == null ? null : safeId(idExtractor.id(value), "load");
+            CachedValue<T> admitted = json == null ? null : new CachedValue<>(json, before, valueCopy == null ? null : resident);
             try (MutationLease ignored = acquireMutationLease()) {
-                synchronized (cacheLock) {
-                    if (generation != cacheGeneration.get()
-                        || (!lineageHit && !matches(before, coordinatorLineage(safeId, coordinator.read(current -> current))))) {
-                        continue;
+                boolean published = coordinator.read(snapshot -> {
+                    synchronized (cacheLock) {
+                        requireOpen();
+                        if (generation != cacheGeneration.get() || !matches(before, coordinatorLineage(safeId, snapshot))) {
+                            return false;
+                        }
+                        if (value == null || !safeId.equals(valueId)) {
+                            cache.remove(safeId);
+                        } else {
+                            cache.put(safeId, admitted);
+                        }
+                        return true;
                     }
-                    if (value == null) {
-                        cache.remove(safeId);
-                        return null;
-                    }
-                    cache.put(valueId != null ? valueId : safeId, new CachedValue(json, before));
-                    return value;
+                });
+                if (published) {
+                    return value == null || !safeId.equals(valueId) ? null : value;
                 }
             }
         }
@@ -593,18 +623,10 @@ public class JsonAssetStore<T> implements AutoCloseable {
     private T preloadFromSnapshot(String safeId, Snapshot snapshot) {
         long generation = cacheGeneration.get();
         try {
-            AssetStamp before = currentStamp(safeId, snapshot);
-            if (before == null) {
+            CachedValue<T> cached = cacheGet(safeId);
+            if (cached != null && !matches(cached.stamp(), coordinatorLineage(safeId, snapshot))) {
                 synchronized (cacheLock) {
-                    if (generation == cacheGeneration.get()) {
-                        cache.remove(safeId);
-                    }
-                }
-                return null;
-            }
-            CachedValue cached = cacheGet(safeId);
-            if (cached != null && !before.equals(cached.stamp())) {
-                synchronized (cacheLock) {
+                    requireOpen();
                     if (generation != cacheGeneration.get()) {
                         return null;
                     }
@@ -612,18 +634,29 @@ public class JsonAssetStore<T> implements AutoCloseable {
                 }
                 cached = null;
             }
-            String json = cached == null ? readCurrentJson(safeId, snapshot) : cached.json();
-            T value = readValue(json);
+            CommittedRead read = cached == null ? readCommitted(safeId, snapshot) : null;
+            AssetStamp before = cached == null ? read.stamp() : cached.stamp();
+            if (before == null || before.deleted()) {
+                cacheRemove(safeId);
+                return null;
+            }
+            String json = cached == null ? read.json() : cached.json();
+            T resident = cached == null ? null : cached.value();
+            if (resident == null) {
+                resident = readValue(json);
+            }
+            T value = resident == null || valueCopy == null ? resident : valueCopy.apply(resident);
             String valueId = value == null ? null : safeId(idExtractor.id(value), "load");
             synchronized (cacheLock) {
-                if (generation != cacheGeneration.get() || !Objects.equals(before, currentStamp(safeId, snapshot))) {
+                requireOpen();
+                if (generation != cacheGeneration.get() || !matches(before, coordinatorLineage(safeId, snapshot))) {
                     return null;
                 }
-                if (value == null) {
+                if (value == null || !safeId.equals(valueId)) {
                     cache.remove(safeId);
                     return null;
                 }
-                cache.put(valueId != null ? valueId : safeId, new CachedValue(json, before));
+                cache.put(safeId, new CachedValue<>(json, before, valueCopy == null ? null : resident));
                 return value;
             }
         } catch (IOException exception) {
@@ -644,8 +677,9 @@ public class JsonAssetStore<T> implements AutoCloseable {
         long generation;
         try (MutationLease ignored = acquireMutationLease()) {
             generation = cacheGeneration.get();
-            before = currentStamp(safeId);
-            json = readCurrentJson(safeId);
+            CommittedRead read = readCommitted(safeId, coordinator.read(current -> current));
+            before = read.stamp();
+            json = read.json();
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to reload " + typeId + ": " + safeId, exception);
         }
@@ -669,72 +703,61 @@ public class JsonAssetStore<T> implements AutoCloseable {
         long generation = cacheGeneration.get();
         String valueId = value == null ? null : safeId(idExtractor.id(value), "reload");
         try (MutationLease ignored = acquireMutationLease()) {
-            synchronized (cacheLock) {
-                if (generation != cacheGeneration.get()) {
-                    throw new IllegalStateException("JSON resource changed before cache publication: " + safeId);
+            coordinator.read(snapshot -> {
+                synchronized (cacheLock) {
+                    try {
+                        requireOpen();
+                        CommittedRead read = readCommitted(safeId, snapshot);
+                        if (generation != cacheGeneration.get() || !Objects.equals(expected, read.stamp())) {
+                            throw new IllegalStateException("JSON resource changed before cache publication: " + safeId);
+                        }
+                        if (value == null) {
+                            cache.remove(safeId);
+                            return null;
+                        }
+                        if (!safeId.equals(valueId)) {
+                            throw new IllegalStateException("JSON resource identity does not match its typed key: " + safeId);
+                        }
+                        if (expected == null || expected.deleted()) {
+                            throw new IllegalStateException("Cannot publish a live JSON resource without a live durable state: " + safeId);
+                        }
+                        String durableJson = read.json();
+                        AssetStamp confirmed = read.stamp();
+                        if (durableJson == null) {
+                            throw new IllegalStateException("Live JSON resource has no durable payload: " + safeId);
+                        }
+                        cache.put(safeId, new CachedValue<>(durableJson, confirmed, null));
+                        return null;
+                    } catch (IOException exception) {
+                        throw new IllegalStateException("Failed to validate " + typeId + " cache publication: " + safeId, exception);
+                    }
                 }
-                AssetStamp actual;
-                try {
-                    actual = currentStamp(safeId);
-                } catch (IOException exception) {
-                    throw new IllegalStateException("Failed to validate " + typeId + " cache publication: " + safeId,
-                        exception);
-                }
-                if (!Objects.equals(expected, actual)) {
-                    throw new IllegalStateException("JSON resource changed before cache publication: " + safeId);
-                }
-                if (value == null) {
-                    cache.remove(safeId);
-                    return;
-                }
-                if (!safeId.equals(valueId)) {
-                    throw new IllegalStateException("JSON resource identity does not match its typed key: " + safeId);
-                }
-                if (actual == null || actual.deleted()) {
-                    throw new IllegalStateException("Cannot publish a live JSON resource without a live durable state: " + safeId);
-                }
-                String durableJson;
-                try {
-                    durableJson = readCurrentJson(safeId);
-                } catch (IOException exception) {
-                    throw new IllegalStateException("Failed to read durable " + typeId + " cache payload: " + safeId,
-                        exception);
-                }
-                AssetStamp confirmed;
-                try {
-                    confirmed = currentStamp(safeId);
-                } catch (IOException exception) {
-                    throw new IllegalStateException("Failed to confirm " + typeId + " cache publication: " + safeId,
-                        exception);
-                }
-                if (generation != cacheGeneration.get() || !Objects.equals(expected, confirmed)) {
-                    throw new IllegalStateException("JSON resource changed before cache publication: " + safeId);
-                }
-                if (durableJson == null) {
-                    throw new IllegalStateException("Live JSON resource has no durable payload: " + safeId);
-                }
-                cache.put(safeId, new CachedValue(durableJson, confirmed));
+            });
+        }
+    }
+
+    private void requireAssetSize(byte[] bytes) throws IOException {
+        if (bytes.length > MAX_ASSET_BYTES) {
+            throw new IOException("JSON resource exceeds its byte limit");
+        }
+    }
+
+    private byte[] readAssetBytes(Path file) throws IOException {
+        Path path = file.toAbsolutePath().normalize();
+        if (path.equals(assetsRoot) || !path.startsWith(assetsRoot)) {
+            throw new IOException("JSON resource is outside coordinated asset storage: " + file);
+        }
+        MigrationPaths.requireNoSymlinkTraversal(assetsRoot, path);
+        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || Files.size(path) > MAX_ASSET_BYTES) {
+            throw new IOException("JSON resource exceeds its byte limit or is not a regular file: " + file);
+        }
+        try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
+            byte[] bytes = input.readNBytes(MAX_ASSET_BYTES + 1);
+            if (bytes.length > MAX_ASSET_BYTES) {
+                throw new IOException("JSON resource exceeds its byte limit: " + file);
             }
+            return bytes;
         }
-    }
-
-    private String readCurrentJson(String safeId) throws IOException {
-        Snapshot snapshot = coordinator.read(current -> current);
-        return readCurrentJson(safeId, snapshot);
-    }
-
-    private String readCurrentJson(String safeId, Snapshot snapshot) throws IOException {
-        AssetKey key = assetKey(safeId);
-        ExpectedState state = snapshot.state(key).orElse(null);
-        if (!(state instanceof Live live)) {
-            return null;
-        }
-        Path file = snapshot.path(key).orElseThrow(() -> new IOException("Live JSON resource has no coordinator path: " + safeId));
-        byte[] bytes = Files.readAllBytes(file);
-        if (!live.hash().equals(StorageSafety.sha256(bytes))) {
-            throw new IOException("Live JSON resource does not match coordinator state: " + safeId);
-        }
-        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     private T readValue(String json) {
@@ -884,12 +907,12 @@ public class JsonAssetStore<T> implements AutoCloseable {
                 StringBuilder revision = new StringBuilder(typeId).append('\n');
                 for (String id : ids) {
                     try {
-                        AssetStamp stamp = currentStamp(id, snapshot);
+                        T value = preloadFromSnapshot(id, snapshot);
+                        CachedValue<T> cached = cacheGet(id);
+                        AssetStamp stamp = cached == null ? null : cached.stamp();
                         if (stamp == null || stamp.deleted()) {
                             throw new IOException("Live JSON resource has no live stamp: " + id);
                         }
-                        String json = readCurrentJson(id, snapshot);
-                        T value = readValue(json);
                         String valueId = value == null ? null : safeId(idExtractor.id(value), "snapshot");
                         if (value == null || !id.equals(valueId)) {
                             throw new IOException("Live JSON resource snapshot identity mismatch: " + id);
@@ -918,6 +941,13 @@ public class JsonAssetStore<T> implements AutoCloseable {
         synchronized (cacheLock) {
             cacheGeneration.incrementAndGet();
             cache.clear();
+        }
+    }
+
+    private void invalidate(String id) {
+        synchronized (cacheLock) {
+            cacheGeneration.incrementAndGet();
+            cache.remove(id);
         }
     }
 
@@ -963,16 +993,17 @@ public class JsonAssetStore<T> implements AutoCloseable {
             throw new IllegalArgumentException("Invalid " + typeId + " id");
         }
         for (int attempt = 0; attempt < MAX_READ_RETRIES; attempt++) {
-            CachedValue previous;
+            CachedValue<T> previous;
             String json;
             AssetStamp before;
             long generation;
             try (MutationLease ignored = acquireMutationLease()) {
                 generation = cacheGeneration.get();
                 previous = cacheGet(safeId);
-                before = currentStamp(safeId);
+                CommittedRead read = readCommitted(safeId, coordinator.read(current -> current));
+                before = read.stamp();
                 cacheRemove(safeId);
-                json = before == null ? null : readCurrentJson(safeId);
+                json = read.json();
             } catch (IOException exception) {
                 throw new IllegalStateException("Failed to reload " + typeId + ": " + safeId, exception);
             }
@@ -993,42 +1024,62 @@ public class JsonAssetStore<T> implements AutoCloseable {
                 throw failure;
             }
             try (MutationLease ignored = acquireMutationLease()) {
-                synchronized (cacheLock) {
-                    if (generation != cacheGeneration.get() || !Objects.equals(before, currentStamp(safeId))) {
-                        continue;
+                boolean published = coordinator.read(snapshot -> {
+                    synchronized (cacheLock) {
+                        try {
+                            requireOpen();
+                            if (generation != cacheGeneration.get() || !Objects.equals(before, currentStamp(safeId, snapshot))) {
+                                return false;
+                            }
+                        } catch (IOException exception) {
+                            throw new UncheckedIOException(exception);
+                        }
+                        if (value == null) {
+                            cache.remove(safeId);
+                            return true;
+                        }
+                        if (json == null) {
+                            throw new IllegalStateException("Validated JSON resource has no durable payload: " + safeId);
+                        }
+                        cache.put(valueId != null ? valueId : safeId, new CachedValue<>(json, before, null));
+                        return true;
                     }
-                    if (value == null) {
-                        cache.remove(safeId);
-                        return null;
-                    }
-                    if (json == null) {
-                        throw new IllegalStateException("Validated JSON resource has no durable payload: " + safeId);
-                    }
-                    cache.put(valueId != null ? valueId : safeId, new CachedValue(json, before));
+                });
+                if (published) {
                     return value;
                 }
-            } catch (IOException exception) {
+            } catch (UncheckedIOException exception) {
                 restoreReloadCache(safeId, previous, generation, before);
-                throw new IllegalStateException("Failed to validate " + typeId + " reload: " + safeId, exception);
+                throw new IllegalStateException("Failed to validate " + typeId + " reload: " + safeId, exception.getCause());
             }
         }
         throw new IllegalStateException("JSON resource changed during reload: " + safeId);
     }
 
-    private void restoreReloadCache(String safeId, CachedValue previous, long generation, AssetStamp expected) {
+    private void restoreReloadCache(String safeId, CachedValue<T> previous, long generation, AssetStamp expected) {
+        if (closed.get()) {
+            return;
+        }
         try (MutationLease ignored = acquireMutationLease()) {
-            synchronized (cacheLock) {
-                if (generation != cacheGeneration.get() || !Objects.equals(expected, currentStamp(safeId))) {
-                    return;
+            coordinator.read(snapshot -> {
+                synchronized (cacheLock) {
+                    try {
+                        requireOpen();
+                        if (generation != cacheGeneration.get() || !Objects.equals(expected, currentStamp(safeId, snapshot))) {
+                            return null;
+                        }
+                    } catch (IOException exception) {
+                        cache.remove(safeId);
+                        return null;
+                    }
+                    if (previous == null || expected == null) {
+                        cache.remove(safeId);
+                    } else {
+                        cache.put(safeId, previous);
+                    }
+                    return null;
                 }
-                if (previous == null || expected == null) {
-                    cache.remove(safeId);
-                } else {
-                    cache.put(safeId, previous);
-                }
-            }
-        } catch (IOException exception) {
-            cacheRemove(safeId);
+            });
         }
     }
 
@@ -1052,7 +1103,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
         try {
             Snapshot snapshot = coordinator.read(current -> current);
             CoordinatorLineage lineage = coordinatorLineage(safeId, snapshot);
-            CachedValue cached = cacheGet(safeId);
+            CachedValue<T> cached = cacheGet(safeId);
             if (cached != null && matches(cached.stamp(), lineage)) {
                 return cached.stamp();
             }
@@ -1079,10 +1130,14 @@ public class JsonAssetStore<T> implements AutoCloseable {
 
     @Override
     public void close() {
-        if (closed.compareAndSet(false, true)) {
-            coordinatorListener.close();
-            clearCache();
+        synchronized (cacheLock) {
+            if (!closed.compareAndSet(false, true)) {
+                return;
+            }
+            cacheGeneration.incrementAndGet();
+            cache.clear();
         }
+        coordinatorListener.close();
     }
 
     private void requireOpen() {
@@ -1186,13 +1241,13 @@ public class JsonAssetStore<T> implements AutoCloseable {
                 requireSaveReplay(snapshot, key, value, safeId, writes, mutationId, expectedRevision, requestedEdit);
                 TransactionResult replay = history.orElseThrow().result();
                 return new PreparedMutation(this, mutationId, snapshot, List.of(), requestedEdit, key, current.revision(), false,
-                    this::clearCache, replay);
+                    () -> invalidate(safeId), replay);
             }
             if (history.isPresent()) {
                 TransactionResult replay = requireHistoricalSaveReplay(history.get(), key, value, writes, mutationId,
                     expectedRevision, requestedEdit);
                 return new PreparedMutation(this, mutationId, snapshot, List.of(), requestedEdit, key,
-                    replay.states().get(key).revision(), false, this::clearCache, replay);
+                    replay.states().get(key).revision(), false, () -> invalidate(safeId), replay);
             }
             checkExpectedRevision(safeId, expectedRevision, current.revision());
             if (current instanceof Deleted) {
@@ -1211,7 +1266,9 @@ public class JsonAssetStore<T> implements AutoCloseable {
                 throw new IllegalStateException("Aggregate create path differs from existing coordinated state: " + typeId + ':' + safeId);
             }
             List<AssetDelta> assets = new ArrayList<>();
-            assets.add(AssetDelta.write(key, target, current, json.getBytes(StandardCharsets.UTF_8)));
+            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+            requireAssetSize(bytes);
+            assets.add(AssetDelta.write(key, target, current, bytes));
             addTombstoneRetirement(snapshot, safeId, assets);
             addBinaryWrites(snapshot, writes, assets);
             addIntentWrite(snapshot, safeId, saveIntentBytes(value, writes, requestedEdit), assets);
@@ -1219,7 +1276,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
             ProjectResourceEdit edit = requestedEdit != null ? requestedEdit
                 : new ProjectResourceEdit(typeId, safeId, null, relative, null, false);
             return new PreparedMutation(this, mutationId, snapshot, assets, edit, key, nextRevision, false,
-                this::clearCache, null);
+                () -> invalidate(safeId), null);
         } catch (IOException exception) {
             throw coordinatedFailure("prepare save", safeId, exception);
         }
@@ -1245,14 +1302,12 @@ public class JsonAssetStore<T> implements AutoCloseable {
                 requireDeleteReplay(snapshot, key, safeId, mutationId, expectedRevision);
                 TransactionResult replay = history.orElseThrow().result();
                     return new PreparedMutation(this, mutationId, snapshot, List.of(), null, key, current.revision(), true,
-                    () -> {
-                        cacheRemove(safeId);
-                    }, replay);
+                    () -> invalidate(safeId), replay);
             }
             if (history.isPresent()) {
                 TransactionResult replay = requireHistoricalDeleteReplay(history.get(), key, safeId, expectedRevision);
                 return new PreparedMutation(this, mutationId, snapshot, List.of(), null, key,
-                    replay.states().get(key).revision(), true, this::clearCache, replay);
+                    replay.states().get(key).revision(), true, () -> invalidate(safeId), replay);
             }
             checkExpectedRevision(safeId, expectedRevision, current.revision());
             long nextRevision = Math.addExact(current.revision(), 1L);
@@ -1267,9 +1322,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
                 AssetDelta.write(tombstoneKey, tombstonePath(safeId), tombstoneState, tombstoneBytes),
                 intentWrite(snapshot, safeId, deleteIntentBytes()));
             ProjectResourceEdit edit = new ProjectResourceEdit(typeId, safeId, null, "", null, true);
-            return new PreparedMutation(this, mutationId, snapshot, assets, edit, key, nextRevision, true, () -> {
-                cacheRemove(safeId);
-            }, null);
+            return new PreparedMutation(this, mutationId, snapshot, assets, edit, key, nextRevision, true, () -> invalidate(safeId), null);
         } catch (IOException exception) {
             throw coordinatedFailure("prepare delete", safeId, exception);
         }
@@ -1484,7 +1537,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
             throw new IllegalStateException("Mutation ID path does not match the persisted " + typeId + ": " + safeId);
         }
         if (!live.hash().equals(StorageSafety.sha256(json.getBytes(StandardCharsets.UTF_8)))
-            || !live.hash().equals(StorageSafety.sha256(Files.readAllBytes(path)))) {
+            || !live.hash().equals(StorageSafety.sha256(readAssetBytes(path)))) {
             throw new IllegalStateException("Mutation ID payload does not match the persisted " + typeId + ": " + safeId);
         }
         requireCurrentIntent(snapshot, safeId, saveIntentBytes(value, binaryWrites, presentation), mutationId);
@@ -1517,7 +1570,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
         }
         Path path = snapshot.path(key)
             .orElseThrow(() -> new IOException("JSON resource replay semantic intent has no path: " + safeId));
-        byte[] persisted = Files.readAllBytes(path);
+        byte[] persisted = readAssetBytes(path);
         String requestedHash = StorageSafety.sha256(requested);
         if (!live.hash().equals(requestedHash) || !live.hash().equals(StorageSafety.sha256(persisted))) {
             throw new IllegalStateException("Mutation ID semantic intent does not match the requested JSON resource operation: " + safeId);
@@ -1537,7 +1590,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
                 .orElseThrow(() -> new IOException("JSON resource replay blob has no coordinator path: " + requestedPath));
             byte[] requested = entry.getValue() == null ? new byte[0] : entry.getValue();
             if (!persistedPath.equals(requestedPath) || !live.hash().equals(StorageSafety.sha256(requested))
-                || !live.hash().equals(StorageSafety.sha256(Files.readAllBytes(persistedPath)))) {
+                || !live.hash().equals(StorageSafety.sha256(readAssetBytes(persistedPath)))) {
                 throw new IllegalStateException("Mutation ID blob does not match coordinated asset storage: " + requestedPath);
             }
         }
@@ -1555,7 +1608,9 @@ public class JsonAssetStore<T> implements AutoCloseable {
     private void addBinaryWrites(Snapshot snapshot, Map<Path, byte[]> binaryWrites, List<AssetDelta> assets) throws IOException {
         for (Map.Entry<Path, byte[]> entry : binaryWrites.entrySet()) {
             Path path = requireAuxiliaryPath(entry.getKey());
-            byte[] bytes = entry.getValue() == null ? new byte[0] : entry.getValue().clone();
+            byte[] requested = entry.getValue() == null ? new byte[0] : entry.getValue();
+            requireAssetSize(requested);
+            byte[] bytes = requested.clone();
             AssetKey key = blobKey(path);
             ExpectedState expected = snapshot.state(key).orElse(Missing.INSTANCE);
             String hash = StorageSafety.sha256(bytes);
@@ -1566,11 +1621,12 @@ public class JsonAssetStore<T> implements AutoCloseable {
         }
     }
 
-    private void addIntentWrite(Snapshot snapshot, String safeId, byte[] bytes, List<AssetDelta> assets) {
+    private void addIntentWrite(Snapshot snapshot, String safeId, byte[] bytes, List<AssetDelta> assets) throws IOException {
         assets.add(intentWrite(snapshot, safeId, bytes));
     }
 
-    private AssetDelta intentWrite(Snapshot snapshot, String safeId, byte[] bytes) {
+    private AssetDelta intentWrite(Snapshot snapshot, String safeId, byte[] bytes) throws IOException {
+        requireAssetSize(bytes);
         AssetKey key = intentKey(safeId);
         ExpectedState expected = snapshot.state(key).orElse(Missing.INSTANCE);
         Path path = assetsRoot.resolve(".mutation-intents").resolve(typeId).resolve(AssetFileFormat.idOnlyFileName(safeId)).normalize();
@@ -1703,8 +1759,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
     }
 
     private String livePayloadHash(Snapshot snapshot, AssetKey key, String safeId) throws IOException {
-        Path path = snapshot.path(key).orElseThrow(() -> new IOException("Live JSON resource has no coordinator path: " + safeId));
-        return readStampFile(path, safeId, false, true).payloadHash();
+        return readCommitted(safeId, snapshot).stamp().payloadHash();
     }
 
     private AssetStamp requireDeletedEvidence(Snapshot snapshot, AssetKey primaryKey, String safeId) throws IOException {
@@ -1727,11 +1782,11 @@ public class JsonAssetStore<T> implements AutoCloseable {
         }
         Path path = snapshot.path(tombstoneKey)
             .orElseThrow(() -> new IOException("Deleted JSON resource tombstone has no coordinator path: " + safeId));
-        byte[] bytes = Files.readAllBytes(path);
+        byte[] bytes = readAssetBytes(path);
         if (!live.hash().equals(StorageSafety.sha256(bytes))) {
             throw new IOException("Deleted JSON resource tombstone bytes do not match coordinator state: " + safeId);
         }
-        AssetStamp stamp = readStampFile(path, safeId, true, true);
+        AssetStamp stamp = readStampJson(new String(bytes, StandardCharsets.UTF_8), path, safeId, true, true);
         if (stamp.revision() != primary.revision() || !stamp.mutationValue().equals(primaryLineage)) {
             throw new IOException("Deleted JSON resource tombstone identity does not match its primary state: " + safeId);
         }
@@ -1781,7 +1836,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
                 || snapshot.mutationValue(key).filter(mutationId.toString()::equals).isEmpty()) {
                 throw new IOException("Aggregate create replay has no exact primary state: " + safeId);
             }
-            bytes = Files.readAllBytes(path);
+            bytes = readAssetBytes(path);
             if (!live.hash().equals(StorageSafety.sha256(bytes))) {
                 throw new IOException("Aggregate create replay primary bytes differ from coordinator state: " + safeId);
             }
@@ -1848,7 +1903,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
         }
         Path path = snapshot.path(key)
             .orElseThrow(() -> new IOException("Aggregate create replay project metadata lineage has no path"));
-        return projectMetadataStamp(Files.readAllBytes(path), metadata, mutationId);
+        return projectMetadataStamp(readAssetBytes(path), metadata, mutationId);
     }
 
     @SuppressWarnings("unchecked")
@@ -1930,36 +1985,47 @@ public class JsonAssetStore<T> implements AutoCloseable {
     }
 
     private AssetStamp currentStamp(String safeId, Snapshot snapshot) throws IOException {
+        return readCommitted(safeId, snapshot).stamp();
+    }
+
+    private CommittedRead readCommitted(String safeId, Snapshot snapshot) throws IOException {
         AssetKey key = assetKey(safeId);
         ExpectedState state = snapshot.state(key).orElse(null);
         if (state == null) {
-            return null;
+            return new CommittedRead(null, null);
         }
         String mutationValue = snapshot.mutationValue(key)
             .orElseThrow(() -> new IOException("JSON resource has no coordinator mutation lineage: " + safeId));
         AssetStamp stamp;
+        String json = null;
         if (state instanceof Live live) {
             Path path = snapshot.path(key)
                 .orElseThrow(() -> new IOException("JSON resource has no coordinator path: " + safeId));
-            if (!live.hash().equals(StorageSafety.sha256(Files.readAllBytes(path)))) {
+            byte[] bytes = readAssetBytes(path);
+            if (!live.hash().equals(StorageSafety.sha256(bytes))) {
                 throw new IOException("JSON resource bytes do not match coordinator state: " + safeId);
             }
-            stamp = readStampFile(path, safeId, false, true);
+            json = new String(bytes, StandardCharsets.UTF_8);
+            stamp = readStampJson(json, path, safeId, false, true);
         } else if (state instanceof Deleted) {
             stamp = requireDeletedEvidence(snapshot, key, safeId);
         } else {
-            return null;
+            return new CommittedRead(null, null);
         }
         if (stamp.revision() != state.revision() || !stamp.mutationValue().equals(mutationValue)) {
             throw new IOException("JSON resource identity does not match coordinator lineage: " + safeId);
         }
-        return stamp;
+        return new CommittedRead(json, stamp);
     }
 
     private AssetStamp readStampFile(Path file, String safeId, boolean deleted, boolean verifyLive) throws IOException {
+        return readStampJson(new String(readAssetBytes(file), StandardCharsets.UTF_8), file, safeId, deleted, verifyLive);
+    }
+
+    private AssetStamp readStampJson(String json, Path file, String safeId, boolean deleted, boolean verifyLive) throws IOException {
         JsonElement parsed;
         try {
-            parsed = JsonParser.parseString(StorageSafety.readUtf8(file));
+            parsed = JsonParser.parseString(json);
         } catch (RuntimeException exception) {
             throw new IOException("Invalid JSON resource identity: " + file, exception);
         }
@@ -1992,10 +2058,10 @@ public class JsonAssetStore<T> implements AutoCloseable {
             if (object.has("deleted") && exactBoolean(object, "deleted", file)) {
                 throw new IOException("JSON resource live identity is marked deleted: " + file);
             }
-            if (verifyLive && (AssetFileFormat.readContentHash(file).isBlank() || !AssetFileFormat.verify(file))) {
+            if (verifyLive && (AssetFileFormat.contentHashOf(object).isBlank() || !AssetFileFormat.verify(object))) {
                 throw new IOException("JSON resource integrity failed: " + file);
             }
-            payloadHash = canonicalPayloadHash(GSON.toJson(object));
+            payloadHash = canonicalPayloadHash(json);
         }
         return new AssetStamp(typeId, safeId, revision, mutation, payloadHash, deleted);
     }
@@ -2082,7 +2148,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
             return new JsonObject();
         }
         Path path = snapshot.path(key).orElseThrow(() -> new IOException("Live JSON resource has no coordinator path: " + safeId));
-        byte[] bytes = Files.readAllBytes(path);
+        byte[] bytes = readAssetBytes(path);
         if (!live.hash().equals(StorageSafety.sha256(bytes))) {
             throw new IOException("Live JSON resource does not match coordinator state: " + safeId);
         }
@@ -2135,6 +2201,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
             requireAuxiliaryPath(normalized);
             String relative = assetsRoot.relativize(normalized).toString().replace('\\', '/');
             byte[] content = entry.getValue() != null ? entry.getValue() : new byte[0];
+            requireAssetSize(content);
             entries.add(relative + "\n" + StorageSafety.sha256(content));
         }
         entries.sort(String::compareTo);
@@ -2171,7 +2238,7 @@ public class JsonAssetStore<T> implements AutoCloseable {
     private void validateCanonicalFile(Path file, String expectedId) throws IOException {
         JsonObject object;
         try {
-            JsonElement parsed = JsonParser.parseString(StorageSafety.readUtf8(file));
+            JsonElement parsed = JsonParser.parseString(new String(readAssetBytes(file), StandardCharsets.UTF_8));
             if (!parsed.isJsonObject()) {
                 throw new IOException("JSON resource is not an object: " + file);
             }
@@ -2179,9 +2246,9 @@ public class JsonAssetStore<T> implements AutoCloseable {
         } catch (RuntimeException exception) {
             throw new IOException("Invalid JSON resource: " + file, exception);
         }
-        if (!typeId.equals(AssetFileFormat.readResourceType(file))
-                || AssetFileFormat.readContentHash(file).isBlank()
-                || !AssetFileFormat.verify(file)) {
+        if (!typeId.equals(text(object, AssetFileFormat.RESOURCE_TYPE))
+                || AssetFileFormat.contentHashOf(object).isBlank()
+                || !AssetFileFormat.verify(object)) {
             throw new IOException("JSON resource integrity failed: " + file);
         }
         try {
@@ -2240,14 +2307,19 @@ public class JsonAssetStore<T> implements AutoCloseable {
     }
 
     private MutationLease acquireMutationLease() {
+        requireOpen();
         MutationLease lease = mutationLeaseProvider.acquire();
         if (lease == null) {
             throw new IllegalStateException("JSON resource mutation admission is unavailable");
         }
+        if (closed.get()) {
+            lease.close();
+            requireOpen();
+        }
         return lease;
     }
 
-    private CachedValue cacheGet(String id) {
+    private CachedValue<T> cacheGet(String id) {
         synchronized (cacheLock) {
             return cache.get(id);
         }

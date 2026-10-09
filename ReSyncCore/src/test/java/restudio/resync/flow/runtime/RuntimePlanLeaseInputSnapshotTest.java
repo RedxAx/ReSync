@@ -1,6 +1,9 @@
 package restudio.resync.flow.runtime;
 
 import org.junit.jupiter.api.Test;
+import restudio.resync.flow.graph.GraphEndpoint;
+import restudio.resync.flow.identity.BranchId;
+import restudio.resync.flow.identity.NodeInstanceId;
 import restudio.resync.flow.diagnostic.Diagnostic;
 import restudio.resync.flow.diagnostic.DiagnosticPhase;
 import restudio.resync.flow.diagnostic.DiagnosticSeverity;
@@ -40,9 +43,11 @@ class RuntimePlanLeaseInputSnapshotTest {
         CompletableFuture<RuntimeResult> firstAttempt = new CompletableFuture<>();
         AtomicInteger calls = new AtomicInteger();
         List<TypedValue> observedInputs = new ArrayList<>();
+        List<Map<GraphEndpoint, TypedValue>> observedEndpoints = new ArrayList<>();
         RuntimeBinding binding = RuntimeBinding.available(operation, provider, "1.0.0", invocation -> {
             TypedValue value = invocation.inputs().get(INPUT);
             observedInputs.add(value);
+            observedEndpoints.add(invocation.routedInputs());
             if (calls.incrementAndGet() == 1) {
                 return firstAttempt;
             }
@@ -55,19 +60,29 @@ class RuntimePlanLeaseInputSnapshotTest {
         Map<PinId, TypedValue> callerInputs = new HashMap<>();
         callerInputs.put(INPUT, original);
 
-        CompletionStage<RuntimeResult> pending = lease.execute(operation.key(), callerInputs, "mutation-1");
+        GraphEndpoint endpoint = new GraphEndpoint(NodeInstanceId.deterministic("snapshot-target"), INPUT, null, BranchId.of("selected"));
+        Map<GraphEndpoint, TypedValue> callerEndpoints = new HashMap<>(Map.of(endpoint, original));
+        RuntimeInvocation invocation = new RuntimeInvocation(operation.key(), callerInputs, "mutation-1", new RuntimeCancellationToken())
+            .withRoutedInputs(callerEndpoints);
+        CompletionStage<RuntimeResult> pending = lease.execute(invocation);
         callerInputs.put(INPUT, changed);
+        callerEndpoints.put(endpoint, changed);
         firstAttempt.complete(RuntimeResult.failure(new RuntimeFailure(
             diagnostic("RUNTIME.HANDLER_FAILURE"), true, TypedValue.value(type("failure"), "retry"))));
 
         RuntimeResult result = pending.toCompletableFuture().get(2, TimeUnit.SECONDS);
-        RuntimeResult replay = lease.execute(operation.key(), Map.of(INPUT, original), "mutation-1")
+        RuntimeResult replay = lease.execute(invocation).toCompletableFuture().get(2, TimeUnit.SECONDS);
+        RuntimeResult conflict = lease.execute(invocation.withRoutedInputs(Map.of(
+            new GraphEndpoint(endpoint.nodeId(), INPUT, null, BranchId.of("other")), original)))
             .toCompletableFuture().get(2, TimeUnit.SECONDS);
 
         assertEquals(RuntimeResult.Status.SUCCESS, result.status());
         assertEquals(original, result.outputs().get(OUTPUT));
         assertEquals(List.of(original, original), observedInputs);
+        assertEquals(List.of(Map.of(endpoint, original), Map.of(endpoint, original)), observedEndpoints);
         assertEquals(result, replay);
+        assertEquals(RuntimeResult.Status.FAILURE, conflict.status());
+        assertEquals("RUNTIME.INVALID_INVOCATION", conflict.failure().diagnostic().code());
         assertEquals(2, calls.get());
         lease.close();
     }

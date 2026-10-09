@@ -38,6 +38,7 @@ import restudio.resync.flow.type.TypedValue;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -223,36 +224,44 @@ class CompiledExecutionRunnerTest {
     }
 
     @Test
-    void convertsDirectlyAssignableNumbersToStringsWithoutACatalogConversionRoute() throws Exception {
-        RuntimeOperationDescriptor sourceOperation = operation("direct-number-source", List.of(
-            new RuntimeOperationDescriptor.Pin(OUTPUT_A, RuntimeOperationDescriptor.Direction.OUTPUT, NUMBER)),
-            RuntimeSemantics.Cancellation.NONE);
-        RuntimeOperationDescriptor targetOperation = operation("direct-string-target", List.of(
-            new RuntimeOperationDescriptor.Pin(DOWNSTREAM_INPUT, RuntimeOperationDescriptor.Direction.INPUT, STRING)),
-            RuntimeSemantics.Cancellation.NONE);
-        GraphEndpoint target = new GraphEndpoint(DOWNSTREAM, DOWNSTREAM_INPUT);
-        GraphConnection connection = new GraphConnection(
-            ConnectionId.of(UUID.fromString("00000000-0000-4000-8000-000000000014")),
-            new GraphEndpoint(SOURCE_A, OUTPUT_A), target);
-        CompiledExecutionPlan plan = plan(List.of(
-            step(SOURCE_A, sourceOperation, Map.of(), outputBindings(OUTPUT_A, target)),
-            step(DOWNSTREAM, targetOperation, Map.of(DOWNSTREAM_INPUT, TypedValue.absent(STRING)), Map.of())),
-            List.of(connection), List.of());
-        AtomicReference<TypedValue> received = new AtomicReference<>();
-        CompiledExecutionRunner runner = new CompiledExecutionRunner(registry(
-            binding(sourceOperation, invocation -> CompletableFuture.completedFuture(RuntimeResult.success(Map.of(
-                OUTPUT_A, TypedValue.value(NUMBER, BigDecimal.valueOf(12))), null))),
-            binding(targetOperation, invocation -> {
-                received.set(invocation.inputs().get(DOWNSTREAM_INPUT));
-                return CompletableFuture.completedFuture(RuntimeResult.success());
-            })),
-            new RuntimeAuthority("test-authority"));
+    void convertsDirectlyAssignableNumbersAndListsToStringsWithoutACatalogConversionRoute() throws Exception {
+        List<TypedValue> values = List.of(TypedValue.value(NUMBER, BigDecimal.valueOf(12)),
+            TypedValue.value(TypeExpr.list(NUMBER), Arrays.asList(BigDecimal.valueOf(12), null), Map.of("source", "list")));
+        List<TypedValue> expected = List.of(TypedValue.value(STRING, "12"),
+            TypedValue.value(TypeExpr.list(STRING), Arrays.asList("12", null), Map.of("source", "list")));
+        for (int index = 0; index < values.size(); index++) {
+            TypedValue supplied = values.get(index);
+            TypedValue assigned = expected.get(index);
+            RuntimeOperationDescriptor sourceOperation = operation("direct-number-source", List.of(
+                new RuntimeOperationDescriptor.Pin(OUTPUT_A, RuntimeOperationDescriptor.Direction.OUTPUT, supplied.type())),
+                RuntimeSemantics.Cancellation.NONE);
+            RuntimeOperationDescriptor targetOperation = operation("direct-string-target", List.of(
+                new RuntimeOperationDescriptor.Pin(DOWNSTREAM_INPUT, RuntimeOperationDescriptor.Direction.INPUT, assigned.type())),
+                RuntimeSemantics.Cancellation.NONE);
+            GraphEndpoint target = new GraphEndpoint(DOWNSTREAM, DOWNSTREAM_INPUT);
+            GraphConnection connection = new GraphConnection(
+                ConnectionId.of(UUID.fromString("00000000-0000-4000-8000-000000000014")),
+                new GraphEndpoint(SOURCE_A, OUTPUT_A), target);
+            CompiledExecutionPlan plan = plan(List.of(
+                step(SOURCE_A, sourceOperation, Map.of(), outputBindings(OUTPUT_A, target)),
+                step(DOWNSTREAM, targetOperation, Map.of(DOWNSTREAM_INPUT, TypedValue.absent(assigned.type())), Map.of())),
+                List.of(connection), List.of());
+            AtomicReference<TypedValue> received = new AtomicReference<>();
+            CompiledExecutionRunner runner = new CompiledExecutionRunner(registry(
+                binding(sourceOperation, invocation -> CompletableFuture.completedFuture(RuntimeResult.success(Map.of(
+                    OUTPUT_A, supplied), null))),
+                binding(targetOperation, invocation -> {
+                    received.set(invocation.inputs().get(DOWNSTREAM_INPUT));
+                    return CompletableFuture.completedFuture(RuntimeResult.success());
+                })),
+                new RuntimeAuthority("test-authority"));
 
-        assertDoesNotThrow(() -> runner.prepare(plan, SOURCE_A));
-        assertEquals(CompiledExecutionRunner.Status.SUCCESS,
-            runner.execute(plan, SOURCE_A, Map.of(), new RuntimeCancellationToken()).toCompletableFuture()
-                .get(5, TimeUnit.SECONDS).status());
-        assertEquals(TypedValue.value(STRING, "12"), received.get());
+            assertDoesNotThrow(() -> runner.prepare(plan, SOURCE_A));
+            assertEquals(CompiledExecutionRunner.Status.SUCCESS,
+                runner.execute(plan, SOURCE_A, Map.of(), new RuntimeCancellationToken()).toCompletableFuture()
+                    .get(5, TimeUnit.SECONDS).status());
+            assertEquals(assigned, received.get());
+        }
     }
 
     @Test

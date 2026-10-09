@@ -4,6 +4,15 @@ import com.google.gson.Gson;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Arrow;
+import org.bukkit.entity.EntityType;
+import org.bukkit.event.Event;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,10 +36,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class CustomContentListenerTickTest {
     @TempDir
@@ -181,6 +192,67 @@ class CustomContentListenerTickTest {
         assertFalse(vars.containsKey("event.instance_id"));
     }
 
+    @Test
+    void cancelledBlockEventsPreserveOnlyCommittedPlacementIdentity() {
+        CustomContentDefinition definition = block("beacon");
+        storage.save(definition);
+        Location origin = location(0, 64, 0);
+        load(origin);
+        service.markPlacedBlock(origin, definition);
+        BlockBreakEvent broken = new BlockBreakEvent(origin.getBlock(), player);
+        broken.setCancelled(true);
+
+        listener.onBlockBreak(broken);
+        listener.onBlockBroken(broken);
+        assertEquals("beacon", service.identifyBlock(origin));
+        broken.setCancelled(false);
+        listener.onBlockBroken(broken);
+        assertNull(service.identifyBlock(origin));
+
+        ItemStack item = service.createItem("beacon", 1);
+        BlockPlaceEvent placed = new BlockPlaceEvent(origin.getBlock(), origin.getBlock().getState(),
+            origin.clone().subtract(0, 1, 0).getBlock(), item, player, true, EquipmentSlot.HAND);
+        placed.setCancelled(true);
+        listener.onBlockPlace(placed);
+        listener.onBlockPlaced(placed);
+        assertNull(service.identifyBlock(origin));
+        placed.setCancelled(false);
+        listener.onBlockPlaced(placed);
+        assertEquals("beacon", service.identifyBlock(origin));
+    }
+
+    @Test
+    void projectileHitKeepsTheFireItemSnapshotAndWaitsForItsFlowBeforeRemoval() {
+        CustomContentDefinition definition = block("bolt");
+        definition.setType("projectile");
+        definition.setMaterial("ARROW");
+        FlowGraph graph = CustomContentGraphAdapter.createContentGraph("bolt", "projectile", "Bolt");
+        graph.getContentProperties().put("projectile.speed", 3.5);
+        graph.getContentProperties().put("projectile.remove_on_hit", true);
+        definition.setGraph(graph);
+        definition.setFlowId(graph.getId());
+        storage.save(definition);
+        ItemStack item = service.createItem("bolt", 2);
+        player.getInventory().setItemInMainHand(item);
+        Arrow arrow = (Arrow) world.spawnEntity(player.getLocation(), EntityType.ARROW);
+        arrow.setShooter(player);
+        arrow.setVelocity(player.getEyeLocation().getDirection());
+        listener.onProjectileLaunch(new ProjectileLaunchEvent(arrow));
+        ItemStack fireItem = (ItemStack) service.lastVars().get("event.item");
+        String instanceId = (String) service.lastVars().get("event.instance_id");
+        item.setAmount(1);
+        service.hitCompletion = new CompletableFuture<>();
+
+        listener.onProjectileHit(new ProjectileHitEvent(arrow));
+
+        assertEquals(fireItem, service.lastVars().get("event.item"));
+        assertEquals(instanceId, service.lastVars().get("event.instance_id"));
+        assertEquals(3.5, arrow.getVelocity().length(), 0.00001);
+        assertFalse(arrow.isDead());
+        service.hitCompletion.complete(null);
+        assertTrue(arrow.isDead());
+    }
+
     private int count(String dispatch) {
         return (int) service.dispatches.stream().filter(dispatch::equals).count();
     }
@@ -222,15 +294,22 @@ class CustomContentListenerTickTest {
     private static final class RecordingCustomContentService extends CustomContentService {
         private final List<String> dispatches = new ArrayList<>();
         private final List<Map<String, Object>> capturedVars = new ArrayList<>();
+        private CompletableFuture<Void> hitCompletion = CompletableFuture.completedFuture(null);
 
         private RecordingCustomContentService(CustomContentStorage storage) {
             super(storage, null, null);
         }
 
         @Override
-        public void dispatch(String contentId, String trigger, Player player, org.bukkit.event.Event event, Map<String, Object> eventVars) {
+        public void dispatch(String contentId, String trigger, Player player, Event event, Map<String, Object> eventVars) {
             dispatches.add(contentId + ":" + trigger);
             capturedVars.add(eventVars == null ? Map.of() : new HashMap<>(eventVars));
+        }
+
+        @Override
+        public CompletableFuture<Void> dispatchComplete(String contentId, String trigger, Player player, Event event, Map<String, Object> eventVars) {
+            dispatch(contentId, trigger, player, event, eventVars);
+            return hitCompletion;
         }
 
         private Map<String, Object> lastVars() {

@@ -274,7 +274,8 @@ public class CustomContentService {
         if (definition == null || !definition.isEnabled()) {
             return null;
         }
-        return providerFor(definition).createItem(definition, amount);
+        CustomContentProvider provider = availableProviderFor(definition);
+        return provider == null ? null : provider.createItem(definition, amount);
     }
 
     public void reconcileContentItems(String contentId) {
@@ -472,27 +473,32 @@ public class CustomContentService {
 
     public ActivationNeeds activationNeeds(String contentId) {
         CompiledContentDefinition compiled = resident(contentId);
-        if (compiled == null) {
+        if (compiled == null || compiled.flows != null) {
             return ActivationNeeds.ALL;
         }
         return ActivationNeeds.fromPins(compiled.consumedStartPins);
     }
 
     public void dispatch(String contentId, String trigger, Player player, Event event, Map<String, Object> eventVars) {
+        dispatchComplete(contentId, trigger, player, event, eventVars);
+    }
+
+    public CompletableFuture<Void> dispatchComplete(String contentId, String trigger, Player player, Event event, Map<String, Object> eventVars) {
         if (trigger == null) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         CompiledContentDefinition compiled = resident(contentId);
         if (compiled == null || !compiled.definition.isEnabled()) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         CustomContentDefinition definition = compiled.definition;
         List<CustomAbilityBinding> bindings = compiled.bindingsByTrigger.getOrDefault(trigger.toLowerCase(Locale.ROOT), List.of());
+        List<CompletableFuture<Void>> pending = new ArrayList<>();
         for (CustomAbilityBinding binding : bindings) {
             if (!passes(definition, binding, player, event, eventVars)) {
                 continue;
             }
-            FlowGraph graph = graphFor(definition, binding.getFlowId());
+            FlowGraph graph = graphFor(compiled, binding.getFlowId());
             if (graph == null) {
                 String message = embeddedTarget(definition, binding.getFlowId())
                     ? "CONTENT_EXECUTION_UNAVAILABLE: Custom content " + contentId + " has no admitted Core execution for ability " + binding.getId()
@@ -518,6 +524,7 @@ public class CustomContentService {
             CompletableFuture<Void> execution = runtime == null
                 ? CompletableFuture.failedFuture(new IllegalStateException("Custom content compiled execution is unavailable"))
                 : runtime.execute(graph, customContentStart != null ? customContentStart : executor.findStartNode(graph), player, event, vars);
+            pending.add(execution);
             execution.whenComplete((ignored, failure) -> {
                 if (failure == null) {
                     return;
@@ -525,6 +532,7 @@ public class CustomContentService {
                 reportDispatchFailure(contentId, trigger, null, failure);
             });
         }
+        return CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new));
     }
 
     private void reportDispatchFailure(String contentId, String trigger, String message, Throwable failure) {
@@ -597,58 +605,86 @@ public class CustomContentService {
         return "";
     }
 
-    private CompiledContentDefinition resident(String contentId) {
+    private synchronized CompiledContentDefinition resident(String contentId) {
         if (contentId == null || contentId.isBlank()) {
             return null;
         }
-        CustomContentExecution runtime = compiledExecution;
-        FlowResourceMutationStamp stamp = runtime != null ? runtime.projectionStamp(contentId) : null;
-        CompiledContentDefinition cached = compiledDefinitions.get(contentId);
-        if (cached != null && stamp != null && stamp.equals(cached.stamp)) {
-            return cached;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            CustomContentExecution runtime = compiledExecution;
+            FlowResourceMutationStamp stamp = runtime != null ? runtime.projectionStamp(contentId) : null;
+            if (stamp == null) {
+                stamp = contentStorage.readMutationStamp(contentId);
+            }
+            if (stamp == null || stamp.deleted()) {
+                compiledDefinitions.remove(contentId);
+                return null;
+            }
+            CompiledContentDefinition cached = compiledDefinitions.get(contentId);
+            if (cached != null && stamp.equals(cached.stamp) && current(cached.flows)) {
+                return cached;
+            }
+            CustomContentDefinition stored = contentStorage.get(contentId);
+            if (stored == null) {
+                compiledDefinitions.remove(contentId);
+                return null;
+            }
+            FlowStorage.RuntimeObservation flows = flowStorage != null ? flowStorage.observeRuntime().orElse(null) : null;
+            CompiledContentDefinition prepared = compiledDefinition(contentId, stored, stamp, flows);
+            if (!stamp.equals(contentStorage.readMutationStamp(contentId)) || !current(prepared.flows)) {
+                continue;
+            }
+            compiledDefinitions.put(contentId, prepared);
+            return prepared;
         }
-        CustomContentDefinition stored = contentStorage.get(contentId);
-        if (stored == null) {
-            compiledDefinitions.remove(contentId);
-            return null;
-        }
-        compiledDefinition(contentId, stored, stamp);
-        return compiledDefinitions.get(contentId);
+        compiledDefinitions.remove(contentId);
+        throw new IllegalStateException("Custom content changed while preparing its trigger bindings: " + contentId);
     }
 
-    private CustomContentDefinition compiledDefinition(String contentId, CustomContentDefinition storedDefinition, FlowResourceMutationStamp stamp) {
+    private boolean current(FlowStorage.RuntimeObservation observation) {
+        return observation == null || flowStorage != null && flowStorage.isRuntimeObservationCurrent(observation);
+    }
+
+    private CompiledContentDefinition compiledDefinition(String contentId, CustomContentDefinition storedDefinition,
+                                                         FlowResourceMutationStamp stamp, FlowStorage.RuntimeObservation flows) {
         String flowId = storedDefinition.getFlowId();
         FlowGraph sourceGraph = storedDefinition.getGraph();
-        if (sourceGraph == null && (flowId == null || flowId.isBlank())) {
-            compiledDefinitions.put(contentId, indexDefinition(storedDefinition, stamp, 0, 0));
-            return storedDefinition;
-        }
-        if (sourceGraph == null && flowStorage != null) {
+        boolean external = sourceGraph == null && flowId != null && !flowId.isBlank();
+        if (external && flowStorage != null) {
+            if (flows == null) {
+                throw new IllegalStateException("Flow persistence is unavailable");
+            }
             sourceGraph = flowStorage.getGraph("flow", flowId);
         }
-        if (sourceGraph == null) {
-            compiledDefinitions.put(contentId, indexDefinition(storedDefinition, stamp, 0, 0));
-            return storedDefinition;
+        CustomContentDefinition definition = sourceGraph != null ? CustomContentGraphAdapter.toDefinition(sourceGraph) : null;
+        if (definition == null || !contentId.equals(definition.getId())) {
+            definition = storedDefinition;
         }
-        int graphIdentity = System.identityHashCode(sourceGraph);
-        int graphVersion = sourceGraph.getVersion();
-        CompiledContentDefinition cached = compiledDefinitions.get(contentId);
-        if (cached != null && stamp != null && stamp.equals(cached.stamp)) {
-            return cached.definition;
+        Map<String, FlowGraph> targets = new HashMap<>();
+        for (CustomAbilityBinding binding : definition.getAbilities()) {
+            if (binding == null || !binding.isEnabled() || embeddedTarget(definition, binding.getFlowId())) {
+                continue;
+            }
+            String targetId = binding.getFlowId();
+            if (targetId == null || targetId.isBlank() || flowStorage == null) {
+                continue;
+            }
+            external = true;
+            if (flows == null) {
+                throw new IllegalStateException("Flow persistence is unavailable");
+            }
+            if (targets.containsKey(targetId)) {
+                continue;
+            }
+            FlowGraph target = flowStorage.getGraph("flow", targetId);
+            if (target != null) {
+                targets.put(targetId, target);
+            }
         }
-        if (cached != null && stamp == null && cached.stamp == null && cached.graphIdentity == graphIdentity && cached.graphVersion == graphVersion) {
-            return cached.definition;
-        }
-        CustomContentDefinition graphDefinition = CustomContentGraphAdapter.toDefinition(sourceGraph);
-        if (graphDefinition == null || !contentId.equals(graphDefinition.getId())) {
-            compiledDefinitions.put(contentId, indexDefinition(storedDefinition, stamp, graphIdentity, graphVersion));
-            return storedDefinition;
-        }
-        compiledDefinitions.put(contentId, indexDefinition(graphDefinition, stamp, graphIdentity, graphVersion));
-        return graphDefinition;
+        return indexDefinition(definition, stamp, external ? flows : null, targets);
     }
 
-    private static CompiledContentDefinition indexDefinition(CustomContentDefinition definition, FlowResourceMutationStamp stamp, int graphIdentity, int graphVersion) {
+    private static CompiledContentDefinition indexDefinition(CustomContentDefinition definition, FlowResourceMutationStamp stamp,
+                                                             FlowStorage.RuntimeObservation flows, Map<String, FlowGraph> targets) {
         Map<String, List<CustomAbilityBinding>> grouped = new HashMap<>();
         for (CustomAbilityBinding binding : definition.getAbilities()) {
             if (binding == null || !binding.isEnabled() || binding.getTrigger() == null || binding.getTrigger().isBlank()) {
@@ -666,16 +702,28 @@ public class CustomContentService {
         }
         FlowGraph graph = definition.getGraph();
         String startNodeId = findCustomContentStartNode(graph);
-        return new CompiledContentDefinition(definition, stamp, graphIdentity, graphVersion, Map.copyOf(bindingsByTrigger),
-            startNodeId, consumedStartPins(graph, startNodeId));
+        Set<String> needs = new LinkedHashSet<>(consumedStartPins(graph, startNodeId));
+        grouped.values().stream().flatMap(List::stream).map(CustomAbilityBinding::getRule).filter(rule -> rule != null).forEach(rule -> {
+            String scope = rule.getCooldownScope() != null ? rule.getCooldownScope().toLowerCase(Locale.ROOT) : "player";
+            if (rule.getCooldownTicks() > 0 && Set.of("item", "instance", "item instance").contains(scope)) {
+                needs.add("item");
+                needs.add("instance_id");
+            }
+            if (rule.getTargetFilter() != null && !"any".equalsIgnoreCase(rule.getTargetFilter())) {
+                needs.add("target");
+            }
+        });
+        return new CompiledContentDefinition(definition, stamp, flows, Map.copyOf(targets), Map.copyOf(bindingsByTrigger),
+            startNodeId, Set.copyOf(needs));
     }
 
-    private FlowGraph graphFor(CustomContentDefinition definition, String flowId) {
+    private FlowGraph graphFor(CompiledContentDefinition compiled, String flowId) {
+        CustomContentDefinition definition = compiled.definition;
         if (embeddedTarget(definition, flowId)) {
             CustomContentExecution runtime = compiledExecution;
             return runtime == null ? null : runtime.graph(definition.getId());
         }
-        return flowStorage.getGraph("flow", flowId);
+        return compiled.targets.get(flowId);
     }
 
     private static boolean embeddedTarget(CustomContentDefinition definition, String flowId) {
@@ -741,7 +789,7 @@ public class CustomContentService {
             return false;
         }
         if (rule.getMaxActivationsPerTick() > 0) {
-            String tickKey = binding.getId() + ":" + currentTick;
+            String tickKey = abilityKey(definition, binding);
             int count = tickActivations.getOrDefault(tickKey, 0);
             if (count >= rule.getMaxActivationsPerTick()) {
                 return false;
@@ -763,15 +811,12 @@ public class CustomContentService {
         if (contentId == null || contentId.isBlank() || trigger == null || trigger.isBlank()) {
             return new CooldownState(false, "", "", 0, 0, 0, true, 1.0, "");
         }
-        CustomContentDefinition definition = contentStorage.get(contentId);
-        if (definition == null) {
+        CompiledContentDefinition compiled = resident(contentId);
+        if (compiled == null) {
             return new CooldownState(false, "", "", 0, 0, 0, true, 1.0, "");
         }
-        CustomAbilityBinding binding = definition.getAbilities().stream()
-            .filter(candidate -> candidate != null && candidate.isEnabled() && candidate.getTrigger() != null
-                && candidate.getTrigger().equalsIgnoreCase(trigger))
-            .findFirst()
-            .orElse(null);
+        CustomContentDefinition definition = compiled.definition;
+        CustomAbilityBinding binding = compiled.bindingsByTrigger.getOrDefault(trigger.toLowerCase(Locale.ROOT), List.of()).stream().findFirst().orElse(null);
         if (binding == null || binding.getRule() == null || binding.getRule().getCooldownTicks() <= 0) {
             return new CooldownState(false, "", "", 0, currentTick, currentTick, true, 1.0, trigger);
         }
@@ -802,9 +847,13 @@ public class CustomContentService {
         return player.isOnGround();
     }
 
+    private static String abilityKey(CustomContentDefinition definition, CustomAbilityBinding binding) {
+        return definition.getId() + '\u0000' + (binding.getId() != null ? binding.getId() : binding.getTrigger());
+    }
+
     private String cooldownKey(CustomContentDefinition definition, CustomAbilityBinding binding, Player player, Map<String, Object> vars) {
         String scope = binding.getRule().getCooldownScope() != null ? binding.getRule().getCooldownScope().toLowerCase(Locale.ROOT) : "player";
-        String base = binding.getId() != null ? binding.getId() : definition.getId() + ":" + binding.getTrigger();
+        String base = abilityKey(definition, binding);
         return switch (scope) {
             case "global" -> base + ":global";
             case "content", "definition" -> base + ':' + definition.getId();
@@ -899,8 +948,8 @@ public class CustomContentService {
     private record CompiledContentDefinition(
         CustomContentDefinition definition,
         FlowResourceMutationStamp stamp,
-        int graphIdentity,
-        int graphVersion,
+        FlowStorage.RuntimeObservation flows,
+        Map<String, FlowGraph> targets,
         Map<String, List<CustomAbilityBinding>> bindingsByTrigger,
         String startNodeId,
         Set<String> consumedStartPins

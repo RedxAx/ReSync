@@ -332,11 +332,13 @@ public class TradeProfileService implements Listener {
                 return false;
             }
             event.setCancelled(true);
-            consume(inventory, 0, integer(offer, "costAmount", 1));
-            if (!text(offer, "cost2").isBlank()) {
-                consume(inventory, 1, integer(offer, "cost2Amount", 1));
-            }
-            giveTradeResult(player, event.getCursor(), result);
+            playerDataAdmission.mutatePlayer("trade-result:" + player.getUniqueId(), player, () -> {
+                consume(inventory, 0, integer(offer, "costAmount", 1));
+                if (!text(offer, "cost2").isBlank()) {
+                    consume(inventory, 1, integer(offer, "cost2Amount", 1));
+                }
+                giveTradeResult(player, event.getCursor(), result);
+            });
             Map<String, Object> variables = new HashMap<>();
             variables.put("tradedItem", result);
             variables.put("resultItem", result);
@@ -383,21 +385,19 @@ public class TradeProfileService implements Listener {
     }
 
     private void giveTradeResult(Player player, ItemStack cursor, ItemStack result) {
-        playerDataAdmission.mutatePlayer("trade-result:" + player.getUniqueId(), player, () -> {
-            if (cursor == null || cursor.getType().isAir()) {
-                player.setItemOnCursor(result);
-                return;
-            }
-            if (cursor.isSimilar(result) && cursor.getAmount() + result.getAmount() <= cursor.getMaxStackSize()) {
-                cursor.setAmount(cursor.getAmount() + result.getAmount());
-                player.setItemOnCursor(cursor);
-                return;
-            }
-            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(result);
-            for (ItemStack leftover : leftovers.values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-            }
-        });
+        if (cursor == null || cursor.getType().isAir()) {
+            player.setItemOnCursor(result);
+            return;
+        }
+        if (cursor.isSimilar(result) && cursor.getAmount() + result.getAmount() <= cursor.getMaxStackSize()) {
+            cursor.setAmount(cursor.getAmount() + result.getAmount());
+            player.setItemOnCursor(cursor);
+            return;
+        }
+        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(result);
+        for (ItemStack leftover : leftovers.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
     }
 
     protected ItemStack createReferencedItem(String reference, int amount) {

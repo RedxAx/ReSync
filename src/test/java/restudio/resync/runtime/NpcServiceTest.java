@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -99,6 +100,7 @@ class NpcServiceTest {
         RecordingDispatcher dispatcher = new RecordingDispatcher();
         TestNpcService service = service(definition, runtime, dispatcher);
         service.spawn("guide", location());
+        String instanceUuid = service.handle("guide").instanceUuid();
         JsonObject updated = playerNpcDefinition();
         JsonObject legacyLocation = new JsonObject();
         legacyLocation.addProperty("world", "world");
@@ -113,7 +115,11 @@ class NpcServiceTest {
         assertEquals(1, runtime.spawnCount);
         assertEquals(1, runtime.reloadCount);
         assertEquals(1, runtime.location("guide").getX());
+        assertEquals(instanceUuid, service.handle("guide").instanceUuid());
         assertEquals(List.of("spawn-flow"), dispatcher.flowIds);
+        assertTrue(service.despawn("guide"));
+        service.spawn("guide", location());
+        assertFalse(instanceUuid.equals(service.handle("guide").instanceUuid()));
         service.shutdown();
     }
 
@@ -351,6 +357,7 @@ class NpcServiceTest {
 
     private static final class TestPlayerNpcRuntime implements PlayerNpcRuntime {
         private String activeId;
+        private String instanceUuid;
         private Location location;
         private int spawnCount;
         private int despawnCount;
@@ -370,6 +377,7 @@ class NpcServiceTest {
         @Override
         public boolean spawn(String id, JsonObject definition, Location location) {
             activeId = id;
+            instanceUuid = UUID.randomUUID().toString();
             this.location = location.clone();
             spawnCount++;
             return true;
@@ -404,6 +412,11 @@ class NpcServiceTest {
         @Override
         public boolean isActive(String id) {
             return id != null && id.equals(activeId);
+        }
+
+        @Override
+        public String instanceUuid(String id) {
+            return isActive(id) ? instanceUuid : "";
         }
 
         @Override

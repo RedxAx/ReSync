@@ -11,6 +11,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import restudio.resync.contract.canonical.CanonicalCodec;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import restudio.flow.data.CustomAbilityBinding;
 import restudio.flow.data.CustomContentDefinition;
@@ -22,6 +23,9 @@ import restudio.flow.data.FlowSerializer;
 import restudio.resync.flow.CompiledCoreFlowExecutionBridge;
 import restudio.resync.flow.CompiledGraphMaterializer;
 import restudio.resync.flow.CompiledGraphMetadataProvider;
+import restudio.resync.modules.flow.FlowResourceAdapter;
+import restudio.resync.modules.flow.FlowResourcePacketRouter;
+import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.flow.CompiledRuntimeContextAdapter;
 import restudio.resync.flow.CompiledTriggerExecution;
 import restudio.resync.flow.FlowExecutor;
@@ -56,6 +60,7 @@ import restudio.resync.flow.identity.OwnerId;
 import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.identity.ProviderId;
 import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.flow.inspector.InspectorFallback;
 import restudio.resync.flow.inspector.InspectorCapability;
 import restudio.resync.flow.inspector.InspectorOptionSource;
@@ -377,6 +382,38 @@ class CustomContentDispatchRuntimeTest {
     }
 
     @Test
+    void sharedEmbeddedGraphUsesLocalRevisionAndConvergesWithoutChangingItsSource() {
+        saveContentGraph("resin", "item");
+        GraphDocument local = contentExecution.list("custom_content").getFirst().envelope().graphDocument();
+        ServerResourceLocator foreign = new ServerResourceLocator(ServerId.deterministic("shared-content-sender"), local.resource().key());
+        GraphDocument source = new GraphDocument(local.schemaVersion(), foreign, 500L, local.catalogBinding(),
+            local.requiredCapabilities(), local.nodes(), local.connections(), local.passthroughs(), local.variables(), local.functions(), local.unknown());
+        CustomContentDefinition content = contentStorage.get("resin");
+        content.getGraph().setResourceRevision(500L);
+        content.getGraph().getOpaqueProperties().put("contentCoreGraph", JsonParser.parseString(GraphDocumentCodec.INSTANCE.encodeText(source)));
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        new FlowResourcePacketRouter(flowStorage, contentStorage, null, null, null, null, null, registry, ignored -> {});
+        @SuppressWarnings("unchecked")
+        FlowResourceAdapter<CustomContentDefinition> adapter = (FlowResourceAdapter<CustomContentDefinition>) registry.get("custom_content");
+        contentStorage.setGraphAdmission(contentExecution::admit);
+        long before = contentStorage.readMutationStamp("resin").revision();
+        String wire = adapter.serializeNetwork(content);
+        assertTrue(registry.saveNetwork("custom_content", adapter.deserialize(wire)).success());
+        CustomContentDefinition saved = contentStorage.get("resin");
+        assertEquals(before + 1L, contentStorage.readMutationStamp("resin").revision());
+        assertEquals(wire, adapter.serializeNetwork(saved));
+        assertEquals(GraphDocumentCodec.INSTANCE.encodeText(source), GraphDocumentCodec.INSTANCE.encodeText(
+            GraphDocumentCodec.INSTANCE.decode(CanonicalCodec.decodePermissive(
+                content.getGraph().getOpaqueProperties().get("contentCoreGraph").toString()))));
+        service.dispatch("resin", "item.use", null, null, Map.of());
+        assertEquals(List.of("resin:item.use:original"), observedTriggers);
+        GraphDocument imported = contentExecution.list("custom_content").getFirst().envelope().graphDocument();
+        assertEquals(local.resource(), imported.resource());
+        assertEquals(before + 1L, imported.revision());
+        assertEquals(local.nodes().stream().map(GraphNode::instanceId).toList(), imported.nodes().stream().map(GraphNode::instanceId).toList());
+    }
+
+    @Test
     void embeddedCatalogRebindRequiresAForwardBindingAndCompatibleTypedState() {
         saveContentGraph("resin", "item");
         GraphDocument source = contentExecution.list("custom_content").getFirst().envelope().graphDocument();
@@ -436,6 +473,30 @@ class CustomContentDispatchRuntimeTest {
         service.dispatch("resin", "item.use", null, null, Map.of());
         assertEquals(List.of("resin:item.use:external"), observedTriggers);
         assertNull(contentExecution.graph("resin"));
+        assertTrue(service.activationNeeds("resin").item());
+        content.setAbilities(List.of());
+        assertTrue(service.hasBoundTrigger("resin", "item.use"));
+
+        List<GraphNode> editedNodes = document.nodes().stream().map(node -> {
+            if (!"capture".equals(node.definition().id().value())) return node;
+            PinId label = PinId.of("label");
+            return new GraphNode(node.instanceId(), node.definition(), node.definitionVersion(), node.modeId(),
+                Map.of(label, new PinValue(label, TypedValue.value(STRING, "changed"))), node.inspectorFields(),
+                node.branches(), node.repeatables(), node.inspectorState(), node.x(), node.y(), node.unknown());
+        }).toList();
+        GraphDocument edited = new GraphDocument(document.schemaVersion(), document.resource(), document.revision() + 1,
+            document.catalogBinding(), document.requiredCapabilities(), editedNodes, document.connections(),
+            document.variables(), document.functions(), document.unknown());
+        var saved = flowStorage.saveCoreGraph(edited, ResourceActivationState.ACTIVE, UUID.randomUUID(), 1);
+        plans.reconcile(document.resource());
+        service.dispatch("resin", "item.use", null, null, Map.of());
+        assertEquals(List.of("resin:item.use:external", "resin:item.use:changed"), observedTriggers);
+        flowStorage.deleteCoreGraph(document.resource(), UUID.randomUUID(), saved.envelope().assetRevision());
+        plans.reconcile(document.resource());
+        service.dispatch("resin", "item.use", null, null, Map.of());
+        assertEquals(2, observedTriggers.size());
+        contentStorage.save(content);
+        assertFalse(service.hasBoundTrigger("resin", "item.use"));
     }
 
     private String projectionFailure(String id) {

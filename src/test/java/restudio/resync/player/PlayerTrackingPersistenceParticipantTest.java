@@ -9,6 +9,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -109,6 +113,46 @@ class PlayerTrackingPersistenceParticipantTest {
 
         participant.resume();
         assertFalse(manager.getDossier(playerId).getRecentEvents().isEmpty());
+    }
+
+    @Test
+    void failedHistoryWritePreservesTheCommittedDossierAndDoesNotPublishADelta() throws Exception {
+        PlayerTrackingManager manager = new PlayerTrackingManager(temporary);
+        UUID playerId = UUID.randomUUID();
+        manager.recordEvent(playerId, "Committed", "test", "state", "before", null);
+        AtomicInteger updates = new AtomicInteger();
+        manager.addListener(update -> updates.incrementAndGet());
+        Path file = manager.getDossierDirectory().resolve(playerId + ".json");
+        Path committed = manager.getDossierDirectory().resolve("preserved.json");
+        Files.move(file, committed);
+        Files.createDirectory(file);
+
+        assertThrows(IllegalStateException.class,
+            () -> manager.recordEvent(playerId, "Unpublished", "test", "state", "after", null));
+
+        assertEquals("Committed", manager.getDossier(playerId).getPlayerName());
+        assertEquals(1, manager.getDossier(playerId).getRecentEvents().size());
+        assertEquals(0, updates.get());
+        assertTrue(Files.readString(committed).contains("before"));
+    }
+
+    @Test
+    void callerAndSnapshotDataCannotChangeResidentEventsOrFacets() {
+        PlayerTrackingManager manager = new PlayerTrackingManager(temporary);
+        UUID playerId = UUID.randomUUID();
+        Map<String, Object> nested = new LinkedHashMap<>(Map.of("state", "committed"));
+        Map<String, Object> data = Map.of("nested", nested);
+        manager.recordEvent(playerId, "Player", "test", "state", "before", data);
+        manager.upsertFacet(playerId, "Player", "status", "test", data);
+        nested.put("state", "caller");
+        PlayerDossier snapshot = manager.getDossier(playerId);
+        for (Map<String, Object> values : List.of(snapshot.getRecentEvents().getFirst().getData(), snapshot.getFacets().get("status").getData())) {
+            assertEquals(Map.of("state", "committed"), values.get("nested"));
+            ((Map<?, ?>) values.get("nested")).clear();
+        }
+        snapshot.getRecentEvents().getFirst().getData().put("nested", Map.of("state", "snapshot"));
+        assertEquals(Map.of("state", "committed"), manager.getDossier(playerId).getRecentEvents().getFirst().getData().get("nested"));
+        assertEquals(Map.of("state", "committed"), manager.getDossier(playerId).getFacets().get("status").getData().get("nested"));
     }
 
     @Test

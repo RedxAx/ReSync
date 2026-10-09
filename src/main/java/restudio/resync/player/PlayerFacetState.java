@@ -16,7 +16,7 @@ public class PlayerFacetState {
         copy.moduleId = moduleId;
         copy.updatedAt = updatedAt;
         copy.metadata = metadata == null ? null : metadata.copy();
-        copy.data = data == null ? new LinkedHashMap<>() : new LinkedHashMap<>(data);
+        copy.data = PlayerDossier.copyData(data);
         return copy;
     }
 
@@ -49,7 +49,7 @@ public class PlayerFacetState {
     }
 
     public void setMetadata(PlayerFacetMetadata metadata) {
-        this.metadata = metadata;
+        this.metadata = metadata == null ? null : metadata.copy();
     }
 
     public Map<String, Object> getData() {
@@ -57,6 +57,6 @@ public class PlayerFacetState {
     }
 
     public void setData(Map<String, Object> data) {
-        this.data = data == null ? new LinkedHashMap<>() : new LinkedHashMap<>(data);
+        this.data = PlayerDossier.copyData(data);
     }
 }

@@ -1,6 +1,7 @@
 package restudio.resync.runtime;
 
 import com.google.gson.JsonArray;
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -8,16 +9,27 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.event.Event;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.MerchantRecipe;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
+import restudio.resync.customization.ReSyncJsonResourceStorage;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.storage.AssetPersistenceGate;
+import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.server.ServerIdentityStore;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
+import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -63,6 +75,34 @@ class ReSyncRuntimeResourceServiceTest {
     }
 
     @Test
+    void lootHooksDispatchFunctionsAndFenceLegacyStringsInReplacementRuntime() {
+        JsonObject table = lootTable(true, entry("minecraft:stone", 1, 1, 1));
+        JsonObject hooks = new JsonObject();
+        for (String hook : List.of("beforeRollAction", "afterRollAction", "deniedRollAction")) {
+            JsonObject call = new JsonObject();
+            call.addProperty("functionId", hook);
+            hooks.add(hook, call);
+        }
+        hooks.addProperty("beforeRollFlow", "legacy-flow");
+        table.add("hooks", hooks);
+        RecordingDispatcher dispatcher = new RecordingDispatcher();
+        TestLootTableService service = new TestLootTableService(table, dispatcher,
+            LegacyRuntimeActivationGate.runtime(Path.of("build", "loot-runtime-hook-test")));
+
+        assertEquals(1, service.generate("starter").size());
+        assertEquals(List.of("beforeRollAction", "afterRollAction"), dispatcher.functionIds);
+        assertEquals(1, ((List<?>) dispatcher.variables.get("items")).size());
+        assertEquals("starter", dispatcher.variables.get("lootTable"));
+        table.addProperty("enabled", false);
+        assertTrue(service.generate("starter").isEmpty());
+        assertEquals(List.of("beforeRollAction", "afterRollAction", "deniedRollAction"), dispatcher.functionIds);
+        hooks.remove("beforeRollAction");
+        table.addProperty("enabled", true);
+        service.generate("starter");
+        assertEquals(null, dispatcher.flowId);
+    }
+
+    @Test
     void lootTableAppliesComponentsAndEntryConditions() {
         JsonObject entry = entry("minecraft:stone", 1, 2, 2);
         JsonObject components = new JsonObject();
@@ -94,6 +134,59 @@ class ReSyncRuntimeResourceServiceTest {
 
         trigger.addProperty("tool", "minecraft:diamond");
         assertEquals("minecraft:diamond", LootTableService.vaultKeyReference(trigger, false));
+    }
+
+    @Test
+    void lootTriggersFollowCommittedChangesAndIsolateCallerValues() throws Exception {
+        JavaPlugin plugin = MockBukkit.createMockPlugin();
+        Path scope = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+        Files.createDirectories(scope);
+        var identity = ServerIdentityStore.open(scope.resolve(ServerIdentityStore.FILE_NAME));
+        var world = MockBukkit.getMock().addSimpleWorld("loot");
+        var player = MockBukkit.getMock().addPlayer();
+        var block = world.getBlockAt(0, 64, 0);
+        block.setType(Material.STONE);
+        try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(scope.resolve("assets"), new Gson())) {
+            var snapshot = coordinator.read(current -> current);
+            coordinator.transact(new AssetTransactionCoordinator.TransactionRequest(UUID.randomUUID(), snapshot.project(), List.of(),
+                List.of(AssetTransactionCoordinator.ProjectDelta.set(List.of("serverId"), new Gson().toJsonTree(identity.serverId().value().toString())))));
+            ReSyncJsonResourceStorage storage = new ReSyncJsonResourceStorage(plugin, LegacyRuntimeActivationGate.runtime(scope),
+                new AssetPersistenceGate(scope), coordinator);
+            LootTableService service = new LootTableService(storage, null);
+            try {
+                JsonObject table = lootTable(true);
+                JsonObject trigger = new JsonObject();
+                trigger.addProperty("event", "block_break");
+                trigger.addProperty("target", "minecraft:stone");
+                trigger.addProperty("overrideDrops", true);
+                table.add("trigger", trigger);
+                storage.save(ReSyncResourceCatalog.LOOT_TABLE, table);
+                BlockBreakEvent first = new BlockBreakEvent(block, player);
+                service.onBlockBreak(first);
+                assertFalse(first.isDropItems());
+                trigger.addProperty("target", "minecraft:diamond_block");
+                BlockBreakEvent isolated = new BlockBreakEvent(block, player);
+                service.onBlockBreak(isolated);
+                assertFalse(isolated.isDropItems());
+                storage.save(ReSyncResourceCatalog.LOOT_TABLE, table);
+                BlockBreakEvent changed = new BlockBreakEvent(block, player);
+                service.onBlockBreak(changed);
+                assertTrue(changed.isDropItems());
+                storage.delete(ReSyncResourceCatalog.LOOT_TABLE, "starter");
+                BlockBreakEvent deleted = new BlockBreakEvent(block, player);
+                service.onBlockBreak(deleted);
+                assertTrue(deleted.isDropItems());
+                service.shutdown();
+                trigger.addProperty("target", "minecraft:stone");
+                storage.save(ReSyncResourceCatalog.LOOT_TABLE, table);
+                BlockBreakEvent resumed = new BlockBreakEvent(block, player);
+                service.onBlockBreak(resumed);
+                assertFalse(resumed.isDropItems());
+            } finally {
+                service.shutdown();
+                storage.closePersistence();
+            }
+        }
     }
 
     @Test
@@ -225,7 +318,11 @@ class ReSyncRuntimeResourceServiceTest {
         private final JsonObject table;
 
         private TestLootTableService(JsonObject table) {
-            super(null, null);
+            this(table, null, null);
+        }
+
+        private TestLootTableService(JsonObject table, RuntimeFlowDispatcher dispatcher, LegacyRuntimeActivationGate gate) {
+            super(null, null, dispatcher, null, gate);
             this.table = table;
         }
 
@@ -293,10 +390,18 @@ class ReSyncRuntimeResourceServiceTest {
 
     private static class RecordingDispatcher extends RuntimeFlowDispatcher {
         private String flowId;
+        private final List<String> functionIds = new ArrayList<>();
         private Map<String, Object> variables;
 
         private RecordingDispatcher() {
             super(null, null);
+        }
+
+        @Override
+        public boolean dispatchFunction(JsonObject call, Player player, Event event, Map<String, Object> variables) {
+            functionIds.add(call.get("functionId").getAsString());
+            this.variables = variables;
+            return true;
         }
 
         @Override

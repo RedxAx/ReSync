@@ -1,5 +1,6 @@
 package restudio.resync.flow.runtime;
 
+import restudio.resync.flow.graph.GraphEndpoint;
 import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.type.TypedValue;
@@ -20,8 +21,16 @@ public record RuntimeInvocation(
     CompiledRuntimeContext runtimeContext,
     CorrelationId invocationId,
     List<FunctionBinding> functionBindings,
-    RuntimeScope scope
+    RuntimeScope scope,
+    Map<GraphEndpoint, TypedValue> routedInputs
 ) {
+    public RuntimeInvocation(RuntimeBindingKey binding, Map<PinId, TypedValue> inputs, String idempotencyKey,
+            RuntimeCancellationToken cancellationToken, RuntimeExecutionContext executionContext,
+            CompiledRuntimeContext runtimeContext, CorrelationId invocationId, List<FunctionBinding> functionBindings,
+            RuntimeScope scope) {
+        this(binding, inputs, idempotencyKey, cancellationToken, executionContext, runtimeContext, invocationId, functionBindings, scope, Map.of());
+    }
+
     public RuntimeInvocation(RuntimeBindingKey binding, Map<PinId, TypedValue> inputs, String idempotencyKey,
             RuntimeCancellationToken cancellationToken, RuntimeExecutionContext executionContext,
             CompiledRuntimeContext runtimeContext, CorrelationId invocationId) {
@@ -30,6 +39,12 @@ public record RuntimeInvocation(
     public RuntimeInvocation {
         binding = Objects.requireNonNull(binding, "Binding Is Required");
         inputs = immutableInputs(inputs);
+        routedInputs = immutableRoutedInputs(routedInputs);
+        for (Map.Entry<GraphEndpoint, TypedValue> entry : routedInputs.entrySet()) {
+            if (!entry.getValue().equals(inputs.get(entry.getKey().pinId()))) {
+                throw new IllegalArgumentException("Routed Input Must Match Its Runtime Pin Value");
+            }
+        }
         idempotencyKey = Objects.requireNonNull(idempotencyKey, "Idempotency Key Is Required").trim();
         cancellationToken = Objects.requireNonNull(cancellationToken, "Cancellation Token Is Required");
         functionBindings = List.copyOf(Objects.requireNonNull(functionBindings, "Invocation Function Bindings Are Required"));
@@ -67,30 +82,35 @@ public record RuntimeInvocation(
     }
 
     public RuntimeInvocation withCancellationToken(RuntimeCancellationToken token) {
-        return new RuntimeInvocation(binding, inputs, idempotencyKey, token, executionContext, runtimeContext, invocationId, functionBindings, scope);
+        return new RuntimeInvocation(binding, inputs, idempotencyKey, token, executionContext, runtimeContext, invocationId, functionBindings, scope, routedInputs);
     }
 
     public RuntimeInvocation withExecutionContext(RuntimeExecutionContext context) {
-        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, context, runtimeContext, invocationId, functionBindings, scope);
+        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, context, runtimeContext, invocationId, functionBindings, scope, routedInputs);
     }
 
     public RuntimeInvocation withRuntimeContext(CompiledRuntimeContext context) {
-        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, context, invocationId, functionBindings, scope);
+        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, context, invocationId, functionBindings, scope, routedInputs);
     }
 
     public RuntimeInvocation withInvocationId(CorrelationId rootInvocationId) {
         return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, runtimeContext,
-            Objects.requireNonNull(rootInvocationId, "Invocation ID Is Required"), functionBindings, scope);
+            Objects.requireNonNull(rootInvocationId, "Invocation ID Is Required"), functionBindings, scope, routedInputs);
     }
 
     public RuntimeInvocation withFunctionBindings(List<FunctionBinding> functions) {
         return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, runtimeContext,
-            invocationId, functions, scope);
+            invocationId, functions, scope, routedInputs);
     }
 
     public RuntimeInvocation withScope(RuntimeScope runtimeScope) {
         return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, runtimeContext,
-            invocationId, functionBindings, runtimeScope);
+            invocationId, functionBindings, runtimeScope, routedInputs);
+    }
+
+    public RuntimeInvocation withRoutedInputs(Map<GraphEndpoint, TypedValue> values) {
+        return new RuntimeInvocation(binding, inputs, idempotencyKey, cancellationToken, executionContext, runtimeContext,
+            invocationId, functionBindings, scope, values);
     }
 
     public long deadlineMillis() {
@@ -112,6 +132,19 @@ public record RuntimeInvocation(
 
     public void throwIfCancelled() {
         cancellationToken.throwIfCancelled();
+    }
+
+    private static Map<GraphEndpoint, TypedValue> immutableRoutedInputs(Map<GraphEndpoint, TypedValue> values) {
+        Objects.requireNonNull(values, "Routed Inputs Are Required");
+        Map<GraphEndpoint, TypedValue> copy = new LinkedHashMap<>();
+        values.forEach((endpoint, value) -> {
+            Objects.requireNonNull(endpoint, "Routed Input Endpoint Is Required");
+            GraphEndpoint identity = new GraphEndpoint(endpoint.nodeId(), endpoint.pinId(), endpoint.elementId(), endpoint.branchId());
+            if (copy.putIfAbsent(identity, Objects.requireNonNull(value, "Routed Input Value Is Required")) != null) {
+                throw new IllegalArgumentException("Routed Inputs Must Have Unique Structural Identities");
+            }
+        });
+        return Collections.unmodifiableMap(copy);
     }
 
     private static Map<PinId, TypedValue> immutableInputs(Map<PinId, TypedValue> values) {

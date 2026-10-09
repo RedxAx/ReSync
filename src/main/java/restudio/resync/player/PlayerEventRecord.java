@@ -18,7 +18,7 @@ public class PlayerEventRecord {
         copy.moduleId = moduleId;
         copy.category = category;
         copy.type = type;
-        copy.data = data == null ? new LinkedHashMap<>() : new LinkedHashMap<>(data);
+        copy.data = PlayerDossier.copyData(data);
         return copy;
     }
 
@@ -67,6 +67,6 @@ public class PlayerEventRecord {
     }
 
     public void setData(Map<String, Object> data) {
-        this.data = data == null ? new LinkedHashMap<>() : new LinkedHashMap<>(data);
+        this.data = PlayerDossier.copyData(data);
     }
 }

@@ -12,6 +12,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Monster;
 import org.bukkit.entity.WaterMob;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
@@ -40,9 +41,13 @@ public class WorldGenRuntimeListener implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onWorldUnload(WorldUnloadEvent event) {
-        WorldGenRuntimeRegistry.unregister(event.getWorld().getName());
+        if (!event.isCancelled()) {
+            String worldName = event.getWorld().getName();
+            WorldGenRuntimeRegistry.unregister(worldName);
+            spawnCooldowns.keySet().removeIf(key -> key.startsWith(worldName + ":"));
+        }
     }
 
     @EventHandler
@@ -153,6 +158,10 @@ public class WorldGenRuntimeListener implements Listener {
     }
 
     private void spawnRule(TerrainPipeline pipeline, WorldGenSpawnRule rule, Location location) {
+        if (location == null || location.getWorld() == null || Bukkit.getWorld(location.getWorld().getUID()) != location.getWorld()
+            || WorldGenRuntimeRegistry.get(location.getWorld()) != pipeline || !location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
+            return;
+        }
         EntityType type = pipeline.entityType(rule.getEntityType(), EntityType.ZOMBIE);
         if (!canSpawnMore(location, type)) {
             return;

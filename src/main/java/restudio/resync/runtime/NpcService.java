@@ -31,6 +31,7 @@ import restudio.flow.data.FlowNpcHandle;
 import restudio.resync.Log;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
+import restudio.resync.customization.ReSyncJsonResourceStorage.ResourceSnapshotValue;
 import restudio.resync.diagnostics.BoundedDiagnosticDeduplicator;
 import restudio.resync.dialog.DialogService;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
@@ -53,12 +54,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NpcService implements Listener {
     private final JavaPlugin plugin;
     private final ReSyncJsonResourceStorage storage;
+    private final RuntimeResourceView<Map<String, Follow>> followView;
     private final CustomContentService customContentService;
     private final RuntimeFlowDispatcher dispatcher;
     private final TradeProfileService tradeProfileService;
     private final LootTableService lootTableService;
     private final DialogService dialogService;
-    private final Map<String, UUID> activeNpcs = new ConcurrentHashMap<>();
+    private final Map<String, NativeNpc> activeNpcs = new ConcurrentHashMap<>();
     private final Map<String, JsonObject> activeDefinitions = new ConcurrentHashMap<>();
     private final BoundedDiagnosticDeduplicator reportedLifecycleFailures = new BoundedDiagnosticDeduplicator(512);
     private final PlayerNpcRuntime playerNpcRuntime;
@@ -104,6 +106,7 @@ public class NpcService implements Listener {
                Path activeDataRoot) {
         this.plugin = plugin;
         this.storage = storage;
+        this.followView = storage != null ? new RuntimeResourceView<>(storage, ReSyncResourceCatalog.NPC_DEFINITION, this::projectFollow) : null;
         this.customContentService = customContentService;
         this.dispatcher = dispatcher;
         this.tradeProfileService = tradeProfileService;
@@ -173,14 +176,14 @@ public class NpcService implements Listener {
         try {
             entity.getPersistentDataContainer().set(npcIdKey, PersistentDataType.STRING, id);
             applyDefinition(entity, definition);
-            activeNpcs.put(id, entity.getUniqueId());
+            admit(id, entity.getUniqueId());
             activeDefinitions.put(id, definition.deepCopy());
             if (!removePlayerNpcPosition(id)) {
                 throw new IllegalStateException("The previous Player NPC instance could not be removed");
             }
         } catch (RuntimeException exception) {
             entity.remove();
-            activeNpcs.remove(id, entity.getUniqueId());
+            remove(id, entity.getUniqueId());
             activeDefinitions.remove(id);
             throw exception;
         }
@@ -192,15 +195,16 @@ public class NpcService implements Listener {
         if (!persistenceWritable()) {
             return false;
         }
-        UUID uuid = activeNpcs.remove(id);
-        Entity entity = uuid != null && plugin != null ? plugin.getServer().getEntity(uuid) : null;
+        FlowNpcHandle previous = handle(id);
+        NativeNpc instance = activeNpcs.remove(id);
+        Entity entity = instance != null && plugin != null ? plugin.getServer().getEntity(instance.entityUuid()) : null;
         Location location = entity != null ? entity.getLocation() : playerNpcRuntime != null ? playerNpcRuntime.location(id) : null;
         boolean entityDespawned = entity != null;
         boolean persisted = playerNpcInstances != null && playerNpcInstances.contains(id);
         if (persisted && !removePlayerNpcPosition(id)) {
             reportLifecycleWarning("persist Player NPC despawn", id, "The saved NPC instance could not be removed");
-            if (uuid != null) {
-                activeNpcs.put(id, uuid);
+            if (instance != null) {
+                activeNpcs.put(id, instance);
             }
             return false;
         }
@@ -209,7 +213,7 @@ public class NpcService implements Listener {
         }
         boolean packetDespawned = playerNpcRuntime != null && playerNpcRuntime.despawn(id);
         if (entityDespawned || packetDespawned || persisted) {
-            dispatch(id, "despawnAction", null, entity, location, null);
+            dispatch(id, "despawnAction", null, entity, location, null, Map.of(), inactive(previous));
             activeDefinitions.remove(id);
             return true;
         }
@@ -270,6 +274,9 @@ public class NpcService implements Listener {
     }
 
     public void shutdown() {
+        if (followView != null) {
+            followView.reset();
+        }
         if (restoreTask != null) {
             restoreTask.cancel();
             restoreTask = null;
@@ -529,10 +536,11 @@ public class NpcService implements Listener {
     public FlowNpcHandle handle(String id) {
         Entity entity = activeEntity(id);
         if (entity != null && !entity.isDead()) {
-            return handle(id, entity.getUniqueId().toString(), false, entity.getLocation());
+            return nativeHandle(id, entity, entity.getLocation());
         }
         Location location = playerNpcRuntime != null ? playerNpcRuntime.location(id) : null;
-        return location != null ? handle(id, "", true, location) : null;
+        String instanceUuid = playerNpcRuntime != null ? playerNpcRuntime.instanceUuid(id) : "";
+        return location != null && instanceUuid != null && !instanceUuid.isBlank() ? handle(id, "", instanceUuid, true, true, location) : null;
     }
 
     public List<FlowNpcHandle> activeHandles() {
@@ -619,16 +627,40 @@ public class NpcService implements Listener {
         return playerEntityType(get(id));
     }
 
-    private FlowNpcHandle handle(String id, String entityUuid, boolean packetBacked, Location location) {
-        return new FlowNpcHandle(id, entityUuid, packetBacked, true, location.getWorld() != null ? location.getWorld().getName() : "",
+    private FlowNpcHandle nativeHandle(String id, Entity entity, Location location) {
+        NativeNpc instance = activeNpcs.get(id);
+        return instance != null && instance.entityUuid().equals(entity.getUniqueId())
+            ? handle(id, entity.getUniqueId().toString(), instance.instanceUuid(), false, !entity.isDead() && entity.isValid(), location)
+            : null;
+    }
+
+    private FlowNpcHandle handle(String id, String entityUuid, String instanceUuid, boolean packetBacked, boolean active, Location location) {
+        return new FlowNpcHandle(id, entityUuid, instanceUuid, packetBacked, active, location.getWorld() != null ? location.getWorld().getName() : "",
             location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
     }
 
+    private FlowNpcHandle inactive(FlowNpcHandle handle) {
+        return handle != null ? new FlowNpcHandle(handle.definitionId(), handle.entityUuid(), handle.instanceUuid(), handle.packetBacked(), false,
+            handle.world(), handle.x(), handle.y(), handle.z(), handle.yaw(), handle.pitch()) : null;
+    }
+
+    private void admit(String id, UUID entityUuid) {
+        activeNpcs.compute(id, (key, current) -> current != null && current.entityUuid().equals(entityUuid)
+            ? current : new NativeNpc(entityUuid, UUID.randomUUID().toString()));
+    }
+
+    private void remove(String id, UUID entityUuid) {
+        activeNpcs.computeIfPresent(id, (key, current) -> current.entityUuid().equals(entityUuid) ? null : current);
+    }
+
+    private record NativeNpc(UUID entityUuid, String instanceUuid) {
+    }
+
     private Entity activeEntity(String id) {
-        UUID uuid = activeNpcs.get(id);
-        Entity entity = uuid != null && plugin != null ? plugin.getServer().getEntity(uuid) : null;
-        if (uuid != null && (entity == null || entity.isDead() || !entity.isValid())) {
-            activeNpcs.remove(id, uuid);
+        NativeNpc instance = activeNpcs.get(id);
+        Entity entity = instance != null && plugin != null ? plugin.getServer().getEntity(instance.entityUuid()) : null;
+        if (instance != null && (entity == null || entity.isDead() || !entity.isValid())) {
+            activeNpcs.remove(id, instance);
             return null;
         }
         return entity;
@@ -682,7 +714,7 @@ public class NpcService implements Listener {
             EntityType expectedType = definition != null ? spawnEntityType(definition) : null;
             if (definition == null || !bool(definition, "enabled", true) || expectedType == null || entity.getType() != expectedType) {
                 entity.remove();
-                activeNpcs.remove(id, entity.getUniqueId());
+                remove(id, entity.getUniqueId());
                 return;
             }
             Entity active = activeEntity(id);
@@ -698,11 +730,11 @@ public class NpcService implements Listener {
                 reportLifecycleWarning("restore NPC entity", id, "The saved Player NPC instance could not be removed");
                 return;
             }
-            activeNpcs.put(id, entity.getUniqueId());
+            admit(id, entity.getUniqueId());
             applyDefinition(entity, definition);
             activeDefinitions.put(id, definition.deepCopy());
         } catch (RuntimeException exception) {
-            activeNpcs.remove(id, entity.getUniqueId());
+            remove(id, entity.getUniqueId());
             activeDefinitions.remove(id);
             entity.remove();
             reportLifecycleFailure("restore persisted NPC entity", id, exception);
@@ -756,7 +788,7 @@ public class NpcService implements Listener {
     }
 
     private void tickFollowPlayers() {
-        for (Map.Entry<String, UUID> entry : activeNpcs.entrySet()) {
+        for (Map.Entry<String, NativeNpc> entry : activeNpcs.entrySet()) {
             try {
                 tickFollowPlayer(entry.getKey());
             } catch (RuntimeException exception) {
@@ -767,11 +799,20 @@ public class NpcService implements Listener {
 
     private void tickFollowPlayer(String id) {
         Entity entity = activeEntity(id);
-        JsonObject definition = get(id);
-        if (entity == null || entity.isDead() || definition == null || !bool(definition, "followPlayer", false)) {
+        if (entity == null || entity.isDead()) {
             return;
         }
-        Player target = nearestPlayer(entity.getLocation(), decimal(definition, "followRange", 12.0));
+        Follow follow;
+        if (followView != null) {
+            follow = followView.get().get(id);
+        } else {
+            JsonObject definition = get(id);
+            follow = definition != null ? follow(definition) : null;
+        }
+        if (follow == null || !follow.enabled()) {
+            return;
+        }
+        Player target = nearestPlayer(entity.getLocation(), follow.range());
         if (target == null) {
             return;
         }
@@ -780,6 +821,21 @@ public class NpcService implements Listener {
         next.setYaw(smoothAngle(next.getYaw(), angles.yaw(), 0.35F));
         next.setPitch(smoothAngle(next.getPitch(), angles.pitch(), 0.35F));
         entity.setRotation(next.getYaw(), next.getPitch());
+    }
+
+    private Map<String, Follow> projectFollow(List<ResourceSnapshotValue> values) {
+        Map<String, Follow> result = new HashMap<>();
+        for (ResourceSnapshotValue value : values) {
+            result.put(value.id(), follow(value.value()));
+        }
+        return Map.copyOf(result);
+    }
+
+    private Follow follow(JsonObject definition) {
+        return new Follow(bool(definition, "followPlayer", false), decimal(definition, "followRange", 12.0));
+    }
+
+    private record Follow(boolean enabled, double range) {
     }
 
     private Player nearestPlayer(Location origin, double range) {
@@ -922,7 +978,7 @@ public class NpcService implements Listener {
         } catch (RuntimeException exception) {
             reportLifecycleFailure("dispatch NPC death action", id, exception);
         } finally {
-            activeNpcs.remove(id, event.getEntity().getUniqueId());
+            remove(id, event.getEntity().getUniqueId());
             activeDefinitions.remove(id);
         }
     }
@@ -939,7 +995,7 @@ public class NpcService implements Listener {
         for (Entity entity : event.getChunk().getEntities()) {
             String id = npcId(entity);
             if (!id.isBlank()) {
-                activeNpcs.remove(id, entity.getUniqueId());
+                remove(id, entity.getUniqueId());
             }
         }
     }
@@ -949,15 +1005,18 @@ public class NpcService implements Listener {
     }
 
     void dispatch(String id, String hook, Player player, Entity entity, Location location, Event event, Map<String, Object> extraVariables) {
+        FlowNpcHandle handle = entity != null && location != null ? nativeHandle(id, entity, location) : handle(id);
+        dispatch(id, hook, player, entity, location, event, extraVariables, handle);
+    }
+
+    private void dispatch(String id, String hook, Player player, Entity entity, Location location, Event event,
+                          Map<String, Object> extraVariables, FlowNpcHandle handle) {
         JsonObject definition = activeDefinition(id);
         JsonObject hooks = definition != null && definition.has("hooks") && definition.get("hooks").isJsonObject() ? definition.getAsJsonObject("hooks") : null;
         if (hooks == null || dispatcher == null) {
             return;
         }
         Map<String, Object> variables = hookVariables(id, player, entity, location);
-        FlowNpcHandle handle = entity != null && location != null
-            ? handle(id, entity.getUniqueId().toString(), false, location)
-            : handle(id);
         variables.put("handle", handle);
         variables.put("event.handle", handle);
         if (extraVariables != null) {

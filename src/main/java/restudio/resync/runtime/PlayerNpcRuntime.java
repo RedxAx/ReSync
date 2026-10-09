@@ -19,6 +19,10 @@ public interface PlayerNpcRuntime {
 
     boolean isActive(String id);
 
+    default String instanceUuid(String id) {
+        return "";
+    }
+
     Location location(String id);
 
     List<String> activeIds();

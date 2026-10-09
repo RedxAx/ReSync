@@ -20,6 +20,7 @@ import restudio.resync.flow.automation.ScheduleDefinition;
 import restudio.resync.flow.automation.TimerDefinition;
 import restudio.resync.flow.automation.VariableDefinition;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.modules.flow.FlowResourceAdapter;
 import restudio.resync.storage.StorageSafety;
 
 import java.util.Locale;
@@ -27,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceStorage.ResourceMutationInterceptor {
     private static final Set<String> RECIPE_TYPES = Set.of("shaped", "shapeless", "furnace", "smelting", "blasting", "blast", "smoking", "smoker",
@@ -70,6 +72,20 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
             case ReSyncResourceCatalog.SCHEDULE_DEFINITION -> validateScheduleDefinition(value);
             default -> validateCommonStructure(value);
         }
+    }
+
+    public void validateNetwork(String type, JsonObject value) {
+        validate(type, value);
+        if (legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyRuntime()) {
+            return;
+        }
+        String id = rawText(value, "id");
+        Function<String, IllegalArgumentException> rejection = reason -> new FlowResourceAdapter.BlockedNetworkResource(type, id, reason);
+        if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type)) {
+            validateLegacyNpcShape(value);
+            rejectLegacyNpcDefinition(value, rejection);
+        }
+        rejectLegacyHookValues(type, value, rejection);
     }
 
     private void validateComponentBuilder(JsonObject value) {
@@ -145,24 +161,72 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
     public void beforeSave(String type, JsonObject value) {
         if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type)) {
             if (legacyRuntimeGate != null && !legacyRuntimeGate.allowsLegacyRuntime()) {
-                rejectLegacyNpcDefinition(value);
+                rejectLegacyNpcDefinition(value, IllegalArgumentException::new);
             } else {
                 migrateNpcDefinition(value);
             }
         }
         if (legacyRuntimeGate != null && !legacyRuntimeGate.allowsLegacyRuntime()) {
-            rejectLegacyHookValues(type, value);
+            rejectLegacyHookValues(type, value, IllegalArgumentException::new);
         }
         validate(type, value);
     }
 
-    private void rejectLegacyNpcDefinition(JsonObject definition) {
+    private void validateLegacyNpcShape(JsonObject definition) {
+        for (String field : Set.of("spawnMode", "skinUsername", "skinUuid", "skinTexture", "skinSignature")) {
+            validateLegacyNpcText(definition, field);
+        }
+        if (definition.has("hooks") && definition.get("hooks").isJsonObject()) {
+            JsonObject hooks = definition.getAsJsonObject("hooks");
+            for (String field : Set.of("spawnFlow", "interactFlow", "rightClickFlow", "leftClickFlow", "damageFlow", "deathFlow", "despawnFlow")) {
+                validateLegacyNpcText(hooks, field);
+            }
+        }
+        JsonElement location = definition.get("location");
+        if (location == null || location.isJsonNull()) {
+            return;
+        }
+        if (!location.isJsonObject()) {
+            throw new IllegalArgumentException("Legacy NPC location must be an object");
+        }
+        Set<String> fields = Set.of("world", "x", "y", "z", "yaw", "pitch");
+        for (Map.Entry<String, JsonElement> entry : location.getAsJsonObject().entrySet()) {
+            String field = entry.getKey();
+            JsonElement value = entry.getValue();
+            if (!fields.contains(field)) {
+                throw new IllegalArgumentException("Unknown legacy NPC location field: " + field);
+            }
+            if ("world".equals(field)) {
+                if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
+                    throw new IllegalArgumentException("Legacy NPC location world must be text");
+                }
+            } else {
+                if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber() || !Double.isFinite(value.getAsDouble())) {
+                    throw new IllegalArgumentException("Legacy NPC location coordinate must be a finite number: " + field);
+                }
+                if ("yaw".equals(field) && Math.abs(value.getAsDouble()) > 360D
+                    || "pitch".equals(field) && Math.abs(value.getAsDouble()) > 90D) {
+                    throw new IllegalArgumentException("Legacy NPC location rotation is invalid: " + field);
+                }
+            }
+        }
+    }
+
+    private void validateLegacyNpcText(JsonObject value, String field) {
+        JsonElement element = value.get(field);
+        if (element != null && !element.isJsonNull()
+            && (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString())) {
+            throw new IllegalArgumentException("Legacy NPC field must be text or null: " + field);
+        }
+    }
+
+    private void rejectLegacyNpcDefinition(JsonObject definition, Function<String, IllegalArgumentException> rejection) {
         if (definition == null) {
             return;
         }
         for (String field : Set.of("spawnMode", "location", "skinUsername", "skinUuid", "skinTexture", "skinSignature")) {
             if (definition.has(field)) {
-                throw new IllegalArgumentException("Legacy NPC field is not accepted by the replacement runtime: " + field);
+                throw rejection.apply("Legacy NPC field is not accepted by the replacement runtime: " + field);
             }
         }
         if (!definition.has("hooks") || !definition.get("hooks").isJsonObject()) {
@@ -171,21 +235,22 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
         JsonObject hooks = definition.getAsJsonObject("hooks");
         for (String field : Set.of("spawnFlow", "interactFlow", "rightClickFlow", "leftClickFlow", "damageFlow", "deathFlow", "despawnFlow")) {
             if (hooks.has(field)) {
-                throw new IllegalArgumentException("Legacy NPC hook is not accepted by the replacement runtime: " + field);
+                throw rejection.apply("Legacy NPC hook is not accepted by the replacement runtime: " + field);
             }
         }
     }
 
-    private void rejectLegacyHookValues(String type, JsonObject value) {
+    private void rejectLegacyHookValues(String type, JsonObject value, Function<String, IllegalArgumentException> rejection) {
         if (value == null) {
             return;
         }
-        if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) || ReSyncResourceCatalog.TRADE_PROFILE.equals(type)) {
+        if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) || ReSyncResourceCatalog.TRADE_PROFILE.equals(type) || ReSyncResourceCatalog.LOOT_TABLE.equals(type)) {
             JsonElement hooksElement = value.get("hooks");
             if (hooksElement != null && hooksElement.isJsonObject()) {
                 for (Map.Entry<String, JsonElement> entry : hooksElement.getAsJsonObject().entrySet()) {
                     if (!isCanonicalAction(entry.getValue())) {
-                        throw new IllegalArgumentException("Legacy hook value is not accepted by the replacement runtime: " + entry.getKey());
+                        String reason = "Legacy hook value is not accepted by the replacement runtime: " + entry.getKey();
+                        throw isLegacyHookText(entry.getValue()) ? rejection.apply(reason) : new IllegalArgumentException(reason);
                     }
                 }
             }
@@ -197,7 +262,7 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
             }
             for (JsonElement element : array.getAsJsonArray()) {
                 if (element != null && element.isJsonObject()) {
-                    rejectLegacyDialogAction(element.getAsJsonObject());
+                    rejectLegacyDialogAction(element.getAsJsonObject(), rejection);
                 }
             }
         }
@@ -221,16 +286,35 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
         return value.isJsonPrimitive() && "none".equalsIgnoreCase(value.getAsString());
     }
 
-    private void rejectLegacyDialogAction(JsonObject action) {
+    private boolean isLegacyHookText(JsonElement value) {
+        if (value != null && value.isJsonPrimitive()) {
+            return value.getAsJsonPrimitive().isString() && !"none".equalsIgnoreCase(value.getAsString());
+        }
+        if (value == null || !value.isJsonArray()) {
+            return false;
+        }
+        boolean legacy = false;
+        for (JsonElement element : value.getAsJsonArray()) {
+            if (!isCanonicalAction(element)) {
+                if (!isLegacyHookText(element)) {
+                    return false;
+                }
+                legacy = true;
+            }
+        }
+        return legacy;
+    }
+
+    private void rejectLegacyDialogAction(JsonObject action, Function<String, IllegalArgumentException> rejection) {
         if (action.has("action")) {
-            throw new IllegalArgumentException("Legacy dialog action is not accepted by the replacement runtime");
+            throw rejection.apply("Legacy dialog action is not accepted by the replacement runtime");
         }
         JsonObject resync = action.has("resync") && action.get("resync").isJsonObject() ? action.getAsJsonObject("resync") : null;
         if (resync == null) {
             return;
         }
         if ("Run Flow".equals(text(resync, "actionMode")) || "Flow".equals(text(resync, "predicateMode"))) {
-            throw new IllegalArgumentException("Legacy dialog Flow action is not accepted by the replacement runtime");
+            throw rejection.apply("Legacy dialog Flow action is not accepted by the replacement runtime");
         }
     }
 

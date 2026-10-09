@@ -10,6 +10,8 @@ import restudio.resync.api.RuntimeDataQuery;
 import restudio.resync.api.RuntimeDataRecord;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
+import restudio.resync.customcontent.CustomContentStorage.CategoryProjection;
+import restudio.resync.runtime.data.RuntimeDataCategoryCatalog.Snapshot;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -23,6 +25,7 @@ public final class CustomContentItemDataAdapter implements RuntimeDataAdapter<It
     private final CustomContentStorage storage;
     private final CustomContentService service;
     private final RuntimeDataCategoryCatalog<CustomContentStorage.CategoryProjection> categoryCatalog;
+    private Snapshot<CategoryProjection> resident;
 
     public CustomContentItemDataAdapter(CustomContentStorage storage, CustomContentService service) {
         this.storage = storage;
@@ -35,8 +38,7 @@ public final class CustomContentItemDataAdapter implements RuntimeDataAdapter<It
 
             @Override
             protected Snapshot<CustomContentStorage.CategoryProjection> captureSnapshot() {
-                CustomContentStorage.CategoryProjection projection = storage.readRuntimeDataCategoryProjection();
-                return snapshot(projection.revision(), records(projection.definitions()), projection);
+                return currentSnapshot();
             }
 
             @Override
@@ -73,8 +75,7 @@ public final class CustomContentItemDataAdapter implements RuntimeDataAdapter<It
 
     @Override
     public String revision() {
-        List<String> ids = storage.listIds();
-        return ID + ":" + ids.size() + ":" + ids.hashCode();
+        return ID + ":" + currentSnapshot().revision();
     }
 
     @Override
@@ -84,7 +85,21 @@ public final class CustomContentItemDataAdapter implements RuntimeDataAdapter<It
 
     @Override
     public List<RuntimeDataRecord> records(RuntimeDataQuery query) {
-        return records(storage.getAll());
+        return currentSnapshot().records();
+    }
+
+    private synchronized Snapshot<CategoryProjection> currentSnapshot() {
+        if (resident != null && storage.isRuntimeDataCategoryProjectionCurrent(resident.token())) {
+            return resident;
+        }
+        resident = null;
+        CategoryProjection projection = storage.readRuntimeDataCategoryProjection();
+        Snapshot<CategoryProjection> captured = new Snapshot<>(projection.revision(), records(projection.definitions()), projection);
+        if (!storage.isRuntimeDataCategoryProjectionCurrent(projection)) {
+            throw new IllegalStateException("Custom item data changed during capture");
+        }
+        resident = captured;
+        return captured;
     }
 
     @Override
@@ -102,7 +117,7 @@ public final class CustomContentItemDataAdapter implements RuntimeDataAdapter<It
     private RuntimeDataRecord record(CustomContentDefinition definition) {
         String type = normalized(definition.getType(), "item");
         String provider = normalized(definition.getProvider(), "vanilla");
-        Set<String> categories = new LinkedHashSet<>(Set.of("custom", "resync", type, provider));
+        Set<String> categories = new LinkedHashSet<>(List.of("custom", "resync", type, provider));
         Set<String> tags = new LinkedHashSet<>();
         if (definition.getTags() != null) {
             definition.getTags().stream().map(value -> normalized(value, "")).filter(value -> !value.isBlank()).forEach(value -> {

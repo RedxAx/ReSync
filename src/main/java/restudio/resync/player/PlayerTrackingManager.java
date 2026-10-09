@@ -269,15 +269,15 @@ public class PlayerTrackingManager implements PlayerTrackingService {
         persistenceFence.readLock().lock();
         try {
             requirePersistenceOpen();
-            PlayerDossier dossier = dossiers.computeIfAbsent(playerId, this::createDossier);
-            synchronized (dossier) {
+            snapshot = dossiers.compute(playerId, (id, current) -> {
+                PlayerDossier candidate = current == null ? createDossier(id) : current.copy();
                 if (playerName != null && !playerName.isBlank()) {
-                    dossier.setPlayerName(playerName);
+                    candidate.setPlayerName(playerName);
                 }
-                mutator.accept(dossier);
-                snapshot = dossier.copy();
-                save(snapshot);
-            }
+                mutator.accept(candidate);
+                save(candidate);
+                return candidate;
+            }).copy();
         } finally {
             persistenceFence.readLock().unlock();
         }
@@ -345,10 +345,10 @@ public class PlayerTrackingManager implements PlayerTrackingService {
                 changed = true;
             }
             changed |= closeStaleSession(dossier);
-            dossiers.put(UUID.fromString(dossier.getPlayerId()), dossier);
             if (changed) {
                 save(dossier);
             }
+            dossiers.put(UUID.fromString(dossier.getPlayerId()), dossier);
         } catch (Exception e) {
             Log.warn("Failed to load dossier " + path.getFileName() + ": " + e.getMessage());
         }
@@ -412,10 +412,8 @@ public class PlayerTrackingManager implements PlayerTrackingService {
         try {
             Path path = StorageSafety.jsonFile(dossierDirectory, dossier.getPlayerId());
             StorageSafety.writeUtf8Atomic(path, gson.toJson(dossier));
-        } catch (IOException e) {
-            Log.warn("Failed to save dossier " + dossier.getPlayerId() + ": " + e.getMessage());
-        } catch (IllegalArgumentException e) {
-            Log.warn("Rejected unsafe dossier id " + dossier.getPlayerId() + ": " + e.getMessage());
+        } catch (IOException | IllegalArgumentException exception) {
+            throw new IllegalStateException("Failed to save player history: " + dossier.getPlayerId(), exception);
         }
     }
 

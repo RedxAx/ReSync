@@ -6,11 +6,17 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.inventory.MerchantRecipe;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -19,6 +25,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TradeProfileServiceTest {
     @BeforeEach
@@ -104,6 +111,35 @@ class TradeProfileServiceTest {
 
         assertTrue(service.openVirtualTrades(player, "profile"));
         assertTrue(dispatcher.flowIds.isEmpty());
+    }
+
+    @Test
+    void rejectedTradeAdmissionLeavesBothPaymentSlotsUntouched() throws Exception {
+        PaperPlayerDataMutationAdmission admission = new PaperPlayerDataMutationAdmission(List.of());
+        admission.quiesce();
+        var installation = PaperPlayerDataMutationAdmission.installShared(admission);
+        try {
+            TestTradeProfileService service = new TestTradeProfileService("""
+                {"enabled":true,"offers":[{"cost":"minecraft:emerald","costAmount":2,
+                "cost2":"minecraft:book","cost2Amount":1,"result":"minecraft:diamond"}]}
+                """);
+            MockBukkit.getMock().addSimpleWorld("trade");
+            Player player = MockBukkit.getMock().addPlayer();
+            assertTrue(service.openVirtualTrades(player, "profile"));
+            var view = player.getOpenInventory();
+            var inventory = view.getTopInventory();
+            inventory.setItem(0, new ItemStack(Material.EMERALD, 2));
+            inventory.setItem(1, new ItemStack(Material.BOOK, 1));
+            inventory.setItem(2, null);
+            InventoryClickEvent event = new InventoryClickEvent(view, InventoryType.SlotType.RESULT, 2,
+                ClickType.LEFT, InventoryAction.PICKUP_ALL);
+            assertThrows(IllegalStateException.class, () -> service.onTradeResultClick(event));
+            assertEquals(2, inventory.getItem(0).getAmount());
+            assertEquals(1, inventory.getItem(1).getAmount());
+            assertTrue(event.isCancelled());
+        } finally {
+            PaperPlayerDataMutationAdmission.clearSharedInstallation(installation);
+        }
     }
 
     private static class TestTradeProfileService extends TradeProfileService {

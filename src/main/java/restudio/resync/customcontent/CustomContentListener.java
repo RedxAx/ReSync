@@ -20,6 +20,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
@@ -30,10 +31,14 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.metadata.FixedMetadataValue;
+import org.bukkit.metadata.MetadataValue;
+import org.bukkit.util.Vector;
 import restudio.resync.ReSync;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.resync.flow.CompiledRuntimeValueCodec;
@@ -46,9 +51,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 public class CustomContentListener implements Listener {
     private static final ThreadLocal<Integer> SUPPRESSED_DAMAGE_DEPTH = ThreadLocal.withInitial(() -> 0);
+    private static final ThreadLocal<Integer> SUPPRESSED_PROJECTILE_DEPTH = ThreadLocal.withInitial(() -> 0);
+    private static final String PROJECTILE_SOURCE = "resync-projectile-source";
     private static final NamespacedKey PROJECTILE_CONTENT_KEY = new NamespacedKey("resync", "projectile_content_id");
     private static final double NEARBY_RANGE_SQUARED = 9.0;
     private final CustomContentStorage storage;
@@ -79,12 +87,14 @@ public class CustomContentListener implements Listener {
                 if (definition != null && "projectile".equalsIgnoreCase(definition.getType())
                     && (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK)
                     && !event.isCancelled() && allowsProjectileSource(definition, "Item Use") && !isBowLike(item)) {
-                    Projectile projectile = launchConfiguredProjectile(player, definition);
-                    markProjectile(projectile, definition, player, item, event, event.getHand());
-                    if (projectileFlag(definition, "consume_item", true)) {
-                        consumeOne(player, event.getHand(), item);
-                    }
                     event.setCancelled(true);
+                    Projectile projectile = launchConfiguredProjectile(player, definition, item, event.getHand());
+                    if (projectile != null) {
+                        fireProjectile(projectile, definition, player, item, event, event.getHand());
+                        if (projectileFlag(definition, "consume_item", true)) {
+                            consumeOne(player, event.getHand(), item);
+                        }
+                    }
                 }
             }
         }
@@ -139,6 +149,20 @@ public class CustomContentListener implements Listener {
         }
     }
 
+    public static <T> T runSuppressingProjectileAbilities(Supplier<T> action) {
+        int depth = SUPPRESSED_PROJECTILE_DEPTH.get();
+        SUPPRESSED_PROJECTILE_DEPTH.set(depth + 1);
+        try {
+            return action.get();
+        } finally {
+            if (depth == 0) {
+                SUPPRESSED_PROJECTILE_DEPTH.remove();
+            } else {
+                SUPPRESSED_PROJECTILE_DEPTH.set(depth);
+            }
+        }
+    }
+
     public static boolean isDamageAbilitySuppressed() {
         return SUPPRESSED_DAMAGE_DEPTH.get() > 0;
     }
@@ -151,11 +175,7 @@ public class CustomContentListener implements Listener {
             CustomContentDefinition definition = storage.get(contentId);
             if (definition != null && "block".equalsIgnoreCase(definition.getType())) {
                 Location location = event.getBlockPlaced().getLocation();
-                service.markPlacedBlock(location, definition);
                 service.dispatch(contentId, "block.place", event.getPlayer(), event, baseVars(event.getPlayer(), item, location, null, event.getHand()));
-            } else {
-                Map<String, Object> vars = baseVars(event.getPlayer(), item, event.getBlockPlaced().getLocation(), null, event.getHand());
-                service.dispatch(contentId, "item.break_block", event.getPlayer(), event, vars);
             }
         }
     }
@@ -166,11 +186,33 @@ public class CustomContentListener implements Listener {
         String blockId = service.identifyBlock(location);
         if (blockId != null) {
             service.dispatch(blockId, "block.break", event.getPlayer(), event, baseVars(event.getPlayer(), event.getPlayer().getInventory().getItemInMainHand(), location, null, EquipmentSlot.HAND));
-            service.clearPlacedBlock(location);
         }
         String itemId = service.identifyItem(event.getPlayer().getInventory().getItemInMainHand());
         if (itemId != null) {
             service.dispatch(itemId, "item.break_block", event.getPlayer(), event, baseVars(event.getPlayer(), event.getPlayer().getInventory().getItemInMainHand(), location, null, EquipmentSlot.HAND));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockPlaced(BlockPlaceEvent event) {
+        if (event.isCancelled() || !event.canBuild()) {
+            return;
+        }
+        String contentId = service.identifyItem(event.getItemInHand());
+        CustomContentDefinition definition = contentId != null ? storage.get(contentId) : null;
+        if (definition != null && "block".equalsIgnoreCase(definition.getType())) {
+            service.markPlacedBlock(event.getBlockPlaced().getLocation(), definition);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockBroken(BlockBreakEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
+        Location location = event.getBlock().getLocation();
+        if (service.identifyBlock(location) != null) {
+            service.clearPlacedBlock(location);
         }
     }
 
@@ -237,12 +279,19 @@ public class CustomContentListener implements Listener {
         if (definition == null || !allowsProjectileSource(definition, "Bow Ammo")) {
             return;
         }
+        if (!isMatchingProjectileDefinition(projectile, definition)) {
+            event.setCancelled(true);
+            return;
+        }
         markProjectile(projectile, definition, player, consumable, event, event.getHand());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onProjectileLaunch(ProjectileLaunchEvent event) {
         Projectile projectile = event.getEntity();
+        if (SUPPRESSED_PROJECTILE_DEPTH.get() > 0) {
+            return;
+        }
         if (projectile.getPersistentDataContainer().has(PROJECTILE_CONTENT_KEY, PersistentDataType.STRING) || !(projectile.getShooter() instanceof Player player)) {
             return;
         }
@@ -268,18 +317,32 @@ public class CustomContentListener implements Listener {
             return;
         }
         Player player = projectile.getShooter() instanceof Player shooter ? shooter : null;
-        ItemStack item = service.createItem(contentId, 1);
-        Map<String, Object> vars = baseVars(player, item, projectile.getLocation(), event.getHitEntity(), null);
+        ProjectileSource source = projectileSource(projectile);
+        ItemStack item = source != null && source.item() != null ? source.item().clone() : null;
+        Map<String, Object> vars = baseVars(player, item, projectile.getLocation(), event.getHitEntity(), source != null ? source.hand() : null);
         vars.put("event.projectile", projectile);
         vars.put("event.projectile_type", projectile.getType().name());
         vars.put("event.velocity", projectile.getVelocity());
         vars.put("event.block", event.getHitBlock());
         vars.put("event.hit_block", event.getHitBlock());
         vars.put("event.hit_face", event.getHitBlockFace());
-        service.dispatch(contentId, "projectile.hit", player, event, vars);
+        service.dispatchComplete(contentId, "projectile.hit", player, event, vars).whenComplete((ignored, failure) -> {
+            if (!projectileFlag(definition, "remove_on_hit", false)) {
+                return;
+            }
+            if (Bukkit.isPrimaryThread()) {
+                projectile.remove();
+            } else {
+                Bukkit.getScheduler().runTask(storage.getPlugin(), projectile::remove);
+            }
+        });
         playProjectileSound(definition, projectile.getLocation(), "hit_sound");
-        if (projectileFlag(definition, "remove_on_hit", false)) {
-            projectile.remove();
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onEntityRemoved(EntityRemoveEvent event) {
+        if (event.getEntity() instanceof Projectile projectile) {
+            projectile.removeMetadata(PROJECTILE_SOURCE, storage.getPlugin());
         }
     }
 
@@ -293,6 +356,13 @@ public class CustomContentListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         service.reconcilePlayerItems(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        UUID playerId = event.getPlayer().getUniqueId();
+        armorSnapshots.remove(playerId);
+        fullSetSnapshots.remove(playerId);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -619,7 +689,18 @@ public class CustomContentListener implements Listener {
         if (projectile.getPersistentDataContainer().has(PROJECTILE_CONTENT_KEY, PersistentDataType.STRING)) {
             return;
         }
+        prepareProjectile(projectile, definition, item, hand);
+        fireProjectile(projectile, definition, player, item, event, hand);
+    }
+
+    private void prepareProjectile(Projectile projectile, CustomContentDefinition definition, ItemStack item, EquipmentSlot hand) {
         projectile.getPersistentDataContainer().set(PROJECTILE_CONTENT_KEY, PersistentDataType.STRING, definition.getId());
+        projectile.setMetadata(PROJECTILE_SOURCE, new FixedMetadataValue(storage.getPlugin(),
+            new ProjectileSource(item != null ? item.clone() : null, hand)));
+        Vector velocity = projectile.getVelocity();
+        if (velocity.lengthSquared() > 0.0) {
+            projectile.setVelocity(velocity.normalize().multiply(projectileNumber(definition, "speed", 2.4)));
+        }
         projectile.setGravity(projectileFlag(definition, "gravity", true));
         projectile.setGlowing(projectileFlag(definition, "glowing", false));
         if (projectile instanceof AbstractArrow arrow) {
@@ -634,7 +715,12 @@ public class CustomContentListener implements Listener {
                 default -> AbstractArrow.PickupStatus.ALLOWED;
             });
         }
-        Map<String, Object> vars = baseVars(player, item, projectile.getLocation(), null, hand);
+    }
+
+    private void fireProjectile(Projectile projectile, CustomContentDefinition definition, Player player, ItemStack item, Event event, EquipmentSlot hand) {
+        ProjectileSource source = projectileSource(projectile);
+        ItemStack snapshot = source != null && source.item() != null ? source.item().clone() : item != null ? item.clone() : null;
+        Map<String, Object> vars = baseVars(player, snapshot, projectile.getLocation(), null, hand);
         vars.put("event.projectile", projectile);
         vars.put("event.projectile_type", projectile.getType().name());
         vars.put("event.velocity", projectile.getVelocity());
@@ -642,23 +728,35 @@ public class CustomContentListener implements Listener {
         playProjectileSound(definition, projectile.getLocation(), "fire_sound");
     }
 
-    private Projectile launchConfiguredProjectile(Player player, CustomContentDefinition definition) {
-        EntityType entityType;
-        try {
-            entityType = EntityType.valueOf(projectileType(definition));
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Unknown projectile type: " + projectileType(definition), exception);
-        }
-        World world = player.getWorld();
-        Entity entity = world.spawnEntity(player.getEyeLocation(), entityType);
-        if (!(entity instanceof Projectile projectile)) {
-            entity.remove();
+    private Projectile launchConfiguredProjectile(Player player, CustomContentDefinition definition, ItemStack item, EquipmentSlot hand) {
+        EntityType entityType = EntityType.valueOf(projectileType(definition));
+        Class<? extends Entity> entityClass = entityType.getEntityClass();
+        if (entityClass == null || !Projectile.class.isAssignableFrom(entityClass)) {
             throw new IllegalArgumentException("Entity type is not a projectile: " + entityType.name());
         }
-        projectile.setShooter(player);
-        double speed = Math.max(0.05, projectileNumber(definition, "speed", 2.4));
-        projectile.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(speed));
+        Vector velocity = player.getEyeLocation().getDirection().normalize().multiply(projectileNumber(definition, "speed", 2.4));
+        Projectile projectile = player.launchProjectile(entityClass.asSubclass(Projectile.class), velocity, launched -> {
+            launched.setShooter(player);
+            launched.setVelocity(velocity);
+            prepareProjectile(launched, definition, item, hand);
+        });
+        if (!projectile.isValid() || projectile.isDead()) {
+            projectile.remove();
+            return null;
+        }
         return projectile;
+    }
+
+    private ProjectileSource projectileSource(Projectile projectile) {
+        for (MetadataValue value : projectile.getMetadata(PROJECTILE_SOURCE)) {
+            if (value.getOwningPlugin() == storage.getPlugin() && value.value() instanceof ProjectileSource source) {
+                return source;
+            }
+        }
+        return null;
+    }
+
+    private record ProjectileSource(ItemStack item, EquipmentSlot hand) {
     }
 
     private String projectileType(CustomContentDefinition definition) {

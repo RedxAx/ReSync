@@ -1,11 +1,20 @@
 package restudio.resync.player;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+
+import java.lang.reflect.Array;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class PlayerDossier {
+    private static final Gson DATA_GSON = new Gson();
     private String playerId;
     private String playerName;
     private boolean online;
@@ -39,6 +48,45 @@ public class PlayerDossier {
             copy.facets.put(entry.getKey(), entry.getValue().copy());
         }
         return copy;
+    }
+
+    static Map<String, Object> copyData(Map<String, Object> data) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        if (data != null) {
+            data.forEach((key, value) -> copy.put(key, copyValue(value)));
+        }
+        return copy;
+    }
+
+    private static Object copyValue(Object value) {
+        if (value == null || value instanceof String || value instanceof Boolean || value instanceof Character
+            || value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long
+            || value instanceof Float || value instanceof Double || value instanceof BigDecimal || value instanceof BigInteger
+            || value instanceof UUID || value instanceof Enum<?>) {
+            return value;
+        }
+        if (value instanceof JsonElement json) {
+            return json.deepCopy();
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> copy = new LinkedHashMap<>();
+            map.forEach((key, entry) -> copy.put(String.valueOf(key), copyValue(entry)));
+            return copy;
+        }
+        if (value instanceof Collection<?> entries) {
+            List<Object> copy = new ArrayList<>(entries.size());
+            entries.forEach(entry -> copy.add(copyValue(entry)));
+            return copy;
+        }
+        if (value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            List<Object> copy = new ArrayList<>(length);
+            for (int index = 0; index < length; index++) {
+                copy.add(copyValue(Array.get(value, index)));
+            }
+            return copy;
+        }
+        return DATA_GSON.fromJson(DATA_GSON.toJsonTree(value), Object.class);
     }
 
     public String getPlayerId() {

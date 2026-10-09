@@ -21,6 +21,7 @@ import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowSerializer;
 import restudio.resync.Log;
 import restudio.resync.flow.ResourceRevisionConflictException;
+import restudio.resync.flow.identity.ServerId;
 import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.flow.protocol.ProtocolRejectionCode;
 import restudio.resync.flow.protocol.ResourcePresentationIntent;
@@ -337,6 +338,10 @@ public class CustomContentStorage implements AutoCloseable {
         saveMutation(definition, UUID.randomUUID(), -1L, true, null);
     }
 
+    public void saveNetwork(CustomContentDefinition definition, ServerId server) {
+        saveMutation(definition, UUID.randomUUID(), -1L, true, null, Objects.requireNonNull(server, "Local server identity is required"));
+    }
+
     public void save(CustomContentDefinition definition, UUID mutationId, long expectedRevision) {
         requireMutationRequest(mutationId, expectedRevision);
         saveMutation(definition, mutationId, expectedRevision, false, null);
@@ -403,6 +408,11 @@ public class CustomContentStorage implements AutoCloseable {
 
     private void saveMutation(CustomContentDefinition definition, UUID mutationId, long expectedRevision,
                               boolean normalizeComponents, String expectedPayloadHash) {
+        saveMutation(definition, mutationId, expectedRevision, normalizeComponents, expectedPayloadHash, null);
+    }
+
+    private void saveMutation(CustomContentDefinition definition, UUID mutationId, long expectedRevision,
+                              boolean normalizeComponents, String expectedPayloadHash, ServerId networkServer) {
         if (definition == null) {
             throw new IllegalArgumentException("Invalid custom content definition");
         }
@@ -425,7 +435,13 @@ public class CustomContentStorage implements AutoCloseable {
                     throw new ItemAttributeValidationException(componentErrors);
                 }
                 FlowResourceMutationStamp current = readMutationStamp(safeId);
+                if (networkServer != null) {
+                    expectedRevision = current == null ? 0L : current.revision();
+                }
                 long revision = Math.addExact(expectedRevision < 0L ? current == null ? 0L : current.revision() : expectedRevision, 1L);
+                if (networkServer != null) {
+                    CustomContentTransfer.bind(definition, networkServer, revision);
+                }
                 String payloadHash = expectedPayloadHash == null
                     ? ResourcePayloadCodecs.json().hashPayload(gson.fromJson(serializeDefinition(definition), Map.class)).canonicalText()
                     : expectedPayloadHash;

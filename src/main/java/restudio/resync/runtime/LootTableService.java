@@ -36,7 +36,9 @@ import org.bukkit.loot.LootTable;
 import org.bukkit.plugin.Plugin;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
+import restudio.resync.customization.ReSyncJsonResourceStorage.ResourceSnapshotValue;
 import restudio.resync.flow.util.TextFormatter;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
@@ -48,6 +50,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.LinkedHashMap;
 
 public class LootTableService implements Listener {
     private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
@@ -56,6 +59,8 @@ public class LootTableService implements Listener {
     private final CustomContentService customContentService;
     private final RuntimeFlowDispatcher dispatcher;
     private final Plugin plugin;
+    private final LegacyRuntimeActivationGate legacyRuntimeGate;
+    private final RuntimeResourceView<Map<String, List<LootTrigger>>> triggerView;
     private final Random random = new Random();
     private final Map<VaultUseKey, VaultSelection> pendingVaultUses = new ConcurrentHashMap<>();
     private final Map<VaultLocation, VaultSelection> restoringVaultUses = new ConcurrentHashMap<>();
@@ -69,10 +74,17 @@ public class LootTableService implements Listener {
     }
 
     public LootTableService(ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, Plugin plugin) {
+        this(storage, customContentService, dispatcher, plugin, null);
+    }
+
+    public LootTableService(ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher,
+                            Plugin plugin, LegacyRuntimeActivationGate legacyRuntimeGate) {
         this.storage = storage;
         this.customContentService = customContentService;
         this.dispatcher = dispatcher;
         this.plugin = plugin;
+        this.legacyRuntimeGate = legacyRuntimeGate;
+        this.triggerView = storage != null ? new RuntimeResourceView<>(storage, ReSyncResourceCatalog.LOOT_TABLE, this::projectTriggers) : null;
     }
 
     public JsonObject get(String id) {
@@ -80,6 +92,9 @@ public class LootTableService implements Listener {
     }
 
     public void shutdown() {
+        if (triggerView != null) {
+            triggerView.reset();
+        }
         Map<VaultLocation, VaultSelection> restores = new HashMap<>(restoringVaultUses);
         pendingVaultUses.forEach((use, selection) -> restores.putIfAbsent(use.vault(), selection));
         pendingVaultUses.clear();
@@ -105,10 +120,10 @@ public class LootTableService implements Listener {
             rollContext.putIfAbsent("lootTable", id);
         }
         if (table == null || !bool(table, "enabled", true)) {
-            dispatch(table, "deniedRollFlow", rollContext, List.of(), event);
+            dispatch(table, "deniedRollAction", rollContext, List.of(), event);
             return List.of();
         }
-        dispatch(table, "beforeRollFlow", rollContext, List.of(), event);
+        dispatch(table, "beforeRollAction", rollContext, List.of(), event);
         List<ItemStack> result = new ArrayList<>();
         JsonArray pools = array(table, "pools");
         for (JsonElement poolElement : pools) {
@@ -126,7 +141,7 @@ public class LootTableService implements Listener {
             }
         }
         List<ItemStack> items = List.copyOf(result);
-        dispatch(table, "afterRollFlow", rollContext, items, event);
+        dispatch(table, "afterRollAction", rollContext, items, event);
         return items;
     }
 
@@ -376,17 +391,9 @@ public class LootTableService implements Listener {
         }
         boolean ominous = VaultBlockDataAccess.isOminous(vault.getBlockData());
         List<VaultTrigger> result = new ArrayList<>();
-        List<String> ids = storage.listIds(ReSyncResourceCatalog.LOOT_TABLE).stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
-        for (String id : ids) {
-            JsonObject table = get(id);
-            if (table == null || !bool(table, "enabled", true)) {
-                continue;
-            }
-            for (JsonObject trigger : triggers(table)) {
-                if (!"vault_open".equalsIgnoreCase(text(trigger, "event")) || !vaultModeMatches(text(trigger, "target"), ominous)) {
-                    continue;
-                }
-                result.add(new VaultTrigger(id, ominous, vaultKeyReference(trigger, ominous)));
+        for (LootTrigger trigger : triggerView.get().getOrDefault("vault_open", List.of())) {
+            if (vaultModeMatches(trigger.target(), ominous)) {
+                result.add(new VaultTrigger(trigger.id(), ominous, vaultKeyReference(trigger.tool(), ominous)));
             }
         }
         return List.copyOf(result);
@@ -436,6 +443,10 @@ public class LootTableService implements Listener {
 
     static String vaultKeyReference(JsonObject trigger, boolean ominous) {
         String configured = trigger != null && trigger.has("tool") && trigger.get("tool").isJsonPrimitive() ? trigger.get("tool").getAsString() : "";
+        return vaultKeyReference(configured, ominous);
+    }
+
+    private static String vaultKeyReference(String configured, boolean ominous) {
         return configured.isBlank() || "none".equalsIgnoreCase(configured)
             ? ominous ? "minecraft:ominous_trial_key" : "minecraft:trial_key"
             : configured;
@@ -486,21 +497,15 @@ public class LootTableService implements Listener {
         }
         List<ItemStack> items = new ArrayList<>();
         boolean overrideDrops = false;
-        for (String id : storage.listIds(ReSyncResourceCatalog.LOOT_TABLE)) {
-            JsonObject table = get(id);
-            if (table == null || !bool(table, "enabled", true)) {
+        for (LootTrigger trigger : triggerView.get().getOrDefault(eventType, List.of())) {
+            if (!triggerMatches(trigger, eventType, player, item, entity, location, damageEvent)) {
                 continue;
             }
-            for (JsonObject trigger : triggers(table)) {
-                if (!triggerMatches(trigger, eventType, player, item, entity, location, damageEvent)) {
-                    continue;
-                }
-                overrideDrops |= bool(trigger, "overrideDrops", false);
-                Map<String, Object> variables = new HashMap<>(context != null ? context : Map.of());
-                variables.put("lootTable", id);
-                variables.put("lootEvent", eventType);
-                items.addAll(generate(id, variables, event));
-            }
+            overrideDrops |= trigger.overrideDrops();
+            Map<String, Object> variables = new HashMap<>(context != null ? context : Map.of());
+            variables.put("lootTable", trigger.id());
+            variables.put("lootEvent", eventType);
+            items.addAll(generate(trigger.id(), variables, event));
         }
         return new TriggeredLootResult(overrideDrops, List.copyOf(items));
     }
@@ -520,19 +525,36 @@ public class LootTableService implements Listener {
         return result;
     }
 
-    private boolean triggerMatches(JsonObject trigger, String eventType, Player player, ItemStack item, Entity entity, Location location, EntityDamageEvent damageEvent) {
-        String configuredEvent = text(trigger, "event");
-        if (configuredEvent.isBlank() || "none".equalsIgnoreCase(configuredEvent) || !configuredEvent.equalsIgnoreCase(eventType)) {
-            return false;
+    private Map<String, List<LootTrigger>> projectTriggers(List<ResourceSnapshotValue> values) {
+        Map<String, List<LootTrigger>> grouped = new LinkedHashMap<>();
+        for (ResourceSnapshotValue value : values) {
+            JsonObject table = value.value();
+            if (!bool(table, "enabled", true)) {
+                continue;
+            }
+            for (JsonObject trigger : triggers(table)) {
+                String event = text(trigger, "event").toLowerCase(Locale.ROOT);
+                if (!event.isBlank() && !"none".equals(event)) {
+                    grouped.computeIfAbsent(event, ignored -> new ArrayList<>()).add(new LootTrigger(value.id(),
+                        text(trigger, "target"), text(trigger, "tool"), text(trigger, "entity"), bool(trigger, "overrideDrops", false)));
+                }
+            }
         }
-        String target = text(trigger, "target");
-        String tool = text(trigger, "tool");
+        Map<String, List<LootTrigger>> result = new LinkedHashMap<>();
+        grouped.forEach((event, entries) -> result.put(event, List.copyOf(entries)));
+        return Map.copyOf(result);
+    }
+
+    private boolean triggerMatches(LootTrigger trigger, String eventType, Player player, ItemStack item, Entity entity,
+                                   Location location, EntityDamageEvent damageEvent) {
+        String target = trigger.target();
+        String tool = trigger.tool();
         return switch (eventType) {
             case "block_break" -> matchesBlockTarget(location, target) && matchesTool(player, item, tool, damageEvent);
             case "block_place" -> (matchesBlockTarget(location, target) || matchesItemTarget(item, target)) && matchesTool(player, item, tool, damageEvent);
             case "entity_death" -> matchesEntityTarget(entity, target) && matchesTool(player, item, tool, damageEvent);
             case "item_use" -> matchesItemTarget(item, firstFilled(target, tool));
-            case "item_hit_entity" -> matchesItemTarget(item, target) && matchesTool(player, item, tool, damageEvent) && matchesEntityTarget(entity, text(trigger, "entity"));
+            case "item_hit_entity" -> matchesItemTarget(item, target) && matchesTool(player, item, tool, damageEvent) && matchesEntityTarget(entity, trigger.entity());
             default -> false;
         };
     }
@@ -668,10 +690,8 @@ public class LootTableService implements Listener {
     }
 
     private void dispatch(JsonObject table, String hook, Map<String, Object> context, List<ItemStack> items, Event event) {
-        String flowId = table != null && table.has("hooks") && table.get("hooks").isJsonObject()
-            ? text(table.getAsJsonObject("hooks"), hook)
-            : "";
-        if (flowId.isBlank() || dispatcher == null) {
+        JsonObject hooks = table != null && table.has("hooks") && table.get("hooks").isJsonObject() ? table.getAsJsonObject("hooks") : null;
+        if (hooks == null || dispatcher == null) {
             return;
         }
         Map<String, Object> variables = new HashMap<>();
@@ -680,8 +700,64 @@ public class LootTableService implements Listener {
         }
         variables.put("lootTable", firstFilled(text(table, "id"), String.valueOf(variables.getOrDefault("lootTable", ""))));
         variables.put("items", items);
+        variables.put("hook", hook);
         Player player = variables.get("player") instanceof Player value ? value : null;
-        dispatcher.dispatch(flowId, player, event, variables);
+        JsonElement action = hooks.get(hook);
+        String legacyHook = hook.substring(0, hook.length() - "Action".length()) + "Flow";
+        if (!legacyAllowed() && (containsLegacyHook(action) || containsLegacyHook(hooks.get(legacyHook)))) {
+            legacyRuntimeGate.recordBlocked("Loot table " + variables.get("lootTable") + " " + hook + " legacy hook fallback");
+        }
+        if (dispatchHook(action, player, event, variables)) {
+            return;
+        }
+        if (legacyAllowed()) {
+            dispatchHook(hooks.get(legacyHook), player, event, variables);
+        }
+    }
+
+    private boolean dispatchHook(JsonElement action, Player player, Event event, Map<String, Object> variables) {
+        if (action == null || action.isJsonNull()) {
+            return false;
+        }
+        if (action.isJsonObject()) {
+            dispatcher.dispatchFunction(action.getAsJsonObject(), player, event, variables);
+            return true;
+        }
+        if (action.isJsonArray()) {
+            boolean dispatched = false;
+            for (JsonElement element : action.getAsJsonArray()) {
+                dispatched |= dispatchHook(element, player, event, variables);
+            }
+            return dispatched;
+        }
+        if (legacyAllowed() && action.isJsonPrimitive() && action.getAsJsonPrimitive().isString()) {
+            String flowId = action.getAsString();
+            if (!flowId.isBlank() && !"none".equalsIgnoreCase(flowId)) {
+                dispatcher.dispatch(flowId, player, event, variables);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsLegacyHook(JsonElement action) {
+        if (action == null || action.isJsonNull()) {
+            return false;
+        }
+        if (action.isJsonArray()) {
+            for (JsonElement element : action.getAsJsonArray()) {
+                if (containsLegacyHook(element)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return action.isJsonPrimitive() && action.getAsJsonPrimitive().isString()
+            && !action.getAsString().isBlank() && !"none".equalsIgnoreCase(action.getAsString());
+    }
+
+    private boolean legacyAllowed() {
+        return legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyRuntime();
     }
 
     private ItemStack roll(JsonArray entries, Map<String, Object> context) {
@@ -1102,6 +1178,9 @@ public class LootTableService implements Listener {
         } catch (RuntimeException exception) {
             throw new IllegalArgumentException("Loot definition field must be a boolean: " + key, exception);
         }
+    }
+
+    private record LootTrigger(String id, String target, String tool, String entity, boolean overrideDrops) {
     }
 
     private record TriggeredLootResult(boolean overrideDrops, List<ItemStack> items) {

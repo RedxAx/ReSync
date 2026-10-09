@@ -11,6 +11,7 @@ import restudio.resync.flow.identity.ContractRef;
 import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.identity.NodeId;
 import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.graph.GraphEndpoint;
 import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.identity.ProviderId;
 import restudio.resync.flow.type.TypeExpr;
@@ -18,6 +19,7 @@ import restudio.resync.flow.type.TypedValue;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -171,7 +173,7 @@ public final class RuntimePlanLease implements AutoCloseable {
     }
 
     public CompletionStage<RuntimeResult> execute(RuntimeBindingKey key, Map<PinId, TypedValue> inputs, String idempotencyKey) {
-        return executeInternal(key, inputs, idempotencyKey, null, null, null);
+        return executeInternal(key, inputs, idempotencyKey, null, null, null, Map.of());
     }
 
     private CompletionStage<RuntimeResult> executeInternal(
@@ -180,9 +182,13 @@ public final class RuntimePlanLease implements AutoCloseable {
         String idempotencyKey,
         RuntimeCancellationToken suppliedToken,
         CompiledRuntimeContext runtimeContext,
-        CorrelationId invocationId
+        CorrelationId invocationId,
+        Map<GraphEndpoint, TypedValue> routedInputs
     ) {
         Objects.requireNonNull(key, "Binding Key Is Required");
+        if (routedInputs.keySet().stream().anyMatch(endpoint -> endpoint.elementId() != null)) {
+            throw new IllegalArgumentException("GRAPH.REPEATABLE_RUNTIME_UNAVAILABLE: Runtime operations do not declare element capabilities");
+        }
         Map<PinId, TypedValue> invocationInputs = immutableInputs(inputs);
         String normalizedKey = Objects.requireNonNull(idempotencyKey, "Idempotency Key Is Required").trim();
         if (normalizedKey.isEmpty()) {
@@ -216,7 +222,7 @@ public final class RuntimePlanLease implements AutoCloseable {
 
         try {
             return executeAdmitted(binding, invocationInputs, normalizedKey, suppliedToken, runtimeContext,
-                rootInvocationId, providerToken, bindingToken, admission);
+                rootInvocationId, providerToken, bindingToken, admission, routedInputs);
         } catch (RuntimeException | Error failure) {
             admission.close();
             throw failure;
@@ -227,10 +233,10 @@ public final class RuntimePlanLease implements AutoCloseable {
                                                            String normalizedKey, RuntimeCancellationToken suppliedToken,
                                                            CompiledRuntimeContext runtimeContext, CorrelationId rootInvocationId,
                                                            RuntimeCancellationToken providerToken, RuntimeCancellationToken bindingToken,
-                                                           InvocationAdmission admission) {
+                                                           InvocationAdmission admission, Map<GraphEndpoint, TypedValue> routedInputs) {
         RuntimeBindingKey key = binding.key();
         long deadlineMillis = effectiveDeadline(binding, suppliedToken, providerToken, bindingToken);
-        ContentHash invocationInputHash = inputHash(binding, invocationInputs, runtimeContext, deadlineMillis);
+        ContentHash invocationInputHash = inputHash(binding, invocationInputs, runtimeContext, deadlineMillis, routedInputs);
         RuntimeResult policyFailure;
         try {
             policyFailure = preflight(binding, invocationInputs);
@@ -257,7 +263,7 @@ public final class RuntimePlanLease implements AutoCloseable {
                 return CompletableFuture.completedFuture(preExecutionFailure);
             }
             return executeEphemeral(binding, invocationInputs, normalizedKey, suppliedToken, runtimeContext,
-                rootInvocationId, admission);
+                rootInvocationId, admission, routedInputs);
         }
 
         CompletableFuture<RuntimeResult> outcome = null;
@@ -352,7 +358,7 @@ public final class RuntimePlanLease implements AutoCloseable {
         }
 
         runAttempts(binding, invocationInputs, normalizedKey, invocationInputHash, outcome, 0, suppliedToken, deadlineMillis,
-            runtimeContext, rootInvocationId, admission);
+            runtimeContext, rootInvocationId, admission, routedInputs);
         return outcome;
     }
 
@@ -364,7 +370,7 @@ public final class RuntimePlanLease implements AutoCloseable {
             invocation.idempotencyKey(),
             invocation.cancellationToken(),
             invocation.runtimeContext(),
-            invocation.invocationId());
+            invocation.invocationId(), invocation.routedInputs());
     }
 
     private RuntimeResult preflight(RuntimeBinding binding, Map<PinId, TypedValue> inputs) {
@@ -495,7 +501,7 @@ public final class RuntimePlanLease implements AutoCloseable {
 
     private static ContentHash inputHash(RuntimeBinding binding, Map<PinId, TypedValue> inputs,
                                          CompiledRuntimeContext runtimeContext,
-                                         long deadlineMillis) {
+                                         long deadlineMillis, Map<GraphEndpoint, TypedValue> routedInputs) {
         if (!needsCanonicalHashes(binding)) {
             return OMITTED_HASH;
         }
@@ -503,9 +509,29 @@ public final class RuntimePlanLease implements AutoCloseable {
         inputs.forEach((pin, value) -> values.put(pin.canonicalText(), value.canonicalValue()));
         Map<String, Object> canonical = new TreeMap<>();
         canonical.put("inputs", values);
+        if (!routedInputs.isEmpty()) {
+            canonical.put("routedInputs", routedInputs.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.comparing(GraphEndpoint::nodeId).thenComparing(GraphEndpoint::pinId)
+                    .thenComparing(GraphEndpoint::elementId, Comparator.nullsFirst(Comparator.naturalOrder()))
+                    .thenComparing(GraphEndpoint::branchId, Comparator.nullsFirst(Comparator.naturalOrder()))))
+                .map(entry -> Map.of("endpoint", endpointValue(entry.getKey()), "value", entry.getValue().canonicalValue())).toList());
+        }
         canonical.put("runtimeContext", runtimeContext == null ? Map.of() : runtimeContext.canonicalValue());
         canonical.put("deadlineMillis", deadlineMillis);
         return ContentHash.of(CanonicalJson.sha256("runtime-invocation", canonical));
+    }
+
+    private static Map<String, Object> endpointValue(GraphEndpoint endpoint) {
+        Map<String, Object> value = new TreeMap<>();
+        value.put("nodeId", endpoint.nodeId().canonicalText());
+        value.put("pinId", endpoint.pinId().canonicalText());
+        if (endpoint.elementId() != null) {
+            value.put("elementId", endpoint.elementId().canonicalText());
+        }
+        if (endpoint.branchId() != null) {
+            value.put("branchId", endpoint.branchId().canonicalText());
+        }
+        return value;
     }
 
     private static Map<PinId, TypedValue> immutableInputs(Map<PinId, TypedValue> inputs) {
@@ -539,12 +565,14 @@ public final class RuntimePlanLease implements AutoCloseable {
         RuntimeCancellationToken suppliedToken,
         CompiledRuntimeContext runtimeContext,
         CorrelationId invocationId,
-        InvocationAdmission admission
+        InvocationAdmission admission,
+        Map<GraphEndpoint, TypedValue> routedInputs
     ) {
         RuntimeCancellationToken token = suppliedToken != null ? suppliedToken : bindingTokens.get(binding.key());
         RuntimeInvocation invocation = new RuntimeInvocation(binding.key(), inputs, idempotencyKey, token)
             .withRuntimeContext(runtimeContext)
-            .withInvocationId(invocationId).withFunctionBindings(input.functionBindings()).withScope(input.scope());
+            .withInvocationId(invocationId).withFunctionBindings(input.functionBindings()).withScope(input.scope())
+            .withRoutedInputs(routedInputs);
         AtomicReference<RuntimeExecutionContext> executionContext = new AtomicReference<>();
         CompletionStage<RuntimeResult> stage;
         try {
@@ -603,7 +631,8 @@ public final class RuntimePlanLease implements AutoCloseable {
         long deadlineMillis,
         CompiledRuntimeContext runtimeContext,
         CorrelationId invocationId,
-        InvocationAdmission admission
+        InvocationAdmission admission,
+        Map<GraphEndpoint, TypedValue> routedInputs
     ) {
         RuntimeBindingKey key = binding.key();
         RuntimeCancellationToken providerToken = providerTokens.get(binding.provider());
@@ -674,7 +703,7 @@ public final class RuntimePlanLease implements AutoCloseable {
                     invocationToken.cancel();
                     finishAttempt(binding, inputs, idempotencyKey, invocationInputHash, outcome, attempt, suppliedToken, deadlineMillis,
                         runtimeContext,
-                        invocationId, validateAttemptResult(binding, timeoutResult(binding), executionContext.get(), true));
+                        invocationId, validateAttemptResult(binding, timeoutResult(binding), executionContext.get(), true), routedInputs);
                     if (!stageAttached.get()) {
                         releaseAttempt.run();
                     }
@@ -700,7 +729,8 @@ public final class RuntimePlanLease implements AutoCloseable {
         stageAttached.set(true);
         RuntimeInvocation invocation = new RuntimeInvocation(key, inputs, idempotencyKey, invocationToken)
             .withRuntimeContext(runtimeContext)
-            .withInvocationId(invocationId).withFunctionBindings(input.functionBindings()).withScope(input.scope());
+            .withInvocationId(invocationId).withFunctionBindings(input.functionBindings()).withScope(input.scope())
+            .withRoutedInputs(routedInputs);
         CompletionStage<RuntimeResult> stage;
         if (attemptFinished.get()) {
             stage = CompletableFuture.completedFuture(cancellationResult(binding));
@@ -730,7 +760,7 @@ public final class RuntimePlanLease implements AutoCloseable {
                 normalized = validateAttemptResult(binding, normalized, executionContext.get(),
                     runtimeTerminal.get() || (failure != null && isCancellation(failure)));
                 finishAttempt(binding, inputs, idempotencyKey, invocationInputHash, outcome, attempt, suppliedToken,
-                    deadlineMillis, runtimeContext, invocationId, normalized);
+                    deadlineMillis, runtimeContext, invocationId, normalized, routedInputs);
             } catch (RuntimeException | Error completionFailure) {
                 outcome.completeExceptionally(completionFailure);
             } finally {
@@ -759,14 +789,15 @@ public final class RuntimePlanLease implements AutoCloseable {
         long deadlineMillis,
         CompiledRuntimeContext runtimeContext,
         CorrelationId invocationId,
-        RuntimeResult result
+        RuntimeResult result,
+        Map<GraphEndpoint, TypedValue> routedInputs
     ) {
         if (!outcome.isDone() && shouldRetry(binding, result, attempt, suppliedToken, deadlineMillis)) {
             InvocationAdmission retryAdmission = invocationStarted();
             if (retryAdmission != null) {
                 try {
                     runAttempts(binding, inputs, idempotencyKey, invocationInputHash, outcome, attempt + 1, suppliedToken,
-                        deadlineMillis, runtimeContext, invocationId, retryAdmission);
+                        deadlineMillis, runtimeContext, invocationId, retryAdmission, routedInputs);
                 } catch (RuntimeException | Error retryFailure) {
                     retryAdmission.close();
                     throw retryFailure;

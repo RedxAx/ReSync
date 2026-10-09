@@ -53,6 +53,7 @@ class MutableExecutionBaselineTest {
         FlowRuntime runtime = new FlowRuntime(new FlowGraph(), new TypeAdapterRegistry(), Map.of(), Map.of(), definitions);
 
         assertEquals("first", runtime.resolveInput(node, "value", String.class));
+        definitions.unregisterPlugin(definitions.defaultPluginId());
         definitions.register(new NodeDefinition.Builder("node", "Node", NodeDefinition.NodeCategory.UTILITY)
             .input(new NodeDefinition.PinBuilder("value", NodeDefinition.PinType.DATA, NodeDefinition.PinDirection.INPUT, FlowDataType.STRING)
                 .defaultValue("second").build())

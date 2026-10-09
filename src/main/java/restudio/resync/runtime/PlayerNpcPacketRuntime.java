@@ -172,6 +172,12 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
     }
 
     @Override
+    public String instanceUuid(String id) {
+        PacketNpc npc = npcs.get(id);
+        return npc != null ? npc.instanceUuid : "";
+    }
+
+    @Override
     public Location location(String id) {
         PacketNpc npc = npcs.get(id);
         return npc != null ? npc.location().clone() : null;
@@ -260,7 +266,8 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
                     return;
                 }
                 WrapperPlayClientInteractEntity packet = new WrapperPlayClientInteractEntity(event);
-                String id = idsByEntity.get(packet.getEntityId());
+                int entityId = packet.getEntityId();
+                String id = idsByEntity.get(entityId);
                 if (id == null) {
                     return;
                 }
@@ -272,7 +279,8 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
                 boolean shifting = packet.isSneaking().orElse(false);
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     PacketNpc npc = npcs.get(id);
-                    if (!player.isOnline() || npc == null || !shouldDispatchInteraction(player, id, leftClick)) {
+                    if (!player.isOnline() || npc == null || npc.entityId() != entityId
+                        || !sameWorld(player.getWorld(), npc.location().getWorld()) || !shouldDispatchInteraction(player, id, leftClick)) {
                         return;
                     }
                     dispatcher.interact(id, player, npc.location(), leftClick, shifting);
@@ -869,7 +877,8 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
     private static final class PacketNpc {
         private final String id;
         private final int entityId;
-        private UserProfile profile;
+        private final String instanceUuid = UUID.randomUUID().toString();
+        private volatile UserProfile profile;
         private Location location;
         private JsonObject definition;
         private double verticalVelocity;

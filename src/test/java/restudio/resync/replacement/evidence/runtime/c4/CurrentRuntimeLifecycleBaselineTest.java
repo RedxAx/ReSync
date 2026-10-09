@@ -17,6 +17,7 @@ import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -29,18 +30,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class CurrentRuntimeLifecycleBaselineTest {
     @Test
-    void nodeRegistrationReplacesAnotherOwnerImmediately() {
+    void nodeRegistrationRejectsAnotherOwnerAndPreservesTheCurrentOwner() {
         NodeDefinitionRegistry registry = new NodeDefinitionRegistry();
         registry.register("first.extension", definition("fixture.extension:node"));
-        registry.register("second.extension", definition("fixture.extension:node"));
+        assertThrows(IllegalArgumentException.class,
+            () -> registry.register("second.extension", definition("fixture.extension:node")));
 
-        assertTrue(registry.getDefinitionsForPlugin("first.extension").isEmpty());
-        assertTrue(registry.getDefinitionsForPlugin("second.extension").stream()
+        assertTrue(registry.getDefinitionsForPlugin("second.extension").isEmpty());
+        assertTrue(registry.getDefinitionsForPlugin("first.extension").stream()
             .anyMatch(node -> "fixture.extension:node".equals(node.getId())));
-        assertTrue("second.extension".equals(registry.getPluginForNode("fixture.extension:node")));
+        assertEquals("first.extension", registry.getPluginForNode("fixture.extension:node"));
     }
 
     @Test
@@ -114,7 +117,7 @@ class CurrentRuntimeLifecycleBaselineTest {
         assertTrue(fixtureText("registry-lifecycle-sequence.json").contains("unregister-plugin-nodes"));
         NodeDefinitionRegistry definitions = new NodeDefinitionRegistry();
         HandlerRegistry handlers = new HandlerRegistry();
-        List<String> observations = new java.util.ArrayList<>();
+        List<String> observations = new ArrayList<>();
         NodeHandler first = handler(new AtomicBoolean());
         NodeHandler second = handler(new AtomicBoolean());
 
@@ -157,14 +160,14 @@ class CurrentRuntimeLifecycleBaselineTest {
     }
 
     @Test
-    void missingProviderNodeFieldsAreDroppedWhileGraphOpaqueFieldsSurvive() throws IOException {
+    void missingProviderNodeAndGraphOpaqueFieldsSurvive() throws IOException {
         String source = new String(getClass().getResourceAsStream("/fixtures/node-replacement/runtime/c4/missing-provider-node.json").readAllBytes(),
             StandardCharsets.UTF_8);
         FlowGraph graph = FlowSerializer.deserialize(source);
         String roundTrip = FlowSerializer.serialize(graph);
 
         assertTrue(roundTrip.contains("futureGraphPayload"));
-        assertFalse(roundTrip.contains("extensionPayload"));
+        assertTrue(roundTrip.contains("extensionPayload"));
     }
 
     @Test

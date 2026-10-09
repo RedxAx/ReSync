@@ -98,6 +98,9 @@ public class PlayerNpcPacketModule implements Module {
             } catch (RuntimeException exception) {
                 Log.warn("Failed to stop the Player NPC packet runtime: " + clean(exception), exception);
             }
+            if (PacketEvents.getAPI() == packetEvents) {
+                PacketEvents.setAPI(null);
+            }
         }
         packetEvents = null;
         ownsPacketEvents = false;

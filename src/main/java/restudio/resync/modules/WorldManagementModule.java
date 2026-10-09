@@ -292,8 +292,11 @@ public class WorldManagementModule implements Module, WorldManagementListener {
                     jobManager.publish(job);
                     send(session, WorldChannelMessage.response(action, false, "RequestFailed", result));
                 } finally {
-                    safetyService.finish(auditRecord, result, failure);
-                    termination.complete(null);
+                    try {
+                        safetyService.finish(auditRecord, result, failure);
+                    } finally {
+                        termination.complete(null);
+                    }
                 }
             })));
         } catch (RuntimeException schedulingFailure) {

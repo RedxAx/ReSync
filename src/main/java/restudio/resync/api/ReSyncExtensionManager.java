@@ -5,6 +5,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.RegisteredListener;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 import restudio.resync.Log;
 import restudio.resync.customcontent.CustomContentProvider;
 import restudio.resync.customcontent.CustomContentService;
@@ -77,6 +78,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -202,6 +204,10 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
     private volatile ExtensionRegistryActivation registryActivation;
     private volatile FlowEventRegistry boundFlowEventRegistry;
     private volatile PendingLifecycleCompensation pendingLifecycleCompensation;
+    private LifecycleTransaction pendingModuleTransaction;
+    private final AtomicReference<LifecycleRetry> lifecycleRetry = new AtomicReference<>();
+    private final Set<LifecycleTransaction> retainedTransactions = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<URLClassLoader> retainedLoaders = Collections.newSetFromMap(new IdentityHashMap<>());
     private volatile PersistenceState persistenceState = PersistenceState.OPEN;
     private final List<ExtensionState> quiescedPersistenceExtensions = new ArrayList<>();
     private IOException persistenceFailure;
@@ -303,8 +309,14 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
             if (!recoveryDurabilityAvailable || startupRecoveryRequired) {
                 return;
             }
+            if (deferLifecycleRetry()) {
+                return;
+            }
+            retryModuleLifecycle();
             retryPendingLifecycleCompensation();
-            if (!recoveryDurabilityAvailable || startupRecoveryRequired || pendingLifecycleCompensation != null) {
+            releaseRetainedLifecycle();
+            if (!recoveryDurabilityAvailable || startupRecoveryRequired || pendingLifecycleCompensation != null
+                || pendingModuleTransaction != null || moduleContext.getModuleRegistry().isRuntimeShutdownPending()) {
                 return;
             }
             retryBlockedLifecycle();
@@ -587,6 +599,18 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
         persistenceLock.writeLock().lock();
         try {
             shutdownRequested = true;
+            if (startupRecoveryRequired && !reconcileStartupRecovery()) {
+                return;
+            }
+            if (deferLifecycleRetry()) {
+                return;
+            }
+            retryModuleLifecycle();
+            retryPendingLifecycleCompensation();
+            releaseRetainedLifecycle();
+            if (pendingModuleTransaction != null || pendingLifecycleCompensation != null) {
+                return;
+            }
             for (String pluginId : new ArrayList<>(activeExtensions().keySet())) {
                 unregister(pluginId);
             }
@@ -598,18 +622,125 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
     }
 
     public boolean isShutdownPending() {
-        if (!recoveryDurabilityAvailable) {
+        persistenceLock.readLock().lock();
+        try {
+            if (!recoveryDurabilityAvailable) {
+                return true;
+            }
+            if (pendingModuleTransaction != null || !retainedTransactions.isEmpty() || !retainedLoaders.isEmpty()
+                || moduleContext.getModuleRegistry().isRuntimeShutdownPending()) {
+                return true;
+            }
+            boolean retainedFence;
+            synchronized (retainedAdmissionFences) {
+                retainedFence = !retainedAdmissionFences.isEmpty();
+            }
+            return (shutdownRequested || lifecycleDegraded || startupRecoveryRequired)
+                && (!activeExtensions().isEmpty() || !jarStates.isEmpty()
+                || !deferredReloads.isEmpty() || !deferredUnloads.isEmpty()
+                || !blockedReloads.isEmpty() || !blockedUnloads.isEmpty()
+                || retainedFence || pendingLifecycleCompensation != null || startupRecoveryRequired || lifecycleDegraded);
+        } finally {
+            persistenceLock.readLock().unlock();
+        }
+    }
+
+    private boolean deferLifecycleRetry() {
+        if (Bukkit.getServer() == null || Bukkit.isPrimaryThread()) {
+            LifecycleRetry queued = lifecycleRetry.getAndSet(null);
+            if (queued != null && queued.task != null) {
+                queued.task.cancel();
+            }
+            return false;
+        }
+        if (pendingModuleTransaction == null && pendingLifecycleCompensation == null
+            && !moduleContext.getModuleRegistry().isRuntimeShutdownPending()) {
+            return false;
+        }
+        LifecycleRetry queued = lifecycleRetry.get();
+        if (queued != null && queued.task != null && queued.task.isCancelled()) {
+            lifecycleRetry.compareAndSet(queued, null);
+        }
+        if (moduleContext.getPlugin() == null || !moduleContext.getPlugin().isEnabled()) {
             return true;
         }
-        boolean retainedFence;
-        synchronized (retainedAdmissionFences) {
-            retainedFence = !retainedAdmissionFences.isEmpty();
+        LifecycleRetry retry = new LifecycleRetry();
+        if (!lifecycleRetry.compareAndSet(null, retry)) {
+            return true;
         }
-        return (shutdownRequested || lifecycleDegraded || startupRecoveryRequired)
-            && (!activeExtensions().isEmpty() || !jarStates.isEmpty()
-            || !deferredReloads.isEmpty() || !deferredUnloads.isEmpty()
-            || !blockedReloads.isEmpty() || !blockedUnloads.isEmpty()
-            || retainedFence || pendingLifecycleCompensation != null || startupRecoveryRequired || lifecycleDegraded);
+        try {
+            retry.task = Bukkit.getScheduler().runTask(moduleContext.getPlugin(), () -> runLifecycleRetry(retry));
+        } catch (RuntimeException | Error failure) {
+            lifecycleRetry.compareAndSet(retry, null);
+            Log.warn("ReSync extension primary lifecycle retry could not be scheduled: " + failure.getMessage());
+        }
+        return true;
+    }
+
+    private void runLifecycleRetry(LifecycleRetry retry) {
+        if (!persistenceLock.writeLock().tryLock()) {
+            lifecycleRetry.compareAndSet(retry, null);
+            return;
+        }
+        try {
+            if (!lifecycleRetry.compareAndSet(retry, null)) {
+                return;
+            }
+            if ((!shutdownRequested && persistenceState != PersistenceState.OPEN)
+                || !recoveryDurabilityAvailable || startupRecoveryRequired) {
+                return;
+            }
+            retryModuleLifecycle();
+            retryPendingLifecycleCompensation();
+            releaseRetainedLifecycle();
+            if (shutdownRequested) {
+                finishShutdownIfIdle();
+            }
+        } catch (RuntimeException | Error failure) {
+            Log.warn("ReSync extension primary lifecycle retry failed: " + failure.getMessage());
+        } finally {
+            persistenceLock.writeLock().unlock();
+        }
+    }
+
+    private static final class LifecycleRetry {
+        private volatile BukkitTask task;
+    }
+
+    private void retryModuleLifecycle() {
+        if (deferLifecycleRetry()) {
+            return;
+        }
+        try {
+            moduleContext.getModuleRegistry().retryRuntimeModuleStops();
+        } catch (RuntimeException | Error failure) {
+            Log.warn("Runtime module retirement retry failed: " + failure.getMessage());
+        }
+        LifecycleTransaction transaction = pendingModuleTransaction;
+        if (transaction != null) {
+            transaction.commit(transaction.pendingPublishCatalog, transaction.pendingAdmissionFence);
+            if (pendingModuleTransaction != transaction) {
+                transaction.close();
+                for (ExtensionState state : transaction.removedStates) {
+                    tryCloseJar(state.jarPath);
+                }
+            }
+        }
+    }
+
+    private void releaseRetainedLifecycle() {
+        if (pendingModuleTransaction != null || pendingLifecycleCompensation != null
+            || moduleContext.getModuleRegistry().isRuntimeShutdownPending()) {
+            return;
+        }
+        for (LifecycleTransaction transaction : List.copyOf(retainedTransactions)) {
+            retainedTransactions.remove(transaction);
+            transaction.close();
+        }
+        for (URLClassLoader loader : List.copyOf(retainedLoaders)) {
+            retainedLoaders.remove(loader);
+            close(loader);
+        }
     }
 
     boolean startupRecoveryRequired() {
@@ -621,6 +752,10 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
     }
 
     private void finishShutdownIfIdle() {
+        if (pendingModuleTransaction != null || pendingLifecycleCompensation != null
+            || moduleContext.getModuleRegistry().isRuntimeShutdownPending()) {
+            return;
+        }
         if (!activeExtensions().isEmpty() || !deferredReloads.isEmpty() || !deferredUnloads.isEmpty()
             || !blockedReloads.isEmpty() || !blockedUnloads.isEmpty()) {
             return;
@@ -716,7 +851,7 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
     }
 
     private boolean reloadExtensionsAfterDrain(FlowExecutor.AdmissionFence admissionFence) {
-        LifecycleTransaction transaction = new LifecycleTransaction();
+        LifecycleTransaction transaction = new LifecycleTransaction(admissionFence);
         try {
             for (ExtensionState state : new ArrayList<>(activeExtensions().values())) {
                 if (!transaction.stageRuntimeRetirement(state)) {
@@ -739,7 +874,7 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
     private ExtensionRegistration registerExtension(JavaPlugin owner, ReSyncExtension extension, URLClassLoader classLoader,
                                                      Path jarPath, FlowExecutor.AdmissionFence admissionFence) {
         requirePersistenceOpen();
-        LifecycleTransaction transaction = new LifecycleTransaction();
+        LifecycleTransaction transaction = new LifecycleTransaction(admissionFence);
         try {
             ExtensionState state = transaction.stageAdd(owner, extension, classLoader, jarPath);
             if (!transaction.commit(true, admissionFence)) {
@@ -827,7 +962,7 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
             return unregister(state, admissionFence);
         }
         blockedReloads.remove(state.pluginId);
-        LifecycleTransaction transaction = new LifecycleTransaction();
+        LifecycleTransaction transaction = new LifecycleTransaction(admissionFence);
         try {
             if (!transaction.stageRuntimeRetirement(state)) {
                 blockedReloads.add(state.pluginId);
@@ -850,7 +985,7 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
         if (activeExtension(pluginId) != state) {
             return false;
         }
-        LifecycleTransaction transaction = new LifecycleTransaction();
+        LifecycleTransaction transaction = new LifecycleTransaction(admissionFence);
         try {
             if (!transaction.stageRuntimeRetirement(state)) {
                 blockedUnloads.add(pluginId);
@@ -966,17 +1101,19 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
 
     private void retryPendingLifecycleCompensation() {
         PendingLifecycleCompensation pending = pendingLifecycleCompensation;
-        if (pending == null) {
+        if (pending == null || deferLifecycleRetry()) {
             return;
         }
         if (!pending.retryActions.isEmpty()) {
             List<Runnable> remaining = new ArrayList<>();
-            for (Runnable action : pending.retryActions) {
+            for (int index = 0; index < pending.retryActions.size(); index++) {
+                Runnable action = pending.retryActions.get(index);
                 try {
                     action.run();
                 } catch (RuntimeException | Error failure) {
-                    remaining.add(action);
+                    remaining.addAll(pending.retryActions.subList(index, pending.retryActions.size()));
                     Log.warn("ReSync extension lifecycle compensation retry failed: " + failure.getMessage());
+                    break;
                 }
             }
             pending.retryActions = List.copyOf(remaining);
@@ -1082,7 +1219,7 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
         if (disabled.isEmpty()) {
             return;
         }
-        LifecycleTransaction transaction = new LifecycleTransaction();
+        LifecycleTransaction transaction = new LifecycleTransaction(admissionFence);
         try {
             boolean staged = true;
             for (ExtensionState state : disabled) {
@@ -1163,10 +1300,11 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
 
     private void reconcileJarChangesAfterDrain(Map<Path, Long> currentFiles, List<Path> changed,
                                                 FlowExecutor.AdmissionFence admissionFence) {
-        LifecycleTransaction transaction = new LifecycleTransaction();
+        LifecycleTransaction transaction = new LifecycleTransaction(admissionFence);
         Map<Path, URLClassLoader> stagedLoaders = new LinkedHashMap<>();
         Map<Path, List<String>> stagedPluginIds = new LinkedHashMap<>();
         List<JarState> retiredJars = new ArrayList<>();
+        transaction.closeActions.add(() -> stagedLoaders.values().forEach(this::close));
         try {
             for (Path path : changed) {
                 JarState previous = jarStates.get(path);
@@ -1206,29 +1344,28 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
                 }
                 stagedPluginIds.put(path, pluginIds);
             }
-            if (!transaction.commit(true, admissionFence)) {
-                return;
-            }
-            for (Path path : changed) {
-                JarState previous = jarStates.remove(path);
-                if (previous != null && !retiredJars.contains(previous)) {
-                    retiredJars.add(previous);
+            transaction.commitActions.add(() -> {
+                for (Path path : changed) {
+                    JarState previous = jarStates.remove(path);
+                    if (previous != null && !retiredJars.contains(previous)) {
+                        retiredJars.add(previous);
+                    }
+                    URLClassLoader classLoader = stagedLoaders.get(path);
+                    List<String> pluginIds = stagedPluginIds.get(path);
+                    if (classLoader != null && pluginIds != null) {
+                        jarStates.put(path, new JarState(currentFiles.get(path), classLoader, pluginIds));
+                    }
                 }
-                URLClassLoader classLoader = stagedLoaders.get(path);
-                List<String> pluginIds = stagedPluginIds.get(path);
-                if (classLoader != null && pluginIds != null) {
-                    jarStates.put(path, new JarState(currentFiles.get(path), classLoader, pluginIds));
+                for (JarState retired : retiredJars) {
+                    close(retired.classLoader);
                 }
-            }
-            for (JarState retired : retiredJars) {
-                close(retired.classLoader);
-            }
-            stagedLoaders.clear();
+                stagedLoaders.clear();
+            });
+            transaction.commit(true, admissionFence);
         } catch (ServiceConfigurationError | LinkageError | Exception exception) {
             Log.error("[ReSync] Failed to reconcile extension jars: " + exception.getMessage(), exception);
         } finally {
             transaction.close();
-            stagedLoaders.values().forEach(this::close);
         }
     }
 
@@ -1256,7 +1393,8 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
     private void loadJarAfterDrain(Path jarPath, long modified, FlowExecutor.AdmissionFence admissionFence) {
         List<String> pluginIds = new ArrayList<>();
         URLClassLoader classLoader = null;
-        LifecycleTransaction transaction = new LifecycleTransaction();
+        LifecycleTransaction transaction = new LifecycleTransaction(admissionFence);
+        boolean accepted = false;
         try {
             classLoader = new URLClassLoader(new URL[]{jarPath.toUri().toURL()}, ReSyncExtension.class.getClassLoader());
             ServiceLoader<ReSyncExtension> loader = ServiceLoader.load(ReSyncExtension.class, classLoader);
@@ -1267,19 +1405,18 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
                 ExtensionState state = transaction.stageAdd(null, extension, classLoader, jarPath);
                 pluginIds.add(state.pluginId);
             }
-            boolean accepted = !pluginIds.isEmpty() && transaction.commit(true, admissionFence);
+            accepted = !pluginIds.isEmpty() && transaction.commit(true, admissionFence);
             if (accepted) {
                 jarStates.put(jarPath, new JarState(modified, classLoader, pluginIds));
-                transaction.close();
-                return;
             }
-            close(classLoader);
         } catch (ServiceConfigurationError | LinkageError | Exception exception) {
-            transaction.close();
-            close(classLoader);
             Log.error("[ReSync] Failed to load extension jar " + jarPath + ": " + exception.getMessage(), exception);
+        } finally {
+            transaction.close();
+            if (!accepted) {
+                close(classLoader);
+            }
         }
-        transaction.close();
     }
 
     private void unloadJar(Path jarPath) {
@@ -1310,9 +1447,9 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
         }
         List<ExtensionState> previous = state.pluginIds.stream()
             .map(this::activeExtension)
-            .filter(java.util.Objects::nonNull)
+            .filter(Objects::nonNull)
             .toList();
-        LifecycleTransaction transaction = new LifecycleTransaction();
+        LifecycleTransaction transaction = new LifecycleTransaction(admissionFence);
         try {
             boolean staged = true;
             for (ExtensionState extension : previous) {
@@ -2277,7 +2414,7 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
             FlowExecutor.AdmissionFence admissionFence = fenceLegacyExecutions();
             try {
                 awaitLegacyExecutions(admissionFence);
-                LifecycleTransaction transaction = new LifecycleTransaction();
+                LifecycleTransaction transaction = new LifecycleTransaction(admissionFence);
                 try {
                     transaction.stageNodeDefinitions(stagedDefinitions);
                     return transaction.commit(true, admissionFence);
@@ -2297,6 +2434,9 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
         if (persistenceState != PersistenceState.OPEN) {
             throw new IllegalStateException("Extension persistence is quiesced");
         }
+        if (pendingModuleTransaction != null) {
+            throw new IllegalStateException("Extension module retirement is pending");
+        }
         if (pendingLifecycleCompensation != null) {
             throw new IllegalStateException("Extension lifecycle compensation is pending");
         }
@@ -2306,7 +2446,8 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
     }
 
     private boolean persistenceOpenForLifecycle() {
-        return recoveryDurabilityAvailable && pendingLifecycleCompensation == null && !startupRecoveryRequired
+        return recoveryDurabilityAvailable && pendingModuleTransaction == null
+            && pendingLifecycleCompensation == null && !startupRecoveryRequired
             && (persistenceState == PersistenceState.OPEN || shutdownRequested);
     }
 
@@ -2458,6 +2599,11 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
 
     private void close(URLClassLoader classLoader) {
         if (classLoader == null) {
+            return;
+        }
+        if (pendingModuleTransaction != null || pendingLifecycleCompensation != null
+            || moduleContext.getModuleRegistry().isRuntimeShutdownPending()) {
+            retainedLoaders.add(classLoader);
             return;
         }
         try {
@@ -2675,13 +2821,21 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
         private final String previousCatalogPublicationKey;
         private boolean changed;
         private boolean committed;
+        private boolean closed;
+        private boolean preflightComplete;
+        private boolean pendingPublishCatalog;
+        private FlowExecutor.AdmissionFence pendingAdmissionFence;
+        private final List<Runnable> commitActions = new ArrayList<>();
+        private final List<Runnable> closeActions = new ArrayList<>();
+        private final Set<String> stoppedModuleIds = new HashSet<>();
         private boolean runtimeActivationAttempted;
         private boolean recoveryMarkerActive;
         private ExtensionRegistryActivation.State stagedRegistryState;
         private ExtensionRegistryActivation.State publishedRegistryState;
         private FlowModule.CatalogRuntimeTransaction catalogRuntimeTransaction;
 
-        private LifecycleTransaction() {
+        private LifecycleTransaction(FlowExecutor.AdmissionFence admissionFence) {
+            pendingAdmissionFence = admissionFence;
             registryActivation = registryActivation();
             previousRegistryState = registryActivation.snapshot();
             FlowModule activeFlowModule = moduleContext.getService(FlowModule.class);
@@ -2776,15 +2930,13 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
             stagedExtensions.put(pluginId, state);
             extensionData.addPlugin(pluginId, extension.getVersion(), extension.getDescription());
             try {
-                initializeExtension(state, new ExtensionContext(state, this), false);
-            } catch (RuntimeException exception) {
+                initializeCandidate(state);
+            } catch (RuntimeException | Error exception) {
                 stagedExtensions.remove(pluginId, state);
                 extensionData.removePlugin(pluginId);
-                state.lifecycleStorageAccess = false;
                 throw exception;
             }
             rebuildStagedEvents();
-            addedStates.add(state);
             changed = true;
             return state;
         }
@@ -2801,17 +2953,20 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
             stagedExtensions.put(replacement.pluginId, replacement);
             extensionData.addPlugin(replacement.pluginId, replacement.extension.getVersion(), replacement.extension.getDescription());
             try {
-                initializeExtension(replacement, new ExtensionContext(replacement, this), false);
-            } catch (RuntimeException exception) {
+                initializeCandidate(replacement);
+            } catch (RuntimeException | Error exception) {
                 stagedExtensions.remove(replacement.pluginId, replacement);
-                source.lifecycleStorageAccess = false;
-                replacement.lifecycleStorageAccess = false;
                 throw exception;
             }
             rebuildStagedEvents();
-            addedStates.add(replacement);
             changed = true;
             return replacement;
+        }
+
+        private void initializeCandidate(ExtensionState state) {
+            addedStates.add(state);
+            candidateLifecycleCompensations.add(() -> stopCandidate(state));
+            initializeExtension(state, new ExtensionContext(state, this), false);
         }
 
         private boolean stageRemove(ExtensionState state) {
@@ -3045,7 +3200,9 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
                     throw new IllegalStateException("Missing runtime module compensation: " + moduleId);
                 }
                 if (moduleContext.getModuleRegistry().hasModule(moduleId)) {
-                    externalCompensations.add(() -> moduleContext.getModuleRegistry().registerRuntimeModule(module, moduleContext));
+                    if (stoppedModuleIds.add(moduleId)) {
+                        externalCompensations.add(() -> moduleContext.getModuleRegistry().registerRuntimeModule(module, moduleContext));
+                    }
                     moduleContext.getModuleRegistry().unregisterRuntimeModule(moduleId, moduleContext);
                 }
             }
@@ -3095,11 +3252,12 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
                     lifecycleFailureInjector.after(LifecyclePhase.COMPENSATION);
                     compensation.run();
                 } catch (RuntimeException | Error exception) {
-                    failedCompensations.add(compensation);
-                    if (failure == null) {
-                        failure = new IllegalStateException("ReSync extension external lifecycle compensation failed");
+                    for (int remaining = index; remaining >= 0; remaining--) {
+                        failedCompensations.add(externalCompensations.get(remaining));
                     }
+                    failure = new IllegalStateException("ReSync extension external lifecycle compensation failed");
                     failure.addSuppressed(exception);
+                    break;
                 }
             }
             externalCompensations.clear();
@@ -3133,15 +3291,27 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
                                                         FlowExecutor.AdmissionFence admissionFence) {
             Map<String, NodeHandler> previousHandlerValues = activeHandlers != null ? activeHandlers.snapshot() : Map.of();
             try {
-                if (!preflightCatalogRuntime()) {
+                if (!preflightComplete) {
+                    if (!preflightCatalogRuntime()) {
+                        return false;
+                    }
+                    recoveryMarkerActive = true;
+                    List<ExtensionState> markerStates = new ArrayList<>(removedStates);
+                    markerStates.addAll(addedStates);
+                    writeLifecycleRecoveryMarker(markerStates);
+                    preflightComplete = true;
+                }
+                if (!drainRemovedModules()) {
+                    pendingModuleTransaction = this;
+                    pendingPublishCatalog = publishCatalog;
+                    pendingAdmissionFence = admissionFence;
+                    retainAdmissionFence(admissionFence);
                     return false;
                 }
-                recoveryMarkerActive = true;
-                List<ExtensionState> markerStates = new ArrayList<>(removedStates);
-                markerStates.addAll(addedStates);
-                writeLifecycleRecoveryMarker(markerStates);
+                if (pendingModuleTransaction == this) {
+                    pendingModuleTransaction = null;
+                }
                 for (ExtensionState state : addedStates) {
-                    candidateLifecycleCompensations.add(() -> stopCandidate(state));
                     state.extension.start();
                     lifecycleFailureInjector.after(LifecyclePhase.NEW_START);
                 }
@@ -3175,8 +3345,14 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
                 candidateLifecycleCompensations.clear();
                 retiredLifecycleCompensations.clear();
                 committed = true;
+                commitActions.forEach(Runnable::run);
+                commitActions.clear();
+                releaseAdmissionFence(admissionFence);
                 return true;
             } catch (RuntimeException | Error exception) {
+                if (pendingModuleTransaction == this) {
+                    pendingModuleTransaction = null;
+                }
                 RuntimeException compensationFailure = null;
                 boolean catalogRuntimeRestorePending = false;
                 boolean recoveryMarkerPending = recoveryMarkerActive;
@@ -3239,9 +3415,27 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
                     lifecycleDegraded = true;
                     retainAdmissionFence(admissionFence);
                 }
+                if (pendingLifecycleCompensation == null && !lifecycleDegraded) {
+                    releaseAdmissionFence(admissionFence);
+                }
                 Log.warn("ReSync extension lifecycle batch was rejected: " + exception.getMessage());
                 return false;
             }
+        }
+
+        private boolean drainRemovedModules() {
+            Set<String> retiring = removedStates.stream().flatMap(state -> state.moduleIds.stream()).collect(Collectors.toSet());
+            if (retiring.isEmpty()) {
+                return true;
+            }
+            List<Module> order = new ArrayList<>(moduleContext.getModuleRegistry().getModules());
+            Collections.reverse(order);
+            for (Module module : order) {
+                if (retiring.contains(module.getModuleId()) && stoppedModuleIds.add(module.getModuleId())) {
+                    externalCompensations.add(() -> moduleContext.getModuleRegistry().registerRuntimeModule(module, moduleContext));
+                }
+            }
+            return moduleContext.getModuleRegistry().drainRuntimeModules(retiring, moduleContext);
         }
 
         private RuntimeException aggregateCompensationFailure(RuntimeException current, Throwable failure) {
@@ -3269,6 +3463,12 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
             ExtensionRegistryActivation.State current = registryActivation.snapshot();
             if (current != previousRegistryState || extensionStates(current).get(state.pluginId) != state) {
                 throw new IllegalStateException("Retired extension state is not restored");
+            }
+            for (Module module : state.modules.values()) {
+                if (moduleContext.getModuleRegistry().getModule(module.getModuleId()) != module
+                    || moduleContext.getModuleRegistry().getModules().stream().noneMatch(started -> started == module)) {
+                    throw new IllegalStateException("Retired extension module restoration is pending: " + module.getModuleId());
+                }
             }
             state.extension.start();
         }
@@ -3306,8 +3506,13 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
 
         private void rollbackLifecycle() {
             RuntimeException failure = null;
+            boolean deferCandidates = Bukkit.getServer() != null && !Bukkit.isPrimaryThread();
             for (int index = candidateLifecycleCompensations.size() - 1; index >= 0; index--) {
                 Runnable compensation = candidateLifecycleCompensations.get(index);
+                if (deferCandidates) {
+                    failedCompensations.add(compensation);
+                    continue;
+                }
                 try {
                     lifecycleFailureInjector.after(LifecyclePhase.COMPENSATION);
                     compensation.run();
@@ -3441,6 +3646,32 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
 
         @Override
         public void close() {
+            if (closed || pendingModuleTransaction == this) {
+                return;
+            }
+            if (pendingLifecycleCompensation != null || moduleContext.getModuleRegistry().isRuntimeShutdownPending()) {
+                if (!committed && !candidateLifecycleCompensations.isEmpty()) {
+                    retainAdmissionFence(pendingAdmissionFence);
+                }
+                retainedTransactions.add(this);
+                return;
+            }
+            if (!committed && !candidateLifecycleCompensations.isEmpty()) {
+                List<Runnable> actions = new ArrayList<>(candidateLifecycleCompensations);
+                Collections.reverse(actions);
+                candidateLifecycleCompensations.clear();
+                pendingLifecycleCompensation = new PendingLifecycleCompensation(pendingAdmissionFence,
+                    actions, false, false, previousCatalogPublicationKey, catalogRuntimeTransaction);
+                lifecycleDegraded = true;
+                retainAdmissionFence(pendingAdmissionFence);
+                retainedTransactions.add(this);
+                retryPendingLifecycleCompensation();
+                if (pendingLifecycleCompensation != null) {
+                    return;
+                }
+                retainedTransactions.remove(this);
+            }
+            closed = true;
             if (catalogRuntimeTransaction != null) {
                 catalogRuntimeTransaction.close();
             }
@@ -3454,6 +3685,9 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
             }
             addedStates.forEach(state -> state.lifecycleStorageAccess = false);
             removedStates.forEach(state -> state.lifecycleStorageAccess = false);
+            closeActions.forEach(Runnable::run);
+            closeActions.clear();
+            releaseAdmissionFence(pendingAdmissionFence);
         }
     }
 
@@ -3906,26 +4140,55 @@ public class ReSyncExtensionManager implements ExtensionPersistenceParticipant.C
             for (String channel : module.getChannels()) {
                 validateNamespaced(state.pluginId, channel, "Channel");
             }
-            if (transaction != null) {
+            if (transaction != null && !transaction.committed) {
+                if (transaction.closed || !persistenceLock.isWriteLockedByCurrentThread()) {
+                    throw new IllegalStateException("Extension module staging is unavailable");
+                }
                 transaction.stageModule(state, module);
                 return;
             }
-            moduleContext.getModuleRegistry().registerRuntimeModule(module, moduleContext);
-            state.moduleIds.add(module.getModuleId());
-            state.modules.put(module.getModuleId(), module);
+            runModuleChange(() -> {
+                moduleContext.getModuleRegistry().registerRuntimeModule(module, moduleContext);
+                state.moduleIds.add(module.getModuleId());
+                state.modules.put(module.getModuleId(), module);
+            });
         }
 
         @Override
         public void unregister(String moduleId) {
             validateNamespaced(state.pluginId, moduleId, "Module");
-            if (transaction != null) {
+            if (transaction != null && !transaction.committed) {
+                if (transaction.closed || !persistenceLock.isWriteLockedByCurrentThread()) {
+                    throw new IllegalStateException("Extension module staging is unavailable");
+                }
                 state.modules.remove(moduleId);
                 state.moduleIds.remove(moduleId);
                 return;
             }
-            moduleContext.getModuleRegistry().unregisterRuntimeModule(moduleId, moduleContext);
-            state.moduleIds.remove(moduleId);
-            state.modules.remove(moduleId);
+            boolean lifecycleAccess = persistenceLock.isWriteLockedByCurrentThread() && state.lifecycleStorageAccess;
+            runModuleChange(() -> {
+                moduleContext.getModuleRegistry().unregisterRuntimeModule(moduleId, moduleContext);
+                if (!lifecycleAccess) {
+                    state.moduleIds.remove(moduleId);
+                    state.modules.remove(moduleId);
+                }
+            });
+        }
+
+        private void runModuleChange(Runnable change) {
+            boolean lifecycleAccess = persistenceLock.isWriteLockedByCurrentThread() && state.lifecycleStorageAccess;
+            persistenceLock.writeLock().lock();
+            try {
+                if (!lifecycleAccess) {
+                    requirePersistenceOpen();
+                }
+                if (activeExtension(state.pluginId) != state) {
+                    throw new IllegalStateException("Extension module owner is retired: " + state.pluginId);
+                }
+                change.run();
+            } finally {
+                persistenceLock.writeLock().unlock();
+            }
         }
     }
 

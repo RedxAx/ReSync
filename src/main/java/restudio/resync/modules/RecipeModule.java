@@ -68,6 +68,7 @@ import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FunctionCallSupport;
+import restudio.resync.flow.handler.FlowHandlerException;
 import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncResourceCatalog;
@@ -82,7 +83,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class RecipeModule implements Module, Listener {
@@ -97,8 +97,10 @@ public class RecipeModule implements Module, Listener {
     private final Set<NamespacedKey> registered = new HashSet<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final BoundedDiagnosticDeduplicator reportedRegistrationFailures = new BoundedDiagnosticDeduplicator(512);
-    private final AtomicBoolean recipeReloadScheduled = new AtomicBoolean();
+    private final BoundedDiagnosticDeduplicator reportedPredicateFailures = new BoundedDiagnosticDeduplicator(256);
+    private final AtomicLong recipeReloadScheduled = new AtomicLong();
     private final AtomicLong recipeChanges = new AtomicLong();
+    private final AtomicLong recipeLifecycle = new AtomicLong();
     private ReSyncJsonResourceStorage.ResourceListener recipeResourceListener;
     private volatile RecipeIndex recipeIndex;
     private RecipeIndex registeredIndex;
@@ -142,11 +144,12 @@ public class RecipeModule implements Module, Listener {
 
     @Override
     public void stop(ModuleContext context) {
+        recipeLifecycle.incrementAndGet();
         if (storage != null && recipeResourceListener != null) {
             storage.removeListener(recipeResourceListener);
             recipeResourceListener = null;
         }
-        recipeReloadScheduled.set(false);
+        recipeReloadScheduled.set(0L);
         HandlerList.unregisterAll(this);
         for (NamespacedKey key : registered) {
             Bukkit.removeRecipe(key);
@@ -158,10 +161,11 @@ public class RecipeModule implements Module, Listener {
 
     void startRecipeLifecycle() {
         if (recipeResourceListener == null) {
+            long generation = recipeLifecycle.incrementAndGet();
             recipeResourceListener = (type, id, value, deleted) -> {
-                if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
+                if (generation == recipeLifecycle.get() && ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
                     invalidateRecipeIndex();
-                    requestRecipeReload();
+                    requestRecipeReload(generation);
                 }
             };
             storage.addListener(recipeResourceListener);
@@ -169,18 +173,34 @@ public class RecipeModule implements Module, Listener {
         reloadRecipes();
     }
 
-    private void requestRecipeReload() {
+    private void requestRecipeReload(long generation) {
+        if (generation != recipeLifecycle.get()) {
+            return;
+        }
         if (Bukkit.isPrimaryThread()) {
             refreshRecipes();
             return;
         }
-        if (!recipeReloadScheduled.compareAndSet(false, true)) {
-            return;
+        while (true) {
+            long scheduled = recipeReloadScheduled.get();
+            if (scheduled == generation || generation != recipeLifecycle.get()) {
+                return;
+            }
+            if (recipeReloadScheduled.compareAndSet(scheduled, generation)) {
+                break;
+            }
         }
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            recipeReloadScheduled.set(false);
-            refreshRecipes();
-        });
+        try {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (!recipeReloadScheduled.compareAndSet(generation, 0L) || generation != recipeLifecycle.get()) {
+                    return;
+                }
+                refreshRecipes();
+            });
+        } catch (RuntimeException failure) {
+            recipeReloadScheduled.compareAndSet(generation, 0L);
+            throw failure;
+        }
     }
 
     public void reloadRecipes() {
@@ -932,7 +952,7 @@ public class RecipeModule implements Module, Listener {
     private boolean conditionsPass(JsonObject definition, Player player, boolean commitCooldown) {
         JsonObject conditions = ResourceJson.object(definition, "conditions");
         if (player == null) {
-            return !ResourceJson.bool(conditions, "requiresPlayer", false);
+            return !ResourceJson.bool(conditions, "requiresPlayer", false) && flowPredicate(definition, null);
         }
         String permission = ResourceJson.string(conditions, "permission", "");
         if (!permission.isBlank() && !player.hasPermission(permission)) {
@@ -965,7 +985,7 @@ public class RecipeModule implements Module, Listener {
             return false;
         }
         int cooldownSeconds = ResourceJson.integer(conditions, "cooldownSeconds", 0);
-        if (cooldownSeconds > 0 && !cooldownReady(recipeId(definition), player, cooldownSeconds, commitCooldown)) {
+        if (cooldownSeconds > 0 && !cooldownReady(recipeId(definition), player, cooldownSeconds, false)) {
             return false;
         }
         String biome = ResourceJson.string(conditions, "biome", "");
@@ -979,7 +999,10 @@ public class RecipeModule implements Module, Listener {
             return false;
         }
         String weather = ResourceJson.string(conditions, "weather", "");
-        return (weather.isBlank() || weatherMatches(player, weather)) && flowPredicate(definition, player);
+        if (!weather.isBlank() && !weatherMatches(player, weather) || !flowPredicate(definition, player)) {
+            return false;
+        }
+        return cooldownSeconds <= 0 || cooldownReady(recipeId(definition), player, cooldownSeconds, commitCooldown);
     }
 
     private boolean playerStatePass(Player player, JsonObject conditions) {
@@ -1168,7 +1191,8 @@ public class RecipeModule implements Module, Listener {
             return false;
         }
         List<String> worlds = ResourceJson.strings(conditions, "worlds");
-        return worlds.isEmpty() || worlds.stream().anyMatch(worldName::equalsIgnoreCase);
+        return (worlds.isEmpty() || worlds.stream().anyMatch(worldName::equalsIgnoreCase))
+            && !ResourceJson.bool(conditions, "requiresPlayer", false) && flowPredicate(definition, null);
     }
 
     private JsonObject selectedStonecuttingDefinition(InventoryClickEvent event) {
@@ -1846,15 +1870,18 @@ public class RecipeModule implements Module, Listener {
     }
 
     private boolean flowPredicate(JsonObject definition, Player player) {
-        String flowId = ResourceJson.string(ResourceJson.object(definition, "conditions"), "flowPredicate", "");
         JsonObject conditions = ResourceJson.object(definition, "conditions");
-        Map<String, Object> vars = new HashMap<>();
-        vars.put("event.recipe", recipeId(definition));
-        boolean flowPass = true;
-        if (!flowId.isBlank() && flowStorage != null && flowExecutor != null) {
-            flowPass = FlowPredicateSupport.evaluate(flowStorage, flowExecutor, flowId, player, null, vars);
+        String flowId = ResourceJson.string(conditions, "flowPredicate", "");
+        Map<String, Object> vars = Map.of("event.recipe", recipeId(definition));
+        try {
+            return FlowPredicateSupport.evaluate(flowStorage, flowExecutor, flowId, player, null, vars)
+                && FunctionCallSupport.evaluate(flowStorage, flowExecutor, ResourceJson.object(conditions, "predicate"), player, null, vars);
+        } catch (FlowHandlerException failure) {
+            if (reportedPredicateFailures.add(recipeId(definition) + ":" + failure.getCode())) {
+                Log.warn("Recipe predicate denied for " + recipeId(definition) + ": " + failure.getMessage(), failure);
+            }
+            return false;
         }
-        return flowPass && FunctionCallSupport.evaluate(flowStorage, flowExecutor, ResourceJson.object(conditions, "predicate"), player, null, vars);
     }
 
     private void dispatchFlow(JsonObject definition, String trigger, Player player, Event event, Map<String, Object> vars) {

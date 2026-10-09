@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class ChunkModule implements Module {
@@ -39,6 +40,8 @@ public class ChunkModule implements Module {
     private static final int MAX_BATCHED_CHUNKS = 96;
     private static final int MAX_BATCHED_BYTES = 131072;
 
+    private volatile boolean stopped;
+    private final AtomicLong generation = new AtomicLong();
     private final Codec codec;
     private final LRUCache<ChunkKey, byte[]> chunkCache;
     private final ConcurrentHashMap<String, Session> subscribers;
@@ -73,8 +76,29 @@ public class ChunkModule implements Module {
     }
 
     @Override
+    public void start(ModuleContext context) {
+        generation.incrementAndGet();
+        stopped = false;
+    }
+
+    @Override
+    public void stop(ModuleContext context) {
+        stopped = true;
+        generation.incrementAndGet();
+        subscribers.clear();
+        pendingLoads.clear();
+        batches.clear();
+        queuedLoads.clear();
+        activeLoads.clear();
+        loadQueues.values().forEach(ConcurrentLinkedQueue::clear);
+        chunkCache.clear();
+    }
+
+    @Override
     public void onSubscribe(Session session, SubscribeRequest req) {
-        subscribers.put(session.getSessionId(), session);
+        if (!stopped) {
+            subscribers.put(session.getSessionId(), session);
+        }
     }
 
     @Override
@@ -85,6 +109,9 @@ public class ChunkModule implements Module {
 
     @Override
     public void onData(Session session, DataMessage req) {
+        if (stopped) {
+            return;
+        }
         byte[] payload = req.getPayload();
         if (payload == null || payload.length < 4) {
             return;
@@ -214,6 +241,10 @@ public class ChunkModule implements Module {
     }
 
     private void loadChunkAsync(ChunkRequest request) {
+        long current = generation.get();
+        if (stopped) {
+            return;
+        }
         ChunkKey key = request.key();
         World world = Bukkit.getWorld(request.world());
         if (world == null) {
@@ -224,6 +255,9 @@ public class ChunkModule implements Module {
 
         world.getChunkAtAsync(request.chunkX(), request.chunkZ())
             .whenComplete((chunk, throwable) -> {
+                if (stopped || current != generation.get()) {
+                    return;
+                }
                 if (throwable != null || chunk == null) {
                     activeLoads.remove(key);
                     String error = throwable != null ? throwable.getMessage() : "Unknown chunk load failure";
@@ -236,11 +270,14 @@ public class ChunkModule implements Module {
                     notifyError(key, "Failed to load chunk: Plugin not enabled");
                     return;
                 }
-                Bukkit.getScheduler().runTask(plugin, () -> finishChunkLoad(key, chunk));
+                Bukkit.getScheduler().runTask(plugin, () -> finishChunkLoad(key, chunk, current));
             });
     }
 
-    private void finishChunkLoad(ChunkKey key, Chunk chunk) {
+    private void finishChunkLoad(ChunkKey key, Chunk chunk, long current) {
+        if (stopped || current != generation.get()) {
+            return;
+        }
         try {
             byte[] chunkData = encodeChunk(chunk);
             activeLoads.remove(key);
@@ -328,7 +365,7 @@ public class ChunkModule implements Module {
     }
 
     private void sendChunkData(Session session, byte[] chunkData) {
-        if (!session.getConnection().isOpen()) {
+        if (stopped || !session.getConnection().isOpen()) {
             return;
         }
 
@@ -372,13 +409,16 @@ public class ChunkModule implements Module {
 
     @Override
     public void onTick() {
+        if (stopped) {
+            return;
+        }
         dispatchChunkLoads();
 
         for (Map.Entry<Session, SessionBatch> entry : batches.entrySet()) {
             Session session = entry.getKey();
             SessionBatch batch = entry.getValue();
 
-            if (!session.getConnection().isOpen()) {
+            if (stopped || !session.getConnection().isOpen()) {
                 batches.remove(session);
                 continue;
             }
@@ -393,7 +433,7 @@ public class ChunkModule implements Module {
     }
 
     private void sendError(Session session, String errorText) {
-        if (!session.getConnection().isOpen()) {
+        if (stopped || !session.getConnection().isOpen()) {
             return;
         }
 

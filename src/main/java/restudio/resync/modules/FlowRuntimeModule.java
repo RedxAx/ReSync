@@ -571,7 +571,7 @@ public class FlowRuntimeModule implements Module {
         }, itemAttributeSchemaService, authorityEpoch, FlowMutationPayloadReader::legacyCompatible);
         resourceBootstrap.registerExternalLifecycle(worldGenStorage, worldManagementService);
         RuntimeFlowDispatcher runtimeFlowDispatcher = new RuntimeFlowDispatcher(storage, executor);
-        lootTableService = new LootTableService(jsonResourceStorage, customContentService, runtimeFlowDispatcher, context.getPlugin());
+        lootTableService = new LootTableService(jsonResourceStorage, customContentService, runtimeFlowDispatcher, context.getPlugin(), legacyRuntimeGate);
         tradeProfileService = new TradeProfileService(jsonResourceStorage, customContentService, runtimeFlowDispatcher, context.getPlugin(), legacyRuntimeGate);
         TriggerRegistry triggerRegistry = new TriggerRegistry(dataRoot.resolve("triggers.json").toFile()) {
             @Override
@@ -2466,7 +2466,7 @@ public class FlowRuntimeModule implements Module {
         new VariableHandler().registerTo(handlerRegistry);
         new LogicHandler().registerTo(handlerRegistry);
         new ResultHandler().registerTo(handlerRegistry);
-        new ResourceValueHandler().registerTo(handlerRegistry);
+        new ResourceValueHandler(storage, serverId).registerTo(handlerRegistry);
         new ConversionHandler().registerTo(handlerRegistry);
         new DebugHandler().registerTo(handlerRegistry);
         new DiscordHandler().registerTo(handlerRegistry);
@@ -2525,7 +2525,7 @@ public class FlowRuntimeModule implements Module {
         new WorldGenFlowHandler(worldGenOperations).registerTo(handlerRegistry);
         new BlockActionHandler().registerTo(handlerRegistry);
         new InventoryActionHandler(customContentService, jsonResourceStorage, serverId).registerTo(handlerRegistry);
-        new ReSyncRuntimeResourceHandler(resourceRegistry).registerTo(handlerRegistry);
+        new ReSyncRuntimeResourceHandler(resourceRegistry, serverId).registerTo(handlerRegistry);
         new MiscHandler().registerTo(handlerRegistry);
         new RestoredNodeHandler().registerTo(handlerRegistry);
         JsonFamilyHandler.registerFamilies(handlerRegistry, propertyRegistry);
@@ -3404,7 +3404,7 @@ public class FlowRuntimeModule implements Module {
             flowStorage::listProjectMetadataIds);
         registerResourceCatalog(registry, ReSyncResourceCatalog.CUSTOM_CONTENT, OptionCatalogProvider.CaptureAffinity.IO, contentStorage::listIds);
         StructureLibrary structures = moduleContext.getRequiredService(StructureLibrary.class);
-        registerResourceCatalog(registry, ReSyncResourceCatalog.STRUCTURE, OptionCatalogProvider.CaptureAffinity.CALLER,
+        registerResourceCatalog(registry, ReSyncResourceCatalog.STRUCTURE, OptionCatalogProvider.CaptureAffinity.IO,
             () -> structures.list().stream().map(value -> value.id()).toList());
         if (worldGenStorage != null) {
             registerResourceCatalog(registry, ReSyncResourceCatalog.WORLDGEN, OptionCatalogProvider.CaptureAffinity.IO,

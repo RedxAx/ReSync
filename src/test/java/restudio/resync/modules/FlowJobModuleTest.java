@@ -15,6 +15,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -140,6 +141,36 @@ class FlowJobModuleTest {
         assertEquals(0, registry.physicalTaskCount());
         assertFalse(registry.health().available());
         assertTrue(registry.health().failures().isEmpty());
+    }
+
+    @Test
+    void shutdownPublicationCanRetryWithoutRepeatingDeliveredCompletions() {
+        AtomicBoolean available = new AtomicBoolean();
+        AtomicInteger dispatches = new AtomicInteger();
+        module = new FlowJobModule(new FlowJobModule.CompletionEventDispatcher() {
+            @Override
+            public void verifyAvailable() {
+                if (!available.get()) {
+                    throw new IllegalStateException("dispatch unavailable");
+                }
+            }
+
+            @Override
+            public void dispatch(FlowJobCompletedEvent event) {
+                dispatches.incrementAndGet();
+            }
+        });
+        module.initialize(context);
+        FlowJobRegistry registry = context.getService(FlowJobRegistry.class);
+        FlowJobReference<Void> job = registry.create("module", "flow:test");
+        registry.succeed(job, null);
+        module.prepareStop(context);
+        assertThrows(CompletionException.class, () -> module.finishStopAsync(context).toCompletableFuture().join());
+
+        available.set(true);
+        module.finishStopAsync(context).toCompletableFuture().join();
+        module.finishStopAsync(context).toCompletableFuture().join();
+        assertEquals(1, dispatches.get());
     }
 
     @SuppressWarnings("unchecked")

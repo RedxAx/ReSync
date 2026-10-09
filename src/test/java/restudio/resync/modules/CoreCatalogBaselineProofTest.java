@@ -129,6 +129,7 @@ import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.storage.StorageSafety;
 import restudio.resync.structure.StructureLibrary;
+import restudio.resync.server.OptionCatalogCaptureExecutor;
 import restudio.resync.world.WorldManagementService;
 import restudio.resync.worldgen.WorldGenGeneratedOutputController;
 import restudio.resync.worldgen.WorldGenOperationService;
@@ -143,6 +144,7 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -343,6 +345,9 @@ class CoreCatalogBaselineProofTest {
             contextField.setAccessible(true);
             contextField.set(module, context);
             OptionCatalogRegistry registry = new OptionCatalogRegistry();
+            OptionCatalogCaptureExecutor.Bounded captures = OptionCatalogCaptureExecutor.bounded(2, Duration.ofSeconds(5),
+                () -> false, Runnable::run, Thread.ofPlatform().daemon().factory());
+            registry.bindCapture(captures::capture);
             new BuiltinOptionCatalogService(() -> null, attributes).registerProviders(registry);
             WorldGenOptionCatalogs.register(registry);
             registry.runtimeData().register(new VanillaItemDataAdapter());
@@ -372,7 +377,7 @@ class CoreCatalogBaselineProofTest {
                 }
             }
             ready = true;
-            return new ProviderFixture(registry, content, json, worldGen);
+            return new ProviderFixture(registry, content, json, worldGen, structures, captures);
         } finally {
             if (!ready) {
                 MockBukkit.unmock();
@@ -511,7 +516,8 @@ class CoreCatalogBaselineProofTest {
     }
 
     private record ProviderFixture(OptionCatalogRegistry registry, CustomContentStorage content,
-                                   ReSyncJsonResourceStorage json, WorldGenProjectStorage worldGen) implements AutoCloseable {
+                                   ReSyncJsonResourceStorage json, WorldGenProjectStorage worldGen,
+                                   StructureLibrary structures, OptionCatalogCaptureExecutor.Bounded captures) implements AutoCloseable {
         @Override
         public void close() throws Exception {
             json.quiescePersistence();
@@ -524,6 +530,8 @@ class CoreCatalogBaselineProofTest {
                     try {
                         worldGen.closePersistence();
                     } finally {
+                        captures.close();
+                        structures.close();
                         MockBukkit.unmock();
                     }
                 }

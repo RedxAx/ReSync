@@ -41,7 +41,7 @@ public class MessageRewriteModule implements Module, Listener {
     private FlowExecutor flowExecutor;
     private MessageLogService messageLog;
     private boolean protocolLibAvailable;
-    private Object protocolBridge;
+    private AutoCloseable protocolBridge;
     private final PlainTextComponentSerializer plainText = PlainTextComponentSerializer.plainText();
     private final GsonComponentSerializer gsonComponent = GsonComponentSerializer.gson();
 
@@ -72,8 +72,9 @@ public class MessageRewriteModule implements Module, Listener {
         HandlerList.unregisterAll(this);
         if (protocolBridge != null) {
             try {
-                protocolBridge.getClass().getMethod("close").invoke(protocolBridge);
-            } catch (Exception ignored) {
+                protocolBridge.close();
+            } catch (Exception failure) {
+                throw new IllegalStateException("Message packet listener could not stop", failure);
             }
             protocolBridge = null;
         }
@@ -126,8 +127,8 @@ public class MessageRewriteModule implements Module, Listener {
         }
         try {
             Class<?> bridgeClass = Class.forName("restudio.resync.modules.ProtocolLibMessageRewriteBridge");
-            protocolBridge = bridgeClass.getConstructor(MessageRewriteModule.class, ModuleContext.class).newInstance(this, context);
-        } catch (Exception exception) {
+            protocolBridge = (AutoCloseable) bridgeClass.getConstructor(MessageRewriteModule.class, ModuleContext.class).newInstance(this, context);
+        } catch (ReflectiveOperationException | ClassCastException | LinkageError exception) {
             protocolLibAvailable = false;
             protocolBridge = null;
         }

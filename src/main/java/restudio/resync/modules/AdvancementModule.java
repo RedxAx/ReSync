@@ -40,6 +40,7 @@ import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRecipeDiscoverEvent;
 import org.bukkit.event.player.PlayerShearEntityEvent;
 import org.bukkit.entity.AbstractArrow;
@@ -58,7 +59,10 @@ import restudio.resync.advancement.AdvancementTriggerDescriptors;
 import restudio.resync.advancement.PaperAdvancementRuntimeBridge;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.Log;
+import restudio.resync.diagnostics.BoundedDiagnosticDeduplicator;
 import restudio.resync.flow.FlowExecutor;
+import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FunctionCallSupport;
@@ -68,13 +72,18 @@ import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.modules.flow.FlowResourceMutationStamp;
 import restudio.flow.data.FlowGraph;
 
+import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class AdvancementModule implements Module, Listener, ReSyncJsonResourceStorage.ResourceMutationInterceptor {
@@ -94,8 +103,18 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     private final AtomicLong treeGeneration = new AtomicLong();
     private volatile TreeSnapshot residentSnapshot;
     private volatile NativeProjection projection;
+    private final Map<PredicateKey, PendingPredicate> pendingPredicates = new ConcurrentHashMap<>();
+    private final Map<UUID, UUID> playerSessions = new HashMap<>();
+    private final BoundedDiagnosticDeduplicator predicateFailures = new BoundedDiagnosticDeduplicator(256);
+    private static final int MAX_PENDING_PREDICATES = 1024;
 
-    private record TreeSnapshot(long generation, long storageGeneration, long verifiedSequence, ReSyncJsonResourceStorage.ResourceSnapshot stamp, Map<String, JsonObject> trees) {
+    private record PredicateKey(long storageGeneration, Path root, JsonAssetStore.AssetStamp tree, UUID player, String node, String criterion) {
+    }
+
+    private record PendingPredicate(long generation, UUID session, NativeProjection projection, FlowStorage.RuntimeObservation flows, AtomicBoolean completed) {
+    }
+
+    private record TreeSnapshot(long generation, long storageGeneration, long verifiedSequence, ReSyncJsonResourceStorage.ResourceSnapshot stamp, Map<String, JsonObject> trees, Map<String, JsonAssetStore.AssetStamp> stamps) {
     }
 
     private record NativeProjection(TreeSnapshot snapshot, boolean ready) {
@@ -169,6 +188,8 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     public void stop(ModuleContext context) {
         running = false;
         projection = null;
+        playerSessions.clear();
+        pendingPredicates.entrySet().removeIf(entry -> entry.getValue().completed().get());
         if (reloadTask != null) {
             reloadTask.cancel();
             reloadTask = null;
@@ -178,9 +199,11 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
             pollingTask = null;
         }
         HandlerList.unregisterAll(this);
-        storage.removeInterceptor(this);
+        if (storage != null) {
+            storage.removeInterceptor(this);
+        }
         invalidateTrees();
-        if (bridge.supported()) {
+        if (bridge != null && bridge.supported()) {
             bridge.replace(Map.of());
         }
     }
@@ -215,7 +238,13 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        playerSessions.put(event.getPlayer().getUniqueId(), UUID.randomUUID());
         sync(event.getPlayer(), admitTrees());
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        playerSessions.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
@@ -533,13 +562,8 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
                         continue;
                     }
                     Map<String, Object> vars = eventVars(player, treeEntry.getKey(), nodeEntry.getKey(), criterionEntry.getKey(), trigger, inputs);
-                    if (!FlowPredicateSupport.evaluate(flowStorage, flowExecutor, text(criterion, "predicateFlowId"), player, event, vars)) {
-                        continue;
-                    }
-                    if (!FunctionCallSupport.evaluate(flowStorage, flowExecutor, object(criterion, "predicate"), player, event, vars)) {
-                        continue;
-                    }
-                    grantAndComplete(trees, node, player, event, treeEntry.getKey(), nodeEntry.getKey(), criterionEntry.getKey(), vars);
+                    evaluateCriterion(trees, node, player, event, treeEntry.getKey(), nodeEntry.getKey(), criterionEntry.getKey(), vars,
+                        text(criterion, "predicateFlowId"), object(criterion, "predicate"));
                 }
             }
         }
@@ -568,11 +592,136 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
                 }
                 String criterion = firstCriterion(node);
                 Map<String, Object> vars = eventVars(player, treeEntry.getKey(), nodeEntry.getKey(), criterion, "flow", Map.of());
-                boolean flowPass = flowId.isBlank() || FlowPredicateSupport.evaluate(flowStorage, flowExecutor, flowId, player, null, vars);
-                if (flowPass && FunctionCallSupport.evaluate(flowStorage, flowExecutor, predicate, player, null, vars)) {
-                    grantAndComplete(trees, node, player, null, treeEntry.getKey(), nodeEntry.getKey(), criterion, vars);
+                evaluateCriterion(trees, node, player, null, treeEntry.getKey(), nodeEntry.getKey(), criterion, vars,
+                    "Flow".equals(type) ? flowId : "", "Function".equals(type) ? predicate : new JsonObject());
+            }
+        }
+    }
+
+    private void evaluateCriterion(Map<String, JsonObject> trees, JsonObject node, Player player, Event event,
+            String tree, String nodeId, String criterion, Map<String, Object> vars, String flowId, JsonObject function) {
+        if (!current(trees) || !player.isOnline() || service.has(player, tree, nodeId, criterion)) {
+            return;
+        }
+        if (flowId.isBlank() && !hasFunctionCall(function)) {
+            grantAndComplete(trees, node, player, event, tree, nodeId, criterion, vars);
+            return;
+        }
+        TreeSnapshot snapshot = admitSnapshot();
+        if (snapshot.trees() != trees || !projected(snapshot)) {
+            return;
+        }
+        PredicateKey key = new PredicateKey(snapshot.storageGeneration(), snapshot.stamp().root(), snapshot.stamps().get(tree), player.getUniqueId(), nodeId, criterion);
+        if (pendingPredicates.containsKey(key)) {
+            return;
+        }
+        if (pendingPredicates.size() >= MAX_PENDING_PREDICATES) {
+            reportPredicateFailure(tree, nodeId, criterion, new IllegalStateException("Advancement predicate capacity is exhausted"));
+            return;
+        }
+        FlowStorage.RuntimeObservation flows = flowStorage == null ? null : flowStorage.observeRuntime().orElse(null);
+        if (flows == null) {
+            reportPredicateFailure(tree, nodeId, criterion, new IllegalStateException("Advancement predicate storage is unavailable"));
+            return;
+        }
+        UUID session = playerSessions.computeIfAbsent(player.getUniqueId(), ignored -> UUID.randomUUID());
+        PendingPredicate pending = new PendingPredicate(treeGeneration.get(), session, projection, flows, new AtomicBoolean());
+        if (pendingPredicates.putIfAbsent(key, pending) != null) {
+            return;
+        }
+        Map<String, Object> inputs = new LinkedHashMap<>();
+        vars.forEach((name, value) -> inputs.put(name, value instanceof ItemStack item ? item.clone() : value));
+        Map<String, Object> admitted = Collections.unmodifiableMap(inputs);
+        JsonObject call = function.deepCopy();
+        CompletableFuture<Boolean> evaluation;
+        try {
+            FlowExecutor.FunctionInvocationContext invocation = !hasFunctionCall(call) || flowExecutor == null ? null
+                : flowExecutor.defaultFunctionInvocationContext(player, event, admitted, CorrelationId.random(), System.currentTimeMillis() + 5000L);
+            evaluation = FlowPredicateSupport.evaluateAsync(flowStorage, flowExecutor, flowId, player, event, admitted)
+                .thenCompose(passed -> passed ? evaluateFunction(key, pending, trees, player, event, admitted, call, invocation)
+                    : CompletableFuture.completedFuture(false));
+        } catch (RuntimeException failure) {
+            evaluation = CompletableFuture.failedFuture(failure);
+        }
+        evaluation.whenComplete((passed, failure) -> {
+            pending.completed().set(true);
+            if (!running || plugin == null || !plugin.isEnabled()) {
+                pendingPredicates.remove(key, pending);
+                return;
+            }
+            Runnable finish = () -> {
+                try {
+                    if (!predicateCurrent(key, pending, trees, player)) {
+                        return;
+                    }
+                    if (failure != null) {
+                        reportPredicateFailure(tree, nodeId, criterion, failure);
+                    } else if (Boolean.TRUE.equals(passed) && !service.has(player, tree, nodeId, criterion)) {
+                        grantAndComplete(trees, node, player, null, tree, nodeId, criterion, admitted);
+                    }
+                } catch (RuntimeException failed) {
+                    reportPredicateFailure(tree, nodeId, criterion, failed);
+                } finally {
+                    pendingPredicates.remove(key, pending);
+                }
+            };
+            if (Bukkit.isPrimaryThread()) {
+                finish.run();
+            } else {
+                try {
+                    Bukkit.getScheduler().runTask(plugin, finish);
+                } catch (RuntimeException stopped) {
+                    pendingPredicates.remove(key, pending);
+                    reportPredicateFailure(tree, nodeId, criterion, stopped);
                 }
             }
+        });
+    }
+
+    private CompletableFuture<Boolean> evaluateFunction(PredicateKey key, PendingPredicate pending, Map<String, JsonObject> trees,
+            Player player, Event event, Map<String, Object> vars, JsonObject call, FlowExecutor.FunctionInvocationContext invocation) {
+        if (Bukkit.isPrimaryThread()) {
+            return predicateCurrent(key, pending, trees, player)
+                ? FunctionCallSupport.evaluateAsync(flowStorage, flowExecutor, call, player, event, vars, invocation)
+                : CompletableFuture.completedFuture(false);
+        }
+        CompletableFuture<Boolean> result = new CompletableFuture<>();
+        try {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                try {
+                    if (!predicateCurrent(key, pending, trees, player)) {
+                        result.complete(false);
+                        return;
+                    }
+                    FunctionCallSupport.evaluateAsync(flowStorage, flowExecutor, call, player, null, vars, invocation)
+                        .whenComplete((passed, failure) -> {
+                            if (failure == null) {
+                                result.complete(passed);
+                            } else {
+                                result.completeExceptionally(failure);
+                            }
+                        });
+                } catch (RuntimeException failure) {
+                    result.completeExceptionally(failure);
+                }
+            });
+        } catch (RuntimeException stopped) {
+            result.completeExceptionally(stopped);
+        }
+        return result;
+    }
+
+    private boolean predicateCurrent(PredicateKey key, PendingPredicate pending, Map<String, JsonObject> trees, Player player) {
+        return pendingPredicates.get(key) == pending && running && plugin != null && plugin.isEnabled()
+            && pending.generation() == treeGeneration.get() && pending.projection() == projection && player.isOnline() && Bukkit.getPlayer(key.player()) == player
+            && pending.session().equals(playerSessions.get(key.player())) && current(trees)
+            && flowStorage.isRuntimeObservationCurrent(pending.flows());
+    }
+
+    private void reportPredicateFailure(String tree, String node, String criterion, Throwable failure) {
+        String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+        if (predicateFailures.add(tree + ":" + node + ":" + criterion + ":" + message)) {
+            Log.warn("Advancement predicate failed for " + tree + "/" + node + "/" + criterion + ": " + message, failure);
         }
     }
 
@@ -665,7 +814,11 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     }
 
     private boolean hasFunctionCall(JsonObject call) {
-        return call != null && (call.has("graph") && call.get("graph").isJsonObject() || !text(call, "functionId").isBlank() && !"none".equalsIgnoreCase(text(call, "functionId")));
+        String function = text(call, "functionId");
+        if (function.isBlank()) {
+            function = text(call, "id");
+        }
+        return call != null && (call.has("graph") && call.get("graph").isJsonObject() || !function.isBlank() && !"none".equalsIgnoreCase(function));
     }
 
     private Map<String, JsonObject> trees(String replacementId, JsonObject replacement) {
@@ -700,19 +853,21 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
                 }
                 if (storage.isCurrent(current.stamp()) && sequence == storage.committedSequence()
                     && storageGeneration == storage.snapshotGeneration() && generation == treeGeneration.get()) {
-                    TreeSnapshot admitted = new TreeSnapshot(generation, storageGeneration, sequence, current.stamp(), current.trees());
+                    TreeSnapshot admitted = new TreeSnapshot(generation, storageGeneration, sequence, current.stamp(), current.trees(), current.stamps());
                     residentSnapshot = admitted;
                     return admitted;
                 }
             }
             ReSyncJsonResourceStorage.ResourceSnapshot snapshot = storage.readSnapshot(ReSyncResourceCatalog.ADVANCEMENT_TREE);
             Map<String, JsonObject> trees = new LinkedHashMap<>();
+            Map<String, JsonAssetStore.AssetStamp> stamps = new LinkedHashMap<>();
             for (ReSyncJsonResourceStorage.ResourceSnapshotValue value : snapshot.values()) {
                 trees.put(value.id(), value.value());
+                stamps.put(value.id(), value.stamp());
             }
             if (generation == treeGeneration.get() && storageGeneration == storage.snapshotGeneration()
                 && snapshot.rootSequence() == storage.committedSequence()) {
-                TreeSnapshot admitted = new TreeSnapshot(generation, storageGeneration, snapshot.rootSequence(), snapshot, Map.copyOf(trees));
+                TreeSnapshot admitted = new TreeSnapshot(generation, storageGeneration, snapshot.rootSequence(), snapshot, Map.copyOf(trees), Map.copyOf(stamps));
                 residentSnapshot = admitted;
                 return admitted;
             }

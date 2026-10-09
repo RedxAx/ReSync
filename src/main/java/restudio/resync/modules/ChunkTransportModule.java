@@ -25,6 +25,18 @@ public class ChunkTransportModule implements Module {
     }
 
     @Override
+    public void start(ModuleContext context) {
+        delegate.start(context);
+    }
+
+    @Override
+    public void stop(ModuleContext context) {
+        if (delegate != null) {
+            delegate.stop(context);
+        }
+    }
+
+    @Override
     public void onSubscribe(Session session, SubscribeRequest req) {
         delegate.onSubscribe(session, req);
     }

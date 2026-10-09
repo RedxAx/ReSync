@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -98,16 +97,40 @@ public final class FlowJobModule implements Module, EphemeralLifecycleParticipan
     @Override
     public CompletionStage<Void> finishStopAsync(ModuleContext context) {
         startShutdown();
+        FlowJobRegistry current;
+        CompletionStage<Void> drain;
+        CompletableFuture<Void> finish;
+        boolean retry;
         synchronized (completionMonitor) {
-            if (registry == null) {
+            current = registry;
+            if (current == null) {
                 return CompletableFuture.completedFuture(null);
             }
-            if (!shutdownFinishStarted) {
-                shutdownFinishStarted = true;
-                shutdownFinish = finishShutdown(shutdownDrain);
+            retry = shutdownFinishStarted && shutdownFinish.toCompletableFuture().isCompletedExceptionally();
+            if (shutdownFinishStarted && !retry) {
+                return shutdownFinish;
             }
-            return shutdownFinish;
+            shutdownFinishStarted = true;
+            finish = new CompletableFuture<>();
+            shutdownFinish = finish;
+            drain = shutdownDrain;
         }
+        if (retry) {
+            try {
+                drain = current.shutdownAsync();
+            } catch (RuntimeException failure) {
+                drain = CompletableFuture.failedFuture(failure);
+            }
+            shutdownDrain = drain;
+        }
+        finishShutdown(drain).whenComplete((unused, failure) -> {
+            if (failure == null) {
+                finish.complete(null);
+            } else {
+                finish.completeExceptionally(failure);
+            }
+        });
+        return finish;
     }
 
     public CompletionStage<Void> prepareSnapshot() {
@@ -173,7 +196,6 @@ public final class FlowJobModule implements Module, EphemeralLifecycleParticipan
             return;
         }
         pendingCompletions.putIfAbsent(snapshot.id(), snapshot);
-        dispatchPendingCompletions(false);
     }
 
     private void beginPersistenceBoundary() {
@@ -206,12 +228,15 @@ public final class FlowJobModule implements Module, EphemeralLifecycleParticipan
 
     private void startShutdown() {
         FlowJobRegistry current;
+        CompletableFuture<Void> drain;
         synchronized (completionMonitor) {
             current = registry;
             if (current == null || shutdownStarted) {
                 return;
             }
             shutdownStarted = true;
+            drain = new CompletableFuture<>();
+            shutdownDrain = drain;
             completionPhase = CompletionPhase.SHUTTING_DOWN;
             invalidateDispatchLocked();
         }
@@ -221,28 +246,27 @@ public final class FlowJobModule implements Module, EphemeralLifecycleParticipan
             Log.warn("Flow job admission close failed during shutdown", failure);
         }
         try {
-            shutdownDrain = current.shutdownAsync();
+            current.shutdownAsync().whenComplete((unused, failure) -> {
+                if (failure == null) {
+                    drain.complete(null);
+                } else {
+                    drain.completeExceptionally(failure);
+                }
+            });
         } catch (RuntimeException failure) {
-            shutdownDrain = CompletableFuture.failedFuture(failure);
+            drain.completeExceptionally(failure);
         }
     }
 
     private CompletionStage<Void> finishShutdown(CompletionStage<Void> drain) {
-        return drain.handle((unused, failure) -> failure)
-            .thenCompose(drainFailure -> {
-                CompletionStage<Void> publication = beginShutdownPublication();
-                return publication.handle((unused, publicationFailure) -> {
-                    Throwable failure = combineFailures(drainFailure, publicationFailure);
-                    detachCompletionListener();
-                    synchronized (completionMonitor) {
-                        completionPhase = CompletionPhase.CLOSED;
-                    }
-                    if (failure != null) {
-                        throw new CompletionException(failure);
-                    }
-                    return null;
-                });
-            });
+        return drain.thenCompose(unused -> beginShutdownPublication()).whenComplete((unused, failure) -> {
+            if (failure == null) {
+                detachCompletionListener();
+            }
+            synchronized (completionMonitor) {
+                completionPhase = failure == null ? CompletionPhase.CLOSED : CompletionPhase.SHUTTING_DOWN;
+            }
+        });
     }
 
     private CompletionStage<Void> beginShutdownPublication() {
@@ -414,16 +438,6 @@ public final class FlowJobModule implements Module, EphemeralLifecycleParticipan
         } catch (RuntimeException failure) {
             return false;
         }
-    }
-
-    private Throwable combineFailures(Throwable first, Throwable second) {
-        if (first == null) {
-            return second;
-        }
-        if (second != null && second != first) {
-            first.addSuppressed(second);
-        }
-        return first;
     }
 
     private enum CompletionPhase {

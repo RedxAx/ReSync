@@ -21,6 +21,7 @@ import restudio.resync.storage.AssetTransactionCoordinator;
 import restudio.resync.storage.CanonicalProjectMetadataFixture;
 
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -140,6 +141,19 @@ class RecipeModuleStartupTest {
 
         runtimeStorage.delete(ReSyncResourceCatalog.RECIPE_DEFINITION, "live_added");
         assertNull(Bukkit.getRecipe(new NamespacedKey(plugin, "live_added")));
+
+        CompletableFuture.runAsync(() -> runtimeStorage.save(ReSyncResourceCatalog.RECIPE_DEFINITION, recipe("""
+            {
+              "id": "queued",
+              "type": "shapeless",
+              "output": {"material": "DIAMOND"},
+              "ingredients": [{"material": "STICK"}]
+            }
+            """))).join();
+        module.stop(null);
+        MockBukkit.getMock().getScheduler().performOneTick();
+        assertNull(Bukkit.getRecipe(new NamespacedKey(plugin, "queued")));
+        assertNull(Bukkit.getRecipe(new NamespacedKey(plugin, "z_valid")));
     }
 
     @Test

@@ -39,6 +39,7 @@ public class ModuleRegistry {
     private final List<ModuleChangeListener> listeners;
     private final Set<Module> preparedShutdownModules;
     private final Set<Module> finishedShutdownModules;
+    private final Map<String, RuntimeStop> runtimeStops = new ConcurrentHashMap<>();
     private LifecycleState lifecycleState;
     private CompletionStage<Void> shutdownAttempt;
     private List<Module> preparedShutdownOrder = List.of();
@@ -58,7 +59,7 @@ public class ModuleRegistry {
         this.modules = new ConcurrentHashMap<>();
         this.channels = new ConcurrentHashMap<>();
         this.initializedOrder = new ArrayList<>();
-        this.startOrder = new ArrayList<>();
+        this.startOrder = new CopyOnWriteArrayList<>();
         this.registrationOrder = new CopyOnWriteArrayList<>();
         this.listeners = new CopyOnWriteArrayList<>();
         this.preparedShutdownModules = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -71,32 +72,42 @@ public class ModuleRegistry {
             return;
         }
         requireStaticRegistrationState();
+        validateRegistration(module);
         registerModuleInternal(module);
     }
 
     public synchronized void registerRuntimeModule(Module module, ModuleContext context) {
+        requireRuntimeThread();
+        if (module == null) {
+            throw new IllegalArgumentException("Module is required");
+        }
+        RuntimeStop retained = runtimeStops.get(module.getModuleId());
+        if (retained != null) {
+            if (retained.module != module) {
+                throw new IllegalStateException("Runtime module retirement is pending: " + module.getModuleId());
+            }
+            unregisterRuntimeModule(module.getModuleId(), context);
+        }
         long lifecycleStarted = TemporaryLifecycleDiagnostics.start();
         long lifecycleCpuStarted = currentThreadCpuNanos();
-        validateModule(module);
         if (lifecycleState != LifecycleState.STARTED) {
             throw new IllegalStateException("Runtime module registration requires started modules");
         }
-        if (modules.containsKey(module.getModuleId())) {
-            throw new IllegalArgumentException("Duplicate module id: " + module.getModuleId());
-        }
-        for (String channel : module.getChannels()) {
-            if (channels.containsKey(channel)) {
-                throw new IllegalArgumentException("Duplicate channel id: " + channel);
+        validateRegistration(module);
+        for (String dependency : module.getMetadata().dependencies()) {
+            Module provider = modules.get(dependency);
+            if (provider == null || startOrder.stream().noneMatch(started -> started == provider)) {
+                throw new IllegalStateException("Missing started dependency '" + dependency + "' for module '" + module.getModuleId() + "'");
             }
         }
         registerModuleInternal(module);
-        for (String channel : module.getChannels()) {
-            if (context.getChannelMuxer().getChannel(channel) == null) {
-                context.getChannelMuxer().createChannel(channel);
-            }
-        }
         initializedOrder.add(module);
         try {
+            for (String channel : module.getChannels()) {
+                if (context.getChannelMuxer().getChannel(channel) == null) {
+                    context.getChannelMuxer().createChannel(channel);
+                }
+            }
             long initializeStarted = TemporaryLifecycleDiagnostics.start();
             long initializeCpuStarted = currentThreadCpuNanos();
             module.initialize(context);
@@ -110,22 +121,29 @@ public class ModuleRegistry {
             moduleLifecycleEvent("module_runtime_register", module, lifecycleStarted, lifecycleCpuStarted, "complete");
         } catch (Throwable failure) {
             moduleLifecycleEvent("module_runtime_register", module, lifecycleStarted, lifecycleCpuStarted, "failed");
-            stopModuleForRollback(module, context, failure);
-            initializedOrder.remove(module);
-            startOrder.remove(module);
-            unregisterModule(module.getModuleId());
-            for (String channel : module.getChannels()) {
-                try {
-                    context.getChannelMuxer().removeChannel(channel);
-                } catch (Throwable cleanupFailure) {
-                    addSuppressedFailure(failure, cleanupFailure);
-                }
+            RuntimeStop stop = runtimeStops.computeIfAbsent(module.getModuleId(), ignored -> new RuntimeStop(module, context));
+            stop.removeWhenFinished = true;
+            try {
+                unregisterRuntimeModule(module.getModuleId(), context);
+            } catch (Throwable cleanupFailure) {
+                addSuppressedFailure(failure, cleanupFailure);
             }
             throw lifecycleFailure(failure);
         }
     }
 
     public synchronized void unregisterModule(String moduleId) {
+        if (runtimeStops.containsKey(moduleId)) {
+            throw new IllegalStateException("Runtime module retirement is pending: " + moduleId);
+        }
+        Module module = modules.get(moduleId);
+        if (module != null && initializedOrder.stream().anyMatch(initialized -> initialized == module)) {
+            throw new IllegalStateException("Initialized module removal requires runtime retirement: " + moduleId);
+        }
+        removeModule(moduleId);
+    }
+
+    private void removeModule(String moduleId) {
         Module module = modules.remove(moduleId);
         if (module != null) {
             registrationOrder.remove(moduleId);
@@ -137,19 +155,123 @@ public class ModuleRegistry {
         }
     }
 
+    private RuntimeStop admitRuntimeStop(Module module, ModuleContext context) {
+        RuntimeStop stop = runtimeStops.computeIfAbsent(module.getModuleId(), ignored -> new RuntimeStop(module, context));
+        startOrder.remove(module);
+        if (!stop.sessionsCleaned) {
+            if (!module.getChannels().isEmpty()) {
+                context.getSessionManager().cleanupModuleChannels(Set.copyOf(module.getChannels()), module);
+            }
+            stop.sessionsCleaned = true;
+        }
+        if (!preparedShutdownModules.contains(module)) {
+            module.prepareStop(context);
+            preparedShutdownModules.add(module);
+        }
+        return stop;
+    }
+
+    public synchronized CompletionStage<Void> prepareRuntimeModuleStop(String moduleId, ModuleContext context) {
+        Module module = modules.get(moduleId);
+        if (module == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        RuntimeStop retained = runtimeStops.get(moduleId);
+        if (retained != null && retained.attempt != null && !retained.attempt.isCompletedExceptionally()) {
+            return retained.attempt.minimalCompletionStage();
+        }
+        requireRuntimeThread();
+        RuntimeStop stop = runtimeStops.computeIfAbsent(moduleId, ignored -> new RuntimeStop(module, context));
+        try {
+            admitRuntimeStop(module, context);
+            CompletionStage<Void> finish = module.finishStopAsync(context);
+            stop.attempt = finish == null
+                ? CompletableFuture.failedFuture(new IllegalStateException("Module shutdown returned no completion"))
+                : finish.toCompletableFuture();
+        } catch (RuntimeException | Error failure) {
+            stop.attempt = CompletableFuture.failedFuture(failure);
+        }
+        return stop.attempt.minimalCompletionStage();
+    }
+
+    public synchronized boolean drainRuntimeModules(Set<String> moduleIds, ModuleContext context) {
+        requireRuntimeThread();
+        List<Module> order = new ArrayList<>(initializedOrder);
+        Collections.reverse(order);
+        for (Module module : order) {
+            if (moduleIds.contains(module.getModuleId())) {
+                admitRuntimeStop(module, context);
+            }
+        }
+        for (Module module : order) {
+            if (!moduleIds.contains(module.getModuleId())) {
+                continue;
+            }
+            CompletableFuture<Void> drain = prepareRuntimeModuleStop(module.getModuleId(), context).toCompletableFuture();
+            if (!drain.isDone() || drain.isCompletedExceptionally() || drain.isCancelled()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public synchronized void unregisterRuntimeModule(String moduleId, ModuleContext context) {
+        requireRuntimeThread();
         Module module = modules.get(moduleId);
         if (module == null) {
             return;
         }
+        RuntimeStop stop = runtimeStops.computeIfAbsent(moduleId, ignored -> new RuntimeStop(module, context));
+        stop.removeWhenFinished = true;
+        CompletableFuture<Void> drain = prepareRuntimeModuleStop(moduleId, context).toCompletableFuture();
+        if (!drain.isDone()) {
+            throw new IllegalStateException("Runtime module retirement is pending: " + moduleId);
+        }
+        drain.getNow(null);
         Set<String> removedChannels = Set.copyOf(module.getChannels());
-        context.getSessionManager().cleanupModuleChannels(removedChannels, module);
-        module.stop(context);
-        unregisterModule(moduleId);
         for (String channel : removedChannels) {
             context.getChannelMuxer().removeChannel(channel);
         }
         notifyUnregistered(moduleId, removedChannels);
+        runtimeStops.remove(moduleId);
+        removeModule(moduleId);
+        preparedShutdownModules.remove(module);
+        finishedShutdownModules.remove(module);
+    }
+
+    public synchronized void retryRuntimeModuleStops() {
+        if (runtimeStops.isEmpty()) {
+            return;
+        }
+        requireRuntimeThread();
+        for (RuntimeStop stop : List.copyOf(runtimeStops.values())) {
+            if (stop.removeWhenFinished) {
+                unregisterRuntimeModule(stop.module.getModuleId(), stop.context);
+            }
+        }
+    }
+
+    public boolean isRuntimeShutdownPending() {
+        return !runtimeStops.isEmpty();
+    }
+
+    private void requireRuntimeThread() {
+        if (Bukkit.getServer() != null && !Bukkit.isPrimaryThread()) {
+            throw new IllegalStateException("Runtime module lifecycle requires the Bukkit primary thread");
+        }
+    }
+
+    private static final class RuntimeStop {
+        private final Module module;
+        private final ModuleContext context;
+        private CompletableFuture<Void> attempt;
+        private boolean sessionsCleaned;
+        private boolean removeWhenFinished;
+
+        private RuntimeStop(Module module, ModuleContext context) {
+            this.module = module;
+            this.context = context;
+        }
     }
 
     public synchronized void initializeModules(ModuleContext context) {
@@ -201,8 +323,7 @@ public class ModuleRegistry {
             TemporaryLifecycleDiagnostics.event("module_initialize_all", lifecycleStarted,
                 Map.of("moduleCount", initializedOrder.size(), "outcome", "failed",
                     "participantTimings", timing(lifecycleStarted, lifecycleCpuStarted)));
-            stopModulesForRollback(initializedOrder, context, failure);
-            initializedOrder.clear();
+            prepareModulesForRollback(initializedOrder, context, failure);
             startOrder.clear();
             lifecycleState = LifecycleState.FAILED;
             throw lifecycleFailure(failure);
@@ -238,8 +359,7 @@ public class ModuleRegistry {
             TemporaryLifecycleDiagnostics.event("module_start_all", lifecycleStarted,
                 Map.of("moduleCount", startOrder.size(), "outcome", "failed",
                     "participantTimings", timing(lifecycleStarted, lifecycleCpuStarted)));
-            stopModulesForRollback(initializedOrder, context, failure);
-            initializedOrder.clear();
+            prepareModulesForRollback(initializedOrder, context, failure);
             startOrder.clear();
             lifecycleState = LifecycleState.FAILED;
             throw lifecycleFailure(failure);
@@ -274,6 +394,7 @@ public class ModuleRegistry {
                     preparedShutdownOrder = List.of();
                     preparedShutdownModules.clear();
                     finishedShutdownModules.clear();
+                    runtimeStops.clear();
                     lifecycleState = LifecycleState.STOPPED;
                 } else if (shutdownAttempt == attempt) {
                     shutdownAttempt = null;
@@ -288,7 +409,7 @@ public class ModuleRegistry {
         if (Bukkit.getServer() == null || Bukkit.isPrimaryThread()) {
             try {
                 return CompletableFuture.completedFuture(admitModuleStops(shutdownOrder, context));
-            } catch (RuntimeException exception) {
+            } catch (RuntimeException | Error exception) {
                 return CompletableFuture.failedFuture(exception);
             }
         }
@@ -300,11 +421,11 @@ public class ModuleRegistry {
             Bukkit.getScheduler().runTask(context.getPlugin(), () -> {
                 try {
                     admission.complete(admitModuleStops(shutdownOrder, context));
-                } catch (RuntimeException exception) {
+                } catch (RuntimeException | Error exception) {
                     admission.completeExceptionally(exception);
                 }
             });
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | Error exception) {
             admission.completeExceptionally(exception);
         }
         return admission;
@@ -336,7 +457,10 @@ public class ModuleRegistry {
             }
         }
         synchronized (this) {
-            admissions = List.copyOf(preparedShutdownOrder);
+            List<Module> reverse = new ArrayList<>(shutdownOrder);
+            Collections.reverse(reverse);
+            preparedShutdownOrder = List.copyOf(reverse);
+            admissions = preparedShutdownOrder;
         }
         return admissions;
     }
@@ -350,7 +474,9 @@ public class ModuleRegistry {
                         return CompletableFuture.completedFuture(null);
                     }
                 }
-                CompletionStage<Void> finish = module.finishStopAsync(context);
+                RuntimeStop runtime = runtimeStops.get(module.getModuleId());
+                CompletionStage<Void> finish = runtime != null
+                    ? prepareRuntimeModuleStop(module.getModuleId(), runtime.context) : module.finishStopAsync(context);
                 return finish == null
                     ? CompletableFuture.failedFuture(new IllegalStateException("Module shutdown returned no completion"))
                     : finish.thenRun(() -> {
@@ -368,7 +494,8 @@ public class ModuleRegistry {
     }
 
     public Module getModuleByChannel(String channelId) {
-        return channels.get(channelId);
+        Module module = channels.get(channelId);
+        return module != null && startOrder.stream().anyMatch(started -> started == module) ? module : null;
     }
 
     public boolean hasModule(String moduleId) {
@@ -432,21 +559,21 @@ public class ModuleRegistry {
         }
     }
 
-    private void stopModulesForRollback(List<Module> modules, ModuleContext context, Throwable failure) {
-        Set<Module> stopped = Collections.newSetFromMap(new IdentityHashMap<>());
+    private void prepareModulesForRollback(List<Module> modules, ModuleContext context, Throwable failure) {
         for (int index = modules.size() - 1; index >= 0; index--) {
             Module module = modules.get(index);
-            if (stopped.add(module)) {
-                stopModuleForRollback(module, context, failure);
+            if (preparedShutdownModules.contains(module)) {
+                continue;
             }
-        }
-    }
-
-    private void stopModuleForRollback(Module module, ModuleContext context, Throwable failure) {
-        try {
-            module.stop(context);
-        } catch (Throwable cleanupFailure) {
-            addSuppressedFailure(failure, cleanupFailure);
+            try {
+                module.prepareStop(context);
+                preparedShutdownModules.add(module);
+                List<Module> next = new ArrayList<>(preparedShutdownOrder);
+                next.add(module);
+                preparedShutdownOrder = List.copyOf(next);
+            } catch (Throwable cleanupFailure) {
+                addSuppressedFailure(failure, cleanupFailure);
+            }
         }
     }
 
@@ -464,6 +591,18 @@ public class ModuleRegistry {
             throw exception;
         }
         return new IllegalStateException("Module lifecycle failed", failure);
+    }
+
+    private void validateRegistration(Module module) {
+        validateModule(module);
+        if (modules.containsKey(module.getModuleId())) {
+            throw new IllegalArgumentException("Duplicate module id: " + module.getModuleId());
+        }
+        for (String channel : module.getChannels()) {
+            if (channels.containsKey(channel)) {
+                throw new IllegalArgumentException("Duplicate channel id: " + channel);
+            }
+        }
     }
 
     private void validateModule(Module module) {
@@ -522,7 +661,11 @@ public class ModuleRegistry {
         Set<String> visiting = new HashSet<>();
         Deque<String> stack = new ArrayDeque<>(registrationOrder);
         while (!stack.isEmpty()) {
-            visit(stack.pop(), ordered, visited, visiting);
+            String moduleId = stack.pop();
+            Module module = modules.get(moduleId);
+            if (module != null && module.isEnabledByDefault()) {
+                visit(moduleId, ordered, visited, visiting);
+            }
         }
         return ordered;
     }
@@ -540,8 +683,9 @@ public class ModuleRegistry {
             return;
         }
         for (String dependency : module.getMetadata().dependencies()) {
-            if (!modules.containsKey(dependency)) {
-                throw new IllegalStateException("Missing dependency '" + dependency + "' for module '" + moduleId + "'");
+            Module provider = modules.get(dependency);
+            if (provider == null || !provider.isEnabledByDefault()) {
+                throw new IllegalStateException("Missing enabled dependency '" + dependency + "' for module '" + moduleId + "'");
             }
             visit(dependency, ordered, visited, visiting);
         }

@@ -77,6 +77,49 @@ class ModuleRegistryShutdownLifecycleTest {
     }
 
     @Test
+    void failedRuntimeRegistrationRetainsIdentityUntilItsPhysicalDrainCompletes() {
+        ModuleRegistry registry = new ModuleRegistry();
+        registry.initializeModules(null);
+        registry.startModules(null);
+        CompletableFuture<Void> drain = new CompletableFuture<>();
+        AtomicInteger preparations = new AtomicInteger();
+        Module candidate = new Module() {
+            @Override
+            public ModuleMetadata getMetadata() {
+                return ModuleMetadata.of("candidate", "Candidate");
+            }
+
+            @Override
+            public void initialize(ModuleContext context) {
+                throw new IllegalStateException("Initialization Failed");
+            }
+
+            @Override
+            public void prepareStop(ModuleContext context) {
+                preparations.incrementAndGet();
+            }
+
+            @Override
+            public CompletionStage<Void> finishStopAsync(ModuleContext context) {
+                return drain;
+            }
+        };
+
+        assertThrows(IllegalStateException.class, () -> registry.registerRuntimeModule(candidate, null));
+        assertTrue(registry.hasModule("candidate"));
+        assertTrue(registry.isRuntimeShutdownPending());
+        assertTrue(registry.getModules().isEmpty());
+        assertThrows(IllegalStateException.class, () -> registry.registerRuntimeModule(
+            new RecordingModule("candidate", new ArrayList<>(), false, false), null));
+        drain.complete(null);
+        registry.retryRuntimeModuleStops();
+
+        assertFalse(registry.hasModule("candidate"));
+        assertFalse(registry.isRuntimeShutdownPending());
+        assertEquals(1, preparations.get());
+    }
+
+    @Test
     void failedModulePreparationIsRetriedBeforeFinish() {
         ModuleRegistry registry = new ModuleRegistry();
         AtomicInteger preparations = new AtomicInteger();
@@ -150,6 +193,24 @@ class ModuleRegistryShutdownLifecycleTest {
         assertEquals(List.of(
             "first.initialize", "failing.initialize",
             "failing.stop", "first.stop"), lifecycle);
+    }
+
+    @Test
+    void initializationFailureRetainsAsyncDrainUntilShutdownCompletes() {
+        ModuleRegistry registry = new ModuleRegistry();
+        List<String> lifecycle = new ArrayList<>();
+        CompletableFuture<Void> drain = new CompletableFuture<>();
+        registry.registerModule(module("flow", lifecycle, new ArrayList<>(), drain, new AtomicBoolean(), true));
+        registry.registerModule(new RecordingModule("failing", lifecycle, true, false));
+
+        assertThrows(IllegalStateException.class, () -> registry.initializeModules(null));
+        CompletableFuture<Void> shutdown = registry.shutdownModulesAsync(null).toCompletableFuture();
+
+        assertFalse(shutdown.isDone());
+        assertEquals(List.of("failing.initialize", "failing.stop", "flow.prepare", "flow.finish"), lifecycle);
+        drain.complete(null);
+        shutdown.join();
+        assertTrue(registry.shutdownModulesAsync(null).toCompletableFuture().isDone());
     }
 
     @Test

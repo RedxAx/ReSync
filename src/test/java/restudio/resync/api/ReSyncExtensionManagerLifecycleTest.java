@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
+import restudio.resync.ReSync;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.CustomContentDefinition;
@@ -51,6 +52,8 @@ import restudio.resync.flow.runtime.RuntimeExecutionBoundary;
 import restudio.resync.flow.runtime.RuntimeRegistrySnapshot;
 import restudio.resync.flow.runtime.RuntimeReceiptStore;
 import restudio.resync.flow.runtime.RuntimeSecurityBoundary;
+import restudio.resync.modules.Module;
+import restudio.resync.modules.ModuleMetadata;
 import restudio.resync.modules.ModuleContext;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.modules.ModuleRegistry;
@@ -76,6 +79,7 @@ import java.util.Set;
 import java.util.Collection;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -109,12 +113,12 @@ class ReSyncExtensionManagerLifecycleTest {
     @BeforeEach
     void setUp() {
         MockBukkit.mock();
-        plugin = MockBukkit.createMockPlugin();
+        plugin = MockBukkit.loadSimple(TestReSync.class);
         HandlerRegistry handlers = new HandlerRegistry();
         TypeAdapterRegistry adapters = new TypeAdapterRegistry();
         RuntimeDataRegistry runtimeData = new RuntimeDataRegistry();
         OptionCatalogRegistry catalogs = new OptionCatalogRegistry(runtimeData);
-        moduleContext = new ModuleContext(null, null, null, null, null, null, new ModuleRegistry(),
+        moduleContext = new ModuleContext((ReSync) plugin, null, null, null, null, null, new ModuleRegistry(),
             null, null, null, null, null, null);
         moduleContext.registerService(NodeDefinitionRegistry.class, new NodeDefinitionRegistry(false));
         moduleContext.registerService(HandlerRegistry.class, handlers);
@@ -268,6 +272,71 @@ class ReSyncExtensionManagerLifecycleTest {
         assertTrue(manager.getPluginIds().isEmpty());
         assertFalse(customContent.hasProvider(provider.getId()));
         assertFalse(manager.isShutdownPending());
+    }
+
+    @Test
+    void shutdownRetainsExtensionPublicationUntilContributedModuleDrainSucceeds() throws Exception {
+        ModuleRegistry modules = moduleContext.getModuleRegistry();
+        modules.initializeModules(moduleContext);
+        modules.startModules(moduleContext);
+        CompletableFuture.runAsync(modules::retryRuntimeModuleStops).get(1, TimeUnit.SECONDS);
+        CompletableFuture<Void> first = new CompletableFuture<>();
+        CompletableFuture<Void> retry = new CompletableFuture<>();
+        AtomicInteger preparations = new AtomicInteger();
+        AtomicInteger finishes = new AtomicInteger();
+        AtomicInteger stops = new AtomicInteger();
+        AtomicBoolean primary = new AtomicBoolean(true);
+        Module module = new Module() {
+            @Override
+            public ModuleMetadata getMetadata() {
+                return ModuleMetadata.of("drain:module", "Drain");
+            }
+
+            @Override
+            public void prepareStop(ModuleContext context) {
+                primary.set(primary.get() && Bukkit.isPrimaryThread());
+                preparations.incrementAndGet();
+            }
+
+            @Override
+            public CompletionStage<Void> finishStopAsync(ModuleContext context) {
+                primary.set(primary.get() && Bukkit.isPrimaryThread());
+                return finishes.incrementAndGet() == 1 ? first : retry;
+            }
+        };
+        manager.registerBukkitExtension(plugin, extension("drain", context -> context.modules().register(module),
+            () -> {}, stops::incrementAndGet));
+        ExtensionRegistryActivation.State active = manager.activeRegistryState();
+
+        manager.shutdown();
+        assertTrue(manager.isShutdownPending());
+        assertSame(active, manager.activeRegistryState());
+        assertTrue(modules.hasModule("drain:module"));
+        assertEquals(0, stops.get());
+        first.completeExceptionally(new IllegalStateException("Transient Drain Failure"));
+        CompletableFuture.runAsync(manager::tick).get(1, TimeUnit.SECONDS);
+        assertSame(active, manager.activeRegistryState());
+        assertEquals(1, finishes.get());
+        Bukkit.getScheduler().cancelTasks(plugin);
+        CompletableFuture.runAsync(manager::tick).get(1, TimeUnit.SECONDS);
+        MockBukkit.getMock().getScheduler().performOneTick();
+        assertTrue(manager.isShutdownPending());
+        assertSame(active, manager.activeRegistryState());
+        assertEquals(2, finishes.get());
+        Bukkit.getPluginManager().disablePlugin(plugin);
+        CompletableFuture.runAsync(manager::tick).get(1, TimeUnit.SECONDS);
+        assertTrue(manager.isShutdownPending());
+        assertSame(active, manager.activeRegistryState());
+        retry.complete(null);
+        manager.shutdown();
+
+        assertFalse(manager.isShutdownPending());
+        assertTrue(manager.getPluginIds().isEmpty());
+        assertFalse(modules.hasModule("drain:module"));
+        assertEquals(1, preparations.get());
+        assertEquals(2, finishes.get());
+        assertEquals(1, stops.get());
+        assertTrue(primary.get());
     }
 
     @Test
@@ -442,6 +511,74 @@ class ReSyncExtensionManagerLifecycleTest {
         assertTrue(manager.getPluginIds().contains("reload"));
         assertEquals(1, starts.get());
         assertEquals(1, stops.get());
+    }
+
+    @Test
+    void failedBatchInitializationRetainsCleanupUntilPrimaryRetrySucceeds() throws Exception {
+        PendingExecution fixture = pendingExecution();
+        AtomicBoolean failBatch = new AtomicBoolean();
+        AtomicBoolean failStop = new AtomicBoolean(true);
+        AtomicBoolean primary = new AtomicBoolean(true);
+        List<String> initialized = new ArrayList<>();
+        List<String> hooks = new ArrayList<>();
+        List<String> stopped = new ArrayList<>();
+        AtomicInteger attempts = new AtomicInteger();
+        try {
+            for (String id : List.of("first", "second")) {
+                manager.registerBukkitExtension(plugin, extension(id, context -> {
+                    if (failBatch.get()) {
+                        initialized.add(id);
+                        hooks.add(id);
+                        if (initialized.size() == 2) {
+                            throw new IllegalStateException("initialize failure");
+                        }
+                    }
+                }, () -> {}, () -> {
+                    primary.set(primary.get() && Bukkit.isPrimaryThread());
+                    attempts.incrementAndGet();
+                    if (id.equals(initialized.getFirst()) && failStop.get()) {
+                        throw new IllegalStateException("stop failure");
+                    }
+                    hooks.remove(id);
+                    stopped.add(id);
+                }));
+            }
+            ExtensionRegistryActivation.State active = manager.activeRegistryState();
+            failBatch.set(true);
+
+            assertFalse(manager.reloadExtensions());
+            assertSame(active, manager.activeRegistryState());
+            assertTrue(manager.isShutdownPending());
+            assertEquals(List.of(initialized.getFirst()), hooks);
+            assertEquals(2, attempts.get());
+            CompletionException failure = assertThrows(CompletionException.class, () -> fixture.execute().join());
+            assertEquals("EXECUTION_FENCED",
+                assertInstanceOf(FlowExecutor.FlowExecutionException.class, failure.getCause()).getCode());
+
+            CompletableFuture.runAsync(manager::tick).get(1, TimeUnit.SECONDS);
+            assertEquals(2, attempts.get());
+            MockBukkit.getMock().getScheduler().performOneTick();
+            assertTrue(manager.isShutdownPending());
+            assertSame(active, manager.activeRegistryState());
+            assertEquals(List.of(initialized.getFirst()), hooks);
+            failStop.set(false);
+            CompletableFuture.runAsync(manager::tick).get(1, TimeUnit.SECONDS);
+            MockBukkit.getMock().getScheduler().performOneTick();
+
+            assertFalse(manager.isShutdownPending());
+            assertSame(active, manager.activeRegistryState());
+            assertTrue(hooks.isEmpty());
+            assertEquals(initialized.reversed(), stopped);
+            assertEquals(4, attempts.get());
+            assertTrue(primary.get());
+            fixture.completion().complete(null);
+            fixture.execute().get(5, TimeUnit.SECONDS);
+            manager.tick();
+            assertEquals(4, attempts.get());
+        } finally {
+            fixture.completion().complete(null);
+            fixture.executor().shutdown();
+        }
     }
 
     @Test
@@ -1276,6 +1413,16 @@ class ReSyncExtensionManagerLifecycleTest {
             return storage;
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to open custom content test persistence", exception);
+        }
+    }
+
+    public static class TestReSync extends ReSync {
+        @Override
+        public void onEnable() {
+        }
+
+        @Override
+        public void onDisable() {
         }
     }
 

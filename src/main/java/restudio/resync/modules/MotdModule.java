@@ -54,6 +54,7 @@ public class MotdModule implements Module, Listener {
     @Override
     public void stop(ModuleContext context) {
         HandlerList.unregisterAll(this);
+        iconCache.clear();
     }
 
     @EventHandler
@@ -134,9 +135,7 @@ public class MotdModule implements Module, Listener {
         if (data.isBlank()) {
             return null;
         }
-        String hash = ResourceJson.string(profile, "iconHash", "");
-        String key = hash.isBlank() ? data : hash;
-        return iconCache.computeIfAbsent(key, ignored -> {
+        return iconCache.computeIfAbsent(data, ignored -> {
             try {
                 byte[] bytes = Base64.getDecoder().decode(stripImageDataPrefix(data));
                 BufferedImage image = validPngIcon(bytes);

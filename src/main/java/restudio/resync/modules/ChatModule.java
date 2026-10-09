@@ -348,6 +348,10 @@ public class ChatModule implements Module, Listener, ReSyncNetworkAgent.Listener
         CompletableFuture<Void> delivered = new CompletableFuture<>();
         Runnable action = () -> {
             try {
+                if (networkAgent != agent || networkPolicy != policy || !plugin.isEnabled()) {
+                    delivered.complete(null);
+                    return;
+                }
                 deliverNetworkChat(message);
                 delivered.complete(null);
             } catch (RuntimeException exception) {

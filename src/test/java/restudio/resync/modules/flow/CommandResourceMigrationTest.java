@@ -28,7 +28,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class CommandResourceMigrationTest {
     private final List<AssetTransactionCoordinator> coordinators = new ArrayList<>();
@@ -44,7 +44,7 @@ class CommandResourceMigrationTest {
     }
 
     @Test
-    void legacyCommandPathsMoveIntoCommandGraphOnce() throws IOException {
+    void legacyCommandBindingsRemainUntouchedDuringInitialization() throws IOException {
         FlowStorage storage = storage();
         FlowGraph command = new FlowGraph();
         command.setId("Name_Color");
@@ -59,9 +59,9 @@ class CommandResourceMigrationTest {
         FlowGraph migrated = storage.getGraph("command", "Name_Color");
         long revision = migrated.getResourceRevision();
 
-        assertEquals("name_color", migrated.getNodes().get("start").getInputValues().get("command"));
-        assertEquals(List.of("<text:colorMap>"), migrated.getNodes().get("start").getInputValues().get("subcommands"));
-        assertTrue(Files.exists(tempDir.resolve("assets/.migrations/command-bindings-v1.json")));
+        assertNull(migrated.getNodes().get("start").getInputValues().get("command"));
+        assertNull(migrated.getNodes().get("start").getInputValues().get("subcommands"));
+        assertFalse(Files.exists(tempDir.resolve("assets/.migrations/command-bindings-v1.json")));
 
         new FlowBlueprintPacketHandler(storage, triggers, null, null);
 
@@ -102,7 +102,7 @@ class CommandResourceMigrationTest {
         assertDoesNotThrow(() -> new FlowBlueprintPacketHandler(storage, triggers, null, null));
 
         assertNull(storage.getGraph("command", "legacy_command").getNodes().get("start").getInputValues().get("command"));
-        assertTrue(Files.readString(tempDir.resolve("assets/.migrations/command-bindings-v1.json")).contains("legacy_command"));
+        assertFalse(Files.exists(tempDir.resolve("assets/.migrations/command-bindings-v1.json")));
     }
 
     private FlowStorage storage() throws IOException {

@@ -67,6 +67,7 @@ public final class StructureResourceAdapter implements FlowResourceAdapter<ReSyn
             throw new IllegalArgumentException("Structure is required");
         }
         library().canonicalId(value.getId());
+        value.validateGeometry();
     }
 
     @Override

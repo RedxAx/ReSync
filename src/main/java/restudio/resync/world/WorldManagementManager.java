@@ -590,19 +590,40 @@ public class WorldManagementManager implements WorldManagementService, Listener,
     @Override
     public void stop() {
         callSync(() -> {
-            HandlerList.unregisterAll(this);
-            if (lockTask != null) {
-                lockTask.cancel();
-                lockTask = null;
-            }
-            EventMutationScope mutation = beginEventMutation("stop", List.copyOf(worlds.keySet()));
-            if (mutation != null) {
-                try (mutation) {
-                    persistAll();
-                    storageExecutor.shutdown();
+            Throwable failure = null;
+            try {
+                HandlerList.unregisterAll(this);
+                if (lockTask != null) {
+                    lockTask.cancel();
+                    lockTask = null;
                 }
-            } else {
-                storageExecutor.shutdown();
+                try (EventMutationScope mutation = beginEventMutation("stop", List.copyOf(worlds.keySet()))) {
+                    if (mutation != null) {
+                        storageExecutor.flush();
+                        persistAll();
+                    }
+                }
+            } catch (IOException | RuntimeException | Error exception) {
+                failure = exception;
+            } finally {
+                try {
+                    storageExecutor.shutdown();
+                } catch (IOException exception) {
+                    if (failure == null) {
+                        failure = exception;
+                    } else {
+                        failure.addSuppressed(exception);
+                    }
+                }
+            }
+            if (failure instanceof Error error) {
+                throw error;
+            }
+            if (failure instanceof RuntimeException exception) {
+                throw exception;
+            }
+            if (failure != null) {
+                throw new IllegalStateException("Failed to stop world management storage", failure);
             }
             return null;
         });
@@ -3595,14 +3616,15 @@ public class WorldManagementManager implements WorldManagementService, Listener,
             return;
         }
         try {
-            storageExecutor.submitTracked(() -> {
+            storageExecutor.submitLatest(action, () -> {
                 try {
                     operation.run();
-                } finally {
-                    scope.close();
+                } catch (RuntimeException | Error failure) {
+                    Log.warn("World storage write failed for " + action + ": " + failure.getMessage());
+                    throw failure;
                 }
-            });
-        } catch (RuntimeException exception) {
+            }, scope::close);
+        } catch (RuntimeException | Error exception) {
             scope.close();
             throw exception;
         }

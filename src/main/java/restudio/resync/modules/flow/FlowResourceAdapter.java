@@ -30,6 +30,25 @@ public interface FlowResourceAdapter<T> {
         }
     }
 
+    class BlockedNetworkResource extends IllegalArgumentException {
+        private final String resourceType;
+        private final String resourceId;
+
+        public BlockedNetworkResource(String resourceType, String resourceId, String reason) {
+            super(Objects.requireNonNull(reason, "Blocked network resource reason is required"));
+            this.resourceType = Objects.requireNonNull(resourceType, "Blocked network resource type is required");
+            this.resourceId = Objects.requireNonNull(resourceId, "Blocked network resource ID is required");
+        }
+
+        public String resourceType() {
+            return resourceType;
+        }
+
+        public String resourceId() {
+            return resourceId;
+        }
+    }
+
     String AUTHORITATIVE_MUTATION_IDENTITY_UNAVAILABLE =
         "Authoritative resource mutation identity durability is unavailable";
 
@@ -37,11 +56,19 @@ public interface FlowResourceAdapter<T> {
 
     T get(String id);
 
+    default T getNetwork(String id) {
+        return get(id);
+    }
+
     default boolean conflicts(String id) {
         return get(id) != null;
     }
 
     List<String> listIds();
+
+    default boolean supportsNetworkSync() {
+        return true;
+    }
 
     default boolean coordinatedNetworkScan() {
         return false;
@@ -50,15 +77,35 @@ public interface FlowResourceAdapter<T> {
 
     T deserialize(String json);
 
+    default T deserializeNetwork(String json) {
+        return deserialize(json);
+    }
+
     default String serialize(T value) {
         return new Gson().toJson(value);
     }
 
     String id(T value);
 
+    default String serializeNetwork(T value) {
+        return serialize(value);
+    }
+
+    default String networkPayload(String payload) {
+        return payload;
+    }
+
+    default void saveNetwork(T value) {
+        save(value);
+    }
+
     void save(T value);
 
     void delete(String id);
+
+    default void deleteNetwork(String id) {
+        delete(id);
+    }
 
     default boolean supportsAuthoritativeMutationIdentity() {
         return false;

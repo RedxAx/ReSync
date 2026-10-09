@@ -114,6 +114,35 @@ public class ReSyncStructure {
         this.blockDataStrings = blockDataStrings;
     }
 
+    public void validateGeometry() {
+        if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) {
+            throw new IllegalArgumentException("Structure dimensions must be positive");
+        }
+        validateArray(blockTypes, "Block Types");
+        validateArray(blockDataStrings, "Block Data");
+    }
+
+    private void validateArray(String[][][] values, String label) {
+        if (values == null || values.length != sizeY) {
+            throw new IllegalArgumentException("Structure " + label + " height does not match its dimensions");
+        }
+        for (String[][] layer : values) {
+            if (layer == null || layer.length != sizeX) {
+                throw new IllegalArgumentException("Structure " + label + " width does not match its dimensions");
+            }
+            for (String[] row : layer) {
+                if (row == null || row.length != sizeZ) {
+                    throw new IllegalArgumentException("Structure " + label + " depth does not match its dimensions");
+                }
+                for (String value : row) {
+                    if (value == null || value.isBlank()) {
+                        throw new IllegalArgumentException("Structure " + label + " values are required");
+                    }
+                }
+            }
+        }
+    }
+
     public long getCreatedAt() {
         return createdAt;
     }

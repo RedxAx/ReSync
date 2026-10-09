@@ -79,6 +79,7 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
     private final Map<FlowResourceKey, Set<TrackedMutationCompletion>> pendingDurableCompletionsByKey;
     private final ThreadLocal<FlowResourceMutationLease> currentMutationLease;
     private final AtomicReference<CoreGraphResourceAuthority> coreGraphAuthority;
+    private AtomicReference<Supplier<NetworkCoreMutations>> networkCoreMutations = new AtomicReference<>();
     private final CoreResourceMutationBus coreMutationBus;
     private Consumer<String> changeListener = ignored -> {
     };
@@ -175,6 +176,34 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
 
     public void bindCoreGraphAuthority(CoreGraphResourceAuthority authority) {
         bindCoreGraphResourceAuthority(authority);
+    }
+
+    public interface NetworkCoreMutations {
+        void save(ServerResourceLocator resource, CoreGraphStorageBoundary.Decoded source);
+
+        void delete(ServerResourceLocator resource);
+    }
+
+    public void bindNetworkCoreMutations(Supplier<NetworkCoreMutations> mutations) {
+        if (!networkCoreMutations.compareAndSet(null, Objects.requireNonNull(mutations, "Network Core mutation authority is required"))) {
+            throw new IllegalStateException("Network Core mutation authority is already bound");
+        }
+    }
+
+    public void saveNetworkCoreGraph(ServerResourceLocator resource, CoreGraphStorageBoundary.Decoded source) {
+        requireNetworkCoreMutations().save(resource, source);
+    }
+
+    public void deleteNetworkCoreGraph(ServerResourceLocator resource) {
+        requireNetworkCoreMutations().delete(resource);
+    }
+
+    private NetworkCoreMutations requireNetworkCoreMutations() {
+        Supplier<NetworkCoreMutations> mutations = networkCoreMutations.get();
+        if (mutations == null) {
+            throw new IllegalStateException("Durable network Core mutation authority is unavailable");
+        }
+        return Objects.requireNonNull(mutations.get(), "Durable network Core mutation authority is unavailable");
     }
 
     public CoreGraphResourceAuthority coreGraphResourceAuthority() {
@@ -1526,6 +1555,7 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
             pendingDurableCompletions, pendingDurableCompletionsByKey, currentMutationLease, coreGraphAuthority,
             coreMutationBus);
         copy.registrations.putAll(registrations);
+        copy.networkCoreMutations = networkCoreMutations;
         copy.auditRecords.addAll(auditRecords);
         copy.changeListener = changeListener;
         copy.liveRefreshExecutor = liveRefreshExecutor;
@@ -1661,6 +1691,52 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
     public FlowOperationResult<FlowResourceReference> save(String typeId, Object value, FlowResourceMutationContext context) {
         return authorizedMutation(typeId, resourceId(typeId, value), "save", context,
             resolvedContext -> persist(typeId, value, "save", ExistencePolicy.ANY, resolvedContext));
+    }
+
+    public FlowOperationResult<FlowResourceReference> saveNetwork(String typeId, Object value) {
+        if (isCoreGraphType(typeId)) {
+            return mutateNetworkCore(typeId, resourceId(typeId, value), value, false);
+        }
+        return authorizedMutation(typeId, resourceId(typeId, value), "save", FlowResourceMutationContext.system(),
+            context -> persist(typeId, value, "save", ExistencePolicy.ANY, context, true));
+    }
+
+    public FlowOperationResult<FlowResourceReference> deleteNetwork(String typeId, String id) {
+        return isCoreGraphType(typeId) ? mutateNetworkCore(typeId, id, null, true) : delete(typeId, id);
+    }
+
+    private FlowOperationResult<FlowResourceReference> mutateNetworkCore(String typeId, String id, Object value, boolean deleted) {
+        FlowResourceRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.mutateNetworkCore(typeId, id, value, deleted);
+        }
+        ResourceRegistration registration = registration(typeId);
+        FlowResourceAdapter<Object> adapter = registration == null ? null : adapter(registration.adapter());
+        String operation = deleted ? "delete" : "save";
+        if (adapter == null) {
+            return unavailable(typeId, operation);
+        }
+        if (!adapter.supportedOperations().contains(operation)) {
+            return unsupported(typeId, operation);
+        }
+        if (id == null || id.isBlank()) {
+            return FlowOperationResult.failure("RESOURCE_ID_REQUIRED", "Resource ID is required", Map.of("resourceType", typeId));
+        }
+        if (!authorizationPolicy.authorize(FlowResourceMutationContext.system(), operation, typeId, id)) {
+            return FlowOperationResult.failure("RESOURCE_AUTHORIZATION_DENIED", "Resource operation is not authorized",
+                Map.of("operation", operation, "resourceType", typeId, "resourceId", id));
+        }
+        try {
+            if (deleted) {
+                adapter.deleteNetwork(id);
+            } else {
+                adapter.saveNetwork(value);
+            }
+            return FlowOperationResult.success(reference(registration, id, !deleted));
+        } catch (RuntimeException exception) {
+            return FlowOperationResult.failure("RESOURCE_" + operation.toUpperCase(Locale.ROOT) + "_FAILED", failureMessage(exception),
+                Map.of("operation", operation, "resourceType", typeId, "resourceId", id));
+        }
     }
 
     void saveAuthoritative(String typeId, Object value) {
@@ -1920,6 +1996,12 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
     private FlowOperationResult<FlowResourceReference> persist(String typeId, Object value, String operation,
                                                                ExistencePolicy existencePolicy,
                                                                FlowResourceMutationContext context) {
+        return persist(typeId, value, operation, existencePolicy, context, false);
+    }
+
+    private FlowOperationResult<FlowResourceReference> persist(String typeId, Object value, String operation,
+                                                               ExistencePolicy existencePolicy,
+                                                               FlowResourceMutationContext context, boolean network) {
         ResourceRegistration registration = registration(typeId);
         FlowResourceAdapter<?> rawAdapter = registration != null ? registration.adapter() : null;
         if (rawAdapter == null) {
@@ -1965,6 +2047,8 @@ public final class FlowResourceRegistry implements AggregateResourceCreateStorag
                 adapter.save(value, context.exactMutationId(), context.expectedRevision(), expectedHash);
                 verifyExactStamp(typeId, id, context.expectedRevision() + 1L, context.exactMutationId(), expectedHash,
                     false, adapter, value);
+            } else if (network) {
+                adapter.saveNetwork(value);
             } else {
                 adapter.save(value);
             }

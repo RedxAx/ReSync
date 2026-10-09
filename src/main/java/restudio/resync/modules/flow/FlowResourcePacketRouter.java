@@ -15,10 +15,14 @@ import restudio.resync.core.Session;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
+import restudio.resync.customcontent.CustomContentTransfer;
+import restudio.resync.flow.identity.ServerId;
 import restudio.resync.customcontent.CustomContentValidator;
 import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.customcontent.ItemAttributeValidationException;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.CoreGraphStorageBoundary;
+import restudio.resync.flow.CoreGraphTransfer;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.GuiManager;
 import restudio.resync.flow.ScoreboardTemplateManager;
@@ -47,6 +51,10 @@ import restudio.resync.world.WorldManagementService;
 import restudio.resync.world.WorldRegistryEntry;
 import restudio.resync.world.WorldSnapshot;
 import restudio.resync.worldgen.WorldGenProjectStorage;
+import restudio.resync.worldgen.contract.WorldGenNodeIdentity;
+import restudio.resync.worldgen.data.WorldGenGraph;
+import restudio.resync.worldgen.data.WorldGenNode;
+import restudio.resync.worldgen.data.WorldGenStage;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenSerializer;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
@@ -58,6 +66,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -167,7 +176,7 @@ public class FlowResourcePacketRouter {
         register(guiAdapter(storage, sender));
         register(scoreboardAdapter(storage, sender));
         register(tabAdapter(storage, sender));
-        register(customContentAdapter(customContentStorage, customContentService, sender,
+        register(customContentAdapter(storage, customContentStorage, customContentService, sender,
             itemAttributeSchemaService != null ? itemAttributeSchemaService : new ItemAttributeSchemaService()));
         register(projectMetadataAdapter(storage, sender));
         registerLifecycle(ReSyncResourceCatalog.STRUCTURE_OWNER, new StructureResourceAdapter(StructureLibrary::active));
@@ -216,6 +225,62 @@ public class FlowResourcePacketRouter {
     private FlowResourceAdapter<FlowGraph> graphAdapter(FlowStorage storage, String resourceType) {
         ReSyncManagedResource descriptor = ReSyncResourceCatalog.byType(resourceType);
         return new FlowResourceAdapter<>() {
+            private final Map<String, NetworkGraph> networkGraphs = new LinkedHashMap<>(16, 0.75f, true);
+            private long networkBytes;
+
+            private record NetworkGraph(CoreGraphStorageBoundary.AssetEnvelope stamp, String payload, long bytes) {}
+
+            private final class NetworkGraphValue extends FlowGraph {
+                private final CoreGraphStorageBoundary.Decoded source;
+
+                private NetworkGraphValue(CoreGraphStorageBoundary.Decoded source) {
+                    this.source = source;
+                    setId(source.graphDocument() == null ? source.functionSourceDocument().graph().resource().id()
+                        : source.graphDocument().resource().id());
+                    setResourceType(resourceType);
+                    setFunction("function".equals(resourceType));
+                }
+            }
+
+            private FlowGraph transfer(CoreGraphStorageBoundary.Decoded source) {
+                return new NetworkGraphValue(source);
+            }
+
+            private CoreGraphStorageBoundary.Decoded transferSource(FlowGraph value) {
+                if (value instanceof NetworkGraphValue network) {
+                    return network.source;
+                }
+                throw new IllegalArgumentException("Shared graph requires a typed Core payload");
+            }
+
+            private ServerResourceLocator localResource(String id) {
+                return new ServerResourceLocator(ServerId.parseCanonicalText(storage.projectMetadataResourceId()),
+                    ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of(resourceType)), id);
+            }
+
+            private synchronized String sharedPayload(CoreGraphStorageBoundary.Decoded source) {
+                String id = source.graphDocument() == null ? source.functionSourceDocument().graph().resource().id()
+                    : source.graphDocument().resource().id();
+                NetworkGraph resident = networkGraphs.get(id);
+                if (resident != null && resident.stamp().equals(source.envelope())) {
+                    return resident.payload();
+                }
+                String payload = CoreGraphTransfer.serialize(source);
+                if (resident != null) {
+                    networkGraphs.remove(id);
+                    networkBytes -= resident.bytes();
+                }
+                long bytes = (long) payload.length() * Character.BYTES;
+                if (bytes <= 32L * 1024 * 1024) {
+                    networkGraphs.put(id, new NetworkGraph(source.envelope(), payload, bytes));
+                    networkBytes += bytes;
+                }
+                while (networkGraphs.size() > 128 || networkBytes > 32L * 1024 * 1024) {
+                    networkBytes -= networkGraphs.remove(networkGraphs.keySet().iterator().next()).bytes();
+                }
+                return payload;
+            }
+
             @Override
             public ReSyncManagedResource descriptor() {
                 return descriptor;
@@ -224,6 +289,54 @@ public class FlowResourcePacketRouter {
             @Override
             public FlowGraph get(String id) {
                 return storage.getGraph(resourceType, id);
+            }
+
+            @Override
+            public FlowGraph getNetwork(String id) {
+                return storage.getCoreGraph(resourceType, id).map(this::transfer).orElse(null);
+            }
+
+            @Override
+            public FlowGraph deserializeNetwork(String json) {
+                return transfer(CoreGraphTransfer.decode(json, resourceType));
+            }
+
+            @Override
+            public String serializeNetwork(FlowGraph value) {
+                return sharedPayload(transferSource(value));
+            }
+
+            @Override
+            public String networkPayload(String payload) {
+                JsonObject document = JsonParser.parseString(payload).getAsJsonObject();
+                String id;
+                if (document.has(CoreGraphStorageBoundary.CORE_PAYLOAD_KIND)) {
+                    CoreGraphStorageBoundary.Decoded source = new CoreGraphStorageBoundary().decodeText(payload);
+                    id = source.graphDocument() == null ? source.functionSourceDocument().graph().resource().id()
+                        : source.graphDocument().resource().id();
+                } else {
+                    id = document.has("id") ? document.get("id").getAsString() : "";
+                }
+                CoreGraphStorageBoundary.Decoded current = storage.getCoreGraph(resourceType, id)
+                    .orElseThrow(() -> new IllegalStateException("Committed Core graph is unavailable for network synchronization"));
+                return sharedPayload(current);
+            }
+
+            @Override
+            public void saveNetwork(FlowGraph value) {
+                CoreGraphStorageBoundary.Decoded source = transferSource(value);
+                resourceRegistry.saveNetworkCoreGraph(localResource(value.getId()), source);
+            }
+
+            @Override
+            public void deleteNetwork(String id) {
+                resourceRegistry.deleteNetworkCoreGraph(localResource(id));
+                synchronized (this) {
+                    NetworkGraph removed = networkGraphs.remove(id);
+                    if (removed != null) {
+                        networkBytes -= removed.bytes();
+                    }
+                }
             }
 
             @Override
@@ -405,6 +518,50 @@ public class FlowResourcePacketRouter {
             @Override
             public WorldGenProject deserialize(String json) {
                 return WorldGenSerializer.deserializeProject(json);
+            }
+
+            @Override
+            public WorldGenProject deserializeNetwork(String json) {
+                JsonObject payload = JsonParser.parseString(json).getAsJsonObject();
+                if (!payload.has("id") || !payload.get("id").isJsonPrimitive()
+                    || !payload.getAsJsonPrimitive("id").isString()) {
+                    throw new IllegalArgumentException("WorldGen network resource must contain a text ID");
+                }
+                jsonResourceValidator.validate(ReSyncResourceCatalog.WORLDGEN, payload);
+                WorldGenProject project = deserialize(json);
+                if (storage.legacyCompatibilityEnabled()) {
+                    return project;
+                }
+                boolean legacy = false;
+                for (WorldGenStage stage : WorldGenStage.values()) {
+                    WorldGenGraph graph = project.graph(stage);
+                    if (graph == null || graph.getNodes() == null) {
+                        continue;
+                    }
+                    for (WorldGenNode node : graph.getNodes().values()) {
+                        if (node == null) {
+                            throw new IllegalArgumentException("WorldGen node is required");
+                        }
+                        WorldGenNodeIdentity.canonical(node.getType(), true);
+                        legacy |= node.getType().indexOf(':') < 0;
+                    }
+                }
+                if (!legacy) {
+                    return project;
+                }
+                if (!payload.has("version") || !payload.get("version").isJsonPrimitive()
+                    || !payload.getAsJsonPrimitive("version").isNumber()
+                    || payload.get("version").getAsBigDecimal().intValueExact() != WorldGenProject.CURRENT_VERSION) {
+                    throw new IllegalArgumentException("Unsupported WorldGen network resource version");
+                }
+                WorldGenCompileDiagnostics diagnostics = PipelineCompiler.diagnoseProject(project, true);
+                if (!diagnostics.isSuccess()) {
+                    String message = diagnostics.getDiagnostics().isEmpty() ? "WorldGen Compile Failed"
+                        : diagnostics.getDiagnostics().getFirst().message();
+                    throw new IllegalArgumentException(message);
+                }
+                throw new FlowResourceAdapter.BlockedNetworkResource(ReSyncResourceCatalog.WORLDGEN, project.getId(),
+                    "Legacy WorldGen node identities require an explicit upgrade");
             }
 
             @Override
@@ -1141,7 +1298,7 @@ public class FlowResourcePacketRouter {
         };
     }
 
-    private FlowResourceAdapter<CustomContentDefinition> customContentAdapter(CustomContentStorage storage, CustomContentService service, FlowPacketSender sender,
+    private FlowResourceAdapter<CustomContentDefinition> customContentAdapter(FlowStorage flowStorage, CustomContentStorage storage, CustomContentService service, FlowPacketSender sender,
                                                                                 ItemAttributeSchemaService attributeSchemaService) {
         CustomContentValidator validator = new CustomContentValidator();
         return new FlowResourceAdapter<>() {
@@ -1195,6 +1352,21 @@ public class FlowResourcePacketRouter {
             @Override
             public void save(CustomContentDefinition value) {
                 storage.save(value);
+            }
+
+            @Override
+            public String serializeNetwork(CustomContentDefinition value) {
+                return CustomContentTransfer.serialize(value);
+            }
+
+            @Override
+            public String networkPayload(String payload) {
+                return serializeNetwork(deserialize(payload));
+            }
+
+            @Override
+            public void saveNetwork(CustomContentDefinition value) {
+                storage.saveNetwork(value, ServerId.parseCanonicalText(flowStorage.projectMetadataResourceId()));
             }
 
             @Override
@@ -1353,6 +1525,11 @@ public class FlowResourcePacketRouter {
             @Override
             public ReSyncManagedResource descriptor() {
                 return ReSyncResourceCatalog.byType(ReSyncResourceCatalog.PROJECT_METADATA);
+            }
+
+            @Override
+            public boolean supportsNetworkSync() {
+                return false;
             }
 
             @Override
@@ -1586,6 +1763,13 @@ public class FlowResourcePacketRouter {
                 if (ReSyncResourceCatalog.SCHEDULE_DEFINITION.equals(type)) {
                     ScheduleDefinition.from(value, id(value));
                 }
+                return value;
+            }
+
+            @Override
+            public JsonObject deserializeNetwork(String json) {
+                JsonObject value = deserialize(json);
+                jsonResourceValidator.validateNetwork(type, value);
                 return value;
             }
 

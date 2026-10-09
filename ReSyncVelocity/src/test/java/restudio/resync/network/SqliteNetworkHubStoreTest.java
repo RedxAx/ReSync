@@ -7,9 +7,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -64,6 +68,43 @@ class SqliteNetworkHubStoreTest {
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement(); var result = statement.executeQuery("PRAGMA user_version")) {
             assertTrue(result.next());
             assertEquals(3, result.getInt(1));
+        }
+    }
+
+    @Test
+    void drainsAcceptedWritesWhenClosingAFullQueue() throws Exception {
+        Path database = temporaryDirectory.resolve("close-full.db");
+        List<CompletableFuture<Void>> writes = new ArrayList<>();
+        try (SqliteNetworkHubStore store = new SqliteNetworkHubStore(database, 32)) {
+            store.open().join();
+            try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement()) {
+                statement.execute("BEGIN IMMEDIATE");
+                for (int index = 0; index < 34; index++) {
+                    CompletableFuture<Void> write = store.appendAudit("network", "operator", "proxy.command", "proxy", "sha256:abc", index);
+                    if (write.isCompletedExceptionally()) {
+                        CompletionException failure = assertThrows(CompletionException.class, write::join);
+                        assertEquals("Append Network Audit Queue Is Full", failure.getCause().getMessage());
+                        break;
+                    }
+                    writes.add(write);
+                }
+                assertTrue(writes.size() >= 32 && writes.size() < 34);
+                CompletableFuture<Void> closing = CompletableFuture.runAsync(store::close);
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+                String rejection;
+                do {
+                    CompletionException failure = assertThrows(CompletionException.class, () -> store.pendingEvents("network", "lobby", 1, 0).join());
+                    rejection = failure.getCause().getMessage();
+                } while (!"Network Store Is Closing".equals(rejection) && System.nanoTime() < deadline);
+                assertEquals("Network Store Is Closing", rejection);
+                statement.execute("COMMIT");
+                CompletableFuture.allOf(writes.toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+                closing.get(5, TimeUnit.SECONDS);
+            }
+        }
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement(); var result = statement.executeQuery("SELECT COUNT(*) FROM audit_records")) {
+            assertTrue(result.next());
+            assertEquals(writes.size(), result.getInt(1));
         }
     }
 
@@ -135,7 +176,7 @@ class SqliteNetworkHubStoreTest {
     void fencesStateAndCommitsOwnershipOnlyAfterApplyAcknowledgement() {
         try (SqliteNetworkHubStore store = store()) {
             UUID playerId = UUID.randomUUID();
-            long now = 2_000;
+            long now = System.currentTimeMillis();
             PlayerTransfer transfer = store.beginTransfer("transfer-one", "network", playerId, "lobby", "survival", now + 30_000, now).join();
             assertEquals(playerId, store.listLeases("network").join().getFirst().playerId());
             byte[] payload = bytes("compressed-state");
@@ -169,7 +210,7 @@ class SqliteNetworkHubStoreTest {
     @Test
     void rejectsSnapshotsWithForgedPayloadHashes() {
         try (SqliteNetworkHubStore store = store()) {
-            long now = 4_000;
+            long now = System.currentTimeMillis();
             UUID playerId = UUID.randomUUID();
             PlayerTransfer transfer = store.beginTransfer("transfer-forged", "network", playerId, "lobby", "survival", now + 30_000, now).join();
             PlayerStateSnapshot forged = new PlayerStateSnapshot("snapshot-forged", "network", playerId, transfer.fenceEpoch(), "survival-shared", bytes("state"), NetworkPayloads.sha256(bytes("different")), 1, 1, "lobby", now + 1, false);
@@ -182,7 +223,7 @@ class SqliteNetworkHubStoreTest {
     @Test
     void savesOwnedDisconnectSnapshotsAndStartsFencedRestores() {
         try (SqliteNetworkHubStore store = store()) {
-            long now = 5_000;
+            long now = System.currentTimeMillis();
             UUID playerId = UUID.randomUUID();
             PlayerLease lease = store.claimOwnership("network", playerId, "survival-one", now).join();
             byte[] payload = bytes("logout-state");
@@ -202,7 +243,7 @@ class SqliteNetworkHubStoreTest {
     @Test
     void restoresHistoricalSnapshotsAndRetainsPinnedHistory() {
         try (SqliteNetworkHubStore store = store()) {
-            long now = 10_000;
+            long now = System.currentTimeMillis();
             UUID playerId = UUID.randomUUID();
             PlayerLease lease = store.claimOwnership("network", playerId, "survival-one", now).join();
             byte[] oldPayload = bytes("old-state");
@@ -226,11 +267,11 @@ class SqliteNetworkHubStoreTest {
     void expiresTransfersAndCreatesConsistentBackups() throws Exception {
         Path backup = temporaryDirectory.resolve("backup.db");
         try (SqliteNetworkHubStore store = store()) {
-            long now = 3_000;
+            long now = System.currentTimeMillis();
             UUID playerId = UUID.randomUUID();
-            store.beginTransfer("transfer-one", "network", playerId, "lobby", "survival", now + 10, now).join();
+            store.beginTransfer("transfer-one", "network", playerId, "lobby", "survival", now + 30_000, now).join();
 
-            assertEquals(1, store.expireTransfers("network", now + 11).join());
+            assertEquals(1, store.expireTransfers("network", now + 30_001).join());
             assertEquals(NetworkTransferStatus.TIMED_OUT, store.getTransfer("transfer-one").join().orElseThrow().status());
             assertEquals("", store.getLease("network", playerId).join().orElseThrow().pendingNodeId());
             assertEquals(backup, store.backup(backup).join());

@@ -37,6 +37,10 @@ public enum NetworkFrameType {
     RESOURCE_LIST(71),
     RESOURCE_SET(72),
     RESOURCE_CHANGED(73),
+    EDITOR_OPEN(80),
+    EDITOR_DATA(81),
+    EDITOR_CLOSE(82),
+    EDITOR_OPENED(83),
     RESPONSE(100),
     ERROR(101);
 

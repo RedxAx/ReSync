@@ -63,7 +63,9 @@ public class ConnectionInfo {
     }
 
     public boolean isOpen() {
-        return webSocket == null || webSocket.isOpen();
+        ConnectionState current = state;
+        return (current == ConnectionState.CONNECTING || current == ConnectionState.CONNECTED
+            || current == ConnectionState.AUTHENTICATED) && (webSocket == null || webSocket.isOpen());
     }
 
     public int getConnectionId() {

@@ -64,7 +64,7 @@ public class ConnectionManager {
     }
 
     public int getConnectionCount() {
-        return connections.size();
+        return connections.size() + virtualConnections.size();
     }
 
     public int reconnectWebSocketClients(String reason) {
@@ -118,6 +118,7 @@ public class ConnectionManager {
             }
         } catch (InterruptedException e) {
             heartbeatExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 }

@@ -22,11 +22,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class NetworkFlowBridge implements ReSyncNetworkAgent.Listener {
     private final Plugin plugin;
-    private final Map<String, Observation> observations = new ConcurrentHashMap<>();
-    private ReSyncNetworkAgent agent;
+    private volatile Delivery current;
 
     public NetworkFlowBridge(Plugin plugin) {
         this.plugin = plugin;
@@ -34,63 +34,132 @@ public class NetworkFlowBridge implements ReSyncNetworkAgent.Listener {
 
     public synchronized void connect(ReSyncNetworkAgent networkAgent) {
         disconnect();
-        agent = networkAgent;
-        if (agent != null) {
-            agent.addListener(this);
+        if (networkAgent != null) {
+            Delivery delivery = new Delivery(networkAgent);
+            current = delivery;
+            networkAgent.addListener(delivery);
         }
     }
 
     public synchronized void disconnect() {
-        if (agent != null) {
-            agent.removeListener(this);
-            agent = null;
+        Delivery delivery = current;
+        current = null;
+        if (delivery != null) {
+            delivery.close();
+            delivery.agent.removeListener(delivery);
         }
-        observations.clear();
     }
 
     @Override
     public void onPresenceChanged(NetworkNodePresence presence) {
-        if (presence.capacity() <= 0) {
-            return;
+        Delivery delivery = current;
+        if (delivery != null) {
+            delivery.onPresenceChanged(presence);
         }
-        String health = health(presence);
-        Observation previous = observations.put(presence.nodeId(), new Observation(presence.status().name(), health));
-        if (previous == null || previous.status().equals(presence.status().name()) && previous.health().equals(health)) {
-            return;
-        }
-        dispatch(() -> Bukkit.getPluginManager().callEvent(new ReSyncNetworkServerStatusEvent(presence, previous.status(), health, previous.health())));
     }
 
     @Override
     public void onVariableChanged(NetworkVariable variable) {
-        dispatch(() -> Bukkit.getPluginManager().callEvent(new ReSyncNetworkVariableChangedEvent(variable)));
+        Delivery delivery = current;
+        if (delivery != null) {
+            delivery.onVariableChanged(variable);
+        }
     }
 
     @Override
     public CompletionStage<Void> onEventReceived(NetworkEvent event) {
-        CompletableFuture<Void> completed = new CompletableFuture<>();
-        dispatch(() -> {
-            try {
+        Delivery delivery = current;
+        return delivery == null ? CompletableFuture.failedFuture(unavailable()) : delivery.onEventReceived(event);
+    }
+
+    private IllegalStateException unavailable() {
+        return new IllegalStateException("Network Flow Delivery Is Unavailable");
+    }
+
+    private final class Delivery implements ReSyncNetworkAgent.Listener {
+        private final ReSyncNetworkAgent agent;
+        private final Map<String, Observation> observations = new ConcurrentHashMap<>();
+        private final Set<CompletableFuture<Void>> pending = ConcurrentHashMap.newKeySet();
+        private volatile boolean closed;
+
+        private Delivery(ReSyncNetworkAgent agent) {
+            this.agent = agent;
+        }
+
+        private boolean active() {
+            return !closed && current == this && plugin.isEnabled();
+        }
+
+        @Override
+        public void onPresenceChanged(NetworkNodePresence presence) {
+            if (presence.capacity() <= 0 || !active()) {
+                return;
+            }
+            dispatch(() -> {
+                String health = health(presence);
+                Observation previous = observations.put(presence.nodeId(), new Observation(presence.status().name(), health));
+                if (previous != null && (!previous.status().equals(presence.status().name()) || !previous.health().equals(health))) {
+                    Bukkit.getPluginManager().callEvent(new ReSyncNetworkServerStatusEvent(presence, previous.status(), health, previous.health()));
+                }
+            });
+        }
+
+        @Override
+        public void onVariableChanged(NetworkVariable variable) {
+            dispatch(() -> Bukkit.getPluginManager().callEvent(new ReSyncNetworkVariableChangedEvent(variable)));
+        }
+
+        @Override
+        public CompletionStage<Void> onEventReceived(NetworkEvent event) {
+            return dispatch(() -> {
                 if (NetworkEventTopics.PLAYER_LIFECYCLE.equals(event.channel())) {
                     dispatchPlayerLifecycle(event.networkId(), NetworkPlayerLifecycleCodec.decode(event.payload()));
                 }
+                if (!active()) {
+                    throw unavailable();
+                }
                 Bukkit.getPluginManager().callEvent(new ReSyncNetworkEventReceivedEvent(event));
-                completed.complete(null);
+            });
+        }
+
+        private CompletableFuture<Void> dispatch(Runnable action) {
+            CompletableFuture<Void> completed = new CompletableFuture<>();
+            pending.add(completed);
+            completed.whenComplete((ignored, failure) -> pending.remove(completed));
+            if (!active()) {
+                completed.completeExceptionally(unavailable());
+                return completed;
+            }
+            Runnable delivery = () -> {
+                if (completed.isDone()) {
+                    return;
+                }
+                try {
+                    if (!active()) {
+                        throw unavailable();
+                    }
+                    action.run();
+                    completed.complete(null);
+                } catch (RuntimeException exception) {
+                    completed.completeExceptionally(exception);
+                }
+            };
+            try {
+                if (Bukkit.isPrimaryThread()) {
+                    delivery.run();
+                } else {
+                    Bukkit.getScheduler().runTask(plugin, delivery);
+                }
             } catch (RuntimeException exception) {
                 completed.completeExceptionally(exception);
             }
-        });
-        return completed;
-    }
-
-    private void dispatch(Runnable action) {
-        if (!plugin.isEnabled()) {
-            return;
+            return completed;
         }
-        if (Bukkit.isPrimaryThread()) {
-            action.run();
-        } else {
-            Bukkit.getScheduler().runTask(plugin, action);
+
+        private void close() {
+            closed = true;
+            pending.forEach(future -> future.completeExceptionally(unavailable()));
+            observations.clear();
         }
     }
 

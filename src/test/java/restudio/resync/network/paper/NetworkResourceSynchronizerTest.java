@@ -4,6 +4,13 @@ import com.google.gson.Gson;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.resync.modules.flow.FlowResourceAdapter;
+import restudio.resync.modules.flow.FlowResourcePacketRouter;
+import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.network.NetworkPayloads;
+import restudio.resync.network.NetworkResource;
+import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig.ResourceConflictPolicy;
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig.ResourcePolicy;
@@ -70,6 +77,32 @@ class NetworkResourceSynchronizerTest {
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, synchronizer::scanLocalResources);
         assertTrue(failure.getMessage().contains(ReSyncResourceCatalog.GUI));
+    }
+
+    @Test
+    void projectMetadataStaysLocalDuringSharedResourceSync() throws Exception {
+        ServerId server = new ServerId(UUID.randomUUID());
+        try (AssetTransactionCoordinator coordinator = AssetTransactionCoordinator.open(temporary.resolve("assets"), new Gson())) {
+            FlowStorage storage = new FlowStorage(temporary.toFile(), LegacyRuntimeActivationGate.runtime(temporary),
+                new AssetPersistenceGate(temporary), server, coordinator);
+            storage.saveProjectMetadata("{\"serverId\":\"project\",\"resources\":[]}", UUID.randomUUID(), 0L);
+            FlowResourceRegistry registry = new FlowResourceRegistry();
+            new FlowResourcePacketRouter(storage, null, null, null, null, null, null, registry, ignored -> {
+            });
+            registry.adapters().stream().map(adapter -> adapter.descriptor().typeId()).toList().stream()
+                .filter(type -> !ReSyncResourceCatalog.PROJECT_METADATA.equals(type)).forEach(registry::unregister);
+            ResourcePolicy policy = new ResourcePolicy(true, SelectionMode.ALL, Set.of(), ResourceConflictPolicy.NETWORK_WINS);
+            NetworkResourceSynchronizer synchronizer = new NetworkResourceSynchronizer(null, null, registry, policy, temporary, null);
+            String retained = storage.getProjectMetadata("project");
+            assertTrue(synchronizer.scanLocalResources().isEmpty());
+            String foreign = UUID.randomUUID().toString();
+            byte[] payload = ("{\"serverId\":\"" + foreign + "\",\"resources\":[]}").getBytes(StandardCharsets.UTF_8);
+            synchronizer.onResourceChanged(new NetworkResource("network", ReSyncResourceCatalog.PROJECT_METADATA,
+                foreign, 1L, NetworkPayloads.sha256(payload), payload, false, "other-node", 1L));
+            synchronizer.saved(ReSyncResourceCatalog.PROJECT_METADATA, server.canonicalText(), retained);
+            synchronizer.deleted(ReSyncResourceCatalog.PROJECT_METADATA, server.canonicalText());
+            assertEquals(retained, storage.getProjectMetadata("project"));
+        }
     }
 
     @Test

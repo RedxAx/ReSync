@@ -7,6 +7,7 @@ import restudio.resync.Log;
 import restudio.resync.migration.MigrationPaths;
 import restudio.resync.network.NetworkResourceMetadata;
 import restudio.resync.storage.StorageSafety;
+import restudio.resync.storage.AssetTransactionCoordinator.CommittedAsset;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -21,6 +22,8 @@ final class NetworkResourceManifestStore {
     private static final int VERSION = 1;
     private final String fileName;
     private final Map<String, Entry> entries = new LinkedHashMap<>();
+    private final Map<String, BlockedResource> blocked = new LinkedHashMap<>(16, 0.75f, true);
+    private String blockedPeer = "";
     private Path file;
     private String loadFailure;
     private boolean quiesced;
@@ -56,6 +59,68 @@ final class NetworkResourceManifestStore {
         return Map.copyOf(entries);
     }
 
+    synchronized boolean blocked(String peer, NetworkResourceMetadata metadata) {
+        return blocked(peer, metadata, null);
+    }
+
+    synchronized boolean blocked(String peer, NetworkResourceMetadata metadata, CommittedAsset localStamp) {
+        requireHealthy();
+        requirePeer(peer);
+        BlockedResource value = blocked.get(metadata.key());
+        if (value == null) {
+            return false;
+        }
+        if (value.revision() == metadata.revision() && value.payloadHash().equals(metadata.payloadHash())
+            && value.deleted() == metadata.deleted()
+            && (value.localStamp() == null || value.localStamp().equals(localStamp))) {
+            return true;
+        }
+        blocked.remove(metadata.key());
+        return false;
+    }
+
+    synchronized boolean block(String peer, NetworkResourceMetadata metadata, String reason) {
+        return block(peer, metadata.type(), metadata.resourceId(), metadata, null, reason);
+    }
+
+    synchronized boolean block(String peer, String type, String id, NetworkResourceMetadata metadata,
+                               CommittedAsset localStamp, String reason) {
+        requireWritable();
+        requirePeer(peer);
+        BlockedResource next = new BlockedResource(type, id, metadata == null ? 0L : metadata.revision(),
+            metadata == null ? "" : metadata.payloadHash(), metadata != null && metadata.deleted(), reason, localStamp);
+        if (next.equals(blocked.get(key(type, id)))) {
+            return false;
+        }
+        blocked.put(key(type, id), next);
+        while (blocked.size() > 128) {
+            blocked.remove(blocked.keySet().iterator().next());
+        }
+        return true;
+    }
+
+    synchronized Map<String, BlockedResource> blockedResources(String peer) {
+        requireHealthy();
+        requirePeer(peer);
+        return Map.copyOf(blocked);
+    }
+
+    synchronized void clearLocalBlock(String peer, String type, String id) {
+        requireHealthy();
+        requirePeer(peer);
+        BlockedResource value = blocked.get(key(type, id));
+        if (value != null && value.localStamp() != null) {
+            blocked.remove(key(type, id));
+        }
+    }
+
+    private void requirePeer(String peer) {
+        if (!blockedPeer.equals(peer)) {
+            blocked.clear();
+            blockedPeer = peer;
+        }
+    }
+
     synchronized void put(NetworkResourceMetadata metadata) {
         requireWritable();
         Entry value = new Entry(metadata.type(), metadata.resourceId(), metadata.revision(), metadata.payloadHash(), metadata.deleted(), metadata.updatedAt());
@@ -64,6 +129,7 @@ final class NetworkResourceManifestStore {
         save(next);
         entries.clear();
         entries.putAll(next);
+        blocked.remove(metadata.key());
     }
 
     synchronized Path root() {
@@ -164,6 +230,8 @@ final class NetworkResourceManifestStore {
         file = candidate;
         entries.clear();
         entries.putAll(loaded);
+        blocked.clear();
+        blockedPeer = "";
         loadFailure = null;
     }
 
@@ -277,6 +345,9 @@ final class NetworkResourceManifestStore {
             }
         }
     }
+
+    record BlockedResource(String type, String resourceId, long revision, String payloadHash, boolean deleted,
+                           String reason, CommittedAsset localStamp) {}
 
     private record Manifest(int version, Map<String, Entry> entries) {
     }

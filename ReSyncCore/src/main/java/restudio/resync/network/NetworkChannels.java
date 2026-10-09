@@ -11,7 +11,8 @@ public final class NetworkChannels {
     public static final String VARIABLES = "network.variables";
     public static final String EVENTS = "network.events";
     public static final String RESOURCES = "network.resources";
-    public static final Set<String> ALL = Set.of(CONTROL, PRESENCE, ROUTING, TRANSFER, STATE, VARIABLES, EVENTS, RESOURCES);
+    public static final String EDITOR = "editor";
+    public static final Set<String> ALL = Set.of(CONTROL, PRESENCE, ROUTING, TRANSFER, STATE, VARIABLES, EVENTS, RESOURCES, EDITOR);
 
     private NetworkChannels() {
     }

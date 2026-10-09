@@ -23,9 +23,10 @@ import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 public class SqliteNetworkHubStore implements NetworkHubStore {
@@ -36,7 +37,11 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
     private final int maximumVariableBytes;
     private final int maximumEventBytes;
     private final int maximumSnapshotBytes;
-    private final AtomicBoolean closing = new AtomicBoolean();
+    private final Object submissionMonitor = new Object();
+    private final CompletableFuture<Void> closed = new CompletableFuture<>();
+    private final int queueCapacity;
+    private volatile Thread worker;
+    private boolean closing;
     private Connection connection;
 
     public SqliteNetworkHubStore(Path databasePath) {
@@ -52,9 +57,11 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
         this.maximumVariableBytes = Math.max(0, maximumVariableBytes);
         this.maximumEventBytes = Math.max(0, maximumEventBytes);
         this.maximumSnapshotBytes = Math.max(0, maximumSnapshotBytes);
-        this.executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(Math.max(32, queueCapacity)), runnable -> {
+        this.queueCapacity = Math.clamp(queueCapacity, 32, Integer.MAX_VALUE - 1);
+        this.executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(this.queueCapacity + 1), runnable -> {
             Thread thread = new Thread(runnable, "resync-network-store");
             thread.setDaemon(true);
+            worker = thread;
             return thread;
         }, new ThreadPoolExecutor.AbortPolicy());
     }
@@ -553,17 +560,18 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
             if (source.equals(target)) {
                 throw new IllegalArgumentException("Transfer Target Must Differ From Source");
             }
-            if (deadline <= now) {
-                throw new IllegalArgumentException("Transfer Deadline Must Be In The Future");
-            }
-            PlayerTransfer duplicate = transfer(required(transferId, "Transfer ID")).orElse(null);
+            PlayerTransfer duplicate = lockTransferRow(required(transferId, "Transfer ID")).orElse(null);
             if (duplicate != null) {
                 if (!duplicate.networkId().equals(network) || !duplicate.playerId().equals(playerId) || !duplicate.sourceNodeId().equals(source) || !duplicate.targetNodeId().equals(target)) {
                     throw new NetworkStoreException("Transfer ID Is Already Used By A Different Transfer");
                 }
                 return duplicate;
             }
-            if (activeTransfer(network, playerId, now)) {
+            long admittedAt = Math.max(now, System.currentTimeMillis());
+            if (deadline <= admittedAt) {
+                throw new IllegalArgumentException("Transfer Deadline Must Be In The Future");
+            }
+            if (activeTransfer(network, playerId, admittedAt)) {
                 throw new NetworkStoreException("Player Already Has An Active Transfer");
             }
             PlayerLease existing = lease(network, playerId).orElse(null);
@@ -601,7 +609,8 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
         }
         return submit("Commit Player Snapshot", () -> transaction(() -> {
             requireOpen();
-            PlayerTransfer transfer = requireTransfer(transferId);
+            PlayerTransfer transfer = lockTransfer(transferId);
+            requireTransferFence(transfer);
             if (atOrAfter(transfer.status(), NetworkTransferStatus.SNAPSHOT_COMMITTED) && transfer.snapshotId().equals(snapshot.snapshotId())) {
                 PlayerStateSnapshot stored = requireSnapshot(snapshot.snapshotId());
                 if (!sameSnapshot(stored, snapshot)) {
@@ -650,7 +659,8 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
     @Override
     public CompletableFuture<PlayerTransfer> acknowledgeApplied(String transferId, String snapshotId, long now) {
         return submit("Acknowledge Player State", () -> transaction(() -> {
-            PlayerTransfer transfer = requireTransfer(transferId);
+            PlayerTransfer transfer = lockTransfer(transferId);
+            requireTransferFence(transfer);
             if (atOrAfter(transfer.status(), NetworkTransferStatus.APPLIED) && transfer.snapshotId().equals(snapshotId)) {
                 return transfer;
             }
@@ -665,10 +675,11 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
     @Override
     public CompletableFuture<PlayerTransfer> commitTransfer(String transferId, long now) {
         return submit("Commit Player Transfer", () -> transaction(() -> {
-            PlayerTransfer transfer = requireTransfer(transferId);
+            PlayerTransfer transfer = lockTransfer(transferId);
             if (transfer.status() == NetworkTransferStatus.COMMITTED) {
                 return transfer;
             }
+            requireTransferFence(transfer);
             requireTransferStatus(transfer, NetworkTransferStatus.APPLIED);
             try (PreparedStatement statement = connection.prepareStatement("UPDATE player_ownership SET owner_node_id = ?, pending_node_id = '', lease_expires_at = 0, updated_at = ? WHERE network_id = ? AND player_id = ? AND fence_epoch = ?")) {
                 statement.setString(1, transfer.targetNodeId());
@@ -883,17 +894,18 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
             if (playerId == null) {
                 throw new IllegalArgumentException("Player ID Is Required");
             }
-            if (deadline <= now) {
-                throw new IllegalArgumentException("Transfer Deadline Must Be In The Future");
-            }
-            PlayerTransfer duplicate = transfer(required(transferId, "Transfer ID")).orElse(null);
+            PlayerTransfer duplicate = lockTransferRow(required(transferId, "Transfer ID")).orElse(null);
             if (duplicate != null) {
                 if (!duplicate.networkId().equals(network) || !duplicate.playerId().equals(playerId) || !duplicate.targetNodeId().equals(target)) {
                     throw new NetworkStoreException("Transfer ID Is Already Used By A Different Restore");
                 }
                 return duplicate;
             }
-            if (activeTransfer(network, playerId, now)) {
+            long admittedAt = Math.max(now, System.currentTimeMillis());
+            if (deadline <= admittedAt) {
+                throw new IllegalArgumentException("Transfer Deadline Must Be In The Future");
+            }
+            if (activeTransfer(network, playerId, admittedAt)) {
                 throw new NetworkStoreException("Player Already Has An Active Transfer");
             }
             PlayerLease lease = lease(network, playerId).orElseThrow(() -> new NetworkStoreException("Player Ownership Does Not Exist"));
@@ -1052,56 +1064,61 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
 
     @Override
     public void close() {
-        if (!closing.compareAndSet(false, true)) {
-            return;
-        }
-        CompletableFuture<Void> closed = new CompletableFuture<>();
-        try {
-            executor.execute(() -> {
-                try {
-                    if (connection != null) {
-                        SQLException failure = null;
-                        try (Statement statement = connection.createStatement()) {
-                            statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
-                        } catch (SQLException exception) {
-                            failure = exception;
-                        }
-                        try {
-                            connection.close();
-                        } catch (SQLException exception) {
-                            if (failure == null) {
-                                failure = exception;
-                            } else {
-                                failure.addSuppressed(exception);
-                            }
-                        }
-                        connection = null;
-                        if (failure != null) {
-                            throw failure;
-                        }
-                    }
-                    closed.complete(null);
-                } catch (SQLException exception) {
-                    closed.completeExceptionally(new NetworkStoreException("Close Network Store Failed", exception));
-                }
-            });
-            closed.join();
-        } finally {
-            executor.shutdown();
-            try {
-                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                    executor.shutdownNow();
-                }
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                executor.shutdownNow();
+        synchronized (submissionMonitor) {
+            if (!closing) {
+                closing = true;
+                executor.execute(this::closeConnection);
+                executor.shutdown();
             }
+        }
+        if (Thread.currentThread() == worker && !closed.isDone()) {
+            throw new NetworkStoreException("Network Store Is Draining; Retry Close From Another Thread");
+        }
+        try {
+            closed.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException exception) {
+            throw new NetworkStoreException("Network Store Is Still Draining; Retry Close", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new NetworkStoreException("Network Store Close Wait Interrupted; Retry Close", exception);
+        } catch (ExecutionException exception) {
+            throw new NetworkStoreException("Close Network Store Failed", exception.getCause());
+        }
+    }
+
+    private void closeConnection() {
+        try {
+            if (connection != null) {
+                SQLException failure = null;
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+                } catch (SQLException exception) {
+                    failure = exception;
+                }
+                try {
+                    connection.close();
+                    connection = null;
+                } catch (SQLException exception) {
+                    if (failure == null) {
+                        failure = exception;
+                    } else {
+                        failure.addSuppressed(exception);
+                    }
+                }
+                if (failure != null) {
+                    throw failure;
+                }
+            }
+            closed.complete(null);
+        } catch (Exception exception) {
+            closed.completeExceptionally(new NetworkStoreException("Close Network Store Failed", exception));
         }
     }
 
     private CompletableFuture<PlayerTransfer> transition(String transferId, NetworkTransferStatus expected, NetworkTransferStatus target, String failure, long now) {
         return submit("Advance Player Transfer", () -> transaction(() -> {
-            PlayerTransfer transfer = requireTransfer(transferId);
+            PlayerTransfer transfer = lockTransfer(transferId);
+            requireTransferFence(transfer);
             if (atOrAfter(transfer.status(), target)) {
                 return transfer;
             }
@@ -1398,6 +1415,35 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
         }
     }
 
+    private void requireTransferFence(PlayerTransfer transfer) throws SQLException {
+        if (TERMINAL_TRANSFERS.contains(transfer.status())) {
+            return;
+        }
+        PlayerLease current = lease(transfer.networkId(), transfer.playerId()).orElse(null);
+        if (current == null || current.fenceEpoch() != transfer.fenceEpoch() || !current.ownerNodeId().equals(transfer.sourceNodeId()) || !current.pendingNodeId().equals(transfer.targetNodeId())) {
+            throw new NetworkStoreException("Player Transfer Lease Is Stale");
+        }
+        long now = System.currentTimeMillis();
+        if (transfer.deadline() > 0 && transfer.deadline() <= now) {
+            clearPendingOwner(transfer, now, true);
+            PlayerTransfer expired = updateTransfer(transfer, NetworkTransferStatus.TIMED_OUT, transfer.snapshotId(), "Transfer Deadline Expired", now);
+            audit(transfer.networkId(), transfer.sourceNodeId(), "transfer.timed_out", transfer.transferId(), transfer.targetNodeId(), now);
+            throw new ExpiredTransfer(expired);
+        }
+    }
+
+    private PlayerTransfer lockTransfer(String transferId) throws SQLException {
+        return lockTransferRow(transferId).orElseThrow(() -> new NetworkStoreException("Player Transfer Does Not Exist"));
+    }
+
+    private Optional<PlayerTransfer> lockTransferRow(String transferId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("UPDATE transfer_intents SET transfer_id = transfer_id WHERE transfer_id = ?")) {
+            statement.setString(1, required(transferId, "Transfer ID"));
+            statement.executeUpdate();
+        }
+        return transfer(transferId);
+    }
+
     private boolean atOrAfter(NetworkTransferStatus current, NetworkTransferStatus expected) {
         if (TERMINAL_TRANSFERS.contains(current)) {
             return current == expected || current == NetworkTransferStatus.COMMITTED;
@@ -1506,6 +1552,14 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
             T result = operation.run();
             connection.commit();
             return result;
+        } catch (ExpiredTransfer exception) {
+            try {
+                connection.commit();
+            } catch (Exception failure) {
+                connection.rollback();
+                throw failure;
+            }
+            throw exception;
         } catch (Exception exception) {
             connection.rollback();
             throw exception;
@@ -1515,22 +1569,27 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
     }
 
     private <T> CompletableFuture<T> submit(String action, SqlOperation<T> operation) {
-        if (closing.get()) {
-            return CompletableFuture.failedFuture(new NetworkStoreException("Network Store Is Closing"));
-        }
         CompletableFuture<T> future = new CompletableFuture<>();
-        try {
-            executor.execute(() -> {
-                try {
-                    future.complete(operation.run());
-                } catch (CompletionException exception) {
-                    future.completeExceptionally(exception.getCause() == null ? exception : exception.getCause());
-                } catch (Exception exception) {
-                    future.completeExceptionally(exception instanceof NetworkStoreException || exception instanceof IllegalArgumentException ? exception : new NetworkStoreException(action + " Failed", exception));
-                }
-            });
-        } catch (RuntimeException exception) {
-            future.completeExceptionally(new NetworkStoreException(action + " Queue Is Full", exception));
+        synchronized (submissionMonitor) {
+            if (closing) {
+                return CompletableFuture.failedFuture(new NetworkStoreException("Network Store Is Closing"));
+            }
+            if (executor.getQueue().size() >= queueCapacity) {
+                return CompletableFuture.failedFuture(new NetworkStoreException(action + " Queue Is Full"));
+            }
+            try {
+                executor.execute(() -> {
+                    try {
+                        future.complete(operation.run());
+                    } catch (CompletionException exception) {
+                        future.completeExceptionally(exception.getCause() == null ? exception : exception.getCause());
+                    } catch (Exception exception) {
+                        future.completeExceptionally(exception instanceof NetworkStoreException || exception instanceof IllegalArgumentException ? exception : new NetworkStoreException(action + " Failed", exception));
+                    }
+                });
+            } catch (RuntimeException exception) {
+                future.completeExceptionally(new NetworkStoreException(action + " Queue Is Full", exception));
+            }
         }
         return future;
     }
@@ -1546,5 +1605,18 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
     @FunctionalInterface
     private interface SqlOperation<T> {
         T run() throws Exception;
+    }
+
+    public static final class ExpiredTransfer extends NetworkStoreException {
+        private final PlayerTransfer transfer;
+
+        private ExpiredTransfer(PlayerTransfer transfer) {
+            super("Player Transfer Deadline Expired");
+            this.transfer = transfer;
+        }
+
+        public PlayerTransfer transfer() {
+            return transfer;
+        }
     }
 }

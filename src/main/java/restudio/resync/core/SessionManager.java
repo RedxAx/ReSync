@@ -127,7 +127,7 @@ public class SessionManager {
     }
 
     public int getSessionCount() {
-        return sessionsByConnection.size();
+        return sessionsById.size();
     }
 
     public long getTotalSessionMemory() {
@@ -165,6 +165,7 @@ public class SessionManager {
             }
         } catch (InterruptedException e) {
             cleanupExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 

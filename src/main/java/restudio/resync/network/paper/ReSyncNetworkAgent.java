@@ -2,11 +2,16 @@ package restudio.resync.network.paper;
 
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitTask;
+import org.java_websocket.WebSocket;
+import org.java_websocket.WebSocketImpl;
+import org.java_websocket.framing.Framedata;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.server.ReSyncServer;
+import restudio.resync.network.NetworkEditorChunk;
 import restudio.resync.network.NetworkChannels;
 import restudio.resync.network.NetworkCredentials;
 import restudio.resync.network.NetworkEvent;
@@ -142,6 +147,7 @@ public class ReSyncNetworkAgent {
     private volatile String connectionFailure = "";
     private boolean retryEnrollment;
     private volatile Client client;
+    private volatile PaperNetworkEditors editors;
     private final AtomicBoolean authorized = new AtomicBoolean();
     private volatile String credential;
     private volatile String recoveryFailure;
@@ -269,6 +275,64 @@ public class ReSyncNetworkAgent {
         this.credential = credentialCandidate;
     }
 
+    public synchronized void connectEditors(ReSyncServer server) {
+        if (started.get() || editors != null) throw new IllegalStateException("Network Editors Already Connected");
+        NetworkRequestContext limitContext = new NetworkRequestContext(PROTOCOL_VERSION, config.networkId(), config.nodeId(),
+            config.nodeId() + "-" + Long.MAX_VALUE, 0, Set.of());
+        int overhead = codec.encode(new NetworkFrame(limitContext, NetworkChannels.EDITOR, NetworkFrameType.EDITOR_DATA, new byte[0])).length;
+        int chunkBytes = Math.max(0, Math.min(NetworkEditorChunk.MAXIMUM_CHUNK_BYTES,
+            Math.min(config.maximumPayloadBytes() - 37, config.maximumFrameBytes() - overhead - 37)));
+        editors = new PaperNetworkEditors(server, config.nodeId(), new PaperNetworkEditors.Wire() {
+            @Override
+            public boolean active(Object session) {
+                return session == client && authorized.get() && !stopping.get() && !persistenceQuiesced.get()
+                    && session instanceof Client current && current.isOpen() && !current.outputFull;
+            }
+
+            @Override
+            public boolean send(Object session, NetworkFrameType type, byte[] payload) {
+                if (!active(session)) return false;
+                try {
+                    ReSyncNetworkAgent.this.send((Client) session, NetworkChannels.EDITOR, type, nextRequestId(), payload, Set.of());
+                    return true;
+                } catch (RuntimeException exception) {
+                    return false;
+                }
+            }
+
+            @Override
+            public void close(Object session, byte[] payload) {
+                if (session != client || !authorized.get() || !(session instanceof Client current) || !current.isOpen()) return;
+                try {
+                    ReSyncNetworkAgent.this.send(current, NetworkChannels.EDITOR, NetworkFrameType.EDITOR_CLOSE, nextRequestId(), payload, Set.of());
+                } catch (RuntimeException exception) {
+                    current.close(1011, "Editor Close Unavailable");
+                }
+            }
+
+            @Override
+            public boolean execute(Object session, Runnable work) {
+                if (!active(session)) return false;
+                try {
+                    connections.execute(work);
+                    return true;
+                } catch (RejectedExecutionException failure) {
+                    return false;
+                }
+            }
+
+            @Override
+            public void failed(Object session, String reason) {
+                if (session == client && session instanceof Client current) current.close(1008, reason);
+            }
+
+            @Override
+            public int chunkBytes() {
+                return chunkBytes;
+            }
+        });
+    }
+
     public NetworkPersistenceDrainController persistenceDrain() {
         return persistenceDrain;
     }
@@ -346,6 +410,8 @@ public class ReSyncNetworkAgent {
         synchronized (lifecycleMonitor) {
             if (stopping.compareAndSet(false, true)) {
                 persistenceQuiesced.set(true);
+                PaperNetworkEditors editor = editors;
+                if (editor != null) editor.closeAll("Network Agent Stopping");
                 if (heartbeatTask != null) {
                     heartbeatTask.cancel();
                     heartbeatTask = null;
@@ -1007,6 +1073,8 @@ public class ReSyncNetworkAgent {
     }
 
     private void checkConnection() {
+        PaperNetworkEditors editor = editors;
+        if (editor != null) editor.expire();
         Client current = client;
         if (stopping.get() || persistenceQuiesced.get() || current == null) return;
         if (!authorized.get() && System.nanoTime() - current.startedAt >= TimeUnit.MILLISECONDS.toNanos(CONNECT_TIMEOUT_MILLIS)) {
@@ -1118,7 +1186,17 @@ public class ReSyncNetworkAgent {
 
     private void send(Client target, String channel, NetworkFrameType type, String requestId, byte[] payload, Set<String> scopes) {
         NetworkRequestContext context = new NetworkRequestContext(PROTOCOL_VERSION, config.networkId(), config.nodeId(), requestId, Instant.now().plusSeconds(REQUEST_TIMEOUT_SECONDS).toEpochMilli(), scopes);
-        target.send(codec.encode(new NetworkFrame(context, channel, type, payload)));
+        byte[] encoded = codec.encode(new NetworkFrame(context, channel, type, payload));
+        synchronized (target) {
+            if (!target.isOpen() || target.outputFull) throw new IllegalStateException("Network Transport Unavailable");
+            if (target.socketRoom(encoded.length + 14L)) {
+                target.send(encoded);
+                return;
+            }
+            target.outputFull = true;
+        }
+        target.closeConnection(1013, "Network Send Queue Full");
+        throw new IllegalStateException("Network Send Queue Full");
     }
 
     private String nextRequestId() {
@@ -1763,6 +1841,8 @@ public class ReSyncNetworkAgent {
     }
 
     private boolean disconnectAuthorized() {
+        PaperNetworkEditors editor = editors;
+        if (editor != null) editor.closeAll("Network Session Closed");
         if (!authorized.compareAndSet(true, false)) {
             return false;
         }
@@ -1833,6 +1913,8 @@ public class ReSyncNetworkAgent {
 
     private void closePersistenceAdmission() {
         persistenceQuiesced.set(true);
+        PaperNetworkEditors editor = editors;
+        if (editor != null) editor.closeAll("Network Persistence Paused");
         try {
             if (Bukkit.getServer() != null && Bukkit.isPrimaryThread()) {
                 playerDataAdmission.requestQuiesce();
@@ -1993,10 +2075,34 @@ public class ReSyncNetworkAgent {
     private final class Client extends WebSocketClient {
         private final long startedAt = System.nanoTime();
         private volatile long lastInbound = startedAt;
+        private volatile boolean outputFull;
 
         private Client(URI uri, Map<String, String> headers) {
             super(uri, new Draft_6455(), headers, CONNECT_TIMEOUT_MILLIS);
-            setConnectionLostTimeout(15);
+            setConnectionLostTimeout(0);
+        }
+
+        private boolean socketRoom(long bytes) {
+            if (!(getConnection() instanceof WebSocketImpl socket)) return false;
+            int frames = 0;
+            for (ByteBuffer queued : socket.outQueue) {
+                bytes += queued.capacity();
+                if (++frames >= 1024 || bytes > NetworkEditorChunk.MAXIMUM_FRAME_BYTES) return false;
+            }
+            return bytes <= NetworkEditorChunk.MAXIMUM_FRAME_BYTES;
+        }
+
+        @Override
+        public void onWebsocketPing(WebSocket connection, Framedata frame) {
+            synchronized (this) {
+                if (outputFull) return;
+                if (socketRoom(frame.getPayloadData().remaining() + 14L)) {
+                    super.onWebsocketPing(connection, frame);
+                    return;
+                }
+                outputFull = true;
+            }
+            closeConnection(1013, "Network Send Queue Full");
         }
 
         @Override
@@ -2020,10 +2126,28 @@ public class ReSyncNetworkAgent {
             }
             byte[] encoded = new byte[message.remaining()];
             message.get(encoded);
+            NetworkFrame decoded;
+            try {
+                decoded = codec.decode(encoded);
+            } catch (RuntimeException exception) {
+                close(1008, "Invalid Network Frame");
+                return;
+            }
+            if (NetworkChannels.EDITOR.equals(decoded.channel())) {
+                PaperNetworkEditors editor = editors;
+                if (client != this || !authorized.get() || stopping.get() || persistenceQuiesced.get()) return;
+                if (!decoded.context().networkId().equals(config.networkId()) || decoded.context().expired(Instant.now().toEpochMilli())
+                    || decoded.context().protocolVersion() != PROTOCOL_VERSION || editor == null || !editor.enqueue(this, decoded)) {
+                    close(1008, "Network Editor Queue Unavailable");
+                    return;
+                }
+                lastInbound = System.nanoTime();
+                return;
+            }
             enqueueConnection(() -> {
                 if (client != this) return;
                 try {
-                    handle(codec.decode(encoded));
+                    handle(decoded);
                     lastInbound = System.nanoTime();
                 } catch (RuntimeException exception) {
                     reportUnavailable(rootMessage(exception));

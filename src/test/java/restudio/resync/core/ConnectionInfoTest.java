@@ -37,6 +37,21 @@ class ConnectionInfoTest {
     }
 
     @Test
+    void virtualConnectionClosesWithItsLifecycleState() {
+        ConnectionInfo info = new ConnectionInfo(null, 1);
+
+        assertTrue(info.isOpen());
+        info.setState(ConnectionState.AUTHENTICATED);
+        assertTrue(info.isOpen());
+        info.setState(ConnectionState.CLOSING);
+        assertFalse(info.isOpen());
+        info.setState(ConnectionState.CLOSED);
+        assertFalse(info.isOpen());
+        info.setState(ConnectionState.TIMED_OUT);
+        assertFalse(info.isOpen());
+    }
+
+    @Test
     void frameSenderBudgetIsExposedByConnectionInfo() {
         ConnectionInfo info = new ConnectionInfo(null, new FrameSender() {
             @Override

@@ -3,13 +3,19 @@ package restudio.resync.protocol;
 import org.junit.jupiter.api.Test;
 import restudio.resync.compression.CompressionPool;
 import restudio.resync.protocol.messages.DataMessage;
+import restudio.resync.protocol.messages.ErrorMessage;
+import restudio.resync.protocol.messages.HandshakeResponse;
+import restudio.resync.protocol.messages.SubscribeRequest;
+import restudio.resync.protocol.messages.UnsubscribeRequest;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -99,6 +105,41 @@ class CodecCompressionTest {
             assertThrows(IllegalArgumentException.class, () -> codec.decodeFrame(compressedFrame(new byte[]{1, 2, 3})));
             assertThrows(IllegalArgumentException.class, () -> codec.decodeFrame(compressedFrame(incomplete)));
             assertThrows(IllegalArgumentException.class, () -> codec.decodeFrame(compressedFrame(trailing)));
+        } finally {
+            compressionPool.close();
+        }
+    }
+
+    @Test
+    void declaredInnerLengthsCannotAmplifyAnAdmittedFrame() {
+        CompressionPool compressionPool = new CompressionPool(6, 1);
+        try {
+            Codec codec = new Codec(compressionPool);
+            int declared = Codec.DEFAULT_MAX_DECOMPRESSED_PAYLOAD_BYTES + 1;
+            byte[] length = ByteBuffer.allocate(4).putInt(declared).array();
+            FrameHeader header = new FrameHeader();
+            header.setMessageType(MessageType.SUBSCRIBE);
+            header.setPayloadLength(length.length);
+            byte[] encoded = Arrays.copyOf(header.toBytes(), 12 + length.length);
+            System.arraycopy(length, 0, encoded, 12, length.length);
+            Codec.Frame frame = codec.decodeFrame(encoded);
+
+            RuntimeException failure = assertThrows(RuntimeException.class, () -> codec.decodePayload(frame));
+            assertInstanceOf(IllegalArgumentException.class, failure.getCause());
+            assertThrows(IllegalArgumentException.class, () -> new SubscribeRequest().deserialize(ByteBuffer.wrap(length)));
+            assertThrows(IllegalArgumentException.class, () -> new UnsubscribeRequest().deserialize(ByteBuffer.wrap(length)));
+            assertThrows(IllegalArgumentException.class, () -> new ErrorMessage().deserialize(
+                ByteBuffer.allocate(8).putInt(0).putInt(declared).flip()));
+            assertThrows(IllegalArgumentException.class, () -> new HandshakeResponse().deserialize(
+                ByteBuffer.allocate(5).put((byte) 1).putInt(declared).flip()));
+            assertThrows(IllegalArgumentException.class, () -> new HandshakeResponse().deserialize(
+                ByteBuffer.allocate(17).put((byte) 1).putInt(0).putInt(2).putInt(0).putInt(declared).flip()));
+            assertThrows(IllegalArgumentException.class, () -> codec.decodeFrame(Arrays.copyOf(encoded, encoded.length + 1)));
+
+            HandshakeResponse response = new HandshakeResponse();
+            response.setMessage("Ready");
+            assertInstanceOf(HandshakeResponse.class, codec.decodePayload(codec.decodeFrame(codec.encodeFrame(response, 0, false))));
+            assertFalse(Codec.isClientMessage(MessageType.HANDSHAKE_RESPONSE));
         } finally {
             compressionPool.close();
         }

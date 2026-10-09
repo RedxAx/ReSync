@@ -36,6 +36,10 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
     public static final String CHANNEL = "resync:bridge";
     private static final int BRIDGE_PROTOCOL_V1 = 1;
     private static final int BRIDGE_PROTOCOL_V2 = 2;
+    private static final int MAX_SESSIONS = 32;
+    private static final int MAX_PLAYER_SESSIONS = 2;
+    private static final int MAX_HELLO_BYTES = 4_096;
+    private static final long HELLO_TIMEOUT_NANOS = 10_000_000_000L;
     private static final int MAX_OUTBOUND_QUEUE_PACKETS = 256;
     private static final long MAX_OUTBOUND_QUEUE_BYTES = 4L * 1024L * 1024L;
     private static final int MAX_BULK_QUEUE_PACKETS = 192;
@@ -45,6 +49,7 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
     private static final long MAX_DRAIN_NANOS = 2_000_000L;
     private final ReSync plugin;
     private final Map<UUID, BridgeSession> sessions = new ConcurrentHashMap<>();
+    private final Object sessionAdmission = new Object();
     private final ConcurrentLinkedQueue<BridgeSession> drainReady = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean drainTaskScheduled = new AtomicBoolean();
     private BukkitTask monitorTask;
@@ -84,14 +89,34 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
         }
         try {
             ReSyncBridgeEnvelope envelope = ReSyncBridgeEnvelope.decode(message);
+            if (envelope.type() == ReSyncBridgeEnvelope.HELLO) {
+                if (!hasBridgeAccess(player)) {
+                    rejectHello(player, envelope.sessionId(), "No Permission");
+                    return;
+                }
+                if (envelope.chunkCount() != 1 || envelope.chunkIndex() != 0 || envelope.payload().length > MAX_HELLO_BYTES) {
+                    rejectHello(player, envelope.sessionId(), "Bridge Handshake Is Too Large");
+                    return;
+                }
+            }
             BridgeSession session = sessions.get(envelope.sessionId());
             if (session == null) {
                 if (envelope.type() != ReSyncBridgeEnvelope.HELLO) {
                     return;
                 }
-                BridgeSession candidate = new BridgeSession(envelope.sessionId(), player);
-                BridgeSession existing = sessions.putIfAbsent(envelope.sessionId(), candidate);
-                session = existing == null ? candidate : existing;
+                synchronized (sessionAdmission) {
+                    session = sessions.get(envelope.sessionId());
+                    if (session == null) {
+                        long playerSessions = sessions.values().stream()
+                            .filter(value -> value.player.getUniqueId().equals(player.getUniqueId())).count();
+                        if (sessions.size() >= MAX_SESSIONS || playerSessions >= MAX_PLAYER_SESSIONS) {
+                            rejectHello(player, envelope.sessionId(), "Bridge Connection Limit Reached");
+                            return;
+                        }
+                        session = new BridgeSession(envelope.sessionId(), player);
+                        sessions.put(envelope.sessionId(), session);
+                    }
+                }
             }
             if (!session.player.getUniqueId().equals(player.getUniqueId())) {
                 return;
@@ -143,10 +168,21 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
 
     private void monitorSessions() {
         for (BridgeSession session : sessions.values()) {
-            if (session.authorized && session.isOpen() && !hasBridgeAccess(session.player)) {
+            session.chunker.expirePending();
+            if (!session.player.isOnline() || !session.authorized && System.nanoTime() - session.createdAt >= HELLO_TIMEOUT_NANOS) {
+                close(session);
+            } else if (session.authorized && session.isOpen() && !hasBridgeAccess(session.player)) {
                 closeUnauthorized(session);
             }
         }
+    }
+
+    private void rejectHello(Player player, UUID sessionId, String reason) {
+        byte[] text = reason.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer payload = ByteBuffer.allocate(13 + text.length);
+        payload.put((byte) 0).putInt(BRIDGE_PROTOCOL_V2).putInt(text.length).put(text).putInt(0);
+        player.sendPluginMessage(plugin, CHANNEL, new ReSyncBridgeEnvelope(ReSyncBridgeEnvelope.PROTOCOL,
+            ReSyncBridgeEnvelope.AUTH_RESULT, sessionId, 1, 0, 1, payload.array()).encode());
     }
 
     private void handleHello(BridgeSession session, byte[] payload) {
@@ -776,6 +812,7 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
 
     private static class BridgeSession {
         private final UUID sessionId;
+        private final long createdAt = System.nanoTime();
         private final Player player;
         private final ReSyncBridgeChunker chunker = new ReSyncBridgeChunker();
         private final AtomicInteger sequence = new AtomicInteger(1);

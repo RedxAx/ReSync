@@ -30,14 +30,11 @@ public class ErrorMessage extends Message {
 
     @Override
     public void deserialize(ByteBuffer buffer) {
+        requireBytes(buffer, Integer.BYTES, "Error code");
         errorCode = buffer.getInt();
-
-        int errorTextLen = buffer.getInt();
-        if (errorTextLen > 0) {
-            byte[] errorTextBytes = new byte[errorTextLen];
-            buffer.get(errorTextBytes);
-            errorText = new String(errorTextBytes, StandardCharsets.UTF_8);
-        }
+        String value = readString(buffer, "Error text");
+        errorText = value.isEmpty() ? null : value;
+        requireComplete(buffer);
     }
 
     public int getErrorCode() {

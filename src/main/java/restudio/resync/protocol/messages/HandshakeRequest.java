@@ -51,35 +51,24 @@ public class HandshakeRequest extends Message {
 
     @Override
     public void deserialize(ByteBuffer buffer) {
-        apiKey = readSizedString(buffer, "API key");
-        clientId = readSizedString(buffer, "client ID");
-        if (buffer.remaining() < Integer.BYTES) {
-            throw new IllegalArgumentException("Handshake protocol version is missing");
-        }
+        apiKey = readString(buffer, "Handshake API key", MAX_FIELD_LENGTH);
+        clientId = readString(buffer, "Handshake client ID", MAX_FIELD_LENGTH);
+        requireBytes(buffer, Integer.BYTES, "Handshake protocol version");
         protocolVersion = buffer.getInt();
+        clientVersion = null;
+        capabilitiesJson = "";
+        collaborationProfileJson = "";
 
-        if (buffer.remaining() >= 4) {
-            clientVersion = readSizedString(buffer, "client version");
+        if (buffer.hasRemaining()) {
+            clientVersion = readString(buffer, "Handshake client version", MAX_FIELD_LENGTH);
         }
-        if (buffer.remaining() >= 4) {
-            capabilitiesJson = readSizedString(buffer, "capabilities");
+        if (buffer.hasRemaining()) {
+            capabilitiesJson = readString(buffer, "Handshake capabilities", MAX_FIELD_LENGTH);
         }
-        if (buffer.remaining() >= 4) {
-            collaborationProfileJson = readSizedString(buffer, "collaboration profile");
+        if (buffer.hasRemaining()) {
+            collaborationProfileJson = readString(buffer, "Handshake collaboration profile", MAX_FIELD_LENGTH);
         }
-    }
-
-    private String readSizedString(ByteBuffer buffer, String field) {
-        if (buffer.remaining() < Integer.BYTES) {
-            throw new IllegalArgumentException("Handshake " + field + " length is missing");
-        }
-        int length = buffer.getInt();
-        if (length < 0 || length > MAX_FIELD_LENGTH || length > buffer.remaining()) {
-            throw new IllegalArgumentException("Invalid handshake " + field + " length");
-        }
-        byte[] bytes = new byte[length];
-        buffer.get(bytes);
-        return new String(bytes, StandardCharsets.UTF_8);
+        requireComplete(buffer);
     }
 
     public String getApiKey() {

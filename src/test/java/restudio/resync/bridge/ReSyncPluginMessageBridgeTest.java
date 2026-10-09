@@ -43,6 +43,30 @@ class ReSyncPluginMessageBridgeTest {
     }
 
     @Test
+    void fragmentedHelloIsRejectedBeforeAdmissionAndPermittedHandshakeStillSucceeds() {
+        TestReSync plugin = MockBukkit.loadSimple(TestReSync.class);
+        RecordingPlayer player = new RecordingPlayer(MockBukkit.getMock());
+        MockBukkit.getMock().addPlayer(player);
+        ReSyncPluginMessageBridge bridge = new ReSyncPluginMessageBridge(plugin);
+        UUID sessionId = UUID.randomUUID();
+        byte[] fragmented = new ReSyncBridgeEnvelope(ReSyncBridgeEnvelope.PROTOCOL, ReSyncBridgeEnvelope.HELLO,
+            sessionId, 1, 0, 2, new byte[ReSyncBridgeChunker.CHUNK_SIZE]).encode();
+
+        bridge.onPluginMessageReceived(ReSyncPluginMessageBridge.CHANNEL, player, fragmented);
+        assertEquals(0, authPayload(player.messages.getLast()).get());
+        player.setOp(true);
+        bridge.onPluginMessageReceived(ReSyncPluginMessageBridge.CHANNEL, player, fragmented);
+        assertEquals(0, authPayload(player.messages.getLast()).get());
+
+        ByteBuffer hello = ByteBuffer.allocate(12).putInt(1).putInt(0).putInt(0);
+        bridge.onPluginMessageReceived(ReSyncPluginMessageBridge.CHANNEL, player,
+            new ReSyncBridgeEnvelope(ReSyncBridgeEnvelope.PROTOCOL, ReSyncBridgeEnvelope.HELLO,
+                sessionId, 2, 0, 1, hello.array()).encode());
+        MockBukkit.getMock().getScheduler().performOneTick();
+        assertEquals(1, authPayload(player.messages.getLast()).get());
+    }
+
+    @Test
     void workerFramesWaitForMainThreadDrainAndKeepWireOrder() throws Exception {
         TestReSync plugin = MockBukkit.loadSimple(TestReSync.class);
         RecordingPlayer player = new RecordingPlayer(MockBukkit.getMock());

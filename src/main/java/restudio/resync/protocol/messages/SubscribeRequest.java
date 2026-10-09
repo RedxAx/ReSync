@@ -32,19 +32,13 @@ public class SubscribeRequest extends Message {
 
     @Override
     public void deserialize(ByteBuffer buffer) {
-        int channelIdLen = buffer.getInt();
-        byte[] channelIdBytes = new byte[channelIdLen];
-        buffer.get(channelIdBytes);
-        channelId = new String(channelIdBytes, StandardCharsets.UTF_8);
-
-        if (buffer.remaining() >= 4) {
-            int dataLen = buffer.getInt();
-            if (dataLen > 0 && buffer.remaining() >= dataLen) {
-                byte[] dataBytes = new byte[dataLen];
-                buffer.get(dataBytes);
-                data = new String(dataBytes, StandardCharsets.UTF_8);
-            }
+        channelId = readString(buffer, "Channel ID");
+        data = null;
+        if (buffer.hasRemaining()) {
+            String value = readString(buffer, "Subscription data");
+            data = value.isEmpty() ? null : value;
         }
+        requireComplete(buffer);
     }
 
     public String getChannelId() {

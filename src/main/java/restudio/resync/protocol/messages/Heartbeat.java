@@ -3,7 +3,6 @@ package restudio.resync.protocol.messages;
 import restudio.resync.protocol.MessageType;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 
 public class Heartbeat extends Message {
     private long timestamp;
@@ -22,7 +21,9 @@ public class Heartbeat extends Message {
 
     @Override
     public void deserialize(ByteBuffer buffer) {
+        requireBytes(buffer, Long.BYTES, "Heartbeat payload");
         timestamp = buffer.getLong();
+        requireComplete(buffer);
     }
 
     public long getTimestamp() {

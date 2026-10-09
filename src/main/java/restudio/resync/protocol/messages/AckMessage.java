@@ -3,7 +3,6 @@ package restudio.resync.protocol.messages;
 import restudio.resync.protocol.MessageType;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 
 public class AckMessage extends Message {
     private int acknowledgedSequence;
@@ -22,7 +21,9 @@ public class AckMessage extends Message {
 
     @Override
     public void deserialize(ByteBuffer buffer) {
+        requireBytes(buffer, Integer.BYTES, "AckMessage payload");
         acknowledgedSequence = buffer.getInt();
+        requireComplete(buffer);
     }
 
     public int getAcknowledgedSequence() {

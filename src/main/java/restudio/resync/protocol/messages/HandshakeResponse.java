@@ -4,7 +4,6 @@ import restudio.resync.protocol.MessageType;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,33 +90,29 @@ public class HandshakeResponse extends Message {
 
     @Override
     public void deserialize(ByteBuffer buffer) {
-        success = buffer.get() == 1;
-
-        int messageLen = buffer.getInt();
-        byte[] messageBytes = new byte[messageLen];
-        buffer.get(messageBytes);
-        message = new String(messageBytes, StandardCharsets.UTF_8);
-
+        requireBytes(buffer, Byte.BYTES, "Handshake success");
+        byte status = buffer.get();
+        if (status != 0 && status != 1) {
+            throw new IllegalArgumentException("Invalid handshake success");
+        }
+        success = status == 1;
+        message = readString(buffer, "Handshake message");
+        requireBytes(buffer, Integer.BYTES, "Handshake protocol version");
         serverProtocolVersion = buffer.getInt();
+        serverVersion = readString(buffer, "Handshake server version");
 
-        int serverVersionLen = buffer.getInt();
-        byte[] serverVersionBytes = new byte[serverVersionLen];
-        buffer.get(serverVersionBytes);
-        serverVersion = new String(serverVersionBytes, StandardCharsets.UTF_8);
-
-        int worldCount = buffer.getInt();
+        int worldCount = readCount(buffer, "Handshake world", Integer.BYTES);
+        worlds = null;
         if (worldCount > 0) {
             String[] worldsArray = new String[worldCount];
             for (int i = 0; i < worldCount; i++) {
-                int worldLen = buffer.getInt();
-                byte[] worldBytes = new byte[worldLen];
-                buffer.get(worldBytes);
-                worldsArray[i] = new String(worldBytes, StandardCharsets.UTF_8);
+                worldsArray[i] = readString(buffer, "Handshake world");
             }
             worlds = Arrays.asList(worldsArray);
         }
 
-        int tileSizeCount = buffer.getInt();
+        int tileSizeCount = readCount(buffer, "Handshake tile size", Integer.BYTES);
+        supportedTileSizes = null;
         if (tileSizeCount > 0) {
             supportedTileSizes = new int[tileSizeCount];
             for (int i = 0; i < tileSizeCount; i++) {
@@ -125,27 +120,20 @@ public class HandshakeResponse extends Message {
             }
         }
 
-        if (buffer.remaining() >= 4) {
-            int channelCount = buffer.getInt();
-            channels = new LinkedHashMap<>();
-            for (int i = 0; i < channelCount && buffer.remaining() >= 8; i++) {
-                int channelLen = buffer.getInt();
-                if (channelLen < 0 || buffer.remaining() < channelLen + 4) {
-                    break;
-                }
-                byte[] channelBytes = new byte[channelLen];
-                buffer.get(channelBytes);
-                channels.put(new String(channelBytes, StandardCharsets.UTF_8), buffer.getInt());
+        channels = new LinkedHashMap<>();
+        if (buffer.hasRemaining()) {
+            int channelCount = readCount(buffer, "Handshake channel", Integer.BYTES * 2);
+            for (int i = 0; i < channelCount; i++) {
+                String channel = readString(buffer, "Handshake channel");
+                requireBytes(buffer, Integer.BYTES, "Handshake channel number");
+                channels.put(channel, buffer.getInt());
             }
         }
-        if (buffer.remaining() >= 4) {
-            int capabilitiesLen = buffer.getInt();
-            if (capabilitiesLen >= 0 && buffer.remaining() >= capabilitiesLen) {
-                byte[] capabilitiesBytes = new byte[capabilitiesLen];
-                buffer.get(capabilitiesBytes);
-                capabilitiesJson = new String(capabilitiesBytes, StandardCharsets.UTF_8);
-            }
+        capabilitiesJson = "";
+        if (buffer.hasRemaining()) {
+            capabilitiesJson = readString(buffer, "Handshake capabilities");
         }
+        requireComplete(buffer);
     }
 
     private int channelsBytesLength() {

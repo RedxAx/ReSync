@@ -84,6 +84,10 @@ public class ReSyncBridgeChunker {
         pendingBytes = 0L;
     }
 
+    public synchronized void expirePending() {
+        cleanup();
+    }
+
     synchronized int pendingMessageCount() {
         return pending.size();
     }

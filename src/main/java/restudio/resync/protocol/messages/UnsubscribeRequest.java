@@ -27,10 +27,8 @@ public class UnsubscribeRequest extends Message {
 
     @Override
     public void deserialize(ByteBuffer buffer) {
-        int channelIdLen = buffer.getInt();
-        byte[] channelIdBytes = new byte[channelIdLen];
-        buffer.get(channelIdBytes);
-        channelId = new String(channelIdBytes, StandardCharsets.UTF_8);
+        channelId = readString(buffer, "Channel ID");
+        requireComplete(buffer);
     }
 
     public String getChannelId() {

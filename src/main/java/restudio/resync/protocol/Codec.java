@@ -89,7 +89,7 @@ public class Codec {
         return baos.toByteArray();
     }
 
-    public Frame decodeFrame(byte[] data) {
+    public FrameHeader decodeHeader(byte[] data) {
         if (data.length < 12) {
             throw new IllegalArgumentException("Frame too short");
         }
@@ -104,11 +104,25 @@ public class Codec {
         if (header.getPayloadLength() > maxEncodedFrameBytes - 12) {
             throw new IllegalArgumentException("Payload too large");
         }
-        byte[] payload = new byte[header.getPayloadLength()];
-
-        if (header.getPayloadLength() > data.length - 12) {
-            throw new IllegalArgumentException("Incomplete frame");
+        if (header.getPayloadLength() != data.length - 12) {
+            throw new IllegalArgumentException("Frame length does not match payload length");
         }
+        if (!header.isCompressed() && header.getPayloadLength() > maxDecompressedPayloadBytes) {
+            throw new IllegalArgumentException("Payload too large");
+        }
+        return header;
+    }
+
+    public static boolean isClientMessage(MessageType type) {
+        return switch (type) {
+            case HANDSHAKE_REQUEST, SUBSCRIBE, UNSUBSCRIBE, DATA, HEARTBEAT, ACK, PROTOCOL_ENVELOPE -> true;
+            case HANDSHAKE_RESPONSE, ERROR, CHANNEL_REGISTRY -> false;
+        };
+    }
+
+    public Frame decodeFrame(byte[] data) {
+        FrameHeader header = decodeHeader(data);
+        byte[] payload = new byte[header.getPayloadLength()];
 
         System.arraycopy(data, 12, payload, 0, header.getPayloadLength());
 
@@ -122,6 +136,9 @@ public class Codec {
     }
 
     public Message decodePayload(Frame frame) {
+        if (frame.payload.length > maxDecompressedPayloadBytes) {
+            throw new IllegalArgumentException("Payload too large");
+        }
         ByteBuffer buffer = ByteBuffer.wrap(frame.payload);
         Class<? extends Message> messageClass = messageTypes.get(frame.header.getMessageType().getValue());
 
@@ -134,6 +151,9 @@ public class Codec {
             message.setChannel(frame.header.getChannel());
             message.setSequence(frame.header.getSequence());
             message.deserialize(buffer);
+            if (buffer.hasRemaining()) {
+                throw new IllegalArgumentException("Trailing message bytes");
+            }
             return message;
         } catch (Exception e) {
             throw new RuntimeException("Failed to decode message", e);

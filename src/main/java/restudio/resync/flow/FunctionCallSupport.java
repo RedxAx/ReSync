@@ -3,6 +3,7 @@ package restudio.resync.flow;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import restudio.flow.data.FlowDataType;
@@ -34,8 +35,42 @@ public final class FunctionCallSupport {
     private FunctionCallSupport() {
     }
 
+    public static CompletableFuture<Boolean> evaluateAsync(FlowStorage storage, FlowExecutor executor, JsonObject call,
+            Player player, Event event, Map<String, Object> vars) {
+        if (call == null || call.isEmpty() || !hasCallableFunction(call)) {
+            return CompletableFuture.completedFuture(true);
+        }
+        try {
+            FlowExecutor.FunctionInvocationContext invocation = executor == null ? null
+                : executor.defaultFunctionInvocationContext(player, event, vars);
+            return evaluateAsync(storage, executor, call, player, event, vars, invocation);
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    public static CompletableFuture<Boolean> evaluateAsync(FlowStorage storage, FlowExecutor executor, JsonObject call,
+            Player player, Event event, Map<String, Object> vars, FlowExecutor.FunctionInvocationContext invocation) {
+        if (call == null || call.isEmpty() || !hasCallableFunction(call)) {
+            return CompletableFuture.completedFuture(true);
+        }
+        try {
+            return execute(storage, executor, call, player, event, vars, invocation).thenApply(FunctionCallSupport::condition);
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private static boolean condition(Map<String, Object> outputs) {
+        Object result = first(outputs, "condition", "result", "return", "success");
+        return result instanceof Boolean value ? value : Boolean.parseBoolean(String.valueOf(result));
+    }
+
     public static boolean evaluate(FlowStorage storage, FlowExecutor executor, JsonObject call, Player player, Event event, Map<String, Object> vars) {
-        FlowExecutor.FunctionInvocationContext invocation = executor == null ? null
+        if (call == null || call.isEmpty() || !hasCallableFunction(call)) {
+            return true;
+        }
+        FlowExecutor.FunctionInvocationContext invocation = executor == null || Bukkit.getServer() != null && Bukkit.isPrimaryThread() ? null
             : executor.defaultFunctionInvocationContext(player, event, vars);
         return evaluate(storage, executor, call, player, event, vars, invocation);
     }
@@ -50,10 +85,13 @@ public final class FunctionCallSupport {
                 "Restore the Flow runtime before evaluating this function");
         }
         String functionId = requestedFunctionId(call);
+        if (Bukkit.getServer() != null && Bukkit.isPrimaryThread()) {
+            throw new FlowHandlerException("FUNCTION_PRIMARY_WAIT_FORBIDDEN", "Function predicates cannot wait on the server thread: " + functionId,
+                "Use asynchronous predicate admission before applying the result", Map.of("functionId", functionId));
+        }
         try {
             Map<String, Object> outputs = execute(storage, executor, call, player, event, vars, invocation).get(5, TimeUnit.SECONDS);
-            Object result = first(outputs, "condition", "result", "return", "success");
-            return result instanceof Boolean value ? value : Boolean.parseBoolean(String.valueOf(result));
+            return condition(outputs);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new FlowHandlerException("FUNCTION_EVALUATION_INTERRUPTED", "Function evaluation was interrupted: " + functionId,
@@ -444,6 +482,9 @@ public final class FunctionCallSupport {
         FlowDataType type = parameter != null ? parameter.getType() : null;
         if (type == null) {
             return null;
+        }
+        if (vars != null && vars.containsKey(parameter.getName())) {
+            return vars.get(parameter.getName());
         }
         String name = parameter.getName() != null ? parameter.getName().toLowerCase(Locale.ROOT) : "";
         if (FlowDataType.BOOLEAN.isAssignableFrom(type)) {

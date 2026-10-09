@@ -3,23 +3,33 @@ package restudio.resync.flow.handler.generic;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowOperationResult;
+import restudio.resync.flow.CoreGraphStorageBoundary;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.function.FunctionParameterContract;
+import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.protocol.ResourceActivationState;
+import restudio.resync.flow.type.TypeExpr;
+import restudio.resync.flow.type.TypeReference;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class FunctionCatalogHandler implements NodeHandler {
     private static final Set<String> OPERATIONS = Set.of("list", "find", "exists", "index", "at_index", "filter", "describe");
     private static final Comparator<String> FUNCTION_ORDER = String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder());
     private final FlowStorage storage;
+    private volatile Catalog resident;
 
     public FunctionCatalogHandler(FlowStorage storage) {
         this.storage = storage;
@@ -69,9 +79,9 @@ public class FunctionCatalogHandler implements NodeHandler {
     }
 
     private void index(FlowContext ctx, FlowNode node) {
-        List<String> values = inputFunctions(ctx, node);
+        Object raw = ctx.getInputValue(node, "functions", Object.class, null);
         String function = text(ctx, node, "function");
-        int index = lookup(values, function).index();
+        int index = (raw == null ? lookup(function) : lookup(stringList(raw instanceof List<?> values ? values : List.of()), function)).index();
         ctx.setOutput(node, "index", index);
         ctx.setOutput(node, "found", index >= 0);
     }
@@ -105,15 +115,15 @@ public class FunctionCatalogHandler implements NodeHandler {
 
     private void describe(FlowContext ctx, FlowNode node) {
         String id = text(ctx, node, "function");
-        FlowGraph function = function(id);
+        Signature function = catalog().signatures().get(id);
         if (function == null) {
             ctx.setOutput(node, "inputs", Map.of());
             ctx.setOutput(node, "outputs", Map.of());
             ctx.setOutput(node, "result", FlowOperationResult.failure("FUNCTION_NOT_FOUND", "Function Not Found", Map.of("function", id)));
             return;
         }
-        ctx.setOutput(node, "inputs", parameters(function.getFunctionInputs()));
-        ctx.setOutput(node, "outputs", parameters(function.getFunctionOutputs()));
+        ctx.setOutput(node, "inputs", function.inputs());
+        ctx.setOutput(node, "outputs", function.outputs());
         ctx.setOutput(node, "result", FlowOperationResult.success(id));
     }
 
@@ -125,17 +135,127 @@ public class FunctionCatalogHandler implements NodeHandler {
                 .sorted((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.getName(), right.getName()))
                 .forEach(parameter -> signature.put(parameter.getName(), parameter.getTypeRef().toString()));
         }
-        return signature;
+        return Collections.unmodifiableMap(signature);
     }
 
     private List<String> functions() {
+        return catalog().ids();
+    }
+
+    private Catalog catalog() {
         if (storage == null) {
-            return List.of();
+            return projection(null, Map.of());
         }
-        return storage.listGraphIds("function").stream()
-            .filter(id -> id != null && function(id) != null)
-            .sorted(FUNCTION_ORDER)
-            .toList();
+        if (!storage.hasCoreGraphAuthority()) {
+            return legacyCatalog();
+        }
+        FlowStorage.RuntimeObservation observation = storage.observeRuntime()
+            .orElseThrow(() -> new IllegalStateException("Function catalog storage is unavailable"));
+        Catalog current = resident;
+        if (current != null && current.observation().equals(observation)
+            && storage.isRuntimeObservationCurrent(observation)) {
+            return current;
+        }
+        return admitCatalog();
+    }
+
+    private synchronized Catalog admitCatalog() {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            FlowStorage.RuntimeObservation observation = storage.observeRuntime()
+                .orElseThrow(() -> new IllegalStateException("Function catalog storage is unavailable"));
+            Catalog current = resident;
+            if (current != null && current.observation().equals(observation)
+                && storage.isRuntimeObservationCurrent(observation)) {
+                return current;
+            }
+            FlowStorage.CommittedGraphIds inventory = storage.readCommittedGraphIds("function");
+            Map<String, Signature> signatures = new LinkedHashMap<>();
+            for (String id : inventory.ids()) {
+                CoreGraphStorageBoundary.Decoded decoded = storage.getCoreGraph("function", id).orElse(null);
+                if (decoded == null || decoded.envelope().assetActivationState() != ResourceActivationState.ACTIVE) {
+                    continue;
+                }
+                FunctionSourceDocument source = decoded.functionSourceDocument();
+                if (source == null) {
+                    continue;
+                }
+                if (!"function".equals(source.graph().resource().resourceType().value())
+                    || !id.equals(source.graph().resource().id())
+                    || !source.signature().function().resource().equals(source.graph().resource())
+                    || source.signature().revision().value() != decoded.envelope().assetRevision()) {
+                    throw new IllegalStateException("Function catalog source identity does not match " + id);
+                }
+                signatures.put(id, new Signature(coreParameters(source.signature().inputs()), coreParameters(source.signature().outputs())));
+            }
+            Catalog admitted = projection(inventory.observation(), signatures);
+            if (!storage.isRuntimeObservationCurrent(inventory.observation())) {
+                continue;
+            }
+            resident = admitted;
+            if (storage.isRuntimeObservationCurrent(inventory.observation())) {
+                return admitted;
+            }
+        }
+        throw new IllegalStateException("Function catalog storage changed during admission");
+    }
+
+    private Catalog legacyCatalog() {
+        Map<String, Signature> signatures = new LinkedHashMap<>();
+        storage.listGraphIds("function").stream().filter(id -> id != null).sorted(FUNCTION_ORDER).forEach(id -> {
+            FlowGraph graph = function(id);
+            if (graph != null) {
+                signatures.put(id, new Signature(parameters(graph.getFunctionInputs()), parameters(graph.getFunctionOutputs())));
+            }
+        });
+        return projection(null, signatures);
+    }
+
+    private Map<String, String> coreParameters(List<FunctionParameterContract> parameters) {
+        Map<String, String> values = new LinkedHashMap<>();
+        parameters.stream().sorted(Comparator.comparing(this::parameterName, FUNCTION_ORDER))
+            .forEach(parameter -> values.put(parameterName(parameter), typeText(parameter.type())));
+        return Collections.unmodifiableMap(values);
+    }
+
+    private String parameterName(FunctionParameterContract parameter) {
+        return parameter.unknown().get("name") instanceof String name && !name.isBlank() ? name : parameter.id().canonicalText();
+    }
+
+    private String typeText(TypeExpr type) {
+        return switch (type) {
+            case TypeExpr.Named named -> typeName(named.reference()) + (named.arguments().isEmpty() ? ""
+                : named.arguments().stream().map(this::typeText).collect(Collectors.joining(",", "<", ">")));
+            case TypeExpr.OptionalType optional -> "optional<" + typeText(optional.element()) + ">";
+            case TypeExpr.ListType list -> "list<" + typeText(list.element()) + ">";
+            case TypeExpr.MapType map -> "map<" + typeText(map.key()) + "," + typeText(map.value()) + ">";
+            case TypeExpr.ResultType result -> "result<" + typeText(result.success()) + "," + typeText(result.failure()) + ">";
+            case TypeExpr.ResourceType resource -> "resource_reference<" + typeName(resource.resourceType()) + ">";
+            default -> type.canonicalJson();
+        };
+    }
+
+    private String typeName(TypeReference type) {
+        return "builtin".equals(type.ownerId()) ? type.localId() : type.ownerId() + ':' + type.localId();
+    }
+
+    private Catalog projection(FlowStorage.RuntimeObservation observation, Map<String, Signature> signatures) {
+        List<String> ids = signatures.keySet().stream().sorted(FUNCTION_ORDER).toList();
+        Map<String, Integer> indices = new LinkedHashMap<>();
+        Map<String, List<String>> folded = new LinkedHashMap<>();
+        for (int index = 0; index < ids.size(); index++) {
+            String id = ids.get(index);
+            indices.put(id, index);
+            folded.computeIfAbsent(id.toLowerCase(Locale.ROOT), ignored -> new ArrayList<>()).add(id);
+        }
+        folded.replaceAll((key, values) -> List.copyOf(values));
+        return new Catalog(observation, ids, Map.copyOf(signatures), Map.copyOf(indices), Map.copyOf(folded));
+    }
+
+    private record Catalog(FlowStorage.RuntimeObservation observation, List<String> ids, Map<String, Signature> signatures,
+                           Map<String, Integer> indices, Map<String, List<String>> folded) {
+    }
+
+    private record Signature(Map<String, String> inputs, Map<String, String> outputs) {
     }
 
     private List<String> inputFunctions(FlowContext ctx, FlowNode node) {
@@ -144,7 +264,24 @@ public class FunctionCatalogHandler implements NodeHandler {
     }
 
     private Lookup lookup(String query) {
-        return lookup(functions(), query);
+        String normalized = query != null ? query.trim() : "";
+        if (normalized.isBlank()) {
+            return Lookup.notFound();
+        }
+        Catalog current = catalog();
+        List<String> matches = current.folded().get(normalized.toLowerCase(Locale.ROOT));
+        if (matches == null) {
+            return Lookup.notFound();
+        }
+        Integer exact = current.indices().get(normalized);
+        if (exact != null) {
+            return Lookup.found(normalized, matches, exact);
+        }
+        if (matches.size() == 1) {
+            String function = matches.getFirst();
+            return Lookup.found(function, matches, current.indices().get(function));
+        }
+        return Lookup.ambiguous(matches);
     }
 
     private Lookup lookup(List<String> values, String query) {

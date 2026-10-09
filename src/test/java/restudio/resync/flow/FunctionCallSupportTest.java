@@ -3,6 +3,7 @@ package restudio.resync.flow;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
 import restudio.flow.data.FlowGraph;
 import restudio.resync.flow.handler.FlowHandlerException;
 import restudio.resync.flow.handler.HandlerRegistry;
@@ -54,6 +55,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FunctionCallSupportTest {
+    @Test
+    void primaryPredicateCallsFailBeforeWaitingForExecution() {
+        MockBukkit.mock();
+        FlowExecutor executor = new FlowExecutor(new HandlerRegistry(), new TypeAdapterRegistry(), Map.of());
+        try {
+            JsonObject call = new JsonObject();
+            call.addProperty("functionId", "live_predicate");
+            FlowHandlerException failure = assertThrows(FlowHandlerException.class,
+                () -> FunctionCallSupport.evaluate(null, executor, call, null, null, Map.of()));
+
+            assertEquals("FUNCTION_PRIMARY_WAIT_FORBIDDEN", failure.getCode());
+            assertEquals("live_predicate", failure.getDetails().get("functionId"));
+            assertTrue(FunctionCallSupport.evaluate(null, executor, new JsonObject(), null, null, Map.of()));
+        } finally {
+            executor.shutdown();
+            MockBukkit.unmock();
+        }
+    }
+
     @Test
     void configuredCallsFailWhenTheExecutorIsUnavailable() {
         JsonObject call = new JsonObject();

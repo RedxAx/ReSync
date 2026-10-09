@@ -12,7 +12,7 @@
     "owner": "restudio.resync",
     "legacyIds": ["call.function"],
     "category": "FUNCTION",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "kind": "ACTION",
     "tags": ["function", "call", "execute", "typed"],
     "handler": "FunctionHandler",
@@ -20,7 +20,7 @@
     "authorizationPolicy": "trusted_server_flow",
     "migrationMapping": {
       "sourceSchemaVersion": 1,
-      "targetSchemaVersion": 2,
+      "targetSchemaVersion": 3,
       "complete": true,
       "pins": [
         {"direction": "input", "source": "flow", "target": "flow"},
@@ -35,7 +35,7 @@
     "inputs": [
       {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the function call when execution reaches this node."},
       {"id": "function", "displayName": "Function", "name": "function", "direction": "input", "dataType": "function", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:function", "description": "Selects the callable Function to execute."},
-      {"id": "arguments", "displayName": "Arguments", "name": "arguments", "direction": "input", "dataType": "map<string,any>", "optional": true, "description": "Provides named Function arguments. A single input may be connected directly. Multiple inputs should use Add Function Argument nodes."},
+      {"id": "arguments", "displayName": "Arguments", "name": "arguments", "direction": "input", "dataType": "any", "optional": true, "description": "Provides named Function arguments. A single input may be connected directly. Multiple inputs should use Add Function Argument nodes."},
       {"id": "continue_on_failure", "displayName": "Continue On Failure", "name": "continue_on_failure", "direction": "input", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": false, "description": "Keeps the Flow moving with a failed Result instead of stopping at a function failure."}
     ],
     "outputs": [

@@ -78,7 +78,7 @@ final class FunctionContractSupport {
         if (value instanceof Iterable<?> iterable) {
             ArrayList<Object> copy = new ArrayList<>();
             iterable.forEach(item -> copy.add(freeze(item, label + " List Value")));
-            return List.copyOf(copy);
+            return Collections.unmodifiableList(copy);
         }
         Object[] array = CanonicalArrays.boxed(value);
         if (array != null) {
@@ -86,7 +86,7 @@ final class FunctionContractSupport {
             for (Object item : array) {
                 copy.add(freeze(item, label + " Array Value"));
             }
-            return List.copyOf(copy);
+            return Collections.unmodifiableList(copy);
         }
         throw new IllegalArgumentException(label + " Contains Unsupported Data");
     }
@@ -142,7 +142,7 @@ final class FunctionContractSupport {
         if (value instanceof Iterable<?> iterable) {
             ArrayList<Object> copy = new ArrayList<>();
             iterable.forEach(item -> copy.add(canonical(item)));
-            return List.copyOf(copy);
+            return Collections.unmodifiableList(copy);
         }
         return value;
     }

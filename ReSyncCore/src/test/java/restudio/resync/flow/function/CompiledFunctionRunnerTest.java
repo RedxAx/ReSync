@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
 
@@ -81,11 +82,13 @@ class CompiledFunctionRunnerTest {
     @Test
     void cancellationStopsBodyAndProducesStructuredResult() {
         AtomicBoolean executed = new AtomicBoolean();
+        AtomicLong clock = new AtomicLong();
         FunctionSignature signature = signature(new FunctionParameterContract(INPUT_ID, TEXT, true),
             new FunctionParameterContract(OUTPUT_ID, TEXT, true));
         CompiledFunction function = new CompiledFunction(signature,
             CompiledFunctionBody.of(frame -> {
                 executed.set(true);
+                clock.set(100);
                 return frame.withOutput(OUTPUT_ID, TypedValue.value(TEXT, "done"));
             }));
         FunctionRuntimeContext context = context(signature, new FunctionInputMap(Map.of(INPUT_ID, TypedValue.value(TEXT, "hello"))))
@@ -97,6 +100,12 @@ class CompiledFunctionRunnerTest {
         assertFalse(executed.get());
         assertTrue(result.outputs().values().isEmpty());
         assertEquals("FUNCTION.CANCELLED", result.diagnostics().getFirst().code());
+        FunctionResult expired = new CompiledFunctionRunner(CompiledFunctionBody.MAXIMUM_STEPS, clock::get).run(function,
+            context.withCancellation(new FunctionCancellation(FunctionCancellation.State.NONE, null, 100)));
+        assertTrue(executed.get());
+        assertTrue(expired.cancelled());
+        assertTrue(expired.outputs().values().isEmpty());
+        assertEquals(1, expired.executedSteps());
     }
 
     @Test

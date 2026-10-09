@@ -1,6 +1,7 @@
 package restudio.resync.flow.function;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +53,15 @@ class FunctionContractFoundationTest {
         mutable.put(INPUT_ID, TypedValue.value(TEXT, "hello"));
         FunctionInputMap values = new FunctionInputMap(mutable);
         mutable.clear();
+
+        TypeExpr list = TypeExpr.list(TEXT);
+        TypedValue nullable = TypedValue.value(list, Arrays.asList("hello", null));
+        FunctionParameterContract nullableInput = new FunctionParameterContract(INPUT_ID, list, true, nullable);
+        FunctionSignature nullableSignature = new FunctionSignature(locator, new FunctionRevision(4), List.of(nullableInput), List.of());
+        assertTrue(nullableSignature.canonicalJson().contains("[\"hello\",null]"));
+        Map<?, ?> defaultValue = (Map<?, ?>) nullableInput.canonicalValue().get("defaultValue");
+        List<?> defaultItems = (List<?>) defaultValue.get("value");
+        assertThrows(UnsupportedOperationException.class, defaultItems::clear);
 
         assertEquals(1, values.values().size());
         assertThrows(UnsupportedOperationException.class, () -> values.values().clear());

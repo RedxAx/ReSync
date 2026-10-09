@@ -9,10 +9,30 @@ import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowOperationResult;
 import restudio.resync.flow.handler.generic.FunctionCatalogHandler;
+import restudio.resync.flow.function.FunctionLocator;
+import restudio.resync.flow.function.FunctionParameterContract;
+import restudio.resync.flow.function.FunctionRevision;
+import restudio.resync.flow.function.FunctionSignature;
+import restudio.resync.flow.function.FunctionSourceDocument;
+import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.identity.CatalogBinding;
+import restudio.resync.flow.identity.ContentHash;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.FunctionParameterId;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.flow.protocol.ResourceActivationState;
+import restudio.resync.flow.type.TypeExpr;
+import restudio.resync.flow.type.TypeReference;
+import restudio.resync.storage.AssetPersistenceGate;
 import restudio.resync.storage.AssetTransactionCoordinator;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
@@ -20,12 +40,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class FunctionCatalogHandlerTest {
     @TempDir
@@ -185,6 +207,53 @@ class FunctionCatalogHandlerTest {
         assertEquals(Map.of("player", "player"), context.outputs.get("inputs"));
         assertEquals(Map.of("granted", "boolean"), context.outputs.get("outputs"));
         assertEquals(Set.of("inputs", "outputs", "result"), context.outputs.keySet());
+    }
+
+    @Test
+    void committedCatalogUsesActiveSourcesAndRejectsTamperingAfterCacheClear() throws Exception {
+        ServerId server = new ServerId(UUID.randomUUID());
+        FlowStorage storage = new FlowStorage(directory, LegacyRuntimeActivationGate.runtime(directory.toPath()),
+            new AssetPersistenceGate(directory.toPath()), server, coordinator());
+        FunctionSourceDocument source = coreFunction(server, "reward", 1);
+        storage.saveCoreGraph(source, ResourceActivationState.ACTIVE, UUID.randomUUID(), 0);
+        storage.saveCoreGraph(coreFunction(server, "inactive", 1), ResourceActivationState.INACTIVE, UUID.randomUUID(), 0);
+        FunctionCatalogHandler handler = new FunctionCatalogHandler(storage);
+
+        List<?> ids = assertInstanceOf(List.class, execute(handler, "list", Map.of()).outputs.get("functions"));
+        assertEquals(List.of("reward"), ids);
+        assertThrows(UnsupportedOperationException.class, ids::clear);
+        Map<?, ?> inputs = assertInstanceOf(Map.class, execute(handler, "describe", Map.of("function", "reward")).outputs.get("inputs"));
+        assertEquals(Map.of("player", "player"), inputs);
+        assertThrows(UnsupportedOperationException.class, inputs::clear);
+        var path = directory.toPath().resolve("assets/Blueprints/Functions/reward.json");
+        byte[] bytes = Files.readAllBytes(path);
+        Files.writeString(path, "{tampered");
+        assertEquals(ids, execute(handler, "list", Map.of()).outputs.get("functions"));
+        assertEquals(inputs, execute(handler, "describe", Map.of("function", "reward")).outputs.get("inputs"));
+        storage.clearCache();
+        assertThrows(IllegalStateException.class, () -> execute(handler, "list", Map.of()));
+        Files.write(path, bytes);
+        assertEquals(ids, execute(handler, "list", Map.of()).outputs.get("functions"));
+        storage.saveCoreGraph(coreFunction(server, "reward", 2), ResourceActivationState.INACTIVE, UUID.randomUUID(), 1);
+        assertEquals(List.of(), execute(handler, "list", Map.of()).outputs.get("functions"));
+        assertFalse((Boolean) execute(handler, "exists", Map.of("function", "reward")).outputs.get("exists"));
+        assertEquals("FUNCTION_NOT_FOUND", assertInstanceOf(FlowOperationResult.class,
+            execute(handler, "describe", Map.of("function", "reward")).outputs.get("result")).errorCode());
+        storage.saveCoreGraph(coreFunction(server, "reward", 3), ResourceActivationState.ACTIVE, UUID.randomUUID(), 2);
+        assertEquals(ids, execute(handler, "list", Map.of()).outputs.get("functions"));
+        storage.deleteCoreGraph("function", "reward", UUID.randomUUID(), 3);
+        assertEquals(List.of(), execute(handler, "list", Map.of()).outputs.get("functions"));
+    }
+
+    private FunctionSourceDocument coreFunction(ServerId server, String id, long revision) {
+        ServerResourceLocator resource = new ServerResourceLocator(server,
+            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("function")), id);
+        CatalogBinding binding = new CatalogBinding(1, new ContentHash("a".repeat(64)), new ContentHash("b".repeat(64)));
+        GraphDocument graph = new GraphDocument(resource, revision, binding, List.of(), List.of());
+        FunctionParameterContract input = new FunctionParameterContract(FunctionParameterId.deterministic(id + "-input"),
+            TypeExpr.named(TypeReference.of("builtin", "player")), true, null, Map.of("name", "player"));
+        return new FunctionSourceDocument(new FunctionSignature(new FunctionLocator(resource), new FunctionRevision(revision),
+            List.of(input), List.of()), graph);
     }
 
     private FlowStorage storage() {

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import restudio.resync.flow.identity.FunctionParameterId;
 import restudio.resync.flow.type.TypedValue;
@@ -56,7 +57,7 @@ public final class FunctionInputMap {
                                              List<FunctionParameterContract> parameters,
                                              String direction) {
         Map<FunctionParameterId, FunctionParameterContract> declarations = parameters.stream()
-            .collect(java.util.stream.Collectors.toUnmodifiableMap(FunctionParameterContract::id, value -> value));
+            .collect(Collectors.toUnmodifiableMap(FunctionParameterContract::id, value -> value));
         List<FunctionDiagnostic> diagnostics = new ArrayList<>();
         values.forEach((id, value) -> {
             FunctionParameterContract declaration = declarations.get(id);

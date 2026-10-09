@@ -88,6 +88,10 @@ public final class CompiledFunctionRunner {
                     "body-execution", "The compiled function step failed and execution was stopped.", failure)), index);
             }
         }
+        cancellationDiagnostic = cancellationDiagnostic(signature, effectiveContext.cancellation());
+        if (cancellationDiagnostic != null) {
+            return FunctionResult.cancelled(signature, cancellationDiagnostic, function.body().size());
+        }
         List<FunctionDiagnostic> outputDiagnostics = frame.outputs().validate(signature);
         if (!outputDiagnostics.isEmpty()) {
             return FunctionResult.failure(signature, withContext(signature, outputDiagnostics), function.body().size());
